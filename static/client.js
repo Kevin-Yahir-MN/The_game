@@ -1,4 +1,6 @@
-// Game constants matching Python constants
+// =============================================
+// CONSTANTES DEL JUEGO
+// =============================================
 const GAME_CONSTANTS = {
     ANCHO: 1200,
     ALTO: 800,
@@ -14,116 +16,115 @@ const GAME_CONSTANTS = {
     ALTO_COLUMNA: 240
 };
 
-// Initialize Socket.IO connection
-const socket = io();
+// =============================================
+// CONFIGURACIÓN DE SOCKET.IO
+// =============================================
+const socket = io({
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 2000,
+    timeout: 15000,
+    transports: ['websocket']
+});
 
-// Game state
-let gameState = null;
-let currentPlayerName = '';
-let gameId = '';
-let app = null;
+// =============================================
+// ESTADO DEL JUEGO
+// =============================================
+let gameState = {
+    tablero: null,
+    jugadores: {},
+    turnoActual: null,
+    mazo: null,
+    gameOver: false
+};
+
+let app;
 let cardSprites = {};
 let columnZones = {};
 let selectedCard = null;
 let originalCardPosition = { x: 0, y: 0 };
 
-// DOM Elements
-const setupScreen = document.getElementById('setup-screen');
-const waitingScreen = document.getElementById('waiting-screen');
-const gameScreen = document.getElementById('game-screen');
-const gameOverScreen = document.getElementById('game-over-screen');
-const playerNameInput = document.getElementById('playerName');
-const gameIdInput = document.getElementById('gameId');
-const displayGameId = document.getElementById('displayGameId');
-const gameInfoDiv = document.getElementById('game-info');
-const gameMessagesDiv = document.getElementById('game-messages');
-const endTurnButton = document.getElementById('endTurn');
-const setupErrorDiv = document.getElementById('setup-error');
-const waitingErrorDiv = document.getElementById('waiting-error');
-const gameResultTitle = document.getElementById('game-result-title');
-const gameResultMessage = document.getElementById('game-result-message');
+// =============================================
+// ELEMENTOS DE INTERFAZ
+// =============================================
+const UI = {
+    setupScreen: document.getElementById('setup-screen'),
+    waitingScreen: document.getElementById('waiting-screen'),
+    gameScreen: document.getElementById('game-screen'),
+    gameOverScreen: document.getElementById('game-over-screen'),
+    playerNameInput: document.getElementById('playerName'),
+    gameIdInput: document.getElementById('gameId'),
+    displayGameId: document.getElementById('displayGameId'),
+    gameInfoDiv: document.getElementById('game-info'),
+    gameMessagesDiv: document.getElementById('game-messages'),
+    endTurnButton: document.getElementById('endTurn'),
+    setupErrorDiv: document.getElementById('setup-error'),
+    waitingErrorDiv: document.getElementById('waiting-error'),
+    gameResultTitle: document.getElementById('game-result-title'),
+    gameResultMessage: document.getElementById('game-result-message')
+};
 
-// Event Listeners
-document.getElementById('createGame').addEventListener('click', createGame);
-document.getElementById('joinGame').addEventListener('click', joinGame);
-document.getElementById('endTurn').addEventListener('click', endTurn);
-document.getElementById('newGameButton').addEventListener('click', newGame);
-
-// Handle creating a new game
-function createGame() {
-    const playerName = playerNameInput.value.trim();
-
-    if (!playerName) {
-        setupErrorDiv.textContent = 'Por favor ingresa tu nombre';
-        return;
-    }
-
-    setupErrorDiv.textContent = '';
-    currentPlayerName = playerName;
-
-    socket.emit('create_game', { playerName });
-    setupScreen.classList.add('hidden');
-    waitingScreen.classList.remove('hidden');
-}
-
-// Handle joining an existing game
-function joinGame() {
-    const playerName = playerNameInput.value.trim();
-    const gameId = gameIdInput.value.trim();
-
-    if (!playerName || !gameId) {
-        setupErrorDiv.textContent = 'Por favor ingresa tu nombre y el ID del juego';
-        return;
-    }
-
-    setupErrorDiv.textContent = '';
-    currentPlayerName = playerName;
-
-    socket.emit('join_game', {
-        playerName,
-        gameId: gameId
+// =============================================
+// MANEJO DE CONEXIÓN
+// =============================================
+function initConnectionStatus() {
+    const statusDiv = document.createElement('div');
+    statusDiv.id = 'connection-status';
+    Object.assign(statusDiv.style, {
+        position: 'fixed',
+        bottom: '10px',
+        right: '10px',
+        padding: '8px 15px',
+        borderRadius: '15px',
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        color: 'white',
+        fontFamily: 'Arial',
+        fontSize: '14px',
+        zIndex: '1000'
     });
+    document.body.appendChild(statusDiv);
 }
 
-// Handle ending turn
-function endTurn() {
-    socket.emit('end_turn');
-}
-
-// Start a new game after game over
-function newGame() {
-    gameOverScreen.classList.add('hidden');
-    setupScreen.classList.remove('hidden');
-    resetGame();
-}
-
-// Reset game state
-function resetGame() {
-    if (app) {
-        app.destroy(true);
-        app = null;
+function updateConnectionStatus(text, color) {
+    const statusDiv = document.getElementById('connection-status');
+    if (statusDiv) {
+        statusDiv.textContent = text;
+        statusDiv.style.color = color;
     }
-    gameState = null;
-    cardSprites = {};
-    columnZones = {};
-    selectedCard = null;
-    gameMessagesDiv.innerHTML = '';
 }
 
-// Socket.IO event handlers
+// =============================================
+// MANEJADORES DE SOCKET.IO (COMPLETOS)
+// =============================================
+socket.on('connect', () => {
+    console.log('✅ Conectado al servidor');
+    updateConnectionStatus('Conectado', '#4CAF50');
+});
+
+socket.on('disconnect', () => {
+    console.log('❌ Desconectado');
+    updateConnectionStatus('Desconectado', '#F44336');
+});
+
+socket.on('connect_error', (err) => {
+    console.error('Error de conexión:', err);
+    updateConnectionStatus('Error de conexión', '#FF9800');
+});
+
 socket.on('game_created', (data) => {
-    gameId = data.gameId;
-    displayGameId.textContent = gameId;
+    console.log('Juego creado con ID:', data.gameId);
+    UI.displayGameId.textContent = data.gameId;
+    UI.setupScreen.classList.add('hidden');
+    UI.waitingScreen.classList.remove('hidden');
 });
 
 socket.on('player_joined', (data) => {
-    waitingErrorDiv.textContent = '';
     addMessage(`${data.playerName} se ha unido al juego`);
 });
 
 socket.on('game_started', () => {
-    waitingScreen.classList.add('hidden');
-    gameScreen.classList.remove('hidden');
+    UI.waitingScreen.classList.add('hidden');
+    UI.gameScreen.classList.remove('hidden');
     initializeGame();
 });
 
@@ -144,28 +145,68 @@ socket.on('turn_ended', (data) => {
     addMessage(`Turno cambiado a ${data.nextPlayer}`);
 });
 
-socket.on('turn_error', (data) => {
-    addMessage(data.message, 'error');
-});
-
-socket.on('join_error', (data) => {
-    if (waitingScreen.classList.contains('hidden')) {
-        setupErrorDiv.textContent = data.message;
-    } else {
-        waitingErrorDiv.textContent = data.message;
-    }
-});
-
-socket.on('player_left', (data) => {
-    addMessage(`${data.playerName} ha abandonado el juego`, 'error');
-    endGame(`El juego ha terminado porque ${data.playerName} se desconectó`);
-});
-
 socket.on('game_over', (result) => {
     endGame(result);
 });
 
-// Initialize PixiJS game
+// =============================================
+// FUNCIONES PRINCIPALES (COMPLETAS)
+// =============================================
+function createGame() {
+    const playerName = UI.playerNameInput.value.trim();
+
+    if (!playerName) {
+        UI.setupErrorDiv.textContent = 'Por favor ingresa tu nombre';
+        return;
+    }
+
+    UI.setupErrorDiv.textContent = '';
+    socket.emit('create_game', { playerName });
+    UI.setupScreen.classList.add('hidden');
+    UI.waitingScreen.classList.remove('hidden');
+}
+
+function joinGame() {
+    const playerName = UI.playerNameInput.value.trim();
+    const gameId = UI.gameIdInput.value.trim();
+
+    if (!playerName || !gameId) {
+        UI.setupErrorDiv.textContent = 'Por favor ingresa tu nombre y el ID del juego';
+        return;
+    }
+
+    UI.setupErrorDiv.textContent = '';
+    socket.emit('join_game', { playerName, gameId });
+}
+
+function endTurn() {
+    socket.emit('end_turn');
+}
+
+function newGame() {
+    UI.gameOverScreen.classList.add('hidden');
+    UI.setupScreen.classList.remove('hidden');
+    resetGame();
+}
+
+function resetGame() {
+    if (app) {
+        app.destroy(true);
+        app = null;
+    }
+    gameState = {
+        tablero: null,
+        jugadores: {},
+        turnoActual: null,
+        mazo: null,
+        gameOver: false
+    };
+    UI.gameMessagesDiv.innerHTML = '';
+}
+
+// =============================================
+// INICIALIZACIÓN DE PIXI.JS (COMPLETA)
+// =============================================
 function initializeGame() {
     app = new PIXI.Application({
         width: GAME_CONSTANTS.ANCHO,
@@ -174,27 +215,20 @@ function initializeGame() {
         view: document.getElementById('gameCanvas')
     });
 
-    // Setup card interaction
     setupCardInteractions();
-
-    // Initial render
     updateGameDisplay();
 }
 
-// Setup card drag and drop
 function setupCardInteractions() {
     app.stage.interactive = true;
 
     app.stage.on('pointerdown', (event) => {
-        if (!gameState || gameState.game_over || gameState.turno !== currentPlayerName) {
-            return;
-        }
+        if (!gameState || gameState.gameOver || gameState.turnoActual !== gameState.playerName) return;
 
         const pos = event.data.global;
 
-        // Check if clicking on a card in hand
         for (const [id, sprite] of Object.entries(cardSprites)) {
-            if (sprite.getBounds().contains(pos.x, pos.y) && sprite.cardOwner === currentPlayerName) {
+            if (sprite.getBounds().contains(pos.x, pos.y) {
                 selectedCard = sprite;
                 originalCardPosition = { x: sprite.x, y: sprite.y };
                 sprite.zIndex = 100;
@@ -213,62 +247,53 @@ function setupCardInteractions() {
     });
 
     app.stage.on('pointerup', (event) => {
-        if (selectedCard) {
-            const pos = event.data.global;
-            let played = false;
+        if (!selectedCard) return;
 
-            // Check if dropped on a column
-            for (const [columnName, zone] of Object.entries(columnZones)) {
-                if (zone.getBounds().contains(pos.x, pos.y)) {
-                    // Emit play card event
-                    socket.emit('play_card', {
-                        column: columnName,
-                        cardValue: selectedCard.cardValue
-                    });
-                    played = true;
-                    break;
-                }
+        const pos = event.data.global;
+        let played = false;
+
+        for (const [columnName, zone] of Object.entries(columnZones)) {
+            if (zone.getBounds().contains(pos.x, pos.y)) {
+                socket.emit('play_card', {
+                    column: columnName,
+                    cardValue: selectedCard.cardValue
+                });
+                played = true;
+                break;
             }
-
-            // Return card to original position if not played
-            if (!played) {
-                selectedCard.x = originalCardPosition.x;
-                selectedCard.y = originalCardPosition.y;
-            }
-
-            selectedCard.zIndex = 0;
-            selectedCard = null;
-            app.stage.sortChildren();
         }
+
+        if (!played) {
+            selectedCard.x = originalCardPosition.x;
+            selectedCard.y = originalCardPosition.y;
+        }
+
+        selectedCard.zIndex = 0;
+        selectedCard = null;
+        app.stage.sortChildren();
     });
 }
 
-// Update game display based on current state
+// =============================================
+// RENDERIZADO DEL JUEGO (COMPLETO)
+// =============================================
 function updateGameDisplay() {
-    if (!app || !gameState) return;
+    if (!app || !gameState.tablero) return;
 
-    // Clear previous sprites
     app.stage.removeChildren();
     cardSprites = {};
     columnZones = {};
 
-    // Draw board columns
-    drawBoard();
-
-    // Draw player hands
-    drawPlayerHands();
-
-    // Update game info
+    renderBoard();
+    renderPlayerHands();
     updateGameInfo();
 
-    // Check if game is over
-    if (gameState.game_over) {
+    if (gameState.gameOver) {
         endGame(gameState.resultado);
     }
 }
 
-// Draw the game board
-function drawBoard() {
+function renderBoard() {
     const board = gameState.tablero;
     const columnNames = Object.keys(board.columnas);
     const totalWidth = (columnNames.length * GAME_CONSTANTS.ANCHO_COLUMNA) +
@@ -276,11 +301,10 @@ function drawBoard() {
     const startX = (GAME_CONSTANTS.ANCHO - totalWidth) / 2;
     const yPos = GAME_CONSTANTS.ALTO / 2 - GAME_CONSTANTS.ALTO_COLUMNA / 2;
 
-    // Draw columns
     columnNames.forEach((columnName, i) => {
         const x = startX + i * (GAME_CONSTANTS.ANCHO_COLUMNA + GAME_CONSTANTS.ESPACIADO_COLUMNAS);
 
-        // Column background
+        // Fondo de columna
         const columnBg = new PIXI.Graphics();
         columnBg.beginFill(0xFFFFFF, 0.2);
         columnBg.drawRect(x, yPos, GAME_CONSTANTS.ANCHO_COLUMNA, GAME_CONSTANTS.ALTO_COLUMNA);
@@ -289,12 +313,11 @@ function drawBoard() {
         columnBg.drawRect(x, yPos, GAME_CONSTANTS.ANCHO_COLUMNA, GAME_CONSTANTS.ALTO_COLUMNA);
         app.stage.addChild(columnBg);
 
-        // Column title
+        // Título de columna
         const titleStyle = new PIXI.TextStyle({
             fontFamily: 'Arial',
             fontSize: 20,
-            fill: gameState.turno === currentPlayerName ? 0xFFFF00 : 0x000000,
-            align: 'center'
+            fill: gameState.turnoActual === gameState.playerName ? 0xFFFF00 : 0x000000
         });
 
         const title = new PIXI.Text(columnName, titleStyle);
@@ -302,7 +325,7 @@ function drawBoard() {
         title.y = yPos - 30;
         app.stage.addChild(title);
 
-        // Store column zone for drop targets
+        // Zona interactiva
         const columnZone = new PIXI.Graphics();
         columnZone.beginFill(0xFF0000, 0);
         columnZone.drawRect(x, yPos, GAME_CONSTANTS.ANCHO_COLUMNA, GAME_CONSTANTS.ALTO_COLUMNA);
@@ -311,7 +334,7 @@ function drawBoard() {
         columnZones[columnName] = columnZone;
         app.stage.addChild(columnZone);
 
-        // Draw last card in column
+        // Última carta de la columna
         const columnCards = board.columnas[columnName];
         if (columnCards.length > 0) {
             const lastCard = columnCards[columnCards.length - 1];
@@ -324,14 +347,13 @@ function drawBoard() {
     });
 }
 
-// Draw player hands
-function drawPlayerHands() {
-    const players = gameState.players;
+function renderPlayerHands() {
+    const players = gameState.jugadores;
     const playerNames = Object.keys(players);
 
     playerNames.forEach((playerName, playerIndex) => {
         const player = players[playerName];
-        const isCurrentPlayer = playerName === currentPlayerName;
+        const isCurrentPlayer = playerName === gameState.playerName;
         const hand = player.mano;
         const margin = 20;
         const totalWidth = GAME_CONSTANTS.ANCHO - 2 * margin;
@@ -344,8 +366,8 @@ function drawPlayerHands() {
             cardSprite.x = startX + i * cardSpacing;
             cardSprite.y = yPos;
 
-            // Highlight playable cards
-            if (isCurrentPlayer && gameState.turno === currentPlayerName) {
+            // Resaltar cartas jugables
+            if (isCurrentPlayer && gameState.turnoActual === gameState.playerName) {
                 let isPlayable = false;
                 for (const columnName in gameState.tablero.columnas) {
                     if (isCardPlayable(card, columnName, hand)) {
@@ -357,12 +379,7 @@ function drawPlayerHands() {
                 if (isPlayable) {
                     const highlight = new PIXI.Graphics();
                     highlight.lineStyle(3, 0x00FF00);
-                    highlight.drawRoundedRect(
-                        -5, -5,
-                        cardSprite.width + 10,
-                        cardSprite.height + 10,
-                        5
-                    );
+                    highlight.drawRoundedRect(-5, -5, cardSprite.width + 10, cardSprite.height + 10, 5);
                     cardSprite.addChild(highlight);
                 }
             }
@@ -373,7 +390,6 @@ function drawPlayerHands() {
     });
 }
 
-// Create a card sprite
 function createCardSprite(cardData, owner = null) {
     const card = new PIXI.Graphics();
     card.beginFill(cardData.color || GAME_CONSTANTS.COLOR_CARTA);
@@ -382,7 +398,7 @@ function createCardSprite(cardData, owner = null) {
     card.lineStyle(2, 0x000000, 0.3);
     card.drawRoundedRect(0, 0, GAME_CONSTANTS.ANCHO_CARTA, GAME_CONSTANTS.ALTO_CARTA, 8);
 
-    // Card value
+    // Valor de la carta
     const style = new PIXI.TextStyle({
         fontFamily: 'Arial',
         fontSize: 24,
@@ -396,22 +412,17 @@ function createCardSprite(cardData, owner = null) {
     valueText.y = GAME_CONSTANTS.ALTO_CARTA / 2;
     card.addChild(valueText);
 
-    // Store card data
+    // Datos de la carta
     card.cardValue = cardData.valor;
     card.cardOwner = owner;
-    card.interactive = owner === currentPlayerName;
+    card.interactive = owner === gameState.playerName;
 
     return card;
 }
 
-// Check if card can be played in column
 function isCardPlayable(card, columnName, hand) {
-    // Simplified check - actual validation happens on server
     const column = gameState.tablero.columnas[columnName];
-
-    if (column.length === 0) {
-        return true;
-    }
+    if (!column || column.length === 0) return true;
 
     const lastCard = column[column.length - 1];
 
@@ -424,68 +435,62 @@ function isCardPlayable(card, columnName, hand) {
     }
 }
 
-// Update game info display
+// =============================================
+// INTERFAZ DE USUARIO (COMPLETA)
+// =============================================
 function updateGameInfo() {
-    const players = gameState.players;
-    const currentPlayer = gameState.turno;
-    const isMyTurn = currentPlayer === currentPlayerName;
+    const players = gameState.jugadores;
+    const currentPlayer = gameState.turnoActual;
+    const isMyTurn = currentPlayer === gameState.playerName;
     const deckCount = gameState.mazo.cartas_restantes;
 
-    let infoHTML = `
-        <h2>Jugadores:</h2>
-        <ul style="list-style-type: none; padding: 0;">
-    `;
+    let infoHTML = `<h2>Jugadores:</h2><ul style="list-style-type: none; padding: 0;">`;
 
     for (const [playerName, player] of Object.entries(players)) {
-        infoHTML += `
-            <li>
-                ${playerName}${playerName === currentPlayer ? ' (Turno actual)' : ''}
-                - Cartas: ${player.mano.length}
-            </li>
-        `;
+        infoHTML += `<li>${playerName}${playerName === currentPlayer ? ' (Turno actual)' : ''} - Cartas: ${player.mano.length}</li>`;
     }
 
-    infoHTML += `</ul>`;
-    infoHTML += `<p>Cartas en mazo: ${deckCount}</p>`;
+    infoHTML += `</ul><p>Cartas en mazo: ${deckCount}</p>`;
     infoHTML += `<p>${isMyTurn ? '¡Es tu turno!' : 'Esperando a otro jugador...'}</p>`;
 
-    gameInfoDiv.innerHTML = infoHTML;
-    endTurnButton.disabled = !isMyTurn || gameState.game_over;
+    UI.gameInfoDiv.innerHTML = infoHTML;
+    UI.endTurnButton.disabled = !isMyTurn || gameState.gameOver;
 }
 
-// Add message to game messages
 function addMessage(text, type = 'info') {
     const messageDiv = document.createElement('div');
     messageDiv.textContent = text;
     messageDiv.className = type === 'error' ? 'error-message' :
         type === 'success' ? 'success-message' : '';
 
-    gameMessagesDiv.appendChild(messageDiv);
-    gameMessagesDiv.scrollTop = gameMessagesDiv.scrollHeight;
+    UI.gameMessagesDiv.appendChild(messageDiv);
+    UI.gameMessagesDiv.scrollTop = UI.gameMessagesDiv.scrollHeight;
 }
 
-// Handle game over
 function endGame(result) {
-    gameScreen.classList.add('hidden');
-    gameOverScreen.classList.remove('hidden');
+    UI.gameScreen.classList.add('hidden');
+    UI.gameOverScreen.classList.remove('hidden');
 
-    gameResultTitle.textContent = result.includes('VICTORY') ? '¡Felicidades!' :
+    UI.gameResultTitle.textContent = result.includes('VICTORY') ? '¡Felicidades!' :
         result.includes('Derrota') ? '¡Juego Terminado!' :
             '¡Resultado del Juego!';
-    gameResultMessage.textContent = result;
+    UI.gameResultMessage.textContent = result;
 }
 
-// Initialize when DOM is loaded
+// =============================================
+// INICIALIZACIÓN (COMPLETA)
+// =============================================
 document.addEventListener('DOMContentLoaded', () => {
-    // Focus player name input
-    playerNameInput.focus();
+    initConnectionStatus();
+    updateConnectionStatus('Conectando...', '#FFC107');
 
-    // Handle Enter key in inputs
-    playerNameInput.addEventListener('keypress', (e) => {
+    UI.playerNameInput.focus();
+
+    UI.playerNameInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') createGame();
     });
 
-    gameIdInput.addEventListener('keypress', (e) => {
+    UI.gameIdInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') joinGame();
     });
 });
