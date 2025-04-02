@@ -2,23 +2,32 @@ from constants import *
 
 
 class Jugador:
-    def __init__(self, nombre, es_ia=False, indice=0):
+    def __init__(self, nombre, es_ia=False):
         self.nombre = nombre
         self.mano = []
         self.es_ia = es_ia
         self.cartas_jugadas_este_turno = 0
         self.cartas_colocadas_este_turno = []
-        self.indice = indice
-        self.color = self.obtener_color_jugador(indice)
 
-    def obtener_color_jugador(self, indice):
-        colores = [
-            (51, 140, 250),   # Azul claro (Jugador 1)
-            (255, 182, 193),  # Rosa claro (Jugador 2)
-            (144, 238, 144),  # Verde claro (Jugador 3)
-            (255, 215, 0)     # Amarillo (Jugador 4)
-        ]
-        return colores[indice % len(colores)]
+    def to_dict(self):
+        """Serializa el jugador a diccionario"""
+        return {
+            'nombre': self.nombre,
+            'es_ia': self.es_ia,
+            'mano': [carta.to_dict() for carta in self.mano],
+            'cartas_jugadas_este_turno': self.cartas_jugadas_este_turno,
+            'cartas_colocadas_este_turno': self.cartas_colocadas_este_turno.copy()
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        """Crea un jugador desde un diccionario serializado"""
+        jugador = cls(data['nombre'], data.get('es_ia', False))
+        jugador.mano = [Carta.from_dict(carta_data)
+                        for carta_data in data['mano']]
+        jugador.cartas_jugadas_este_turno = data['cartas_jugadas_este_turno']
+        jugador.cartas_colocadas_este_turno = data['cartas_colocadas_este_turno']
+        return jugador
 
     def robar_carta(self, mazo):
         cartas_necesarias = 6 - len(self.mano)
@@ -51,8 +60,7 @@ class Jugador:
 
         for i, carta in enumerate(self.mano):
             x = inicio_x + i * espacio_carta
-            # Ajuste vertical para multijugador
-            y = ALTO - 150 - (self.indice * 50)
+            y = ALTO - 150 if not self.es_ia else 30
 
             if x + carta.rect.width > ANCHO - margen:
                 x = ANCHO - margen - carta.rect.width

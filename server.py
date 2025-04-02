@@ -1,315 +1,107 @@
-import socket
-import threading
-import json
-from time import sleep
-import sys
+import os
+from flask import Flask, render_template, request, session
+from flask_socketio import SocketIO, emit, join_room, leave_room
+import random
+from game_logic import GameManager
+from constants import *
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_secret_key')
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+games = GameManager()
 
 
-class GameServer:
-    def __init__(self, host='0.0.0.0', port=5555):
-        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server.bind((host, port))
-        self.server.listen()
-        self.clients = []
-        self.players = {}
-        self.game_state = {
-            'players': {},
-            'tablero': {
-                'ascendente_1': [1],
-                'ascendente_2': [1],
-                'descendente_1': [100],
-                'descendente_2': [100]
-            },
-            'mazo': list(range(2, 100)),
-            'turno': None,
-            'game_started': False
-        }
-        self.max_players = 5
-        self.min_players = 2
-        self.lock = threading.Lock()
-
-        # Mostrar información de conexión al iniciar
-        self.host = host
-        self.port = port
-
-    def show_server_info(self):
-        print("\n" + "="*50)
-        print(f"⚡ SERVIDOR INICIADO CORRECTAMENTE")
-        print("="*50)
-        print(f"🔌 Dirección: {self.host}")
-        print(f"🔢 Puerto: {self.port}")
-        print(f"👥 Máx. jugadores: {self.max_players}")
-        print("="*50 + "\n")
-        print("Esperando conexiones de jugadores...")
-        print("Presiona Ctrl+C para detener el servidor\n")
-
-    def broadcast(self, message, sender=None):
-        with self.lock:
-            for client_id in self.players:
-                if client_id != sender:
-                    try:
-                        self.players[client_id]['socket'].send(
-                            json.dumps(message).encode('utf-8'))
-                    except:
-                        self.remove_player(client_id)
-
-    def handle_client(self, client, address):
-        client_id = f"{address[0]}:{address[1]}"
-        try:
-            # Esperar mensaje de conexión
-            data = client.recv(1024).decode('utf-8')
-            join_data = json.loads(data)
-
-            if join_data['type'] != 'join' or 'nickname' not in join_data:
-                client.close()
-                return
-
-            with self.lock:
-                if len(self.players) >= self.max_players:
-                    client.send(json.dumps({
-                        'type': 'error',
-                        'message': 'Game is full'
-                    }).encode('utf-8'))
-                    client.close()
-                    return
-
-                self.players[client_id] = {
-                    'socket': client,
-                    'nickname': join_data['nickname'],
-                    'mano': []
-                }
-
-                print(
-                    f"🎮 Jugador conectado: {join_data['nickname']} ({address[0]})")
-
-                # Repartir cartas iniciales si el juego ya empezó
-                if self.game_state['game_started']:
-                    self.deal_cards_to_new_player(client_id)
-
-                # Notificar a todos
-                self.broadcast({
-                    'type': 'notification',
-                    'message': f"{join_data['nickname']} se unió al juego"
-                })
-
-                # Enviar estado actual al nuevo jugador
-                client.send(json.dumps({
-                    'type': 'game_state',
-                    'state': self.game_state
-                }).encode('utf-8'))
-
-            # Manejar mensajes del cliente
-            while True:
-                data = client.recv(1024).decode('utf-8')
-                if not data:
-                    break
-
-                message = json.loads(data)
-                self.process_message(message, client_id)
-
-        except Exception as e:
-            print(f"Error con el cliente {client_id}: {e}")
-        finally:
-            self.remove_player(client_id)
-
-    def process_message(self, message, client_id):
-        if message['type'] == 'start_game':
-            self.start_game()
-        elif message['type'] == 'play_card':
-            self.play_card(client_id, message)
-        elif message['type'] == 'end_turn':
-            self.end_turn(client_id)
-
-    def start_game(self):
-        with self.lock:
-            if len(self.players) >= self.min_players and not self.game_state['game_started']:
-                self.game_state['game_started'] = True
-                random.shuffle(self.game_state['mazo'])
-
-                print("\n¡JUEGO INICIADO! Repartiendo cartas...")
-
-                # Repartir cartas iniciales (6 por jugador)
-                for player_id in self.players:
-                    self.players[player_id]['mano'] = []
-                    for _ in range(6):
-                        if self.game_state['mazo']:
-                            card = self.game_state['mazo'].pop()
-                            self.players[player_id]['mano'].append(card)
-                    print(
-                        f"  - {self.players[player_id]['nickname']}: {len(self.players[player_id]['mano'])} cartas")
-
-                # Elegir primer jugador al azar
-                self.game_state['turno'] = random.choice(
-                    list(self.players.keys()))
-
-                # Actualizar estado del juego
-                self.update_game_state()
-
-                # Notificar a todos
-                self.broadcast({
-                    'type': 'game_start',
-                    'state': self.game_state
-                })
-
-    def deal_cards_to_new_player(self, player_id):
-        # Repartir cartas a un jugador que se une a partida en curso
-        cards_needed = 6 - len(self.players[player_id]['mano'])
-        for _ in range(cards_needed):
-            if self.game_state['mazo']:
-                card = self.game_state['mazo'].pop()
-                self.players[player_id]['mano'].append(card)
-
-    def play_card(self, player_id, message):
-        with self.lock:
-            if not self.game_state['game_started'] or self.game_state['turno'] != player_id:
-                return
-
-            # Validar movimiento
-            card = message['card']
-            column = message['column']
-
-            if card not in self.players[player_id]['mano']:
-                return
-
-            # Lógica de validación simplificada
-            last_card = self.game_state['tablero'][column][-1]
-            valid = False
-
-            if 'ascendente' in column:
-                valid = card > last_card or card == last_card - 10
-            else:
-                valid = card < last_card or card == last_card + 10
-
-            if valid:
-                # Mover carta
-                self.players[player_id]['mano'].remove(card)
-                self.game_state['tablero'][column].append(card)
-
-                print(
-                    f"🃏 {self.players[player_id]['nickname']} jugó {card} en {column}")
-
-                # Robar nueva carta si hay
-                if self.game_state['mazo']:
-                    new_card = self.game_state['mazo'].pop()
-                    self.players[player_id]['mano'].append(new_card)
-
-                self.update_game_state()
-                self.broadcast({
-                    'type': 'game_update',
-                    'state': self.game_state
-                })
-
-    def end_turn(self, player_id):
-        with self.lock:
-            if self.game_state['game_started'] and self.game_state['turno'] == player_id:
-                # Cambiar turno al siguiente jugador
-                player_ids = list(self.players.keys())
-                current_index = player_ids.index(player_id)
-                next_index = (current_index + 1) % len(player_ids)
-                self.game_state['turno'] = player_ids[next_index]
-
-                print(
-                    f"🔄 Turno cambiado a {self.players[self.game_state['turno']]['nickname']}")
-
-                self.update_game_state()
-                self.broadcast({
-                    'type': 'game_update',
-                    'state': self.game_state
-                })
-
-    def update_game_state(self):
-        # Actualizar estado para enviar a clientes
-        state = {
-            'players': {pid: {
-                'nickname': self.players[pid]['nickname'],
-                'card_count': len(self.players[pid]['mano']),
-                'is_turn': pid == self.game_state['turno']
-            } for pid in self.players},
-            'tablero': self.game_state['tablero'],
-            'mazo_count': len(self.game_state['mazo']),
-            'game_started': self.game_state['game_started']
-        }
-        self.game_state['broadcast_state'] = state
-
-    def remove_player(self, client_id):
-        with self.lock:
-            if client_id in self.players:
-                nickname = self.players[client_id]['nickname']
-                try:
-                    self.players[client_id]['socket'].close()
-                except:
-                    pass
-
-                del self.players[client_id]
-                print(f"🚪 Jugador desconectado: {nickname}")
-
-                # Si el juego está en progreso y quedan jugadores
-                if self.game_state['game_started'] and self.players:
-                    # Si era su turno, pasar al siguiente
-                    if self.game_state['turno'] == client_id:
-                        player_ids = list(self.players.keys())
-                        next_index = 0 % len(player_ids)
-                        self.game_state['turno'] = player_ids[next_index]
-
-                    self.update_game_state()
-                    self.broadcast({
-                        'type': 'notification',
-                        'message': f"{nickname} abandonó el juego"
-                    })
-                    self.broadcast({
-                        'type': 'game_update',
-                        'state': self.game_state
-                    })
-                else:
-                    self.broadcast({
-                        'type': 'notification',
-                        'message': f"{nickname} abandonó el juego"
-                    })
-
-    def shutdown(self):
-        print("\nApagando servidor...")
-        with self.lock:
-            # Notificar a todos los clientes
-            self.broadcast({
-                'type': 'notification',
-                'message': "El servidor se está apagando"
-            })
-
-            # Cerrar todas las conexiones
-            for player_id in list(self.players.keys()):
-                self.remove_player(player_id)
-
-            # Cerrar socket del servidor
-            self.server.close()
-        print("Servidor detenido correctamente")
-
-    def run(self):
-        self.show_server_info()
-        try:
-            while True:
-                client, address = self.server.accept()
-                thread = threading.Thread(
-                    target=self.handle_client, args=(client, address))
-                thread.start()
-        except KeyboardInterrupt:
-            self.shutdown()
-        except Exception as e:
-            print(f"Error inesperado: {e}")
-            self.shutdown()
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description='Servidor del juego The Game')
-    parser.add_argument('--host', default='0.0.0.0',
-                        help='Dirección IP del servidor')
-    parser.add_argument('--port', type=int, default=5555,
-                        help='Puerto del servidor')
-    args = parser.parse_args()
+@socketio.on('connect')
+def handle_connect():
+    print(f"Client connected: {request.sid}")
 
-    server = GameServer(host=args.host, port=args.port)
-    try:
-        server.run()
-    except Exception as e:
-        print(f"Error al iniciar el servidor: {e}")
-        sys.exit(1)
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    game_id = session.get('game_id')
+    if game_id:
+        leave_room(game_id)
+        games.handle_disconnect(game_id, session.get('player_name'))
+        emit('player_left', {'playerName': session.get(
+            'player_name')}, room=game_id)
+
+
+@socketio.on('create_game')
+def handle_create_game(data):
+    game_id = games.create_game(data['playerName'])
+    session['game_id'] = game_id
+    session['player_name'] = data['playerName']
+    join_room(game_id)
+    emit('game_created', {'gameId': game_id})
+    emit('waiting_for_player', room=game_id)
+
+
+@socketio.on('join_game')
+def handle_join_game(data):
+    game_id = data['gameId'].strip()
+    player_name = data['playerName'].strip()
+
+    if not game_id or not player_name:
+        emit('join_error', {'message': 'ID de juego y nombre son requeridos'})
+        return
+
+    result, message = games.join_game(game_id, player_name)
+    if result:
+        session['game_id'] = game_id
+        session['player_name'] = player_name
+        join_room(game_id)
+        emit('player_joined', {'playerName': player_name}, room=game_id)
+        emit('game_started', room=game_id)
+        emit('game_state', games.get_game_state(game_id), room=game_id)
+    else:
+        emit('join_error', {'message': message})
+
+
+@socketio.on('play_card')
+def handle_play_card(data):
+    game_id = session.get('game_id')
+    player_name = session.get('player_name')
+
+    if not game_id or not player_name:
+        return
+
+    success, message = games.play_card(
+        game_id,
+        player_name,
+        data['column'],
+        data['cardValue']
+    )
+
+    if success:
+        emit('game_state', games.get_game_state(game_id), room=game_id)
+        emit('play_success', {'message': message}, room=game_id)
+    else:
+        emit('play_error', {'message': message})
+
+
+@socketio.on('end_turn')
+def handle_end_turn():
+    game_id = session.get('game_id')
+    player_name = session.get('player_name')
+
+    if not game_id or not player_name:
+        return
+
+    success, message = games.end_turn(game_id, player_name)
+    if success:
+        emit('game_state', games.get_game_state(game_id), room=game_id)
+        emit('turn_ended', {
+             'nextPlayer': games.get_current_player(game_id)}, room=game_id)
+    else:
+        emit('turn_error', {'message': message})
+
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    socketio.run(app, host='0.0.0.0', port=port, debug=True)

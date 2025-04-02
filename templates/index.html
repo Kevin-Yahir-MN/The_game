@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>The Game - Multijugador</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/6.3.0/browser/pixi.min.js"></script>
+    <script src="/static/client.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .screen {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            max-width: 800px;
+            width: 100%;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #228B22;
+            margin-bottom: 30px;
+        }
+
+        input,
+        button {
+            padding: 10px 15px;
+            margin: 10px 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: #228B22;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #1E7A1E;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        #gameCanvas {
+            background-color: #228B22;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        #game-info {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .error-message {
+            color: #ff3333;
+            margin: 10px 0;
+        }
+
+        .success-message {
+            color: #228B22;
+            margin: 10px 0;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="setup-screen" class="screen">
+        <h1>The Game - Multijugador</h1>
+        <div>
+            <input type="text" id="playerName" placeholder="Tu nombre" maxlength="20">
+            <button id="createGame">Crear Juego</button>
+        </div>
+        <div style="margin-top: 20px;">
+            <p>O unirse a un juego existente:</p>
+            <input type="text" id="gameId" placeholder="ID del juego">
+            <button id="joinGame">Unirse a Juego</button>
+        </div>
+        <div id="setup-error" class="error-message"></div>
+    </div>
+
+    <div id="waiting-screen" class="screen hidden">
+        <h2>Esperando jugador...</h2>
+        <p>Comparte este ID del juego con tu amigo:</p>
+        <p id="displayGameId" style="font-size: 24px; font-weight: bold;"></p>
+        <div id="waiting-error" class="error-message"></div>
+    </div>
+
+    <div id="game-screen" class="hidden">
+        <div id="game-info"></div>
+        <div id="game-messages"></div>
+        <div id="game-container">
+            <canvas id="gameCanvas" width="1200" height="800"></canvas>
+        </div>
+        <button id="endTurn" disabled>Terminar Turno</button>
+    </div>
+
+    <div id="game-over-screen" class="screen hidden">
+        <h2 id="game-result-title"></h2>
+        <p id="game-result-message"></p>
+        <button id="newGameButton">Jugar Otra Vez</button>
+    </div>
+</body>
+
+</html>

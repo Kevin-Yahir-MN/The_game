@@ -15,6 +15,31 @@ class Carta:
             (ANCHO_CARTA+5, ALTO_CARTA+5), pygame.SRCALPHA)
         self.sombra.fill((0, 0, 0, 100))
 
+    def to_dict(self):
+        """Convierte la carta a un diccionario serializable"""
+        return {
+            'valor': self.valor,
+            'color': self.color,
+            'jugada_este_turno': self.jugada_este_turno,
+            'rect': {
+                'x': self.rect.x,
+                'y': self.rect.y,
+                'width': self.rect.width,
+                'height': self.rect.height
+            }
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        """Crea una carta desde un diccionario"""
+        carta = cls(data['valor'], data.get('color'))
+        carta.jugada_este_turno = data.get('jugada_este_turno', False)
+        carta.rect.x = data['rect']['x']
+        carta.rect.y = data['rect']['y']
+        carta.rect.width = data['rect']['width']
+        carta.rect.height = data['rect']['height']
+        return carta
+
     def dibujar(self, superficie, x, y):
         self.rect.x = x
         self.rect.y = y

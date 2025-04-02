@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: the-game-server
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py
+    env: python
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
