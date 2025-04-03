@@ -117,6 +117,9 @@ function connectWebSocket() {
                 case 'notification':
                     showNotification(message.message, message.isError);
                     break;
+                case 'card_returned':
+                    showNotification('Carta devuelta a tu mano', false);
+                    break;
             }
         } catch (error) {
             console.error('Error procesando mensaje:', error);
@@ -147,9 +150,10 @@ function showNotification(message, isError = false) {
 function updateGameState(newState) {
     console.log('Actualizando estado del juego:', newState);
 
-    // Actualizar las cartas en mano (incluyendo las devueltas)
-    const previousCards = gameState.yourCards;
+    // Guardar estado previo para comparación
+    const previousBoard = { ...gameState.board };
 
+    // Actualizar estado
     gameState = {
         ...gameState,
         ...newState
@@ -163,6 +167,7 @@ function updateGameState(newState) {
         return currentValue === card.value;
     });
 
+    // Actualizar estado de las cartas jugables
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
     if (Array.isArray(gameState.yourCards)) {
         gameState.yourCards = gameState.yourCards.map(value => {
@@ -201,23 +206,14 @@ function handleCanvasClick(event) {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    // Verificar click en columnas (prioridad si hay carta seleccionada)
+    // Primero verificar si hay carta seleccionada y click en columna
     const clickedColumn = getClickedColumn(x, y);
     if (clickedColumn && selectedCard) {
-        // Verificar si hay una carta jugada este turno en esa columna
-        const cardInColumn = gameState.cardsPlayedThisTurn.find(
-            c => c.position === clickedColumn &&
-                c.value === gameState.board[clickedColumn.includes('asc') ? 'ascending' : 'descending'][clickedColumn.includes('1') ? 0 : 1]
-        );
-
-        // Si hay carta en la columna pero tenemos una seleccionada, intentar jugar
-        if (cardInColumn) {
-            playCard(selectedCard.value, clickedColumn);
-            return;
-        }
+        playCard(selectedCard.value, clickedColumn);
+        return;
     }
 
-    // Verificar click en cartas jugadas este turno (solo si no hay carta seleccionada)
+    // Solo verificar devolución de cartas si no hay carta seleccionada
     if (!selectedCard) {
         const clickedPlayedCard = gameState.cardsPlayedThisTurn.find(card => {
             const pos = getCardPosition(card.position);
@@ -247,11 +243,6 @@ function handleCanvasClick(event) {
             }
         }
     });
-
-    // Si clickeamos una columna con carta seleccionada (y no había carta jugada este turno)
-    if (clickedColumn && selectedCard) {
-        playCard(selectedCard.value, clickedColumn);
-    }
 }
 
 function getClickedColumn(x, y) {
@@ -331,48 +322,26 @@ function isValidMove(cardValue, position) {
     }
 }
 
-function returnCard(room, player, cardValue, position) {
-    let returned = false;
-    const board = room.gameState.board;
+function returnCardToHand(cardInfo) {
+    // Verificar que la carta aún está en la posición indicada
+    const currentValue = cardInfo.position.includes('asc')
+        ? gameState.board.ascending[cardInfo.position === 'asc1' ? 0 : 1]
+        : gameState.board.descending[cardInfo.position === 'desc1' ? 0 : 1];
 
-    if (position.includes('asc')) {
-        const index = position === 'asc1' ? 0 : 1;
-        if (board.ascending[index] === cardValue) {
-            // Buscar el valor anterior en el historial
-            const previousValue = findPreviousValue(room, position, cardValue);
-            board.ascending[index] = previousValue || 1;
-            player.cards.push(cardValue);
-            player.cardsPlayedThisTurn--;
-            returned = true;
-        }
-    } else {
-        const index = position === 'desc1' ? 0 : 1;
-        if (board.descending[index] === cardValue) {
-            // Buscar el valor anterior en el historial
-            const previousValue = findPreviousValue(room, position, cardValue);
-            board.descending[index] = previousValue || 100;
-            player.cards.push(cardValue);
-            player.cardsPlayedThisTurn--;
-            returned = true;
-        }
+    if (currentValue !== cardInfo.value) {
+        showNotification('La carta ya no está en esta posición', true);
+        return;
     }
 
-    if (returned) {
-        broadcastGameState(room);
-        player.ws.send(JSON.stringify({
-            type: 'notification',
-            message: 'Carta devuelta a tu mano',
-            isError: false
-        }));
-    } else {
-        player.ws.send(JSON.stringify({
-            type: 'notification',
-            message: 'No se pudo devolver la carta (ya fue movida)',
-            isError: true
-        }));
-        // Enviar estado actual para sincronizar
-        broadcastGameState(room);
-    }
+    socket.send(JSON.stringify({
+        type: 'return_card',
+        playerId: currentPlayer.id,
+        cardValue: cardInfo.value,
+        position: cardInfo.position
+    }));
+
+    // No eliminamos inmediatamente, esperamos confirmación del servidor
+    showNotification('Procesando devolución de carta...', false);
 }
 
 function endTurn() {
