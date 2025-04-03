@@ -224,7 +224,7 @@ function handleCanvasClick(event) {
         });
 
         if (clickedPlayedCard) {
-            returnMostRecentCardInColumn(clickedPlayedCard.position);
+            returnCardToHand(clickedPlayedCard);
             return;
         }
     }
@@ -247,26 +247,10 @@ function handleCanvasClick(event) {
     });
 }
 
-function returnMostRecentCardInColumn(position) {
-    // Encontrar la carta más reciente jugada en esta columna
-    const cardsInColumn = gameState.cardsPlayedThisTurn
-        .filter(c => c.position === position)
-        .sort((a, b) => b.value - a.value); // Ordenar descendente para obtener la más reciente
-
-    if (cardsInColumn.length === 0) {
-        showNotification('No hay cartas para devolver en esta columna', true);
-        return;
-    }
-
-    const cardToReturn = cardsInColumn[0];
-
-    // Verificar que la carta aún está en el tablero
-    const currentValue = cardToReturn.position.includes('asc')
-        ? gameState.board.ascending[cardToReturn.position === 'asc1' ? 0 : 1]
-        : gameState.board.descending[cardToReturn.position === 'desc1' ? 0 : 1];
-
-    if (currentValue !== cardToReturn.value) {
-        showNotification('La carta ya no está en esta posición', true);
+function returnCardToHand(cardToReturn) {
+    // Verificar que la carta pertenece al jugador actual
+    if (!gameState.yourCards.some(card => card.value === cardToReturn.value)) {
+        showNotification('No puedes devolver cartas que no hayas jugado este turno', true);
         return;
     }
 
@@ -277,7 +261,12 @@ function returnMostRecentCardInColumn(position) {
         position: cardToReturn.position
     }));
 
-    showNotification('Devolviendo la última carta jugada...', false);
+    // Actualizar estado local
+    gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
+        card => !(card.value === cardToReturn.value && card.position === cardToReturn.position)
+    );
+
+    updateEndTurnButton();
 }
 
 function getClickedColumn(x, y) {
@@ -337,8 +326,7 @@ function playCard(cardValue, position) {
 
     gameState.cardsPlayedThisTurn.push({
         value: cardValue,
-        position: position,
-        isPlayedThisTurn: true
+        position: position
     });
 
     selectedCard = null;

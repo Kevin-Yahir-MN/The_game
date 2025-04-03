@@ -344,7 +344,10 @@ function playCard(room, player, cardValue, position) {
 
     if (validMove) {
         player.cards.splice(cardIndex, 1);
-        player.cardsPlayedThisTurn++;
+        player.cardsPlayedThisTurn.push({
+            value: cardValue,
+            position: position
+        });
         checkGameStatus(room);
         broadcastGameState(room);
     } else {
@@ -373,63 +376,65 @@ function updateBoardHistory(room, position, board) {
 
 function returnCard(room, player, cardValue, position) {
     const board = room.gameState.board;
-    let returned = false;
 
-    // Obtener todas las cartas jugadas este turno en esta columna
-    const cardsInColumn = room.players.flatMap(p =>
-        p.cardsPlayedThisTurn.map(c => ({ ...c, playerId: p.id })))
-        .filter(c => c.position === position)
-        .sort((a, b) => b.value - a.value); // Ordenar descendente
+    // Verificar que la carta está actualmente en la posición especificada
+    let currentValue;
+    if (position.includes('asc')) {
+        const index = position === 'asc1' ? 0 : 1;
+        currentValue = board.ascending[index];
+    } else {
+        const index = position === 'desc1' ? 0 : 1;
+        currentValue = board.descending[index];
+    }
 
-    // Tomar la última carta jugada en esta columna
-    const lastCardInColumn = cardsInColumn[0];
-
-    if (!lastCardInColumn || lastCardInColumn.value !== cardValue || lastCardInColumn.playerId !== player.id) {
+    if (currentValue !== cardValue) {
         player.ws.send(JSON.stringify({
             type: 'notification',
-            message: 'No se puede devolver esta carta',
+            message: 'La carta ya no está en esa posición',
             isError: true
         }));
         return;
     }
 
-    if (position.includes('asc')) {
-        const index = position === 'asc1' ? 0 : 1;
-        if (board.ascending[index] === cardValue) {
-            // Buscar el valor anterior en el historial
-            const previousValue = findPreviousValue(room, position, cardValue);
-            board.ascending[index] = previousValue || 1;
-            player.cards.push(cardValue);
-            player.cardsPlayedThisTurn--;
-            returned = true;
-        }
-    } else {
-        const index = position === 'desc1' ? 0 : 1;
-        if (board.descending[index] === cardValue) {
-            // Buscar el valor anterior en el historial
-            const previousValue = findPreviousValue(room, position, cardValue);
-            board.descending[index] = previousValue || 100;
-            player.cards.push(cardValue);
-            player.cardsPlayedThisTurn--;
-            returned = true;
-        }
-    }
-
-    if (returned) {
-        broadcastGameState(room);
-        player.ws.send(JSON.stringify({
-            type: 'card_returned',
-            message: 'Carta devuelta a tu mano',
-            cardValue: cardValue,
-            position: position
-        }));
-    } else {
+    // Verificar que el jugador jugó esa carta este turno
+    if (!player.cardsPlayedThisTurn.some(c => c.value === cardValue && c.position === position)) {
         player.ws.send(JSON.stringify({
             type: 'notification',
-            message: 'No se pudo devolver la carta',
+            message: 'No puedes devolver cartas que no hayas jugado este turno',
             isError: true
         }));
+        return;
     }
+
+    // Buscar el valor anterior en el historial
+    const previousValue = findPreviousValue(room, position, cardValue);
+
+    // Actualizar el tablero
+    if (position.includes('asc')) {
+        const index = position === 'asc1' ? 0 : 1;
+        board.ascending[index] = previousValue || 1;
+    } else {
+        const index = position === 'desc1' ? 0 : 1;
+        board.descending[index] = previousValue || 100;
+    }
+
+    // Devolver la carta al jugador
+    player.cards.push(cardValue);
+
+    // Eliminar de las cartas jugadas este turno
+    player.cardsPlayedThisTurn = player.cardsPlayedThisTurn.filter(
+        c => !(c.value === cardValue && c.position === position)
+    );
+
+    // Notificar a todos
+    broadcastGameState(room);
+
+    player.ws.send(JSON.stringify({
+        type: 'card_returned',
+        message: 'Carta devuelta a tu mano',
+        cardValue: cardValue,
+        position: position
+    }));
 }
 
 function findPreviousValue(room, position, currentValue) {
