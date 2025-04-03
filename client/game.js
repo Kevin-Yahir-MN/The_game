@@ -14,11 +14,19 @@ let gameState = {
     players: [],
     yourCards: [],
     board: {
-        ascending: [1, 1],
-        descending: [100, 100]
+        ascending: [1, 1],    // [asc1, asc2]
+        descending: [100, 100] // [desc1, desc2]
     },
     currentTurn: null,
-    remainingDeck: 0
+    remainingDeck: 98
+};
+
+// Constantes de diseño
+const CARD_WIDTH = 80;
+const CARD_HEIGHT = 120;
+const BOARD_POSITION = {
+    x: canvas.width / 2 - 200,
+    y: canvas.height / 2 - 100
 };
 
 // Clases del juego
@@ -27,8 +35,8 @@ class Card {
         this.value = value;
         this.x = x;
         this.y = y;
-        this.width = 60;
-        this.height = 90;
+        this.width = CARD_WIDTH;
+        this.height = CARD_HEIGHT;
         this.isPlayable = isPlayable;
         this.isSelected = false;
     }
@@ -36,56 +44,29 @@ class Card {
     draw() {
         // Fondo de la carta
         ctx.fillStyle = this.isSelected ? '#FFD700' : '#FFFFFF';
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+
+        // Borde si es jugable
         if (this.isPlayable) {
             ctx.strokeStyle = '#00FF00';
             ctx.lineWidth = 3;
             ctx.strokeRect(this.x - 2, this.y - 2, this.width + 4, this.height + 4);
+        } else {
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
         }
-        ctx.fillRect(this.x, this.y, this.width, this.height);
 
         // Valor de la carta
         ctx.fillStyle = '#000000';
-        ctx.font = 'bold 18px Arial';
+        ctx.font = 'bold 24px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(this.value, this.x + this.width / 2, this.y + this.height / 2 + 7);
+        ctx.fillText(this.value, this.x + this.width / 2, this.y + this.height / 2 + 10);
     }
 
     contains(x, y) {
         return x >= this.x && x <= this.x + this.width &&
             y >= this.y && y <= this.y + this.height;
-    }
-}
-
-class BoardPile {
-    constructor(x, y, value, type, index) {
-        this.x = x;
-        this.y = y;
-        this.value = value;
-        this.type = type; // 'asc' o 'desc'
-        this.index = index; // 0 o 1
-        this.width = 60;
-        this.height = 90;
-    }
-
-    draw() {
-        // Fondo del montón
-        ctx.fillStyle = '#F5F5F5';
-        ctx.fillRect(this.x, this.y, this.width, this.height);
-
-        // Borde
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(this.x, this.y, this.width, this.height);
-
-        // Valor actual
-        ctx.fillStyle = '#000000';
-        ctx.font = 'bold 18px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(this.value, this.x + this.width / 2, this.y + this.height / 2 + 7);
-
-        // Indicador de tipo
-        ctx.font = '12px Arial';
-        ctx.fillText(this.type === 'asc' ? '↑' : '↓', this.x + this.width / 2, this.y + 20);
     }
 }
 
@@ -171,15 +152,13 @@ function handleCanvasClick(event) {
     const y = event.clientY - rect.top;
 
     // Verificar clic en cartas del jugador
-    const cardWidth = 60;
-    const cardHeight = 90;
-    const startX = (canvas.width - (gameState.yourCards.length * (cardWidth + 10))) / 2;
+    const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + 10))) / 2;
 
     gameState.yourCards.forEach((card, index) => {
-        card.x = startX + index * (cardWidth + 10);
-        card.y = canvas.height - cardHeight - 20;
+        card.x = startX + index * (CARD_WIDTH + 10);
+        card.y = canvas.height - CARD_HEIGHT - 20;
 
-        if (card.contains(x, y) {
+        if (card.contains(x, y)) {
             card.isSelected = !card.isSelected;
             // Deseleccionar otras cartas
             gameState.yourCards.forEach((otherCard, otherIndex) => {
@@ -189,27 +168,24 @@ function handleCanvasClick(event) {
     });
 
     // Verificar clic en pilas del tablero
-    const boardPiles = createBoardPiles();
-    boardPiles.forEach(pile => {
-        if (x >= pile.x && x <= pile.x + pile.width &&
-            y >= pile.y && y <= pile.y + pile.height) {
+    if (y >= BOARD_POSITION.y && y <= BOARD_POSITION.y + CARD_HEIGHT) {
+        const selectedCard = gameState.yourCards.find(card => card.isSelected);
+        if (!selectedCard || !selectedCard.isPlayable) return;
 
-            const selectedCard = gameState.yourCards.find(card => card.isSelected);
-            if (selectedCard && selectedCard.isPlayable) {
-                playCard(selectedCard.value, `${pile.type}${pile.index + 1}`);
-            }
+        // Determinar en qué pila se hizo clic
+        if (x >= BOARD_POSITION.x && x <= BOARD_POSITION.x + CARD_WIDTH) {
+            playCard(selectedCard.value, 'asc1');
         }
-    });
-}
-
-function createBoardPiles() {
-    const centerX = canvas.width / 2;
-    return [
-        new BoardPile(centerX - 150, 150, gameState.board.ascending[0], 'asc', 0),
-        new BoardPile(centerX - 50, 150, gameState.board.ascending[1], 'asc', 1),
-        new BoardPile(centerX + 50, 150, gameState.board.descending[0], 'desc', 0),
-        new BoardPile(centerX + 150, 150, gameState.board.descending[1], 'desc', 1)
-    ];
+        else if (x >= BOARD_POSITION.x + CARD_WIDTH + 20 && x <= BOARD_POSITION.x + CARD_WIDTH * 2 + 20) {
+            playCard(selectedCard.value, 'asc2');
+        }
+        else if (x >= BOARD_POSITION.x + CARD_WIDTH * 2 + 40 && x <= BOARD_POSITION.x + CARD_WIDTH * 3 + 40) {
+            playCard(selectedCard.value, 'desc1');
+        }
+        else if (x >= BOARD_POSITION.x + CARD_WIDTH * 3 + 60 && x <= BOARD_POSITION.x + CARD_WIDTH * 4 + 60) {
+            playCard(selectedCard.value, 'desc2');
+        }
+    }
 }
 
 function playCard(cardValue, position) {
@@ -252,8 +228,7 @@ function gameLoop() {
     drawGameInfo();
 
     // Dibujar tablero
-    const boardPiles = createBoardPiles();
-    boardPiles.forEach(pile => pile.draw());
+    drawBoard();
 
     // Dibujar cartas del jugador
     drawPlayerCards();
@@ -264,37 +239,57 @@ function gameLoop() {
 function drawGameInfo() {
     // Turno actual
     const currentTurnPlayer = gameState.players.find(p => p.id === gameState.currentTurn);
-    const turnText = currentTurnPlayer ?
-        (currentTurnPlayer.id === currentPlayer.id ?
-            'TU TURNO' : `Turno de: ${currentTurnPlayer.name}`) : 'Esperando jugadores...';
-
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 24px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(turnText, canvas.width / 2, 50);
-
-    // Cartas restantes
-    ctx.font = '16px Arial';
-    ctx.fillText(`Mazo: ${gameState.remainingDeck} cartas`, canvas.width / 2, 80);
-
-    // Cartas por jugador
     ctx.textAlign = 'left';
-    gameState.players.forEach((player, index) => {
-        const text = `${player.name}: ${player.cardCount} cartas`;
-        ctx.fillText(text, 20, 100 + (index * 30));
-    });
+    ctx.fillText(`Turno: ${currentTurnPlayer?.name || ''}`, 20, 40);
+
+    // Cartas en la baraja
+    ctx.fillText(`Cartas en la baraja: ${gameState.remainingDeck}`, 20, 80);
+}
+
+function drawBoard() {
+    // Dibujar las 4 pilas del tablero
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+
+    // Pila Ascendente 1
+    ctx.fillText('Ascendente', BOARD_POSITION.x + CARD_WIDTH / 2, BOARD_POSITION.y - 10);
+    const asc1 = new Card(gameState.board.ascending[0], BOARD_POSITION.x, BOARD_POSITION.y);
+    asc1.draw();
+
+    // Pila Ascendente 2
+    ctx.fillText('Ascendente', BOARD_POSITION.x + CARD_WIDTH + 20 + CARD_WIDTH / 2, BOARD_POSITION.y - 10);
+    const asc2 = new Card(gameState.board.ascending[1], BOARD_POSITION.x + CARD_WIDTH + 20, BOARD_POSITION.y);
+    asc2.draw();
+
+    // Pila Descendente 1
+    ctx.fillText('Descendente', BOARD_POSITION.x + CARD_WIDTH * 2 + 40 + CARD_WIDTH / 2, BOARD_POSITION.y - 10);
+    const desc1 = new Card(gameState.board.descending[0], BOARD_POSITION.x + CARD_WIDTH * 2 + 40, BOARD_POSITION.y);
+    desc1.draw();
+
+    // Pila Descendente 2
+    ctx.fillText('Descendente', BOARD_POSITION.x + CARD_WIDTH * 3 + 60 + CARD_WIDTH / 2, BOARD_POSITION.y - 10);
+    const desc2 = new Card(gameState.board.descending[1], BOARD_POSITION.x + CARD_WIDTH * 3 + 60, BOARD_POSITION.y);
+    desc2.draw();
 }
 
 function drawPlayerCards() {
     if (!gameState.yourCards || gameState.yourCards.length === 0) return;
 
-    const cardWidth = 60;
-    const cardHeight = 90;
-    const startX = (canvas.width - (gameState.yourCards.length * (cardWidth + 10))) / 2;
+    const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + 10))) / 2;
 
+    // Título "Tu mano"
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Tu mano', canvas.width / 2, canvas.height - CARD_HEIGHT - 50);
+
+    // Dibujar cartas
     gameState.yourCards.forEach((card, index) => {
-        card.x = startX + index * (cardWidth + 10);
-        card.y = canvas.height - cardHeight - 20;
+        card.x = startX + index * (CARD_WIDTH + 10);
+        card.y = canvas.height - CARD_HEIGHT - 20;
         card.draw();
     });
 }
