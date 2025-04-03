@@ -43,17 +43,39 @@ app.use(express.static(path.join(__dirname, 'client')));
 // Almacenamiento de salas
 const rooms = new Map();
 
+// Inicializar mazo de cartas
+function initializeDeck() {
+    const deck = [];
+    for (let i = 2; i < 100; i++) {
+        deck.push(i);
+    }
+    return shuffleArray(deck);
+}
+
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
 // Endpoints API
 app.post('/create-room', (req, res) => {
     const { playerName } = req.body;
-    if (!playerName) return res.status(400).json({ success: false, message: 'Nombre requerido' });
+    if (!playerName) {
+        return res.status(400).json({
+            success: false,
+            message: 'Se requiere nombre de jugador'
+        });
+    }
 
     const roomId = Math.floor(1000 + Math.random() * 9000).toString();
-    const hostId = uuidv4();
+    const playerId = uuidv4();
 
     rooms.set(roomId, {
         players: [{
-            id: hostId,
+            id: playerId,
             name: playerName,
             isHost: true,
             ws: null,
@@ -62,10 +84,10 @@ app.post('/create-room', (req, res) => {
         gameState: {
             deck: initializeDeck(),
             board: {
-                ascending: [1, 1],
-                descending: [100, 100]
+                ascending: [1, 1],    // [asc1, asc2]
+                descending: [100, 100] // [desc1, desc2]
             },
-            currentTurn: hostId,
+            currentTurn: playerId,
             gameStarted: false
         }
     });
@@ -73,14 +95,26 @@ app.post('/create-room', (req, res) => {
     res.json({
         success: true,
         roomId,
-        playerId: hostId
+        playerId,
+        playerName
     });
 });
 
 app.post('/join-room', (req, res) => {
     const { playerName, roomId } = req.body;
-    if (!playerName || !roomId) return res.status(400).json({ success: false, message: 'Datos incompletos' });
-    if (!rooms.has(roomId)) return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+    if (!playerName || !roomId) {
+        return res.status(400).json({
+            success: false,
+            message: 'Nombre de jugador y código de sala requeridos'
+        });
+    }
+
+    if (!rooms.has(roomId)) {
+        return res.status(404).json({
+            success: false,
+            message: 'Sala no encontrada'
+        });
+    }
 
     const room = rooms.get(roomId);
     const playerId = uuidv4();
@@ -97,23 +131,32 @@ app.post('/join-room', (req, res) => {
     res.json({
         success: true,
         playerId,
+        playerName,
         host: room.players.find(p => p.isHost).name
     });
 });
 
 app.get('/room-info/:roomId', (req, res) => {
     const roomId = req.params.roomId;
-    if (!rooms.has(roomId)) return res.status(404).json({ success: false });
+    if (!rooms.has(roomId)) {
+        return res.status(404).json({
+            success: false,
+            message: 'Sala no encontrada'
+        });
+    }
 
     const room = rooms.get(roomId);
     res.json({
         success: true,
         players: room.players.map(p => ({
+            id: p.id,
             name: p.name,
             isHost: p.isHost,
-            cardCount: p.cards.length
+            cardCount: p.cards.length,
+            connected: p.ws !== null
         })),
-        gameStarted: room.gameState.gameStarted
+        gameStarted: room.gameState.gameStarted,
+        currentTurn: room.gameState.currentTurn
     });
 });
 
@@ -131,27 +174,27 @@ wss.on('connection', (ws, req) => {
     const player = room.players.find(p => p.id === playerId);
     if (!player) return ws.close(1008, 'Jugador no registrado');
 
+    // Actualizar conexión WebSocket del jugador
     player.ws = ws;
     console.log(`✔ ${player.name} conectado a sala ${roomId}`);
 
-    // Enviar estado inicial
+    // Notificar a todos los jugadores
+    broadcastRoomUpdate(room);
+
+    // Enviar estado inicial al jugador
     ws.send(JSON.stringify({
-        type: 'game_state',
-        state: {
+        type: 'init_game',
+        playerId: player.id,
+        roomId: roomId,
+        isHost: player.isHost,
+        gameState: {
             board: room.gameState.board,
             currentTurn: room.gameState.currentTurn,
-            yourCards: player.cards,
-            players: room.players.map(p => ({
-                id: p.id,
-                name: p.name,
-                cardCount: p.cards.length
-            }))
+            gameStarted: room.gameState.gameStarted
         }
     }));
 
-    // Notificar a todos de la nueva conexión
-    broadcastRoomUpdate(room);
-
+    // Manejo de mensajes
     ws.on('message', (message) => {
         try {
             const msg = JSON.parse(message);
@@ -162,8 +205,8 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('close', () => {
-        player.ws = null;
         console.log(`✖ ${player.name} desconectado`);
+        player.ws = null;
         broadcastRoomUpdate(room);
     });
 });
@@ -178,13 +221,13 @@ function handleGameMessage(room, player, msg) {
             break;
 
         case 'play_card':
-            if (player.id === room.gameState.currentTurn) {
-                playCard(room, player, msg.card, msg.position);
+            if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                playCard(room, player, msg.cardValue, msg.position);
             }
             break;
 
         case 'draw_card':
-            if (player.id === room.gameState.currentTurn) {
+            if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                 drawCard(room, player);
             }
             break;
@@ -194,7 +237,7 @@ function handleGameMessage(room, player, msg) {
 function startGame(room) {
     room.gameState.gameStarted = true;
 
-    // Repartir cartas
+    // Repartir cartas iniciales (6 por jugador)
     room.players.forEach(player => {
         player.cards = [];
         for (let i = 0; i < 6; i++) {
@@ -204,27 +247,33 @@ function startGame(room) {
         }
     });
 
+    // El host juega primero
     room.gameState.currentTurn = room.players[0].id;
 
     broadcastGameState(room);
 }
 
 function playCard(room, player, cardValue, position) {
-    const cardIndex = player.cards.findIndex(c => c === cardValue);
+    const cardIndex = player.cards.indexOf(cardValue);
     if (cardIndex === -1) return;
 
     const board = room.gameState.board;
     let validMove = false;
+    let targetValue, newValue;
 
-    if (position === 'asc1' || position === 'asc2') {
+    if (position.includes('asc')) {
         const target = position === 'asc1' ? 0 : 1;
-        if (cardValue > board.ascending[target] || cardValue === board.ascending[target] - 10) {
+        targetValue = board.ascending[target];
+        // Validar: carta > valor actual O carta = valor actual - 10
+        if (cardValue > targetValue || cardValue === targetValue - 10) {
             board.ascending[target] = cardValue;
             validMove = true;
         }
     } else {
         const target = position === 'desc1' ? 0 : 1;
-        if (cardValue < board.descending[target] || cardValue === board.descending[target] + 10) {
+        targetValue = board.descending[target];
+        // Validar: carta < valor actual O carta = valor actual + 10
+        if (cardValue < targetValue || cardValue === targetValue + 10) {
             board.descending[target] = cardValue;
             validMove = true;
         }
@@ -232,6 +281,7 @@ function playCard(room, player, cardValue, position) {
 
     if (validMove) {
         player.cards.splice(cardIndex, 1);
+        checkGameStatus(room);
         nextTurn(room);
     }
 }
@@ -251,7 +301,29 @@ function nextTurn(room) {
     broadcastGameState(room);
 }
 
+function checkGameStatus(room) {
+    // Verificar si algún jugador se quedó sin cartas
+    const playersWithCards = room.players.filter(p => p.cards.length > 0).length;
+
+    if (playersWithCards === 0 && room.gameState.deck.length === 0) {
+        // Todos ganan
+        broadcastToRoom(room, {
+            type: 'game_over',
+            result: 'win',
+            message: '¡Todos ganan! Todas las cartas jugadas.'
+        });
+    }
+}
+
 // Helper functions
+function broadcastToRoom(room, message) {
+    room.players.forEach(player => {
+        if (player.ws && player.ws.readyState === WebSocket.OPEN) {
+            player.ws.send(JSON.stringify(message));
+        }
+    });
+}
+
 function broadcastGameState(room) {
     room.players.forEach(player => {
         if (player.ws && player.ws.readyState === WebSocket.OPEN) {
@@ -265,7 +337,8 @@ function broadcastGameState(room) {
                         id: p.id,
                         name: p.name,
                         cardCount: p.cards.length
-                    }))
+                    })),
+                    remainingDeck: room.gameState.deck.length
                 }
             }));
         }
@@ -276,6 +349,7 @@ function broadcastRoomUpdate(room) {
     const roomInfo = {
         type: 'room_update',
         players: room.players.map(p => ({
+            id: p.id,
             name: p.name,
             isHost: p.isHost,
             cardCount: p.cards.length,
@@ -284,27 +358,7 @@ function broadcastRoomUpdate(room) {
         gameStarted: room.gameState.gameStarted
     };
 
-    room.players.forEach(player => {
-        if (player.ws && player.ws.readyState === WebSocket.OPEN) {
-            player.ws.send(JSON.stringify(roomInfo));
-        }
-    });
-}
-
-function initializeDeck() {
-    const deck = [];
-    for (let i = 2; i < 100; i++) {
-        deck.push(i);
-    }
-    return shuffleArray(deck);
-}
-
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
+    broadcastToRoom(room, roomInfo);
 }
 
 // Start Server

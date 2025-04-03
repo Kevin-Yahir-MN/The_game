@@ -80,3 +80,59 @@ body {
     margin: 0 auto;
     border: 3px solid #333;
 }
+
+/* Estilos para la lista de jugadores */
+#playersList {
+    list-style-type: none;
+    padding: 0;
+    margin: 20px 0;
+}
+
+#playersList li {
+    padding: 10px 15px;
+    margin: 5px 0;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+}
+
+#playersList li.host {
+    background-color: #e3f2fd;
+    font-weight: bold;
+}
+
+#playersList li.you {
+    background-color: #e8f5e9;
+}
+
+#playersList li.you::after {
+    content: " (Tú)";
+    color: #2e7d32;
+}
+
+#playersList li.host::after {
+    content: " (Host)";
+    color: #0d47a1;
+}
+
+/* Botón de inicio */
+#startGame {
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: background-color 0.3s;
+}
+
+#startGame:hover {
+    background-color: #388e3c;
+}
+
+#startGame.hidden {
+    display: none;
+}
