@@ -32,16 +32,32 @@
         .game-instructions li {
             margin-bottom: 5px;
         }
+
+        #endTurnBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            z-index: 100;
+        }
+
+        #endTurnBtn:hover {
+            background-color: #c0392b;
+        }
     </style>
 </head>
 
 <body>
     <div id="gameContainer">
+        <button id="endTurnBtn">Terminar Turno</button>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
-        <div id="gameControls">
-            <button id="returnCards" class="game-button" disabled>Devolver Cartas</button>
-            <button id="endTurn" class="game-button" disabled>Terminar Turno</button>
-        </div>
     </div>
 
     <div class="game-instructions">
@@ -50,8 +66,7 @@
             <li>Haz click en una carta para seleccionarla (amarillo)</li>
             <li>Haz click en una columna para jugar la carta seleccionada</li>
             <li>Las cartas jugadas este turno aparecen en azul</li>
-            <li>Puedes hacer click en cartas azules para devolverlas a tu mano</li>
-            <li>Juega al menos 2 cartas por turno (1 si no quedan cartas en la baraja)</li>
+            <li>Debes jugar al menos 2 cartas por turno (1 si no quedan cartas en la baraja)</li>
             <li>Presiona "Terminar Turno" cuando hayas terminado</li>
         </ul>
     </div>

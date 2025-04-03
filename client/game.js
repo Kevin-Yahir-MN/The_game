@@ -4,8 +4,7 @@ const ctx = canvas.getContext('2d');
 const WS_URL = 'wss://the-game-2xks.onrender.com';
 
 // Elementos de la interfaz
-const returnCardsButton = document.getElementById('returnCards');
-const endTurnButton = document.getElementById('endTurn');
+const endTurnButton = document.getElementById('endTurnBtn');
 
 // Variables del juego
 let socket;
@@ -124,37 +123,10 @@ function initGame() {
         return;
     }
 
-    returnCardsButton.addEventListener('click', handleReturnCards);
     endTurnButton.addEventListener('click', endTurn);
     connectWebSocket();
     canvas.addEventListener('click', handleCanvasClick);
     gameLoop();
-}
-
-// Función para manejar el botón de devolver cartas
-function handleReturnCards() {
-    if (gameState.currentTurn !== currentPlayer.id) {
-        showNotification('No es tu turno', true);
-        return;
-    }
-
-    if (gameState.cardsPlayedThisTurn.length === 0) {
-        showNotification('No hay cartas para devolver', true);
-        return;
-    }
-
-    gameState.cardsPlayedThisTurn.forEach(card => {
-        socket.send(JSON.stringify({
-            type: 'return_card',
-            playerId: currentPlayer.id,
-            cardValue: card.value,
-            position: card.position
-        }));
-    });
-
-    selectedCard = null;
-    gameState.cardsPlayedThisTurn = [];
-    updateEndTurnButton();
 }
 
 // Conectar al servidor WebSocket
@@ -173,16 +145,7 @@ function connectWebSocket() {
 
             switch (message.type) {
                 case 'game_state':
-                    // Preservar las cartas jugadas este turno si es nuestro turno
-                    const wasOurTurn = gameState.currentTurn === currentPlayer.id;
-                    const ourCardsPlayed = wasOurTurn ? gameState.cardsPlayedThisTurn : [];
-
                     updateGameState(message.state);
-
-                    // Restaurar las cartas jugadas este turno si sigue siendo nuestro turno
-                    if (gameState.currentTurn === currentPlayer.id) {
-                        gameState.cardsPlayedThisTurn = ourCardsPlayed;
-                    }
                     break;
                 case 'game_started':
                     updateGameState(message.state);
@@ -195,20 +158,12 @@ function connectWebSocket() {
                     break;
                 case 'invalid_move':
                     showNotification(message.reason, true);
-                    // Si el movimiento fue inválido, devolver la carta a la mano
-                    if (selectedCard) {
-                        gameState.yourCards.push(new Card(selectedCard.value, 0, 0, false));
-                        selectedCard = null;
-                    }
                     break;
                 case 'init_state':
                     gameState = { ...gameState, ...message.state };
                     break;
                 case 'notification':
                     showNotification(message.message, message.isError);
-                    break;
-                case 'card_returned':
-                    showNotification('Carta devuelta a tu mano', false);
                     break;
                 case 'card_played':
                     // Actualizar el estado cuando el servidor confirma que se jugó una carta
@@ -220,7 +175,6 @@ function connectWebSocket() {
                         value: message.cardValue,
                         position: message.position
                     });
-                    updateEndTurnButton();
                     break;
                 default:
                     console.warn('Tipo de mensaje no reconocido:', message.type);
@@ -315,8 +269,6 @@ function updateGameState(newState) {
     if (!isYourTurn) {
         selectedCard = null;
     }
-
-    updateEndTurnButton();
 }
 
 // Verificar si una carta puede ser jugada
@@ -343,18 +295,6 @@ function handleCanvasClick(event) {
     const clickedColumn = getClickedColumn(x, y);
     if (clickedColumn && selectedCard) {
         playCard(selectedCard.value, clickedColumn);
-        return;
-    }
-
-    // Verificar si se hizo clic en una carta jugada este turno
-    const clickedPlayedCard = gameState.cardsPlayedThisTurn.find(card => {
-        const pos = getCardPosition(card.position);
-        return x >= pos.x && x <= pos.x + CARD_WIDTH &&
-            y >= pos.y && y <= pos.y + CARD_HEIGHT;
-    });
-
-    if (clickedPlayedCard) {
-        returnCardToHand(clickedPlayedCard);
         return;
     }
 
@@ -396,29 +336,26 @@ function playCard(cardValue, position) {
         position: position
     }));
 
-    // No actualizar el estado local aquí - esperar confirmación del servidor (mensaje 'card_played')
     selectedCard = null;
 }
 
-// Devolver carta a la mano
-function returnCardToHand(card) {
-    if (gameState.currentTurn !== currentPlayer.id) {
-        showNotification('No es tu turno', true);
+// Terminar turno
+function endTurn() {
+    const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+    if (gameState.cardsPlayedThisTurn.length < minCardsRequired) {
+        const missingCards = minCardsRequired - gameState.cardsPlayedThisTurn.length;
+        showNotification(`Debes jugar ${missingCards} carta(s) más para terminar el turno`, true);
         return;
     }
 
     socket.send(JSON.stringify({
-        type: 'return_card',
+        type: 'end_turn',
         playerId: currentPlayer.id,
-        cardValue: card.value,
-        position: card.position
+        cardsPlayed: gameState.cardsPlayedThisTurn.length
     }));
 
-    // Actualizar UI localmente
-    gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
-        c => !(c.value === card.value && c.position === card.position)
-    );
-    updateEndTurnButton();
+    gameState.cardsPlayedThisTurn = [];
+    selectedCard = null;
 }
 
 // Obtener columna clickeada
@@ -433,45 +370,6 @@ function getClickedColumn(x, y) {
     if (x >= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 && x <= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 + CARD_WIDTH) return 'desc2';
 
     return null;
-}
-
-// Obtener posición de una carta en el tablero
-function getCardPosition(position) {
-    switch (position) {
-        case 'asc1': return { x: BOARD_POSITION.x, y: BOARD_POSITION.y };
-        case 'asc2': return { x: BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, y: BOARD_POSITION.y };
-        case 'desc1': return { x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, y: BOARD_POSITION.y };
-        case 'desc2': return { x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, y: BOARD_POSITION.y };
-        default: return { x: 0, y: 0 };
-    }
-}
-
-// Terminar turno
-function endTurn() {
-    const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-    if (gameState.cardsPlayedThisTurn.length < minCardsRequired) {
-        showNotification(`Debes jugar al menos ${minCardsRequired} cartas este turno`, true);
-        return;
-    }
-
-    socket.send(JSON.stringify({
-        type: 'end_turn',
-        playerId: currentPlayer.id,
-        cardsPlayed: gameState.cardsPlayedThisTurn.length
-    }));
-
-    gameState.cardsPlayedThisTurn = [];
-    selectedCard = null;
-    updateEndTurnButton();
-}
-
-// Actualizar estado de los botones
-function updateEndTurnButton() {
-    const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-    endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id ||
-        gameState.cardsPlayedThisTurn.length < minCardsRequired;
-    returnCardsButton.disabled = gameState.currentTurn !== currentPlayer.id ||
-        gameState.cardsPlayedThisTurn.length === 0;
 }
 
 // Bucle principal del juego
@@ -502,10 +400,6 @@ function drawGameInfo() {
 
     ctx.fillText(`Turno: ${currentTurnPlayer?.name || 'Esperando...'}`, 20, 20);
     ctx.fillText(`Cartas en la baraja: ${gameState.remainingDeck}`, 20, 50);
-
-    // Contador de cartas jugadas con estilo destacado
-    ctx.fillStyle = '#FFFF00';
-    ctx.font = 'bold 26px Arial';
     ctx.fillText(`Cartas jugadas este turno: ${gameState.cardsPlayedThisTurn.length}`, 20, 80);
 }
 
