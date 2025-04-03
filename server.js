@@ -2,6 +2,7 @@ const express = require('express');
 const WebSocket = require('ws');
 const http = require('http');
 const { v4: uuidv4 } = require('uuid');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -10,8 +11,9 @@ const wss = new WebSocket.Server({ server });
 // Almacenamiento de salas en memoria
 const rooms = new Map();
 
+// Middleware
 app.use(express.json());
-app.use(express.static('client'));
+app.use(express.static(path.join(__dirname, 'client'))); // Sirve archivos estáticos desde /client
 
 // Endpoint para crear sala
 app.post('/create-room', (req, res) => {
@@ -113,6 +115,16 @@ wss.on('connection', (ws, req) => {
     });
 });
 
+// Rutas para páginas HTML
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'client', 'index.html'));
+});
+
+app.get('/game.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'client', 'game.html'));
+});
+
+// Funciones auxiliares
 function handleClientMessage(roomId, playerId, message) {
     const room = rooms.get(roomId);
     if (!room) return;
@@ -124,7 +136,6 @@ function handleClientMessage(roomId, playerId, message) {
         case 'card_played':
         case 'end_turn':
         case 'game_state':
-            // Solo el host puede enviar actualizaciones del juego
             if (player.isHost) {
                 broadcastToRoom(roomId, msg, playerId);
             }
@@ -150,6 +161,7 @@ function generateRoomId() {
     return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
+// Iniciar servidor
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Servidor escuchando en puerto ${PORT}`);
