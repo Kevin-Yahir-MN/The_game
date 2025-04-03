@@ -11,21 +11,26 @@
             position: fixed;
             bottom: 10px;
             left: 10px;
-            background-color: rgba(255, 255, 255, 0.8);
-            padding: 10px;
-            border-radius: 5px;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 10px 15px;
+            border-radius: 8px;
             font-size: 14px;
             max-width: 300px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
 
         .game-instructions h3 {
-            margin-top: 0;
-            margin-bottom: 8px;
+            margin: 0 0 8px 0;
+            color: #2c3e50;
         }
 
         .game-instructions ul {
-            margin-top: 0;
+            margin: 0;
             padding-left: 20px;
+        }
+
+        .game-instructions li {
+            margin-bottom: 5px;
         }
     </style>
 </head>
@@ -41,9 +46,11 @@
     <div class="game-instructions">
         <h3>Instrucciones:</h3>
         <ul>
-            <li>Haz click en una carta para seleccionarla</li>
+            <li>Haz click en una carta para seleccionarla (amarillo)</li>
             <li>Haz click en una columna para jugar la carta seleccionada</li>
-            <li>Debes jugar al menos 2 cartas por turno (1 si no quedan cartas en el mazo)</li>
+            <li>Las cartas jugadas este turno aparecen en azul</li>
+            <li>Puedes hacer click en cartas azules para devolverlas a tu mano</li>
+            <li>Juega al menos 2 cartas por turno (1 si no quedan cartas)</li>
             <li>Presiona "Terminar Turno" cuando hayas terminado</li>
         </ul>
     </div>
