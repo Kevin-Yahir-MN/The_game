@@ -112,15 +112,18 @@ function connectWebSocket() {
                     alert(message.message);
                     break;
                 case 'invalid_move':
-                    alert('Movimiento inválido: ' + message.reason);
+                    showNotification(message.reason, true);
                     break;
                 case 'init_state':
-                    // Estado inicial cuando un jugador se conecta
                     gameState = {
                         ...gameState,
                         ...message.state,
-                        yourCards: message.yourCards || []
+                        yourCards: message.yourCards || [],
+                        cardsPlayedThisTurn: message.isYourTurn ? gameState.cardsPlayedThisTurn : []
                     };
+                    break;
+                case 'notification':
+                    showNotification(message.message, message.isError);
                     break;
             }
         } catch (error) {
@@ -138,17 +141,27 @@ function connectWebSocket() {
     };
 }
 
+function showNotification(message, isError = false) {
+    const notification = document.createElement('div');
+    notification.className = `notification ${isError ? 'error' : ''}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        notification.classList.add('fade-out');
+        setTimeout(() => notification.remove(), 500);
+    }, 3000);
+}
+
 function updateGameState(newState) {
     console.log('Actualizando estado del juego:', newState);
 
-    // Mantener las cartas jugadas este turno
-    const currentTurnCards = gameState.cardsPlayedThisTurn;
-
-    // Actualizar estado
+    // Mantener las cartas jugadas este turno solo si es nuestro turno
     gameState = {
         ...gameState,
         ...newState,
-        cardsPlayedThisTurn: currentTurnCards
+        cardsPlayedThisTurn: newState.currentTurn === currentPlayer.id ?
+            gameState.cardsPlayedThisTurn : []
     };
 
     // Actualizar estado de las cartas jugables
@@ -171,14 +184,17 @@ function updateGameState(newState) {
 function canPlayCard(cardValue) {
     const { ascending, descending } = gameState.board;
 
-    return (cardValue > ascending[0] || cardValue === ascending[0] - 10) ||  // asc1
-        (cardValue > ascending[1] || cardValue === ascending[1] - 10) ||  // asc2
-        (cardValue < descending[0] || cardValue === descending[0] + 10) || // desc1
-        (cardValue < descending[1] || cardValue === descending[1] + 10);   // desc2
+    return (cardValue === ascending[0] - 10 || cardValue > ascending[0]) ||  // asc1
+        (cardValue === ascending[1] - 10 || cardValue > ascending[1]) ||  // asc2
+        (cardValue === descending[0] + 10 || cardValue < descending[0]) || // desc1
+        (cardValue === descending[1] + 10 || cardValue < descending[1]);   // desc2
 }
 
 function handleCanvasClick(event) {
-    if (gameState.currentTurn !== currentPlayer.id) return;
+    if (gameState.currentTurn !== currentPlayer.id) {
+        showNotification('No es tu turno', true);
+        return;
+    }
 
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
@@ -262,6 +278,8 @@ function playCard(cardValue, position) {
         x: x,
         y: y
     });
+
+    updateEndTurnButton();
 }
 
 function returnCardToHand(cardInfo) {
@@ -276,12 +294,14 @@ function returnCardToHand(cardInfo) {
     gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
         c => !(c.value === cardInfo.value && c.position === cardInfo.position)
     );
+
+    updateEndTurnButton();
 }
 
 function endTurn() {
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
     if (gameState.cardsPlayedThisTurn.length < minCardsRequired) {
-        alert(`Debes jugar al menos ${minCardsRequired} cartas este turno`);
+        showNotification(`Debes jugar al menos ${minCardsRequired} cartas este turno`, true);
         return;
     }
 
@@ -292,12 +312,14 @@ function endTurn() {
     }));
 
     gameState.cardsPlayedThisTurn = [];
+    updateEndTurnButton();
 }
 
 function updateEndTurnButton() {
     const endTurnBtn = document.getElementById('endTurn');
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-    endTurnBtn.disabled = gameState.cardsPlayedThisTurn.length < minCardsRequired;
+    endTurnBtn.disabled = gameState.currentTurn !== currentPlayer.id ||
+        gameState.cardsPlayedThisTurn.length < minCardsRequired;
 }
 
 function gameLoop() {
