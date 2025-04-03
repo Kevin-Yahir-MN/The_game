@@ -190,23 +190,34 @@ function handleCanvasClick(event) {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    // Verificar click en cartas jugadas este turno
-    const clickedPlayedCard = gameState.cardsPlayedThisTurn.find(card => {
-        const pos = getCardPosition(card.position);
-        return x >= pos.x && x <= pos.x + CARD_WIDTH &&
-            y >= pos.y && y <= pos.y + CARD_HEIGHT;
-    });
-
-    if (clickedPlayedCard) {
-        returnCardToHand(clickedPlayedCard);
-        return;
-    }
-
-    // Verificar click en columnas
+    // Verificar click en columnas (prioridad si hay carta seleccionada)
     const clickedColumn = getClickedColumn(x, y);
     if (clickedColumn && selectedCard) {
-        playCard(selectedCard.value, clickedColumn);
-        return;
+        // Verificar si hay una carta jugada este turno en esa columna
+        const cardInColumn = gameState.cardsPlayedThisTurn.find(
+            c => c.position === clickedColumn &&
+                c.value === gameState.board[clickedColumn.includes('asc') ? 'ascending' : 'descending'][clickedColumn.includes('1') ? 0 : 1]
+        );
+
+        // Si hay carta en la columna pero tenemos una seleccionada, intentar jugar
+        if (cardInColumn) {
+            playCard(selectedCard.value, clickedColumn);
+            return;
+        }
+    }
+
+    // Verificar click en cartas jugadas este turno (solo si no hay carta seleccionada)
+    if (!selectedCard) {
+        const clickedPlayedCard = gameState.cardsPlayedThisTurn.find(card => {
+            const pos = getCardPosition(card.position);
+            return x >= pos.x && x <= pos.x + CARD_WIDTH &&
+                y >= pos.y && y <= pos.y + CARD_HEIGHT;
+        });
+
+        if (clickedPlayedCard) {
+            returnCardToHand(clickedPlayedCard);
+            return;
+        }
     }
 
     // Verificar click en cartas de la mano
@@ -225,6 +236,11 @@ function handleCanvasClick(event) {
             }
         }
     });
+
+    // Si clickeamos una columna con carta seleccionada (y no había carta jugada este turno)
+    if (clickedColumn && selectedCard) {
+        playCard(selectedCard.value, clickedColumn);
+    }
 }
 
 function getClickedColumn(x, y) {
