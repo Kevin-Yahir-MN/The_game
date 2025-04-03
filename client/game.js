@@ -5,7 +5,6 @@ const WS_URL = 'wss://the-game-2xks.onrender.com';
 
 // Elementos de la interfaz
 const endTurnButton = document.getElementById('endTurnBtn');
-const undoLastCardButton = document.getElementById('undoLastCardBtn');
 
 // Variables del juego
 let socket;
@@ -70,10 +69,9 @@ class Card {
 
         // Fondo de la carta
         let fillColor = '#FFFFFF';
-        if (this === selectedCard) {
-            fillColor = '#FFFF99'; // Amarillo para carta seleccionada
-        } else if (this.isPlayedThisTurn) {
-            fillColor = this.isMostRecent ? '#4DA6FF' : '#1E90FF'; // Azul para cartas jugadas este turno
+        if (this === selectedCard) fillColor = '#FFFF99';
+        else if (this.isPlayedThisTurn) {
+            fillColor = this.isMostRecent ? '#ADD8E6' : '#A0C0E0';
         }
 
         ctx.fillStyle = fillColor;
@@ -126,7 +124,6 @@ function initGame() {
     }
 
     endTurnButton.addEventListener('click', endTurn);
-    undoLastCardButton.addEventListener('click', undoLastCard);
     connectWebSocket();
     canvas.addEventListener('click', handleCanvasClick);
     gameLoop();
@@ -167,21 +164,11 @@ function connectWebSocket() {
                         gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
                             c => c.value !== message.cardValue
                         );
-                        updateUndoButton();
                     }
                     break;
                 case 'card_played':
                     // Confirmación del servidor de que se jugó una carta
                     showNotification(`Carta ${message.cardValue} colocada correctamente`, false);
-                    break;
-                case 'card_returned':
-                    // Confirmación del servidor de que se devolvió una carta
-                    showNotification(`Carta ${message.cardValue} devuelta a tu mano`, false);
-                    gameState.yourCards.push(new Card(message.cardValue, 0, 0, false));
-                    gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
-                        c => c.value !== message.cardValue
-                    );
-                    updateGameState({}); // Forzar actualización de la UI
                     break;
                 case 'init_state':
                     gameState = { ...gameState, ...message.state };
@@ -241,15 +228,20 @@ function isValidMove(cardValue, position) {
 function updateGameState(newState) {
     console.log('Actualizando estado del juego:', newState);
 
-    if (newState && newState.board) {
-        gameState.board = {
+    if (!newState || !newState.board) {
+        console.error('Estado del juego inválido:', newState);
+        return;
+    }
+
+    gameState = {
+        ...gameState,
+        ...newState,
+        board: {
             ascending: newState.board.ascending || [1, 1],
             descending: newState.board.descending || [100, 100]
-        };
-        gameState.remainingDeck = newState.remainingDeck || 98;
-        gameState.currentTurn = newState.currentTurn || gameState.currentTurn;
-        gameState.players = newState.players || gameState.players;
-    }
+        },
+        remainingDeck: newState.remainingDeck || 98
+    };
 
     if (!Array.isArray(gameState.yourCards)) {
         gameState.yourCards = [];
@@ -278,14 +270,6 @@ function updateGameState(newState) {
         selectedCard = null;
         gameState.cardsPlayedThisTurn = [];
     }
-
-    updateUndoButton();
-}
-
-// Actualizar estado del botón de devolver carta
-function updateUndoButton() {
-    const isYourTurn = gameState.currentTurn === currentPlayer.id;
-    undoLastCardButton.disabled = !isYourTurn || gameState.cardsPlayedThisTurn.length === 0;
 }
 
 // Verificar si una carta puede ser jugada
@@ -346,12 +330,10 @@ function playCard(cardValue, position) {
     }
 
     // Actualizar el estado local inmediatamente
-    const newPlayedCard = {
+    gameState.cardsPlayedThisTurn.push({
         value: cardValue,
-        position: position,
-        timestamp: Date.now()
-    };
-    gameState.cardsPlayedThisTurn.push(newPlayedCard);
+        position: position
+    });
 
     // Eliminar la carta de la mano
     const cardIndex = gameState.yourCards.findIndex(card => card.value === cardValue);
@@ -368,41 +350,7 @@ function playCard(cardValue, position) {
     }));
 
     selectedCard = null;
-    updateUndoButton();
     showNotification(`Carta ${cardValue} jugada en ${position}`, false);
-}
-
-// Devolver la última carta jugada
-function undoLastCard() {
-    if (gameState.currentTurn !== currentPlayer.id) {
-        showNotification('No es tu turno', true);
-        return;
-    }
-
-    if (gameState.cardsPlayedThisTurn.length === 0) {
-        showNotification('No hay cartas para devolver', true);
-        return;
-    }
-
-    // Obtener la última carta jugada (ordenadas por timestamp)
-    const lastPlayedCards = [...gameState.cardsPlayedThisTurn].sort((a, b) => b.timestamp - a.timestamp);
-    const lastCard = lastPlayedCards[0];
-
-    if (!lastCard) {
-        showNotification('No se pudo encontrar la última carta jugada', true);
-        return;
-    }
-
-    // Enviar solicitud al servidor para devolver la carta
-    socket.send(JSON.stringify({
-        type: 'return_card',
-        playerId: currentPlayer.id,
-        cardValue: lastCard.value,
-        position: lastCard.position
-    }));
-
-    // Actualizar UI localmente (el servidor confirmará con 'card_returned')
-    showNotification(`Devolviendo carta ${lastCard.value}...`, false);
 }
 
 // Terminar turno
@@ -422,7 +370,6 @@ function endTurn() {
 
     gameState.cardsPlayedThisTurn = [];
     selectedCard = null;
-    updateUndoButton();
     showNotification('Turno terminado', false);
 }
 
@@ -491,25 +438,17 @@ function drawBoard() {
 
     // Dibujar flechas y cartas ascendentes
     ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    const asc1Card = new Card(gameState.board.ascending[0], BOARD_POSITION.x, BOARD_POSITION.y);
-    asc1Card.isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(c => c.position === 'asc1' && c.value === gameState.board.ascending[0]);
-    asc1Card.draw();
+    new Card(gameState.board.ascending[0], BOARD_POSITION.x, BOARD_POSITION.y).draw();
 
     ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    const asc2Card = new Card(gameState.board.ascending[1], BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, BOARD_POSITION.y);
-    asc2Card.isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(c => c.position === 'asc2' && c.value === gameState.board.ascending[1]);
-    asc2Card.draw();
+    new Card(gameState.board.ascending[1], BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, BOARD_POSITION.y).draw();
 
     // Dibujar flechas y cartas descendentes
     ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    const desc1Card = new Card(gameState.board.descending[0], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, BOARD_POSITION.y);
-    desc1Card.isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(c => c.position === 'desc1' && c.value === gameState.board.descending[0]);
-    desc1Card.draw();
+    new Card(gameState.board.descending[0], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, BOARD_POSITION.y).draw();
 
     ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    const desc2Card = new Card(gameState.board.descending[1], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, BOARD_POSITION.y);
-    desc2Card.isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(c => c.position === 'desc2' && c.value === gameState.board.descending[1]);
-    desc2Card.draw();
+    new Card(gameState.board.descending[1], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, BOARD_POSITION.y).draw();
 }
 
 // Dibujar las cartas del jugador
