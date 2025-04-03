@@ -5,59 +5,151 @@ document.addEventListener('DOMContentLoaded', () => {
     const joinRoomBtn = document.getElementById('joinRoom');
     const roomCodeInput = document.getElementById('roomCode');
 
+    // Función para mostrar errores
+    function showError(message) {
+        const errorElement = document.createElement('div');
+        errorElement.className = 'notification error';
+        errorElement.textContent = message;
+        document.body.appendChild(errorElement);
+
+        setTimeout(() => {
+            errorElement.remove();
+        }, 3000);
+    }
+
+    // Función para validar el nombre del jugador
+    function validatePlayerName(name) {
+        if (!name || name.trim() === '') {
+            showError('Ingresa tu nombre');
+            return false;
+        }
+        if (name.length > 20) {
+            showError('El nombre no puede tener más de 20 caracteres');
+            return false;
+        }
+        return true;
+    }
+
+    // Función para validar el código de sala
+    function validateRoomCode(code) {
+        if (!code || code.trim() === '') {
+            showError('Ingresa el código de sala');
+            return false;
+        }
+        if (!/^\d{4}$/.test(code)) {
+            showError('El código debe tener 4 dígitos');
+            return false;
+        }
+        return true;
+    }
+
+    // Evento para crear sala
     createRoomBtn.addEventListener('click', async () => {
         const playerName = playerNameInput.value.trim();
-        if (!playerName) return alert('Ingresa tu nombre');
+
+        if (!validatePlayerName(playerName)) return;
+
+        createRoomBtn.disabled = true;
+        createRoomBtn.textContent = 'Creando...';
 
         try {
             const response = await fetch(`${API_URL}/create-room`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
                 body: JSON.stringify({ playerName })
             });
+
+            if (!response.ok) {
+                throw new Error(`Error HTTP: ${response.status}`);
+            }
+
             const data = await response.json();
 
             if (data.success) {
-                // Guardar todos los datos necesarios
+                // Guardar datos en sessionStorage
                 sessionStorage.setItem('playerName', playerName);
                 sessionStorage.setItem('playerId', data.playerId);
                 sessionStorage.setItem('roomId', data.roomId);
                 sessionStorage.setItem('isHost', 'true');
+
+                // Redirigir a la sala
                 window.location.href = 'sala.html';
+            } else {
+                showError(data.message || 'Error al crear la sala');
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Error al crear sala');
+            showError('Error al conectar con el servidor');
+        } finally {
+            createRoomBtn.disabled = false;
+            createRoomBtn.textContent = 'Crear Sala';
         }
     });
 
+    // Evento para unirse a sala
     joinRoomBtn.addEventListener('click', async () => {
         const playerName = playerNameInput.value.trim();
         const roomCode = roomCodeInput.value.trim();
 
-        if (!playerName || !roomCode) return alert('Datos incompletos');
+        if (!validatePlayerName(playerName)) return;
+        if (!validateRoomCode(roomCode)) return;
+
+        joinRoomBtn.disabled = true;
+        joinRoomBtn.textContent = 'Uniendo...';
 
         try {
             const response = await fetch(`${API_URL}/join-room`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ playerName, roomId: roomCode })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    playerName,
+                    roomId: roomCode
+                })
             });
+
+            if (!response.ok) {
+                throw new Error(`Error HTTP: ${response.status}`);
+            }
+
             const data = await response.json();
 
             if (data.success) {
-                // Guardar todos los datos necesarios
+                // Guardar datos en sessionStorage
                 sessionStorage.setItem('playerName', playerName);
                 sessionStorage.setItem('playerId', data.playerId);
                 sessionStorage.setItem('roomId', roomCode);
                 sessionStorage.setItem('isHost', 'false');
+
+                // Redirigir a la sala
                 window.location.href = 'sala.html';
             } else {
-                alert(data.message || 'Error al unirse a la sala');
+                showError(data.message || 'Error al unirse a la sala');
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Error de conexión');
+            showError('Error al conectar con el servidor');
+        } finally {
+            joinRoomBtn.disabled = false;
+            joinRoomBtn.textContent = 'Unirse';
+        }
+    });
+
+    // Permitir enviar con Enter
+    playerNameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            createRoomBtn.click();
+        }
+    });
+
+    roomCodeInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            joinRoomBtn.click();
         }
     });
 });
