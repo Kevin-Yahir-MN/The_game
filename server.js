@@ -42,8 +42,6 @@ app.use(express.static(path.join(__dirname, 'client')));
 
 // Almacenamiento de salas
 const rooms = new Map();
-
-// Estructura para rastrear historial de movimientos
 const boardHistory = new Map();
 
 // Inicializar mazo de cartas
@@ -331,46 +329,30 @@ function playCard(room, player, cardValue, position) {
     if (position.includes('asc')) {
         const target = position === 'asc1' ? 0 : 1;
         const targetValue = board.ascending[target];
-        // Validar: carta > valor actual O carta = valor actual - 10
         if (cardValue > targetValue || cardValue === targetValue - 10) {
             board.ascending[target] = cardValue;
             validMove = true;
-        } else {
-            player.ws.send(JSON.stringify({
-                type: 'notification',
-                message: `En pilas ascendentes, la carta debe ser mayor que ${targetValue} o igual a ${targetValue - 10}`,
-                isError: true
-            }));
         }
     } else {
         const target = position === 'desc1' ? 0 : 1;
         const targetValue = board.descending[target];
-        // Validar: carta < valor actual O carta = valor actual + 10
         if (cardValue < targetValue || cardValue === targetValue + 10) {
             board.descending[target] = cardValue;
             validMove = true;
-        } else {
-            player.ws.send(JSON.stringify({
-                type: 'notification',
-                message: `En pilas descendentes, la carta debe ser menor que ${targetValue} o igual a ${targetValue + 10}`,
-                isError: true
-            }));
         }
     }
 
     if (validMove) {
         player.cards.splice(cardIndex, 1);
         player.cardsPlayedThisTurn++;
-
-        // Notificar a todos sobre el movimiento
-        broadcastToRoom(room, {
-            type: 'notification',
-            message: `${player.name} jugó una carta`,
-            isError: false
-        });
-
         checkGameStatus(room);
         broadcastGameState(room);
+    } else {
+        player.ws.send(JSON.stringify({
+            type: 'notification',
+            message: 'Movimiento inválido',
+            isError: true
+        }));
     }
 }
 
@@ -390,57 +372,57 @@ function updateBoardHistory(room, position, board) {
 }
 
 function returnCard(room, player, cardValue, position) {
-    const roomId = Array.from(rooms.entries()).find(([id, r]) => r === room)[0];
-    const history = boardHistory.get(roomId);
+    const board = room.gameState.board;
     let returned = false;
+
+    // Obtener todas las cartas jugadas este turno en esta columna
+    const cardsInColumn = room.players.flatMap(p =>
+        p.cardsPlayedThisTurn.map(c => ({ ...c, playerId: p.id })))
+        .filter(c => c.position === position)
+        .sort((a, b) => b.value - a.value); // Ordenar descendente
+
+    // Tomar la última carta jugada en esta columna
+    const lastCardInColumn = cardsInColumn[0];
+
+    if (!lastCardInColumn || lastCardInColumn.value !== cardValue || lastCardInColumn.playerId !== player.id) {
+        player.ws.send(JSON.stringify({
+            type: 'notification',
+            message: 'No se puede devolver esta carta',
+            isError: true
+        }));
+        return;
+    }
 
     if (position.includes('asc')) {
         const index = position === 'asc1' ? 0 : 1;
-        if (room.gameState.board.ascending[index] === cardValue) {
-            // Obtener el valor anterior del historial
-            const historyArray = position === 'asc1' ? history.ascending1 : history.ascending2;
-            if (historyArray.length > 1) {
-                historyArray.pop(); // Eliminar el valor actual
-                room.gameState.board.ascending[index] = historyArray[historyArray.length - 1];
-                player.cards.push(cardValue);
-                player.cardsPlayedThisTurn--;
-                returned = true;
-            } else {
-                // Si no hay historial, volver al valor inicial
-                room.gameState.board.ascending[index] = 1;
-                player.cards.push(cardValue);
-                player.cardsPlayedThisTurn--;
-                returned = true;
-            }
+        if (board.ascending[index] === cardValue) {
+            // Buscar el valor anterior en el historial
+            const previousValue = findPreviousValue(room, position, cardValue);
+            board.ascending[index] = previousValue || 1;
+            player.cards.push(cardValue);
+            player.cardsPlayedThisTurn--;
+            returned = true;
         }
     } else {
         const index = position === 'desc1' ? 0 : 1;
-        if (room.gameState.board.descending[index] === cardValue) {
-            // Obtener el valor anterior del historial
-            const historyArray = position === 'desc1' ? history.descending1 : history.descending2;
-            if (historyArray.length > 1) {
-                historyArray.pop(); // Eliminar el valor actual
-                room.gameState.board.descending[index] = historyArray[historyArray.length - 1];
-                player.cards.push(cardValue);
-                player.cardsPlayedThisTurn--;
-                returned = true;
-            } else {
-                // Si no hay historial, volver al valor inicial
-                room.gameState.board.descending[index] = 100;
-                player.cards.push(cardValue);
-                player.cardsPlayedThisTurn--;
-                returned = true;
-            }
+        if (board.descending[index] === cardValue) {
+            // Buscar el valor anterior en el historial
+            const previousValue = findPreviousValue(room, position, cardValue);
+            board.descending[index] = previousValue || 100;
+            player.cards.push(cardValue);
+            player.cardsPlayedThisTurn--;
+            returned = true;
         }
     }
 
     if (returned) {
-        broadcastToRoom(room, {
-            type: 'notification',
-            message: `${player.name} ha devuelto una carta`,
-            isError: false
-        });
         broadcastGameState(room);
+        player.ws.send(JSON.stringify({
+            type: 'card_returned',
+            message: 'Carta devuelta a tu mano',
+            cardValue: cardValue,
+            position: position
+        }));
     } else {
         player.ws.send(JSON.stringify({
             type: 'notification',
@@ -448,6 +430,26 @@ function returnCard(room, player, cardValue, position) {
             isError: true
         }));
     }
+}
+
+function findPreviousValue(room, position, currentValue) {
+    const roomId = Array.from(rooms.entries()).find(([id, r]) => r === room)[0];
+    const history = boardHistory.get(roomId);
+
+    if (position === 'asc1') {
+        const index = history.ascending1.indexOf(currentValue);
+        return index > 0 ? history.ascending1[index - 1] : null;
+    } else if (position === 'asc2') {
+        const index = history.ascending2.indexOf(currentValue);
+        return index > 0 ? history.ascending2[index - 1] : null;
+    } else if (position === 'desc1') {
+        const index = history.descending1.indexOf(currentValue);
+        return index > 0 ? history.descending1[index - 1] : null;
+    } else if (position === 'desc2') {
+        const index = history.descending2.indexOf(currentValue);
+        return index > 0 ? history.descending2[index - 1] : null;
+    }
+    return null;
 }
 
 function endTurn(room, player, cardsPlayed) {

@@ -42,15 +42,21 @@ class Card {
         this.height = CARD_HEIGHT;
         this.isPlayable = isPlayable;
         this.isPlayedThisTurn = false;
+        this.isMostRecent = false;
     }
 
     draw() {
-        // Fondo de la carta (amarillo si está seleccionada, azul si se jugó este turno)
-        ctx.fillStyle = this === selectedCard ? '#FFFF99' :
-            this.isPlayedThisTurn ? '#ADD8E6' : '#FFFFFF';
+        // Fondo de la carta
+        let fillColor = '#FFFFFF';
+        if (this === selectedCard) fillColor = '#FFFF99';
+        else if (this.isPlayedThisTurn) {
+            fillColor = this.isMostRecent ? '#ADD8E6' : '#A0C0E0';
+        }
+
+        ctx.fillStyle = fillColor;
         ctx.fillRect(this.x, this.y, this.width, this.height);
 
-        // Borde (verde si es jugable)
+        // Borde
         ctx.strokeStyle = this.isPlayable ? '#00FF00' : '#000000';
         ctx.lineWidth = this.isPlayable ? 3 : 1;
         ctx.strokeRect(this.x, this.y, this.width, this.height);
@@ -150,10 +156,6 @@ function showNotification(message, isError = false) {
 function updateGameState(newState) {
     console.log('Actualizando estado del juego:', newState);
 
-    // Guardar estado previo para comparación
-    const previousBoard = { ...gameState.board };
-
-    // Actualizar estado
     gameState = {
         ...gameState,
         ...newState
@@ -213,7 +215,7 @@ function handleCanvasClick(event) {
         return;
     }
 
-    // Solo verificar devolución de cartas si no hay carta seleccionada
+    // Verificar click en cartas jugadas este turno (solo si no hay carta seleccionada)
     if (!selectedCard) {
         const clickedPlayedCard = gameState.cardsPlayedThisTurn.find(card => {
             const pos = getCardPosition(card.position);
@@ -222,7 +224,7 @@ function handleCanvasClick(event) {
         });
 
         if (clickedPlayedCard) {
-            returnCardToHand(clickedPlayedCard);
+            returnMostRecentCardInColumn(clickedPlayedCard.position);
             return;
         }
     }
@@ -243,6 +245,39 @@ function handleCanvasClick(event) {
             }
         }
     });
+}
+
+function returnMostRecentCardInColumn(position) {
+    // Encontrar la carta más reciente jugada en esta columna
+    const cardsInColumn = gameState.cardsPlayedThisTurn
+        .filter(c => c.position === position)
+        .sort((a, b) => b.value - a.value); // Ordenar descendente para obtener la más reciente
+
+    if (cardsInColumn.length === 0) {
+        showNotification('No hay cartas para devolver en esta columna', true);
+        return;
+    }
+
+    const cardToReturn = cardsInColumn[0];
+
+    // Verificar que la carta aún está en el tablero
+    const currentValue = cardToReturn.position.includes('asc')
+        ? gameState.board.ascending[cardToReturn.position === 'asc1' ? 0 : 1]
+        : gameState.board.descending[cardToReturn.position === 'desc1' ? 0 : 1];
+
+    if (currentValue !== cardToReturn.value) {
+        showNotification('La carta ya no está en esta posición', true);
+        return;
+    }
+
+    socket.send(JSON.stringify({
+        type: 'return_card',
+        playerId: currentPlayer.id,
+        cardValue: cardToReturn.value,
+        position: cardToReturn.position
+    }));
+
+    showNotification('Devolviendo la última carta jugada...', false);
 }
 
 function getClickedColumn(x, y) {
@@ -322,28 +357,6 @@ function isValidMove(cardValue, position) {
     }
 }
 
-function returnCardToHand(cardInfo) {
-    // Verificar que la carta aún está en la posición indicada
-    const currentValue = cardInfo.position.includes('asc')
-        ? gameState.board.ascending[cardInfo.position === 'asc1' ? 0 : 1]
-        : gameState.board.descending[cardInfo.position === 'desc1' ? 0 : 1];
-
-    if (currentValue !== cardInfo.value) {
-        showNotification('La carta ya no está en esta posición', true);
-        return;
-    }
-
-    socket.send(JSON.stringify({
-        type: 'return_card',
-        playerId: currentPlayer.id,
-        cardValue: cardInfo.value,
-        position: cardInfo.position
-    }));
-
-    // No eliminamos inmediatamente, esperamos confirmación del servidor
-    showNotification('Procesando devolución de carta...', false);
-}
-
 function endTurn() {
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
     if (gameState.cardsPlayedThisTurn.length < minCardsRequired) {
@@ -398,25 +411,37 @@ function drawBoard() {
     // Ascendente 1
     ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
     const asc1Card = new Card(gameState.board.ascending[0], BOARD_POSITION.x, BOARD_POSITION.y);
-    asc1Card.isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(c => c.position === 'asc1' && c.value === gameState.board.ascending[0]);
+    const asc1PlayedCards = gameState.cardsPlayedThisTurn.filter(c => c.position === 'asc1');
+    asc1Card.isPlayedThisTurn = asc1PlayedCards.some(c => c.value === gameState.board.ascending[0]);
+    asc1Card.isMostRecent = asc1PlayedCards.length > 0 &&
+        asc1PlayedCards[asc1PlayedCards.length - 1].value === gameState.board.ascending[0];
     asc1Card.draw();
 
     // Ascendente 2
     ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
     const asc2Card = new Card(gameState.board.ascending[1], BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, BOARD_POSITION.y);
-    asc2Card.isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(c => c.position === 'asc2' && c.value === gameState.board.ascending[1]);
+    const asc2PlayedCards = gameState.cardsPlayedThisTurn.filter(c => c.position === 'asc2');
+    asc2Card.isPlayedThisTurn = asc2PlayedCards.some(c => c.value === gameState.board.ascending[1]);
+    asc2Card.isMostRecent = asc2PlayedCards.length > 0 &&
+        asc2PlayedCards[asc2PlayedCards.length - 1].value === gameState.board.ascending[1];
     asc2Card.draw();
 
     // Descendente 1
     ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
     const desc1Card = new Card(gameState.board.descending[0], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, BOARD_POSITION.y);
-    desc1Card.isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(c => c.position === 'desc1' && c.value === gameState.board.descending[0]);
+    const desc1PlayedCards = gameState.cardsPlayedThisTurn.filter(c => c.position === 'desc1');
+    desc1Card.isPlayedThisTurn = desc1PlayedCards.some(c => c.value === gameState.board.descending[0]);
+    desc1Card.isMostRecent = desc1PlayedCards.length > 0 &&
+        desc1PlayedCards[desc1PlayedCards.length - 1].value === gameState.board.descending[0];
     desc1Card.draw();
 
     // Descendente 2
     ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
     const desc2Card = new Card(gameState.board.descending[1], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, BOARD_POSITION.y);
-    desc2Card.isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(c => c.position === 'desc2' && c.value === gameState.board.descending[1]);
+    const desc2PlayedCards = gameState.cardsPlayedThisTurn.filter(c => c.position === 'desc2');
+    desc2Card.isPlayedThisTurn = desc2PlayedCards.some(c => c.value === gameState.board.descending[1]);
+    desc2Card.isMostRecent = desc2PlayedCards.length > 0 &&
+        desc2PlayedCards[desc2PlayedCards.length - 1].value === gameState.board.descending[1];
     desc2Card.draw();
 }
 
