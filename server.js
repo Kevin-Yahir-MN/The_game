@@ -194,6 +194,24 @@ wss.on('connection', (ws, req) => {
         }
     }));
 
+    // Si el juego ya empezó, enviar el estado completo
+    if (room.gameState.gameStarted) {
+        ws.send(JSON.stringify({
+            type: 'game_state',
+            state: {
+                board: room.gameState.board,
+                currentTurn: room.gameState.currentTurn,
+                yourCards: player.cards,
+                players: room.players.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    cardCount: p.cards.length
+                })),
+                remainingDeck: room.gameState.deck.length
+            }
+        }));
+    }
+
     // Manejo de mensajes
     ws.on('message', (message) => {
         try {
@@ -222,6 +240,23 @@ function handleGameMessage(room, player, msg) {
 
         case 'play_card':
             if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
+                if (!validPositions.includes(msg.position)) {
+                    player.ws.send(JSON.stringify({
+                        type: 'invalid_move',
+                        reason: 'Posición inválida'
+                    }));
+                    return;
+                }
+
+                if (!player.cards.includes(msg.cardValue)) {
+                    player.ws.send(JSON.stringify({
+                        type: 'invalid_move',
+                        reason: 'No tienes esa carta'
+                    }));
+                    return;
+                }
+
                 playCard(room, player, msg.cardValue, msg.position);
             }
             break;
@@ -229,6 +264,12 @@ function handleGameMessage(room, player, msg) {
         case 'draw_card':
             if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                 drawCard(room, player);
+            }
+            break;
+
+        case 'end_turn':
+            if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                nextTurn(room);
             }
             break;
     }
@@ -250,6 +291,12 @@ function startGame(room) {
     // El host juega primero
     room.gameState.currentTurn = room.players[0].id;
 
+    // Notificar a todos que el juego ha comenzado
+    broadcastToRoom(room, {
+        type: 'game_started'
+    });
+
+    // Enviar estado inicial del juego
     broadcastGameState(room);
 }
 
@@ -259,23 +306,32 @@ function playCard(room, player, cardValue, position) {
 
     const board = room.gameState.board;
     let validMove = false;
-    let targetValue, newValue;
 
     if (position.includes('asc')) {
         const target = position === 'asc1' ? 0 : 1;
-        targetValue = board.ascending[target];
+        const targetValue = board.ascending[target];
         // Validar: carta > valor actual O carta = valor actual - 10
         if (cardValue > targetValue || cardValue === targetValue - 10) {
             board.ascending[target] = cardValue;
             validMove = true;
+        } else {
+            player.ws.send(JSON.stringify({
+                type: 'invalid_move',
+                reason: `En pilas ascendentes, la carta debe ser mayor que ${targetValue} o igual a ${targetValue - 10}`
+            }));
         }
     } else {
         const target = position === 'desc1' ? 0 : 1;
-        targetValue = board.descending[target];
+        const targetValue = board.descending[target];
         // Validar: carta < valor actual O carta = valor actual + 10
         if (cardValue < targetValue || cardValue === targetValue + 10) {
             board.descending[target] = cardValue;
             validMove = true;
+        } else {
+            player.ws.send(JSON.stringify({
+                type: 'invalid_move',
+                reason: `En pilas descendentes, la carta debe ser menor que ${targetValue} o igual a ${targetValue + 10}`
+            }));
         }
     }
 
@@ -290,6 +346,11 @@ function drawCard(room, player) {
     if (room.gameState.deck.length > 0) {
         player.cards.push(room.gameState.deck.pop());
         nextTurn(room);
+    } else {
+        player.ws.send(JSON.stringify({
+            type: 'invalid_move',
+            reason: 'No quedan cartas en el mazo'
+        }));
     }
 }
 
@@ -319,7 +380,11 @@ function checkGameStatus(room) {
 function broadcastToRoom(room, message) {
     room.players.forEach(player => {
         if (player.ws && player.ws.readyState === WebSocket.OPEN) {
-            player.ws.send(JSON.stringify(message));
+            try {
+                player.ws.send(JSON.stringify(message));
+            } catch (error) {
+                console.error(`Error enviando mensaje a ${player.name}:`, error);
+            }
         }
     });
 }

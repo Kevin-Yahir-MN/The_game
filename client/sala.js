@@ -11,25 +11,24 @@ const isHost = sessionStorage.getItem('isHost') === 'true';
 // Elementos del DOM
 const roomIdDisplay = document.getElementById('roomIdDisplay');
 const playersList = document.getElementById('playersList');
-const startGameBtn = document.getElementById('startGame');
+const startBtn = document.getElementById('startGame');
 
 document.addEventListener('DOMContentLoaded', () => {
     // Configurar elementos iniciales
     roomIdDisplay.textContent = roomId;
 
     if (isHost) {
-        startGameBtn.classList.remove('hidden');
-        startGameBtn.addEventListener('click', startGame);
+        startBtn.classList.remove('hidden');
+        startBtn.addEventListener('click', handleStartGame);
     }
 
-    // Iniciar conexión y actualizaciones
-    connectWebSocket();
+    // Iniciar conexión WebSocket
+    initializeWebSocket();
     updatePlayersList();
     setInterval(updatePlayersList, 3000);
 });
 
-function connectWebSocket() {
-    // Cerrar conexión existente si está abierta
+function initializeWebSocket() {
     if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
         socket.close();
     }
@@ -42,6 +41,8 @@ function connectWebSocket() {
 
     socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
+        console.log('Mensaje recibido:', message);
+
         if (message.type === 'game_started') {
             window.location.href = 'game.html';
         } else if (message.type === 'room_update') {
@@ -50,7 +51,8 @@ function connectWebSocket() {
     };
 
     socket.onclose = () => {
-        console.log('Conexión WebSocket cerrada');
+        console.log('Conexión cerrada, reconectando...');
+        setTimeout(initializeWebSocket, 2000);
     };
 
     socket.onerror = (error) => {
@@ -58,46 +60,17 @@ function connectWebSocket() {
     };
 }
 
-function updatePlayersList() {
-    fetch(`${API_URL}/room-info/${roomId}`)
-        .then(response => {
-            if (!response.ok) throw new Error('Error en la respuesta');
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                updatePlayersUI(data.players);
-            }
-        })
-        .catch(error => {
-            console.error('Error al actualizar jugadores:', error);
-        });
-}
-
-function updatePlayersUI(players) {
-    playersList.innerHTML = players.map(player => {
-        // Manejo seguro del nombre del jugador
-        const name = typeof player === 'object' ? player.name : player;
-        const isCurrentPlayer = name === playerName;
-        const isHostPlayer = typeof player === 'object' ? player.isHost : false;
-
-        return `
-            <li class="${isHostPlayer ? 'host' : ''} ${isCurrentPlayer ? 'you' : ''}">
-                ${name}
-                ${isHostPlayer ? ' (Host)' : ''}
-                ${isCurrentPlayer ? ' (Tú)' : ''}
-            </li>`;
-    }).join('');
-}
-
-function startGame() {
+function handleStartGame() {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
-        alert('Error: No hay conexión con el servidor. Intenta nuevamente.');
-        connectWebSocket();
+        alert('Error: No hay conexión con el servidor. Reconectando...');
+        initializeWebSocket();
         return;
     }
 
     try {
+        startBtn.disabled = true;
+        startBtn.textContent = 'Iniciando...';
+
         socket.send(JSON.stringify({
             type: 'start_game',
             playerId: playerId,
@@ -105,7 +78,35 @@ function startGame() {
         }));
     } catch (error) {
         console.error('Error al iniciar juego:', error);
-        alert('Error al iniciar el juego. Recargando...');
-        window.location.reload();
+        startBtn.disabled = false;
+        startBtn.textContent = 'Iniciar Juego';
+        alert('Error al iniciar el juego. Intenta nuevamente.');
     }
+}
+
+async function updatePlayersList() {
+    try {
+        const response = await fetch(`${API_URL}/room-info/${roomId}`);
+        if (!response.ok) throw new Error('Error en la respuesta');
+
+        const data = await response.json();
+        if (data.success) {
+            updatePlayersUI(data.players);
+        }
+    } catch (error) {
+        console.error('Error al actualizar jugadores:', error);
+    }
+}
+
+function updatePlayersUI(players) {
+    playersList.innerHTML = players.map(player => {
+        const isCurrentPlayer = player.id === playerId;
+        return `
+            <li class="${player.isHost ? 'host' : ''} ${isCurrentPlayer ? 'you' : ''}">
+                ${player.name}
+                ${player.isHost ? ' (Host)' : ''}
+                ${isCurrentPlayer ? ' (Tú)' : ''}
+                ${player.connected ? '🟢' : '🔴'}
+            </li>`;
+    }).join('');
 }
