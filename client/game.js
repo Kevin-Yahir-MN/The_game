@@ -20,8 +20,8 @@ let gameState = {
     players: [],
     yourCards: [],
     board: {
-        ascending: [1, 1],
-        descending: [100, 100]
+        ascending: [1, 1],    // [asc1, asc2]
+        descending: [100, 100] // [desc1, desc2]
     },
     currentTurn: null,
     remainingDeck: 98,
@@ -37,6 +37,7 @@ const BOARD_POSITION = {
     y: canvas.height / 2 - CARD_HEIGHT / 2
 };
 
+// Clase Card para representar las cartas
 class Card {
     constructor(value, x, y, isPlayable = false) {
         this.value = value;
@@ -50,6 +51,7 @@ class Card {
     }
 
     draw() {
+        // Fondo de la carta
         let fillColor = '#FFFFFF';
         if (this === selectedCard) fillColor = '#FFFF99';
         else if (this.isPlayedThisTurn) {
@@ -59,14 +61,17 @@ class Card {
         ctx.fillStyle = fillColor;
         ctx.fillRect(this.x, this.y, this.width, this.height);
 
+        // Borde
         ctx.strokeStyle = this.isPlayable ? '#00FF00' : '#000000';
         ctx.lineWidth = this.isPlayable ? 3 : 1;
         ctx.strokeRect(this.x, this.y, this.width, this.height);
 
+        // Valor de la carta
         ctx.fillStyle = '#000000';
         ctx.font = 'bold 24px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(this.value, this.x + this.width / 2, this.y + this.height / 2 + 10);
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.value.toString(), this.x + this.width / 2, this.y + this.height / 2);
     }
 
     contains(x, y) {
@@ -75,6 +80,136 @@ class Card {
     }
 }
 
+// Inicialización del juego
+function initGame() {
+    console.log('Iniciando juego para:', currentPlayer.name, 'ID:', currentPlayer.id, 'en sala:', roomId);
+
+    // Verificar que el canvas existe
+    if (!canvas) {
+        console.error('Canvas no encontrado');
+        alert('Error: No se encontró el elemento canvas');
+        return;
+    }
+
+    // Establecer tamaño del canvas
+    canvas.width = 800;
+    canvas.height = 600;
+
+    // Verificar que el contexto 2D se obtuvo correctamente
+    if (!ctx) {
+        console.error('No se pudo obtener el contexto 2D');
+        alert('Error: No se pudo inicializar el contexto de dibujo');
+        return;
+    }
+
+    // Verificar datos del jugador
+    if (!currentPlayer.id || !roomId) {
+        console.error('Faltan datos del jugador o sala');
+        alert('Error: No se encontraron datos del jugador. Vuelve a la sala.');
+        return;
+    }
+
+    // Configurar botones
+    if (currentPlayer.isHost) {
+        startButton.style.display = 'block';
+        startButton.addEventListener('click', startGame);
+    } else {
+        startButton.style.display = 'none';
+    }
+
+    endTurnButton.addEventListener('click', endTurn);
+
+    // Iniciar conexión WebSocket
+    connectWebSocket();
+
+    // Configurar evento de clic en el canvas
+    canvas.addEventListener('click', handleCanvasClick);
+
+    // Iniciar bucle del juego
+    gameLoop();
+}
+
+// Conectar al servidor WebSocket
+function connectWebSocket() {
+    socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
+
+    socket.onopen = () => {
+        console.log('Conexión WebSocket establecida');
+        socket.send(JSON.stringify({ type: 'get_game_state' }));
+    };
+
+    socket.onmessage = (event) => {
+        try {
+            const message = JSON.parse(event.data);
+            console.log('Mensaje recibido:', message);
+
+            switch (message.type) {
+                case 'game_state':
+                    updateGameState(message.state);
+                    break;
+
+                case 'game_started':
+                    startButton.style.display = 'none';
+                    updateGameState(message.state);
+                    break;
+
+                case 'your_cards':
+                    gameState.yourCards = message.cards.map(value =>
+                        new Card(value, 0, 0, false));
+                    break;
+
+                case 'game_over':
+                    alert(message.message);
+                    break;
+
+                case 'invalid_move':
+                    showNotification(message.reason, true);
+                    break;
+
+                case 'init_state':
+                    gameState = {
+                        ...gameState,
+                        ...message.state
+                    };
+                    break;
+
+                case 'notification':
+                    showNotification(message.message, message.isError);
+                    break;
+
+                case 'card_returned':
+                    showNotification('Carta devuelta a tu mano', false);
+                    break;
+
+                default:
+                    console.warn('Tipo de mensaje no reconocido:', message.type);
+            }
+        } catch (error) {
+            console.error('Error procesando mensaje:', error);
+        }
+    };
+
+    socket.onclose = () => {
+        console.log('Conexión cerrada, reconectando...');
+        setTimeout(connectWebSocket, 2000);
+    };
+
+    socket.onerror = (error) => {
+        console.error('Error en WebSocket:', error);
+    };
+}
+
+// Función para iniciar el juego (solo host)
+function startGame() {
+    startButton.disabled = true;
+    startButton.textContent = 'Iniciando...';
+
+    socket.send(JSON.stringify({
+        type: 'start_game'
+    }));
+}
+
+// Mostrar notificación en pantalla
 function showNotification(message, isError = false) {
     const notification = document.createElement('div');
     notification.className = `notification ${isError ? 'error' : ''}`;
@@ -86,19 +221,29 @@ function showNotification(message, isError = false) {
     }, 3000);
 }
 
+// Actualizar el estado del juego
 function updateGameState(newState) {
+    console.log('Actualizando estado del juego:', newState);
+
+    // Validar el estado recibido
+    if (!newState || !newState.board) {
+        console.error('Estado del juego inválido:', newState);
+        return;
+    }
+
+    // Actualizar el estado manteniendo los valores por defecto si son undefined
     gameState = {
         ...gameState,
-        ...newState
+        ...newState,
+        board: {
+            ascending: newState.board.ascending || [1, 1],
+            descending: newState.board.descending || [100, 100]
+        },
+        remainingDeck: newState.remainingDeck || 98,
+        cardsPlayedThisTurn: newState.cardsPlayedThisTurn || []
     };
 
-    gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(card => {
-        const currentValue = card.position.includes('asc')
-            ? gameState.board.ascending[card.position === 'asc1' ? 0 : 1]
-            : gameState.board.descending[card.position === 'desc1' ? 0 : 1];
-        return currentValue === card.value;
-    });
-
+    // Actualizar estado de las cartas jugables
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
     if (Array.isArray(gameState.yourCards)) {
         gameState.yourCards = gameState.yourCards.map(value => {
@@ -111,13 +256,16 @@ function updateGameState(newState) {
         });
     }
 
+    // Deseleccionar carta si no es nuestro turno
     if (!isYourTurn) {
         selectedCard = null;
     }
 
+    // Actualizar estado del botón de terminar turno
     updateEndTurnButton();
 }
 
+// Verificar si una carta puede ser jugada
 function canPlayCard(cardValue) {
     const { ascending, descending } = gameState.board;
 
@@ -127,6 +275,7 @@ function canPlayCard(cardValue) {
         (cardValue < descending[1] || cardValue === descending[1] + 10);
 }
 
+// Manejar clic en el canvas
 function handleCanvasClick(event) {
     if (gameState.currentTurn !== currentPlayer.id) {
         showNotification('No es tu turno', true);
@@ -137,12 +286,14 @@ function handleCanvasClick(event) {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
+    // Verificar si se hizo clic en una columna con carta seleccionada
     const clickedColumn = getClickedColumn(x, y);
     if (clickedColumn && selectedCard) {
         playCard(selectedCard.value, clickedColumn);
         return;
     }
 
+    // Verificar si se hizo clic en una carta jugada este turno (para devolverla)
     if (!selectedCard) {
         const clickedPlayedCard = gameState.cardsPlayedThisTurn.find(card => {
             const pos = getCardPosition(card.position);
@@ -156,6 +307,7 @@ function handleCanvasClick(event) {
         }
     }
 
+    // Verificar si se hizo clic en una carta de la mano
     const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + 10))) / 2;
     gameState.yourCards.forEach((card, index) => {
         card.x = startX + index * (CARD_WIDTH + 10);
@@ -173,6 +325,7 @@ function handleCanvasClick(event) {
     });
 }
 
+// Devolver carta a la mano
 function returnCardToHand(cardToReturn) {
     if (!gameState.yourCards.some(card => card.value === cardToReturn.value)) {
         showNotification('No puedes devolver cartas que no hayas jugado este turno', true);
@@ -186,6 +339,7 @@ function returnCardToHand(cardToReturn) {
         position: cardToReturn.position
     }));
 
+    // Actualizar estado local
     gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
         card => !(card.value === cardToReturn.value && card.position === cardToReturn.position)
     );
@@ -193,6 +347,7 @@ function returnCardToHand(cardToReturn) {
     updateEndTurnButton();
 }
 
+// Obtener columna clickeada
 function getClickedColumn(x, y) {
     if (y < BOARD_POSITION.y || y > BOARD_POSITION.y + CARD_HEIGHT) {
         return null;
@@ -209,6 +364,7 @@ function getClickedColumn(x, y) {
     return null;
 }
 
+// Obtener posición de una carta en el tablero
 function getCardPosition(position) {
     switch (position) {
         case 'asc1': return { x: BOARD_POSITION.x, y: BOARD_POSITION.y };
@@ -219,6 +375,7 @@ function getCardPosition(position) {
     }
 }
 
+// Jugar una carta
 function playCard(cardValue, position) {
     if (!selectedCard || selectedCard.value !== cardValue) {
         showNotification('Selecciona una carta válida primero', true);
@@ -257,6 +414,7 @@ function playCard(cardValue, position) {
     updateEndTurnButton();
 }
 
+// Verificar si un movimiento es válido
 function isValidMove(cardValue, position) {
     const { ascending, descending } = gameState.board;
 
@@ -269,6 +427,7 @@ function isValidMove(cardValue, position) {
     }
 }
 
+// Terminar turno
 function endTurn() {
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
     if (gameState.cardsPlayedThisTurn.length < minCardsRequired) {
@@ -287,79 +446,80 @@ function endTurn() {
     updateEndTurnButton();
 }
 
+// Actualizar estado del botón de terminar turno
 function updateEndTurnButton() {
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
     endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id ||
         gameState.cardsPlayedThisTurn.length < minCardsRequired;
 }
 
+// Bucle principal del juego
 function gameLoop() {
+    // Limpiar el canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Dibujar fondo verde
     ctx.fillStyle = '#228B22';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    drawGameInfo();
-    drawBoard();
-    drawPlayerCards();
+    // Dibujar elementos del juego
+    try {
+        drawGameInfo();
+        drawBoard();
+        drawPlayerCards();
+    } catch (error) {
+        console.error('Error al dibujar:', error);
+    }
+
     requestAnimationFrame(gameLoop);
 }
 
+// Dibujar información del juego
 function drawGameInfo() {
     const currentTurnPlayer = gameState.players.find(p => p.id === gameState.currentTurn);
+
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 24px Arial';
     ctx.textAlign = 'left';
-    ctx.fillText(`Turno: ${currentTurnPlayer?.name || 'Esperando...'}`, 20, 40);
-    ctx.fillText(`Cartas en la baraja: ${gameState.remainingDeck}`, 20, 80);
-    ctx.fillText(`Cartas jugadas: ${gameState.cardsPlayedThisTurn.length}`, 20, 120);
+    ctx.textBaseline = 'top';
+
+    ctx.fillText(`Turno: ${currentTurnPlayer?.name || 'Esperando...'}`, 20, 20);
+    ctx.fillText(`Cartas en la baraja: ${gameState.remainingDeck}`, 20, 50);
+    ctx.fillText(`Cartas jugadas: ${gameState.cardsPlayedThisTurn.length}`, 20, 80);
 }
 
+// Dibujar el tablero
 function drawBoard() {
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 32px Arial';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
 
-    // Ascendente 1
+    // Dibujar flechas y cartas ascendentes
     ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
     const asc1Card = new Card(gameState.board.ascending[0], BOARD_POSITION.x, BOARD_POSITION.y);
-    const asc1PlayedCards = gameState.cardsPlayedThisTurn.filter(c => c.position === 'asc1');
-    asc1Card.isPlayedThisTurn = asc1PlayedCards.some(c => c.value === gameState.board.ascending[0]);
-    asc1Card.isMostRecent = asc1PlayedCards.length > 0 &&
-        asc1PlayedCards[asc1PlayedCards.length - 1].value === gameState.board.ascending[0];
     asc1Card.draw();
 
-    // Ascendente 2
     ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
     const asc2Card = new Card(gameState.board.ascending[1], BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, BOARD_POSITION.y);
-    const asc2PlayedCards = gameState.cardsPlayedThisTurn.filter(c => c.position === 'asc2');
-    asc2Card.isPlayedThisTurn = asc2PlayedCards.some(c => c.value === gameState.board.ascending[1]);
-    asc2Card.isMostRecent = asc2PlayedCards.length > 0 &&
-        asc2PlayedCards[asc2PlayedCards.length - 1].value === gameState.board.ascending[1];
     asc2Card.draw();
 
-    // Descendente 1
+    // Dibujar flechas y cartas descendentes
     ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
     const desc1Card = new Card(gameState.board.descending[0], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, BOARD_POSITION.y);
-    const desc1PlayedCards = gameState.cardsPlayedThisTurn.filter(c => c.position === 'desc1');
-    desc1Card.isPlayedThisTurn = desc1PlayedCards.some(c => c.value === gameState.board.descending[0]);
-    desc1Card.isMostRecent = desc1PlayedCards.length > 0 &&
-        desc1PlayedCards[desc1PlayedCards.length - 1].value === gameState.board.descending[0];
     desc1Card.draw();
 
-    // Descendente 2
     ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
     const desc2Card = new Card(gameState.board.descending[1], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, BOARD_POSITION.y);
-    const desc2PlayedCards = gameState.cardsPlayedThisTurn.filter(c => c.position === 'desc2');
-    desc2Card.isPlayedThisTurn = desc2PlayedCards.some(c => c.value === gameState.board.descending[1]);
-    desc2Card.isMostRecent = desc2PlayedCards.length > 0 &&
-        desc2PlayedCards[desc2PlayedCards.length - 1].value === gameState.board.descending[1];
     desc2Card.draw();
 }
 
+// Dibujar las cartas del jugador
 function drawPlayerCards() {
     if (!gameState.yourCards || !Array.isArray(gameState.yourCards)) return;
 
     const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + 10))) / 2;
+
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 20px Arial';
     ctx.textAlign = 'center';
@@ -372,36 +532,5 @@ function drawPlayerCards() {
     });
 }
 
-function initGame() {
-    console.log('Iniciando juego para:', currentPlayer.name, 'ID:', currentPlayer.id, 'en sala:', roomId);
-
-    if (!currentPlayer.id || !roomId) {
-        console.error('Faltan datos del jugador o sala');
-        alert('Error: No se encontraron datos del jugador. Vuelve a la sala.');
-        return;
-    }
-
-    if (currentPlayer.isHost) {
-        startButton.style.display = 'block';
-        startButton.addEventListener('click', startGame);
-    } else {
-        startButton.style.display = 'none';
-    }
-
-    endTurnButton.addEventListener('click', endTurn);
-
-    connectWebSocket();
-    canvas.addEventListener('click', handleCanvasClick);
-    gameLoop();
-}
-
-function startGame() {
-    startButton.disabled = true;
-    startButton.textContent = 'Iniciando...';
-
-    socket.send(JSON.stringify({
-        type: 'start_game'
-    }));
-}
-
+// Iniciar el juego cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', initGame);

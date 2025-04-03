@@ -1,27 +1,81 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Game - Lobby</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>El Juego</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+
+        #gameCanvas {
+            background-color: #228B22;
+            border: 3px solid #333;
+            margin-bottom: 20px;
+        }
+
+        #startGame,
+        #endTurn {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        #startGame {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+        }
+
+        #startGame:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        #endTurn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+        }
+
+        #endTurn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            background-color: #333;
+            color: white;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+
+        .notification.error {
+            background-color: #f44336;
+        }
+    </style>
 </head>
 
 <body>
-    <div class="container">
-        <h1>The Game</h1>
-        <div class="login-box">
-            <input type="text" id="playerName" placeholder="Tu nombre" maxlength="20">
-            <div class="action-buttons">
-                <button id="createRoom">Crear Sala</button>
-                <div class="separator">o</div>
-                <input type="text" id="roomCode" placeholder="Código de sala" maxlength="4">
-                <button id="joinRoom">Unirse</button>
-            </div>
-        </div>
-    </div>
-    <script src="lobby.js"></script>
+    <button id="startGame" style="display: none;">Iniciar Juego</button>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <button id="endTurn">Terminar Turno</button>
+
+    <script src="game.js"></script>
 </body>
 
 </html>
