@@ -20,7 +20,8 @@ let gameState = {
     },
     currentTurn: null,
     remainingDeck: 98,
-    cardsPlayedThisTurn: []
+    cardsPlayedThisTurn: [],
+    gameStarted: false
 };
 
 // Constantes de diseño
@@ -107,6 +108,10 @@ function connectWebSocket() {
                 case 'game_state':
                     updateGameState(message.state);
                     break;
+                case 'game_started':
+                    gameState.gameStarted = true;
+                    showNotification('¡El juego ha comenzado!', false);
+                    break;
                 case 'game_over':
                     alert(message.message);
                     break;
@@ -117,7 +122,8 @@ function connectWebSocket() {
                     gameState = {
                         ...gameState,
                         ...message.state,
-                        yourCards: message.yourCards || []
+                        yourCards: message.yourCards || [],
+                        gameStarted: message.gameStarted || false
                     };
                     break;
                 case 'notification':
@@ -125,6 +131,9 @@ function connectWebSocket() {
                     break;
                 case 'card_returned':
                     showNotification('Carta devuelta a tu mano', false);
+                    break;
+                case 'room_update':
+                    updatePlayersList(message.players);
                     break;
             }
         } catch (error) {
@@ -153,6 +162,24 @@ function showNotification(message, isError = false) {
     }, 3000);
 }
 
+function updatePlayersList(players) {
+    const playersList = document.getElementById('playersList');
+    playersList.innerHTML = '';
+
+    players.forEach(player => {
+        const playerElement = document.createElement('div');
+        playerElement.className = `player ${player.connected ? '' : 'disconnected'}`;
+        playerElement.innerHTML = `
+            <span class="name">${player.name}</span>
+            <span class="cards">${player.cardCount} cartas</span>
+            ${player.isHost ? '<span class="host">(Host)</span>' : ''}
+            ${player.id === currentPlayer.id ? '<span class="you">(Tú)</span>' : ''}
+            ${gameState.currentTurn === player.id ? '<span class="turn">← Turno</span>' : ''}
+        `;
+        playersList.appendChild(playerElement);
+    });
+}
+
 function updateGameState(newState) {
     console.log('Actualizando estado del juego:', newState);
 
@@ -170,7 +197,7 @@ function updateGameState(newState) {
     });
 
     // Actualizar estado de las cartas jugables
-    const isYourTurn = gameState.currentTurn === currentPlayer.id;
+    const isYourTurn = gameState.currentTurn === currentPlayer.id && gameState.gameStarted;
     if (Array.isArray(gameState.yourCards)) {
         gameState.yourCards = gameState.yourCards.map(value => {
             return new Card(
@@ -187,18 +214,24 @@ function updateGameState(newState) {
     }
 
     updateEndTurnButton();
+    updatePlayersList(gameState.players);
 }
 
 function canPlayCard(cardValue) {
     const { ascending, descending } = gameState.board;
 
-    return (cardValue === ascending[0] - 10 || cardValue > ascending[0]) ||
-        (cardValue === ascending[1] - 10 || cardValue > ascending[1]) ||
-        (cardValue === descending[0] + 10 || cardValue < descending[0]) ||
-        (cardValue === descending[1] + 10 || cardValue < descending[1]);
+    return (cardValue > ascending[0] || cardValue === ascending[0] - 10) ||
+        (cardValue > ascending[1] || cardValue === ascending[1] - 10) ||
+        (cardValue < descending[0] || cardValue === descending[0] + 10) ||
+        (cardValue < descending[1] || cardValue === descending[1] + 10);
 }
 
 function handleCanvasClick(event) {
+    if (!gameState.gameStarted) {
+        showNotification('El juego no ha comenzado', true);
+        return;
+    }
+
     if (gameState.currentTurn !== currentPlayer.id) {
         showNotification('No es tu turno', true);
         return;
@@ -208,14 +241,14 @@ function handleCanvasClick(event) {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    // Primero verificar si hay carta seleccionada y click en columna
+    // Verificar click en columna con carta seleccionada
     const clickedColumn = getClickedColumn(x, y);
     if (clickedColumn && selectedCard) {
         playCard(selectedCard.value, clickedColumn);
         return;
     }
 
-    // Verificar click en cartas jugadas este turno (solo si no hay carta seleccionada)
+    // Verificar click en cartas jugadas este turno
     if (!selectedCard) {
         const clickedPlayedCard = gameState.cardsPlayedThisTurn.find(card => {
             const pos = getCardPosition(card.position);
@@ -367,6 +400,7 @@ function updateEndTurnButton() {
     const endTurnBtn = document.getElementById('endTurn');
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
     endTurnBtn.disabled = gameState.currentTurn !== currentPlayer.id ||
+        !gameState.gameStarted ||
         gameState.cardsPlayedThisTurn.length < minCardsRequired;
 }
 
@@ -389,6 +423,13 @@ function drawGameInfo() {
     ctx.fillText(`Turno: ${currentTurnPlayer?.name || 'Esperando...'}`, 20, 40);
     ctx.fillText(`Cartas en la baraja: ${gameState.remainingDeck}`, 20, 80);
     ctx.fillText(`Cartas jugadas: ${gameState.cardsPlayedThisTurn.length}`, 20, 120);
+
+    if (!gameState.gameStarted) {
+        ctx.fillStyle = '#FFA500';
+        ctx.font = 'bold 32px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('ESPERANDO A QUE COMIENCE EL JUEGO', canvas.width / 2, 50);
+    }
 }
 
 function drawBoard() {

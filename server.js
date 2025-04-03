@@ -81,7 +81,7 @@ app.post('/create-room', (req, res) => {
             isHost: true,
             ws: null,
             cards: [],
-            cardsPlayedThisTurn: 0
+            cardsPlayedThisTurn: []
         }],
         gameState: {
             deck: initializeDeck(),
@@ -127,6 +127,13 @@ app.post('/join-room', (req, res) => {
     }
 
     const room = rooms.get(roomId);
+    if (room.gameState.gameStarted) {
+        return res.status(400).json({
+            success: false,
+            message: 'El juego ya ha comenzado en esta sala'
+        });
+    }
+
     const playerId = uuidv4();
     const newPlayer = {
         id: playerId,
@@ -134,7 +141,7 @@ app.post('/join-room', (req, res) => {
         isHost: false,
         ws: null,
         cards: [],
-        cardsPlayedThisTurn: 0
+        cardsPlayedThisTurn: []
     };
 
     room.players.push(newPlayer);
@@ -240,6 +247,19 @@ wss.on('connection', (ws, req) => {
         console.log(`✖ ${player.name} desconectado`);
         player.ws = null;
         broadcastRoomUpdate(room);
+
+        // Si el host se desconecta, asignar nuevo host
+        if (player.isHost && room.players.length > 1) {
+            const newHost = room.players.find(p => p.id !== player.id);
+            if (newHost) {
+                newHost.isHost = true;
+                broadcastToRoom(room, {
+                    type: 'notification',
+                    message: `${newHost.name} es ahora el host`,
+                    isError: false
+                });
+            }
+        }
     });
 });
 
@@ -285,7 +305,27 @@ function handleGameMessage(room, player, msg) {
 
         case 'end_turn':
             if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                endTurn(room, player, msg.cardsPlayed);
+                endTurn(room, player);
+            }
+            break;
+
+        case 'get_game_state':
+            if (room.gameState.gameStarted) {
+                player.ws.send(JSON.stringify({
+                    type: 'game_state',
+                    state: {
+                        board: room.gameState.board,
+                        currentTurn: room.gameState.currentTurn,
+                        yourCards: player.cards,
+                        players: room.players.map(p => ({
+                            id: p.id,
+                            name: p.name,
+                            cardCount: p.cards.length
+                        })),
+                        remainingDeck: room.gameState.deck.length,
+                        isYourTurn: room.gameState.currentTurn === player.id
+                    }
+                }));
             }
             break;
     }
@@ -305,7 +345,7 @@ function startGame(room) {
     });
 
     // El host juega primero
-    room.gameState.currentTurn = room.players[0].id;
+    room.gameState.currentTurn = room.players.find(p => p.isHost).id;
 
     // Notificar a todos que el juego ha comenzado
     broadcastToRoom(room, {
@@ -348,6 +388,7 @@ function playCard(room, player, cardValue, position) {
             value: cardValue,
             position: position
         });
+
         checkGameStatus(room);
         broadcastGameState(room);
     } else {
@@ -362,15 +403,31 @@ function playCard(room, player, cardValue, position) {
 function updateBoardHistory(room, position, board) {
     const roomId = Array.from(rooms.entries()).find(([id, r]) => r === room)[0];
     const history = boardHistory.get(roomId);
+    let currentValue;
 
-    if (position === 'asc1') {
-        history.ascending1.push(board.ascending[0]);
-    } else if (position === 'asc2') {
-        history.ascending2.push(board.ascending[1]);
-    } else if (position === 'desc1') {
-        history.descending1.push(board.descending[0]);
-    } else if (position === 'desc2') {
-        history.descending2.push(board.descending[1]);
+    if (position === 'asc1') currentValue = board.ascending[0];
+    else if (position === 'asc2') currentValue = board.ascending[1];
+    else if (position === 'desc1') currentValue = board.descending[0];
+    else if (position === 'desc2') currentValue = board.descending[1];
+    else return;
+
+    // Solo agregar si el valor es diferente al último registrado
+    const lastValue = getLastHistoryValue(history, position);
+    if (currentValue !== lastValue) {
+        if (position === 'asc1') history.ascending1.push(currentValue);
+        else if (position === 'asc2') history.ascending2.push(currentValue);
+        else if (position === 'desc1') history.descending1.push(currentValue);
+        else if (position === 'desc2') history.descending2.push(currentValue);
+    }
+}
+
+function getLastHistoryValue(history, position) {
+    switch (position) {
+        case 'asc1': return history.ascending1[history.ascending1.length - 1];
+        case 'asc2': return history.ascending2[history.ascending2.length - 1];
+        case 'desc1': return history.descending1[history.descending1.length - 1];
+        case 'desc2': return history.descending2[history.descending2.length - 1];
+        default: return null;
     }
 }
 
@@ -441,26 +498,28 @@ function findPreviousValue(room, position, currentValue) {
     const roomId = Array.from(rooms.entries()).find(([id, r]) => r === room)[0];
     const history = boardHistory.get(roomId);
 
-    if (position === 'asc1') {
-        const index = history.ascending1.indexOf(currentValue);
-        return index > 0 ? history.ascending1[index - 1] : null;
-    } else if (position === 'asc2') {
-        const index = history.ascending2.indexOf(currentValue);
-        return index > 0 ? history.ascending2[index - 1] : null;
-    } else if (position === 'desc1') {
-        const index = history.descending1.indexOf(currentValue);
-        return index > 0 ? history.descending1[index - 1] : null;
-    } else if (position === 'desc2') {
-        const index = history.descending2.indexOf(currentValue);
-        return index > 0 ? history.descending2[index - 1] : null;
+    switch (position) {
+        case 'asc1':
+            const asc1Index = history.ascending1.indexOf(currentValue);
+            return asc1Index > 0 ? history.ascending1[asc1Index - 1] : null;
+        case 'asc2':
+            const asc2Index = history.ascending2.indexOf(currentValue);
+            return asc2Index > 0 ? history.ascending2[asc2Index - 1] : null;
+        case 'desc1':
+            const desc1Index = history.descending1.indexOf(currentValue);
+            return desc1Index > 0 ? history.descending1[desc1Index - 1] : null;
+        case 'desc2':
+            const desc2Index = history.descending2.indexOf(currentValue);
+            return desc2Index > 0 ? history.descending2[desc2Index - 1] : null;
+        default:
+            return null;
     }
-    return null;
 }
 
-function endTurn(room, player, cardsPlayed) {
+function endTurn(room, player) {
     // Verificar mínimo de cartas jugadas
     const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
-    if (player.cardsPlayedThisTurn < minCardsRequired) {
+    if (player.cardsPlayedThisTurn.length < minCardsRequired) {
         player.ws.send(JSON.stringify({
             type: 'notification',
             message: `Debes jugar al menos ${minCardsRequired} cartas este turno`,
@@ -470,8 +529,8 @@ function endTurn(room, player, cardsPlayed) {
     }
 
     // Robar cartas automáticamente
-    if (player.cardsPlayedThisTurn > 0 && room.gameState.deck.length > 0) {
-        const cardsToDraw = Math.min(player.cardsPlayedThisTurn, room.gameState.deck.length);
+    if (player.cardsPlayedThisTurn.length > 0 && room.gameState.deck.length > 0) {
+        const cardsToDraw = Math.min(player.cardsPlayedThisTurn.length, room.gameState.deck.length);
         for (let i = 0; i < cardsToDraw; i++) {
             player.cards.push(room.gameState.deck.pop());
         }
@@ -488,11 +547,17 @@ function endTurn(room, player, cardsPlayed) {
 
     // Pasar al siguiente turno
     const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
-    const nextIndex = (currentIndex + 1) % room.players.length;
+    let nextIndex = (currentIndex + 1) % room.players.length;
+
+    // Saltar jugadores desconectados
+    while (nextIndex !== currentIndex && (!room.players[nextIndex].ws || room.players[nextIndex].ws.readyState !== WebSocket.OPEN)) {
+        nextIndex = (nextIndex + 1) % room.players.length;
+    }
+
     room.gameState.currentTurn = room.players[nextIndex].id;
 
     // Reiniciar contador de cartas jugadas
-    player.cardsPlayedThisTurn = 0;
+    player.cardsPlayedThisTurn = [];
 
     // Notificar cambio de turno
     broadcastToRoom(room, {
@@ -505,16 +570,22 @@ function endTurn(room, player, cardsPlayed) {
 }
 
 function checkGameStatus(room) {
-    // Verificar si algún jugador se quedó sin cartas
-    const playersWithCards = room.players.filter(p => p.cards.length > 0).length;
+    // Verificar si todos los jugadores se quedaron sin cartas y el mazo está vacío
+    const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
 
-    if (playersWithCards === 0 && room.gameState.deck.length === 0) {
-        // Todos ganan
+    if (allPlayersEmpty && room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
             type: 'game_over',
             result: 'win',
             message: '¡Todos ganan! Todas las cartas jugadas.'
         });
+
+        // Limpiar la sala después de un tiempo
+        setTimeout(() => {
+            const roomId = Array.from(rooms.entries()).find(([id, r]) => r === room)[0];
+            rooms.delete(roomId);
+            boardHistory.delete(roomId);
+        }, 30000);
     }
 }
 
