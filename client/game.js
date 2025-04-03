@@ -24,12 +24,13 @@ let gameState = {
 // Constantes de diseño
 const CARD_WIDTH = 80;
 const CARD_HEIGHT = 120;
+const COLUMN_SPACING = 60;
 const BOARD_POSITION = {
-    x: canvas.width / 2 - 200,
-    y: canvas.height / 2 - 100
+    x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
+    y: canvas.height / 2 - CARD_HEIGHT / 2
 };
 
-// Clases del juego
+// Clase Card para representar las cartas
 class Card {
     constructor(value, x, y, isPlayable = false) {
         this.value = value;
@@ -46,7 +47,7 @@ class Card {
         ctx.fillStyle = this.isSelected ? '#FFD700' : '#FFFFFF';
         ctx.fillRect(this.x, this.y, this.width, this.height);
 
-        // Borde si es jugable
+        // Borde
         if (this.isPlayable) {
             ctx.strokeStyle = '#00FF00';
             ctx.lineWidth = 3;
@@ -169,20 +170,20 @@ function handleCanvasClick(event) {
 
     // Verificar clic en pilas del tablero
     if (y >= BOARD_POSITION.y && y <= BOARD_POSITION.y + CARD_HEIGHT) {
-        const selectedCard = gameState.yourCards.find(card => card.isSelected);
-        if (!selectedCard || !selectedCard.isPlayable) return;
+        const selectedCard = gameState.yourCards.find(card => card.isSelected && card.isPlayable);
+        if (!selectedCard) return;
 
-        // Determinar en qué pila se hizo clic
+        // Determinar en qué columna se hizo clic
         if (x >= BOARD_POSITION.x && x <= BOARD_POSITION.x + CARD_WIDTH) {
             playCard(selectedCard.value, 'asc1');
         }
-        else if (x >= BOARD_POSITION.x + CARD_WIDTH + 20 && x <= BOARD_POSITION.x + CARD_WIDTH * 2 + 20) {
+        else if (x >= BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING && x <= BOARD_POSITION.x + CARD_WIDTH * 2 + COLUMN_SPACING) {
             playCard(selectedCard.value, 'asc2');
         }
-        else if (x >= BOARD_POSITION.x + CARD_WIDTH * 2 + 40 && x <= BOARD_POSITION.x + CARD_WIDTH * 3 + 40) {
+        else if (x >= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 && x <= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 + CARD_WIDTH) {
             playCard(selectedCard.value, 'desc1');
         }
-        else if (x >= BOARD_POSITION.x + CARD_WIDTH * 3 + 60 && x <= BOARD_POSITION.x + CARD_WIDTH * 4 + 60) {
+        else if (x >= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 && x <= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 + CARD_WIDTH) {
             playCard(selectedCard.value, 'desc2');
         }
     }
@@ -249,30 +250,26 @@ function drawGameInfo() {
 }
 
 function drawBoard() {
-    // Dibujar las 4 pilas del tablero
+    // Dibujar las 4 pilas del tablero con flechas
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 20px Arial';
+    ctx.font = 'bold 32px Arial';
     ctx.textAlign = 'center';
 
-    // Pila Ascendente 1
-    ctx.fillText('Ascendente', BOARD_POSITION.x + CARD_WIDTH / 2, BOARD_POSITION.y - 10);
-    const asc1 = new Card(gameState.board.ascending[0], BOARD_POSITION.x, BOARD_POSITION.y);
-    asc1.draw();
+    // Pila Ascendente 1 (↑)
+    ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
+    new Card(gameState.board.ascending[0], BOARD_POSITION.x, BOARD_POSITION.y).draw();
 
-    // Pila Ascendente 2
-    ctx.fillText('Ascendente', BOARD_POSITION.x + CARD_WIDTH + 20 + CARD_WIDTH / 2, BOARD_POSITION.y - 10);
-    const asc2 = new Card(gameState.board.ascending[1], BOARD_POSITION.x + CARD_WIDTH + 20, BOARD_POSITION.y);
-    asc2.draw();
+    // Pila Ascendente 2 (↑)
+    ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
+    new Card(gameState.board.ascending[1], BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, BOARD_POSITION.y).draw();
 
-    // Pila Descendente 1
-    ctx.fillText('Descendente', BOARD_POSITION.x + CARD_WIDTH * 2 + 40 + CARD_WIDTH / 2, BOARD_POSITION.y - 10);
-    const desc1 = new Card(gameState.board.descending[0], BOARD_POSITION.x + CARD_WIDTH * 2 + 40, BOARD_POSITION.y);
-    desc1.draw();
+    // Pila Descendente 1 (↓)
+    ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
+    new Card(gameState.board.descending[0], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, BOARD_POSITION.y).draw();
 
-    // Pila Descendente 2
-    ctx.fillText('Descendente', BOARD_POSITION.x + CARD_WIDTH * 3 + 60 + CARD_WIDTH / 2, BOARD_POSITION.y - 10);
-    const desc2 = new Card(gameState.board.descending[1], BOARD_POSITION.x + CARD_WIDTH * 3 + 60, BOARD_POSITION.y);
-    desc2.draw();
+    // Pila Descendente 2 (↓)
+    ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
+    new Card(gameState.board.descending[1], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, BOARD_POSITION.y).draw();
 }
 
 function drawPlayerCards() {
