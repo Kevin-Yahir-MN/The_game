@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Game - Multijugador</title>
+    <title>The Game - Lobby</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 
@@ -13,19 +13,11 @@
         <h1>The Game</h1>
         <div class="login-box">
             <input type="text" id="playerName" placeholder="Tu nombre" maxlength="20">
-
             <div class="action-buttons">
                 <button id="createRoom">Crear Sala</button>
                 <div class="separator">o</div>
-                <input type="text" id="roomCode" placeholder="Código de sala (4 dígitos)" maxlength="4" pattern="\d{4}">
-                <button id="joinRoom">Unirse a Sala</button>
-            </div>
-
-            <div id="roomInfo" class="hidden">
-                <p>Sala creada con éxito!</p>
-                <p>ID de sala: <span id="roomIdDisplay"></span></p>
-                <p>Comparte este código con otros jugadores</p>
-                <button id="startGame">Iniciar Juego</button>
+                <input type="text" id="roomCode" placeholder="Código de sala" maxlength="4">
+                <button id="joinRoom">Unirse</button>
             </div>
         </div>
     </div>

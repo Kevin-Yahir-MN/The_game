@@ -3,205 +3,114 @@ const WebSocket = require('ws');
 const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-const cors = require('cors'); // Añade esta línea
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
 
-// Configuración CORS para Express
-app.use(cors({
-    origin: [
-        'https://the-game-2xks.onrender.com',
-        'https://the-game-server.onrender.com'
-    ],
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type']
-}));
+// Configuración CORS
+const allowedOrigins = [
+    'https://the-game-2xks.onrender.com',
+    'http://localhost:3000'
+];
 
-// Middleware para parsear JSON
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    next();
+});
+
+// WebSocket Server
+const wss = new WebSocket.Server({
+    server,
+    verifyClient: (info, done) => {
+        if (!allowedOrigins.includes(info.origin)) {
+            return done(false, 403, 'Origen no permitido');
+        }
+        done(true);
+    }
+});
+
+// Middleware
 app.use(express.json());
-
-// Servir archivos estáticos desde la carpeta client
 app.use(express.static(path.join(__dirname, 'client')));
 
-// Almacenamiento de salas en memoria
+// Almacenamiento de salas
 const rooms = new Map();
 
-// Endpoint para crear sala
+// API Endpoints
 app.post('/create-room', (req, res) => {
     const { playerName } = req.body;
+    if (!playerName) return res.status(400).json({ success: false, message: 'Se requiere nombre' });
 
-    if (!playerName) {
-        return res.status(400).json({
-            success: false,
-            message: 'Nombre de jugador requerido'
-        });
-    }
-
-    const roomId = generateRoomId();
-    const hostPlayer = {
-        id: uuidv4(),
-        name: playerName,
-        isHost: true,
-        ws: null
-    };
-
+    const roomId = Math.floor(1000 + Math.random() * 9000).toString();
     rooms.set(roomId, {
-        players: [hostPlayer],
-        gameState: null,
-        host: hostPlayer.id
+        players: [{ id: uuidv4(), name: playerName, isHost: true, ws: null }],
+        gameState: null
     });
 
-    res.json({
-        success: true,
-        roomId
-    });
+    res.json({ success: true, roomId });
 });
 
-// Endpoint para unirse a sala
 app.post('/join-room', (req, res) => {
     const { playerName, roomId } = req.body;
-
-    if (!playerName || !roomId) {
-        return res.status(400).json({
-            success: false,
-            message: 'Nombre de jugador y código de sala requeridos'
-        });
-    }
-
-    if (!rooms.has(roomId)) {
-        return res.status(404).json({
-            success: false,
-            message: 'Sala no encontrada'
-        });
-    }
+    if (!playerName || !roomId) return res.status(400).json({ success: false, message: 'Datos incompletos' });
+    if (!rooms.has(roomId)) return res.status(404).json({ success: false, message: 'Sala no encontrada' });
 
     const room = rooms.get(roomId);
-    const newPlayer = {
-        id: uuidv4(),
-        name: playerName,
-        isHost: false,
-        ws: null
-    };
+    room.players.push({ id: uuidv4(), name: playerName, isHost: false, ws: null });
 
-    room.players.push(newPlayer);
-
-    res.json({
-        success: true
-    });
+    res.json({ success: true });
 });
 
-// Configuración CORS para WebSocket
+// WebSocket Logic
 wss.on('connection', (ws, req) => {
-    // Verificación de origen para WebSocket
-    const origin = req.headers.origin;
-    const allowedOrigins = [
-        'https://the-game-2xks.onrender.com',
-        'https://the-game-server.onrender.com'
-    ];
+    const params = new URLSearchParams(req.url.split('?')[1]);
+    const roomId = params.get('roomId');
+    const playerName = params.get('playerName');
 
-    if (!allowedOrigins.includes(origin)) {
-        ws.close();
-        return;
-    }
-
-    const urlParams = new URLSearchParams(req.url.split('?')[1]);
-    const roomId = urlParams.get('roomId');
-    const playerName = urlParams.get('playerName');
-
-    if (!rooms.has(roomId)) {
-        ws.close();
-        return;
+    if (!roomId || !playerName || !rooms.has(roomId)) {
+        return ws.close(1008, 'Datos inválidos');
     }
 
     const room = rooms.get(roomId);
     const player = room.players.find(p => p.name === playerName);
-
-    if (!player) {
-        ws.close();
-        return;
-    }
+    if (!player) return ws.close(1008, 'Jugador no registrado');
 
     player.ws = ws;
 
-    // Notificar a todos los jugadores de la sala
-    broadcastToRoom(roomId, {
-        type: 'player_joined',
-        players: room.players.map(p => p.name)
-    });
-
     ws.on('message', (message) => {
-        handleClientMessage(roomId, player.id, message);
+        try {
+            const msg = JSON.parse(message);
+            broadcastToRoom(roomId, { ...msg, playerName });
+        } catch (error) {
+            console.error('Error procesando mensaje:', error);
+        }
     });
 
     ws.on('close', () => {
-        room.players = room.players.filter(p => p.id !== player.id);
-
-        if (room.players.length === 0) {
-            rooms.delete(roomId);
-        } else if (player.id === room.host) {
-            // Asignar nuevo host
-            room.host = room.players[0].id;
-            room.players[0].isHost = true;
-        }
-
-        broadcastToRoom(roomId, {
-            type: 'player_left',
-            playerName,
-            players: room.players.map(p => p.name)
-        });
+        room.players = room.players.filter(p => p.name !== playerName);
+        broadcastToRoom(roomId, { type: 'player_left', playerName });
     });
 });
 
-// Rutas para páginas HTML
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client', 'index.html'));
-});
-
-app.get('/game.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client', 'game.html'));
-});
-
-// Funciones auxiliares
-function handleClientMessage(roomId, playerId, message) {
+// Helpers
+function broadcastToRoom(roomId, message) {
     const room = rooms.get(roomId);
     if (!room) return;
-
-    const msg = JSON.parse(message);
-    const player = room.players.find(p => p.id === playerId);
-
-    switch (msg.type) {
-        case 'card_played':
-        case 'end_turn':
-        case 'game_state':
-            if (player.isHost) {
-                broadcastToRoom(roomId, msg, playerId);
-            }
-            break;
-        default:
-            broadcastToRoom(roomId, msg, playerId);
-    }
-}
-
-function broadcastToRoom(roomId, message, excludePlayerId = null) {
-    const room = rooms.get(roomId);
-    if (!room) return;
-
     room.players.forEach(player => {
-        if (player.ws && player.ws.readyState === WebSocket.OPEN &&
-            player.id !== excludePlayerId) {
+        if (player.ws && player.ws.readyState === WebSocket.OPEN) {
             player.ws.send(JSON.stringify(message));
         }
     });
 }
 
-function generateRoomId() {
-    return Math.floor(1000 + Math.random() * 9000).toString();
-}
-
-// Iniciar servidor
+// Start Server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Servidor escuchando en puerto ${PORT}`);
+    console.log(`Servidor iniciado en puerto ${PORT}`);
 });
