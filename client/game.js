@@ -407,7 +407,7 @@ class Juego {
     }
 
     setupWebSocket() {
-        const WS_URL = 'wss://your-render-app.onrender.com';
+        const WS_URL = 'wss://your-app-name.onrender.com';
         socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerName=${currentPlayer}`);
 
         socket.onopen = () => {

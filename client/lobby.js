@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const startGameBtn = document.getElementById('startGame');
 
     // URL del servidor backend (debes cambiarla por tu URL de Render)
-    const SERVER_URL = 'https://your-render-app.onrender.com';
+    const SERVER_URL = 'https://the-game-server.onrender.com';
 
     createRoomBtn.addEventListener('click', async () => {
         const playerName = playerNameInput.value.trim();
