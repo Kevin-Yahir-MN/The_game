@@ -4,7 +4,7 @@ const ctx = canvas.getContext('2d');
 const WS_URL = 'wss://the-game-2xks.onrender.com';
 
 // Elementos de la interfaz
-const startButton = document.getElementById('startGame');
+const returnCardsButton = document.getElementById('returnCards');
 const endTurnButton = document.getElementById('endTurn');
 
 // Variables del juego
@@ -110,13 +110,7 @@ function initGame() {
     }
 
     // Configurar botones
-    if (currentPlayer.isHost) {
-        startButton.style.display = 'block';
-        startButton.addEventListener('click', startGame);
-    } else {
-        startButton.style.display = 'none';
-    }
-
+    returnCardsButton.addEventListener('click', handleReturnCards);
     endTurnButton.addEventListener('click', endTurn);
 
     // Iniciar conexión WebSocket
@@ -127,6 +121,34 @@ function initGame() {
 
     // Iniciar bucle del juego
     gameLoop();
+}
+
+// Función para manejar el botón de devolver cartas
+function handleReturnCards() {
+    if (gameState.currentTurn !== currentPlayer.id) {
+        showNotification('No es tu turno', true);
+        return;
+    }
+
+    if (gameState.cardsPlayedThisTurn.length === 0) {
+        showNotification('No hay cartas para devolver', true);
+        return;
+    }
+
+    // Devolver todas las cartas jugadas este turno
+    gameState.cardsPlayedThisTurn.forEach(card => {
+        socket.send(JSON.stringify({
+            type: 'return_card',
+            playerId: currentPlayer.id,
+            cardValue: card.value,
+            position: card.position
+        }));
+    });
+
+    // Limpiar la selección
+    selectedCard = null;
+    gameState.cardsPlayedThisTurn = [];
+    updateEndTurnButton();
 }
 
 // Conectar al servidor WebSocket
@@ -149,7 +171,6 @@ function connectWebSocket() {
                     break;
 
                 case 'game_started':
-                    startButton.style.display = 'none';
                     updateGameState(message.state);
                     break;
 
@@ -199,16 +220,6 @@ function connectWebSocket() {
     };
 }
 
-// Función para iniciar el juego (solo host)
-function startGame() {
-    startButton.disabled = true;
-    startButton.textContent = 'Iniciando...';
-
-    socket.send(JSON.stringify({
-        type: 'start_game'
-    }));
-}
-
 // Mostrar notificación en pantalla
 function showNotification(message, isError = false) {
     const notification = document.createElement('div');
@@ -243,25 +254,34 @@ function updateGameState(newState) {
         cardsPlayedThisTurn: newState.cardsPlayedThisTurn || []
     };
 
+    // Asegurarse que yourCards es un array
+    if (!Array.isArray(gameState.yourCards)) {
+        gameState.yourCards = [];
+    }
+
     // Actualizar estado de las cartas jugables
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
-    if (Array.isArray(gameState.yourCards)) {
-        gameState.yourCards = gameState.yourCards.map(value => {
-            return new Card(
-                value,
-                0,
-                0,
-                isYourTurn && canPlayCard(value)
-            );
-        });
-    }
+    gameState.yourCards = gameState.yourCards.map(value => {
+        // Si ya es una instancia de Card, solo actualiza isPlayable
+        if (value instanceof Card) {
+            value.isPlayable = isYourTurn && canPlayCard(value.value);
+            return value;
+        }
+        // Si no, crea una nueva Card
+        return new Card(
+            value,
+            0, // x se actualizará en drawPlayerCards()
+            0, // y se actualizará en drawPlayerCards()
+            isYourTurn && canPlayCard(value)
+        );
+    });
 
     // Deseleccionar carta si no es nuestro turno
     if (!isYourTurn) {
         selectedCard = null;
     }
 
-    // Actualizar estado del botón de terminar turno
+    // Actualizar estado de los botones
     updateEndTurnButton();
 }
 
@@ -451,6 +471,10 @@ function updateEndTurnButton() {
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
     endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id ||
         gameState.cardsPlayedThisTurn.length < minCardsRequired;
+
+    // Actualizar estado del botón de devolver cartas
+    returnCardsButton.disabled = gameState.currentTurn !== currentPlayer.id ||
+        gameState.cardsPlayedThisTurn.length === 0;
 }
 
 // Bucle principal del juego
@@ -516,7 +540,10 @@ function drawBoard() {
 
 // Dibujar las cartas del jugador
 function drawPlayerCards() {
-    if (!gameState.yourCards || !Array.isArray(gameState.yourCards)) return;
+    if (!gameState.yourCards || !Array.isArray(gameState.yourCards)) {
+        console.warn('yourCards no es un array válido:', gameState.yourCards);
+        return;
+    }
 
     const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + 10))) / 2;
 
@@ -526,8 +553,13 @@ function drawPlayerCards() {
     ctx.fillText('Tu mano', canvas.width / 2, canvas.height - CARD_HEIGHT - 50);
 
     gameState.yourCards.forEach((card, index) => {
-        card.x = startX + index * (CARD_WIDTH + 10);
-        card.y = canvas.height - CARD_HEIGHT - 20;
+        if (!card) return;
+
+        // Asignar posiciones solo si no las tienen
+        if (card.x === undefined || card.y === undefined) {
+            card.x = startX + index * (CARD_WIDTH + 10);
+            card.y = canvas.height - CARD_HEIGHT - 20;
+        }
         card.draw();
     });
 }
