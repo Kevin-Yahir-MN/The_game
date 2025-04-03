@@ -32,6 +32,7 @@ let gameState = {
 const CARD_WIDTH = 80;
 const CARD_HEIGHT = 120;
 const COLUMN_SPACING = 60;
+const CARD_SPACING = 10;
 const BOARD_POSITION = {
     x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
     y: canvas.height / 2 - CARD_HEIGHT / 2
@@ -48,9 +49,26 @@ class Card {
         this.isPlayable = isPlayable;
         this.isPlayedThisTurn = false;
         this.isMostRecent = false;
+        this.radius = 5; // Radio para esquinas redondeadas
     }
 
     draw() {
+        // Guardar el estado del contexto
+        ctx.save();
+
+        // Dibujar carta con esquinas redondeadas
+        ctx.beginPath();
+        ctx.moveTo(this.x + this.radius, this.y);
+        ctx.lineTo(this.x + this.width - this.radius, this.y);
+        ctx.quadraticCurveTo(this.x + this.width, this.y, this.x + this.width, this.y + this.radius);
+        ctx.lineTo(this.x + this.width, this.y + this.height - this.radius);
+        ctx.quadraticCurveTo(this.x + this.width, this.y + this.height, this.x + this.width - this.radius, this.y + this.height);
+        ctx.lineTo(this.x + this.radius, this.y + this.height);
+        ctx.quadraticCurveTo(this.x, this.y + this.height, this.x, this.y + this.height - this.radius);
+        ctx.lineTo(this.x, this.y + this.radius);
+        ctx.quadraticCurveTo(this.x, this.y, this.x + this.radius, this.y);
+        ctx.closePath();
+
         // Fondo de la carta
         let fillColor = '#FFFFFF';
         if (this === selectedCard) fillColor = '#FFFF99';
@@ -59,12 +77,12 @@ class Card {
         }
 
         ctx.fillStyle = fillColor;
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.fill();
 
         // Borde
         ctx.strokeStyle = this.isPlayable ? '#00FF00' : '#000000';
         ctx.lineWidth = this.isPlayable ? 3 : 1;
-        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.stroke();
 
         // Valor de la carta
         ctx.fillStyle = '#000000';
@@ -72,6 +90,9 @@ class Card {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(this.value.toString(), this.x + this.width / 2, this.y + this.height / 2);
+
+        // Restaurar el estado del contexto
+        ctx.restore();
     }
 
     contains(x, y) {
@@ -261,17 +282,24 @@ function updateGameState(newState) {
 
     // Actualizar estado de las cartas jugables
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
-    gameState.yourCards = gameState.yourCards.map(value => {
-        // Si ya es una instancia de Card, solo actualiza isPlayable
+
+    // Calcular posición inicial para las cartas
+    const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
+    const startY = canvas.height - CARD_HEIGHT - 20;
+
+    gameState.yourCards = gameState.yourCards.map((value, index) => {
+        // Si ya es una instancia de Card, actualizar propiedades
         if (value instanceof Card) {
+            value.x = startX + index * (CARD_WIDTH + CARD_SPACING);
+            value.y = startY;
             value.isPlayable = isYourTurn && canPlayCard(value.value);
             return value;
         }
-        // Si no, crea una nueva Card
+        // Si no, crear una nueva Card con posición correcta
         return new Card(
             value,
-            0, // x se actualizará en drawPlayerCards()
-            0, // y se actualizará en drawPlayerCards()
+            startX + index * (CARD_WIDTH + CARD_SPACING),
+            startY,
             isYourTurn && canPlayCard(value)
         );
     });
@@ -328,11 +356,7 @@ function handleCanvasClick(event) {
     }
 
     // Verificar si se hizo clic en una carta de la mano
-    const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + 10))) / 2;
-    gameState.yourCards.forEach((card, index) => {
-        card.x = startX + index * (CARD_WIDTH + 10);
-        card.y = canvas.height - CARD_HEIGHT - 20;
-
+    gameState.yourCards.forEach(card => {
         if (card.contains(x, y)) {
             if (selectedCard === card) {
                 selectedCard = null;
@@ -545,22 +569,16 @@ function drawPlayerCards() {
         return;
     }
 
-    const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + 10))) / 2;
-
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 20px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('Tu mano', canvas.width / 2, canvas.height - CARD_HEIGHT - 50);
 
-    gameState.yourCards.forEach((card, index) => {
-        if (!card) return;
-
-        // Asignar posiciones solo si no las tienen
-        if (card.x === undefined || card.y === undefined) {
-            card.x = startX + index * (CARD_WIDTH + 10);
-            card.y = canvas.height - CARD_HEIGHT - 20;
+    // Solo dibujar las cartas (las posiciones ya están asignadas en updateGameState)
+    gameState.yourCards.forEach(card => {
+        if (card) {
+            card.draw();
         }
-        card.draw();
     });
 }
 
