@@ -18,11 +18,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data.success) {
-                sessionStorage.setItem('playerName', playerName);
+                sessionStorage.setItem('playerName', data.playerName);
                 sessionStorage.setItem('roomId', data.roomId);
-                window.location.href = 'game.html';
+                sessionStorage.setItem('isHost', 'true');
+                window.location.href = 'sala.html';
             }
         } catch (error) {
+            console.error('Error:', error);
             alert('Error al crear sala');
         }
     });
@@ -44,11 +46,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success) {
                 sessionStorage.setItem('playerName', playerName);
                 sessionStorage.setItem('roomId', roomCode);
-                window.location.href = 'game.html';
+                sessionStorage.setItem('isHost', 'false');
+                window.location.href = 'sala.html';
             } else {
                 alert(data.message || 'Error al unirse');
             }
         } catch (error) {
+            console.error('Error:', error);
             alert('Error de conexión');
         }
     });

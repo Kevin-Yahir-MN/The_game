@@ -29,6 +29,7 @@ const wss = new WebSocket.Server({
     server,
     verifyClient: (info, done) => {
         if (!allowedOrigins.includes(info.origin)) {
+            console.warn(`Origen bloqueado: ${info.origin}`);
             return done(false, 403, 'Origen no permitido');
         }
         done(true);
@@ -42,10 +43,10 @@ app.use(express.static(path.join(__dirname, 'client')));
 // Almacenamiento de salas
 const rooms = new Map();
 
-// API Endpoints
+// Endpoints API
 app.post('/create-room', (req, res) => {
     const { playerName } = req.body;
-    if (!playerName) return res.status(400).json({ success: false, message: 'Se requiere nombre' });
+    if (!playerName) return res.status(400).json({ success: false, message: 'Nombre requerido' });
 
     const roomId = Math.floor(1000 + Math.random() * 9000).toString();
     rooms.set(roomId, {
@@ -53,7 +54,11 @@ app.post('/create-room', (req, res) => {
         gameState: null
     });
 
-    res.json({ success: true, roomId });
+    res.json({
+        success: true,
+        roomId,
+        playerName
+    });
 });
 
 app.post('/join-room', (req, res) => {
@@ -62,9 +67,25 @@ app.post('/join-room', (req, res) => {
     if (!rooms.has(roomId)) return res.status(404).json({ success: false, message: 'Sala no encontrada' });
 
     const room = rooms.get(roomId);
-    room.players.push({ id: uuidv4(), name: playerName, isHost: false, ws: null });
+    const newPlayer = { id: uuidv4(), name: playerName, isHost: false, ws: null };
+    room.players.push(newPlayer);
 
-    res.json({ success: true });
+    res.json({
+        success: true,
+        host: room.players.find(p => p.isHost).name
+    });
+});
+
+app.get('/room-info/:roomId', (req, res) => {
+    const roomId = req.params.roomId;
+    if (!rooms.has(roomId)) return res.status(404).json({ success: false });
+
+    const room = rooms.get(roomId);
+    res.json({
+        success: true,
+        players: room.players.map(p => p.name),
+        host: room.players.find(p => p.isHost).name
+    });
 });
 
 // WebSocket Logic
@@ -82,11 +103,21 @@ wss.on('connection', (ws, req) => {
     if (!player) return ws.close(1008, 'Jugador no registrado');
 
     player.ws = ws;
+    console.log(`✔ ${playerName} conectado a sala ${roomId}`);
+
+    // Notificar a todos de la nueva conexión
+    broadcastToRoom(roomId, {
+        type: 'player_joined',
+        playerName,
+        players: room.players.map(p => p.name)
+    });
 
     ws.on('message', (message) => {
         try {
             const msg = JSON.parse(message);
-            broadcastToRoom(roomId, { ...msg, playerName });
+            if (msg.type === 'start_game' && player.isHost) {
+                broadcastToRoom(roomId, { type: 'game_started' });
+            }
         } catch (error) {
             console.error('Error procesando mensaje:', error);
         }
@@ -94,11 +125,17 @@ wss.on('connection', (ws, req) => {
 
     ws.on('close', () => {
         room.players = room.players.filter(p => p.name !== playerName);
-        broadcastToRoom(roomId, { type: 'player_left', playerName });
+        console.log(`✖ ${playerName} desconectado`);
+
+        broadcastToRoom(roomId, {
+            type: 'player_left',
+            playerName,
+            players: room.players.map(p => p.name)
+        });
     });
 });
 
-// Helpers
+// Helper functions
 function broadcastToRoom(roomId, message) {
     const room = rooms.get(roomId);
     if (!room) return;
@@ -112,5 +149,6 @@ function broadcastToRoom(roomId, message) {
 // Start Server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Servidor iniciado en puerto ${PORT}`);
+    console.log(`🚀 Servidor iniciado en puerto ${PORT}`);
+    console.log(`🌍 Orígenes permitidos: ${allowedOrigins.join(', ')}`);
 });

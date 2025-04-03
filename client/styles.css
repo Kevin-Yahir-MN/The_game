@@ -1,8 +1,10 @@
+/* Estilos generales */
 body {
     font-family: 'Arial', sans-serif;
     margin: 0;
     padding: 0;
     background-color: #f0f0f0;
+    color: #333;
 }
 
 .container {
@@ -11,24 +13,70 @@ body {
     padding: 20px;
 }
 
+/* Lobby */
+.login-box {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.action-buttons {
+    margin: 20px 0;
+}
+
+/* Sala */
+.room-info {
+    background-color: #4682B4;
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+#roomIdDisplay {
+    font-size: 2em;
+    font-weight: bold;
+}
+
+.players-list {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.players-list li {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.players-list li.host {
+    font-weight: bold;
+    color: #2c6c91;
+}
+
+#startGame {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    font-size: 1.2em;
+    border-radius: 5px;
+    cursor: pointer;
+    display: block;
+    margin: 20px auto;
+}
+
+.hidden {
+    display: none;
+}
+
+/* Juego */
 #gameCanvas {
-    background-color: #228B22;
+    background: #228B22;
     display: block;
     margin: 0 auto;
     border: 3px solid #333;
-}
-
-button {
-    background-color: #4682B4;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    margin: 10px;
-    cursor: pointer;
-}
-
-input {
-    padding: 10px;
-    margin: 5px;
-    width: 200px;
 }
