@@ -264,9 +264,9 @@ function handleGameMessage(room, player, msg) {
             }
             break;
 
-        case 'return_cards':
+        case 'return_card':
             if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                returnCards(room, player, msg.cards);
+                returnCard(room, player, msg.cardValue, msg.position);
             }
             break;
 
@@ -276,6 +276,26 @@ function handleGameMessage(room, player, msg) {
             }
             break;
     }
+}
+
+// Nueva función para devolver una carta
+function returnCard(room, player, cardValue, position) {
+    if (position.includes('asc')) {
+        const index = position === 'asc1' ? 0 : 1;
+        if (room.gameState.board.ascending[index] === cardValue) {
+            room.gameState.board.ascending[index] = position === 'asc1' ? 1 : 1;
+            player.cards.push(cardValue);
+            player.cardsPlayedThisTurn--;
+        }
+    } else {
+        const index = position === 'desc1' ? 0 : 1;
+        if (room.gameState.board.descending[index] === cardValue) {
+            room.gameState.board.descending[index] = position === 'desc1' ? 100 : 100;
+            player.cards.push(cardValue);
+            player.cardsPlayedThisTurn--;
+        }
+    }
+    broadcastGameState(room);
 }
 
 function startGame(room) {
