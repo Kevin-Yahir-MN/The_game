@@ -20,7 +20,7 @@ let gameState = {
     },
     currentTurn: null,
     remainingDeck: 98,
-    cardsPlayedThisTurn: []
+    cardsPlayedThisTurn: [] // Registro de cartas jugadas en el turno actual
 };
 
 // Constantes de diseño
@@ -41,25 +41,24 @@ class Card {
         this.width = CARD_WIDTH;
         this.height = CARD_HEIGHT;
         this.isPlayable = isPlayable;
-        this.isPlayedThisTurn = false;
-        this.isMostRecent = false;
+        this.isSelected = false;
     }
 
     draw() {
         // Fondo de la carta
-        let fillColor = '#FFFFFF';
-        if (this === selectedCard) fillColor = '#FFFF99';
-        else if (this.isPlayedThisTurn) {
-            fillColor = this.isMostRecent ? '#ADD8E6' : '#A0C0E0';
-        }
-
-        ctx.fillStyle = fillColor;
+        ctx.fillStyle = this.isSelected ? '#FFD700' : '#FFFFFF';
         ctx.fillRect(this.x, this.y, this.width, this.height);
 
         // Borde
-        ctx.strokeStyle = this.isPlayable ? '#00FF00' : '#000000';
-        ctx.lineWidth = this.isPlayable ? 3 : 1;
-        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        if (this.isPlayable) {
+            ctx.strokeStyle = '#00FF00';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(this.x - 2, this.y - 2, this.width + 4, this.height + 4);
+        } else {
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
+        }
 
         // Valor de la carta
         ctx.fillStyle = '#000000';
@@ -87,6 +86,8 @@ function initGame() {
     connectWebSocket();
     canvas.addEventListener('click', handleCanvasClick);
     document.getElementById('endTurn').addEventListener('click', endTurn);
+    document.getElementById('returnCards').addEventListener('click', returnCards);
+
     gameLoop();
 }
 
@@ -111,7 +112,7 @@ function connectWebSocket() {
                     alert(message.message);
                     break;
                 case 'invalid_move':
-                    showNotification(message.reason, true);
+                    alert('Movimiento inválido: ' + message.reason);
                     break;
                 case 'init_state':
                     gameState = {
@@ -208,28 +209,7 @@ function handleCanvasClick(event) {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    // Primero verificar si hay carta seleccionada y click en columna
-    const clickedColumn = getClickedColumn(x, y);
-    if (clickedColumn && selectedCard) {
-        playCard(selectedCard.value, clickedColumn);
-        return;
-    }
-
-    // Verificar click en cartas jugadas este turno (solo si no hay carta seleccionada)
-    if (!selectedCard) {
-        const clickedPlayedCard = gameState.cardsPlayedThisTurn.find(card => {
-            const pos = getCardPosition(card.position);
-            return x >= pos.x && x <= pos.x + CARD_WIDTH &&
-                y >= pos.y && y <= pos.y + CARD_HEIGHT;
-        });
-
-        if (clickedPlayedCard) {
-            returnCardToHand(clickedPlayedCard);
-            return;
-        }
-    }
-
-    // Verificar click en cartas de la mano
+    // Verificar click en cartas del jugador
     const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + 10))) / 2;
     gameState.yourCards.forEach((card, index) => {
         card.x = startX + index * (CARD_WIDTH + 10);
@@ -245,53 +225,28 @@ function handleCanvasClick(event) {
             }
         }
     });
-}
 
-function returnCardToHand(cardToReturn) {
-    // Verificar que la carta pertenece al jugador actual
-    if (!gameState.yourCards.some(card => card.value === cardToReturn.value)) {
-        showNotification('No puedes devolver cartas que no hayas jugado este turno', true);
-        return;
-    }
+    // Verificar click en pilas del tablero
+    if (y >= BOARD_POSITION.y && y <= BOARD_POSITION.y + CARD_HEIGHT) {
+        let position;
+        if (x >= BOARD_POSITION.x && x <= BOARD_POSITION.x + CARD_WIDTH) {
+            position = 'asc1';
+        }
+        else if (x >= BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING && x <= BOARD_POSITION.x + CARD_WIDTH * 2 + COLUMN_SPACING) {
+            position = 'asc2';
+        }
+        else if (x >= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 && x <= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 + CARD_WIDTH) {
+            position = 'desc1';
+        }
+        else if (x >= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 && x <= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 + CARD_WIDTH) {
+            position = 'desc2';
+        } else {
+            return;
+        }
 
-    socket.send(JSON.stringify({
-        type: 'return_card',
-        playerId: currentPlayer.id,
-        cardValue: cardToReturn.value,
-        position: cardToReturn.position
-    }));
-
-    // Actualizar estado local
-    gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
-        card => !(card.value === cardToReturn.value && card.position === cardToReturn.position)
-    );
-
-    updateEndTurnButton();
-}
-
-function getClickedColumn(x, y) {
-    if (y < BOARD_POSITION.y || y > BOARD_POSITION.y + CARD_HEIGHT) {
-        return null;
-    }
-
-    if (x >= BOARD_POSITION.x && x <= BOARD_POSITION.x + CARD_WIDTH) return 'asc1';
-    if (x >= BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING &&
-        x <= BOARD_POSITION.x + CARD_WIDTH * 2 + COLUMN_SPACING) return 'asc2';
-    if (x >= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 &&
-        x <= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 + CARD_WIDTH) return 'desc1';
-    if (x >= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 &&
-        x <= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 + CARD_WIDTH) return 'desc2';
-
-    return null;
-}
-
-function getCardPosition(position) {
-    switch (position) {
-        case 'asc1': return { x: BOARD_POSITION.x, y: BOARD_POSITION.y };
-        case 'asc2': return { x: BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, y: BOARD_POSITION.y };
-        case 'desc1': return { x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, y: BOARD_POSITION.y };
-        case 'desc2': return { x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, y: BOARD_POSITION.y };
-        default: return { x: 0, y: 0 };
+        if (selectedCard) {
+            playCard(selectedCard.value, position);
+        }
     }
 }
 
@@ -345,6 +300,22 @@ function isValidMove(cardValue, position) {
     }
 }
 
+function returnCards() {
+    if (gameState.currentTurn !== currentPlayer.id || gameState.cardsPlayedThisTurn.length === 0) {
+        showNotification('No hay cartas para devolver', true);
+        return;
+    }
+
+    socket.send(JSON.stringify({
+        type: 'return_cards',
+        playerId: currentPlayer.id,
+        cards: gameState.cardsPlayedThisTurn
+    }));
+
+    gameState.cardsPlayedThisTurn = [];
+    updateEndTurnButton();
+}
+
 function endTurn() {
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
     if (gameState.cardsPlayedThisTurn.length < minCardsRequired) {
@@ -365,9 +336,14 @@ function endTurn() {
 
 function updateEndTurnButton() {
     const endTurnBtn = document.getElementById('endTurn');
+    const returnBtn = document.getElementById('returnCards');
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+
     endTurnBtn.disabled = gameState.currentTurn !== currentPlayer.id ||
         gameState.cardsPlayedThisTurn.length < minCardsRequired;
+
+    returnBtn.disabled = gameState.currentTurn !== currentPlayer.id ||
+        gameState.cardsPlayedThisTurn.length === 0;
 }
 
 function gameLoop() {
@@ -398,39 +374,19 @@ function drawBoard() {
 
     // Ascendente 1
     ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    const asc1Card = new Card(gameState.board.ascending[0], BOARD_POSITION.x, BOARD_POSITION.y);
-    const asc1PlayedCards = gameState.cardsPlayedThisTurn.filter(c => c.position === 'asc1');
-    asc1Card.isPlayedThisTurn = asc1PlayedCards.some(c => c.value === gameState.board.ascending[0]);
-    asc1Card.isMostRecent = asc1PlayedCards.length > 0 &&
-        asc1PlayedCards[asc1PlayedCards.length - 1].value === gameState.board.ascending[0];
-    asc1Card.draw();
+    new Card(gameState.board.ascending[0], BOARD_POSITION.x, BOARD_POSITION.y).draw();
 
     // Ascendente 2
     ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    const asc2Card = new Card(gameState.board.ascending[1], BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, BOARD_POSITION.y);
-    const asc2PlayedCards = gameState.cardsPlayedThisTurn.filter(c => c.position === 'asc2');
-    asc2Card.isPlayedThisTurn = asc2PlayedCards.some(c => c.value === gameState.board.ascending[1]);
-    asc2Card.isMostRecent = asc2PlayedCards.length > 0 &&
-        asc2PlayedCards[asc2PlayedCards.length - 1].value === gameState.board.ascending[1];
-    asc2Card.draw();
+    new Card(gameState.board.ascending[1], BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, BOARD_POSITION.y).draw();
 
     // Descendente 1
     ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    const desc1Card = new Card(gameState.board.descending[0], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, BOARD_POSITION.y);
-    const desc1PlayedCards = gameState.cardsPlayedThisTurn.filter(c => c.position === 'desc1');
-    desc1Card.isPlayedThisTurn = desc1PlayedCards.some(c => c.value === gameState.board.descending[0]);
-    desc1Card.isMostRecent = desc1PlayedCards.length > 0 &&
-        desc1PlayedCards[desc1PlayedCards.length - 1].value === gameState.board.descending[0];
-    desc1Card.draw();
+    new Card(gameState.board.descending[0], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, BOARD_POSITION.y).draw();
 
     // Descendente 2
     ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    const desc2Card = new Card(gameState.board.descending[1], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, BOARD_POSITION.y);
-    const desc2PlayedCards = gameState.cardsPlayedThisTurn.filter(c => c.position === 'desc2');
-    desc2Card.isPlayedThisTurn = desc2PlayedCards.some(c => c.value === gameState.board.descending[1]);
-    desc2Card.isMostRecent = desc2PlayedCards.length > 0 &&
-        desc2PlayedCards[desc2PlayedCards.length - 1].value === gameState.board.descending[1];
-    desc2Card.draw();
+    new Card(gameState.board.descending[1], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, BOARD_POSITION.y).draw();
 }
 
 function drawPlayerCards() {

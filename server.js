@@ -263,9 +263,9 @@ function handleGameMessage(room, player, msg) {
             }
             break;
 
-        case 'return_card':
+        case 'return_cards':
             if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                returnCard(room, player, msg.cardValue, msg.position);
+                returnCards(room, player, msg.cards);
             }
             break;
 

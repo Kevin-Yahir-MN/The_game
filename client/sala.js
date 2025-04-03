@@ -44,6 +44,7 @@ function initializeWebSocket() {
         console.log('Mensaje recibido:', message);
 
         if (message.type === 'game_started') {
+            console.log('Juego iniciado, redirigiendo...');
             window.location.href = 'game.html';
         } else if (message.type === 'room_update') {
             updatePlayersUI(message.players);
@@ -68,6 +69,7 @@ function handleStartGame() {
     }
 
     try {
+        console.log('Intentando iniciar juego...');
         startBtn.disabled = true;
         startBtn.textContent = 'Iniciando...';
 
