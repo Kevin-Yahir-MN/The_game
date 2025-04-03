@@ -158,23 +158,23 @@ function connectWebSocket() {
                     break;
                 case 'invalid_move':
                     showNotification(message.reason, true);
+                    // Revertir cambios locales si el movimiento fue inválido
+                    if (message.cardValue) {
+                        gameState.yourCards.push(new Card(message.cardValue, 0, 0, false));
+                        gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
+                            c => c.value !== message.cardValue
+                        );
+                    }
+                    break;
+                case 'card_played':
+                    // Confirmación del servidor de que se jugó una carta
+                    showNotification(`Carta ${message.cardValue} colocada correctamente`, false);
                     break;
                 case 'init_state':
                     gameState = { ...gameState, ...message.state };
                     break;
                 case 'notification':
                     showNotification(message.message, message.isError);
-                    break;
-                case 'card_played':
-                    // Actualizar el estado cuando el servidor confirma que se jugó una carta
-                    const cardIndex = gameState.yourCards.findIndex(card => card.value === message.cardValue);
-                    if (cardIndex !== -1) {
-                        gameState.yourCards.splice(cardIndex, 1);
-                    }
-                    gameState.cardsPlayedThisTurn.push({
-                        value: message.cardValue,
-                        position: message.position
-                    });
                     break;
                 default:
                     console.warn('Tipo de mensaje no reconocido:', message.type);
@@ -268,6 +268,7 @@ function updateGameState(newState) {
 
     if (!isYourTurn) {
         selectedCard = null;
+        gameState.cardsPlayedThisTurn = [];
     }
 }
 
@@ -328,6 +329,18 @@ function playCard(cardValue, position) {
         return;
     }
 
+    // Actualizar el estado local inmediatamente
+    gameState.cardsPlayedThisTurn.push({
+        value: cardValue,
+        position: position
+    });
+
+    // Eliminar la carta de la mano
+    const cardIndex = gameState.yourCards.findIndex(card => card.value === cardValue);
+    if (cardIndex !== -1) {
+        gameState.yourCards.splice(cardIndex, 1);
+    }
+
     // Enviar jugada al servidor
     socket.send(JSON.stringify({
         type: 'play_card',
@@ -337,6 +350,7 @@ function playCard(cardValue, position) {
     }));
 
     selectedCard = null;
+    showNotification(`Carta ${cardValue} jugada en ${position}`, false);
 }
 
 // Terminar turno
@@ -356,6 +370,7 @@ function endTurn() {
 
     gameState.cardsPlayedThisTurn = [];
     selectedCard = null;
+    showNotification('Turno terminado', false);
 }
 
 // Obtener columna clickeada
@@ -392,6 +407,8 @@ function gameLoop() {
 // Dibujar información del juego
 function drawGameInfo() {
     const currentTurnPlayer = gameState.players.find(p => p.id === gameState.currentTurn);
+    const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+    const cardsNeeded = Math.max(0, minCardsRequired - gameState.cardsPlayedThisTurn.length);
 
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 24px Arial';
@@ -400,7 +417,16 @@ function drawGameInfo() {
 
     ctx.fillText(`Turno: ${currentTurnPlayer?.name || 'Esperando...'}`, 20, 20);
     ctx.fillText(`Cartas en la baraja: ${gameState.remainingDeck}`, 20, 50);
-    ctx.fillText(`Cartas jugadas este turno: ${gameState.cardsPlayedThisTurn.length}`, 20, 80);
+
+    // Contador de cartas jugadas con color condicional
+    ctx.fillStyle = gameState.cardsPlayedThisTurn.length >= minCardsRequired ? '#00FF00' : '#FFFF00';
+    ctx.fillText(`Cartas jugadas: ${gameState.cardsPlayedThisTurn.length}/${minCardsRequired}`, 20, 80);
+
+    // Mostrar cartas faltantes si es necesario
+    if (cardsNeeded > 0 && gameState.currentTurn === currentPlayer.id) {
+        ctx.fillStyle = '#FF0000';
+        ctx.fillText(`Faltan ${cardsNeeded} carta(s)`, 20, 110);
+    }
 }
 
 // Dibujar el tablero
