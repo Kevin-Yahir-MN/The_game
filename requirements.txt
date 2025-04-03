@@ -1,7 +1,0 @@
-flask==2.3.2
-flask-socketio==5.3.6
-python-engineio==4.6.0
-python-socketio==5.8.0
-eventlet==0.33.3
-pygame==2.5.2
-python-dotenv==1.0.0
