@@ -18,7 +18,8 @@ let gameState = {
         descending: [100, 100] // [desc1, desc2]
     },
     currentTurn: null,
-    remainingDeck: 98
+    remainingDeck: 98,
+    cardsPlayedThisTurn: [] // Registro de cartas jugadas en el turno actual
 };
 
 // Constantes de diseño
@@ -81,7 +82,7 @@ function initGame() {
     // Event listeners
     canvas.addEventListener('click', handleCanvasClick);
     document.getElementById('endTurn').addEventListener('click', endTurn);
-    document.getElementById('drawCard').addEventListener('click', drawCard);
+    document.getElementById('returnCards').addEventListener('click', returnCards);
 
     gameLoop();
 }
@@ -121,7 +122,12 @@ function connectWebSocket() {
 }
 
 function updateGameState(newState) {
+    // Guardar cartas jugadas este turno
+    const prevCardsPlayed = gameState.cardsPlayedThisTurn;
+
+    // Actualizar estado
     gameState = { ...gameState, ...newState };
+    gameState.cardsPlayedThisTurn = prevCardsPlayed;
 
     // Actualizar estado de las cartas jugables
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
@@ -133,6 +139,9 @@ function updateGameState(newState) {
         );
         return card;
     });
+
+    // Actualizar estado del botón de terminar turno
+    updateEndTurnButton();
 }
 
 function canPlayCard(cardValue) {
@@ -174,18 +183,23 @@ function handleCanvasClick(event) {
         if (!selectedCard) return;
 
         // Determinar en qué columna se hizo clic
+        let position;
         if (x >= BOARD_POSITION.x && x <= BOARD_POSITION.x + CARD_WIDTH) {
-            playCard(selectedCard.value, 'asc1');
+            position = 'asc1';
         }
         else if (x >= BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING && x <= BOARD_POSITION.x + CARD_WIDTH * 2 + COLUMN_SPACING) {
-            playCard(selectedCard.value, 'asc2');
+            position = 'asc2';
         }
         else if (x >= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 && x <= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 + CARD_WIDTH) {
-            playCard(selectedCard.value, 'desc1');
+            position = 'desc1';
         }
         else if (x >= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 && x <= BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 + CARD_WIDTH) {
-            playCard(selectedCard.value, 'desc2');
+            position = 'desc2';
+        } else {
+            return;
         }
+
+        playCard(selectedCard.value, position);
     }
 }
 
@@ -198,24 +212,61 @@ function playCard(cardValue, position) {
         cardValue: cardValue,
         position: position
     }));
+
+    // Registrar carta jugada este turno
+    gameState.cardsPlayedThisTurn.push({
+        value: cardValue,
+        position: position
+    });
+
+    // Actualizar estado del botón
+    updateEndTurnButton();
 }
 
-function drawCard() {
-    if (gameState.currentTurn !== currentPlayer.id) return;
+function returnCards() {
+    if (gameState.currentTurn !== currentPlayer.id || gameState.cardsPlayedThisTurn.length === 0) return;
 
     socket.send(JSON.stringify({
-        type: 'draw_card',
-        playerId: currentPlayer.id
+        type: 'return_cards',
+        playerId: currentPlayer.id,
+        cards: gameState.cardsPlayedThisTurn
     }));
+
+    // Limpiar registro de cartas jugadas este turno
+    gameState.cardsPlayedThisTurn = [];
+    updateEndTurnButton();
 }
 
 function endTurn() {
     if (gameState.currentTurn !== currentPlayer.id) return;
 
+    // Verificar mínimo de cartas jugadas
+    const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+    if (gameState.cardsPlayedThisTurn.length < minCardsRequired) {
+        alert(`Debes jugar al menos ${minCardsRequired} cartas este turno`);
+        return;
+    }
+
     socket.send(JSON.stringify({
         type: 'end_turn',
-        playerId: currentPlayer.id
+        playerId: currentPlayer.id,
+        cardsPlayed: gameState.cardsPlayedThisTurn.length
     }));
+
+    // Limpiar registro de cartas jugadas este turno
+    gameState.cardsPlayedThisTurn = [];
+}
+
+function updateEndTurnButton() {
+    const endTurnBtn = document.getElementById('endTurn');
+    const returnBtn = document.getElementById('returnCards');
+    const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+
+    // Habilitar/deshabilitar botón de terminar turno
+    endTurnBtn.disabled = gameState.cardsPlayedThisTurn.length < minCardsRequired;
+
+    // Habilitar/deshabilitar botón de devolver cartas
+    returnBtn.disabled = gameState.cardsPlayedThisTurn.length === 0;
 }
 
 function gameLoop() {
@@ -247,6 +298,13 @@ function drawGameInfo() {
 
     // Cartas en la baraja
     ctx.fillText(`Cartas en la baraja: ${gameState.remainingDeck}`, 20, 80);
+
+    // Cartas jugadas este turno
+    ctx.fillText(`Cartas jugadas este turno: ${gameState.cardsPlayedThisTurn.length}`, 20, 120);
+
+    // Mínimo requerido
+    const minRequired = gameState.remainingDeck > 0 ? 2 : 1;
+    ctx.fillText(`Mínimo requerido: ${minRequired}`, 20, 160);
 }
 
 function drawBoard() {

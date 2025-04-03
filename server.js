@@ -79,7 +79,8 @@ app.post('/create-room', (req, res) => {
             name: playerName,
             isHost: true,
             ws: null,
-            cards: []
+            cards: [],
+            cardsPlayedThisTurn: 0
         }],
         gameState: {
             deck: initializeDeck(),
@@ -123,7 +124,8 @@ app.post('/join-room', (req, res) => {
         name: playerName,
         isHost: false,
         ws: null,
-        cards: []
+        cards: [],
+        cardsPlayedThisTurn: 0
     };
 
     room.players.push(newPlayer);
@@ -190,7 +192,8 @@ wss.on('connection', (ws, req) => {
         gameState: {
             board: room.gameState.board,
             currentTurn: room.gameState.currentTurn,
-            gameStarted: room.gameState.gameStarted
+            gameStarted: room.gameState.gameStarted,
+            remainingDeck: room.gameState.deck.length
         }
     }));
 
@@ -261,15 +264,15 @@ function handleGameMessage(room, player, msg) {
             }
             break;
 
-        case 'draw_card':
+        case 'return_cards':
             if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                drawCard(room, player);
+                returnCards(room, player, msg.cards);
             }
             break;
 
         case 'end_turn':
             if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                nextTurn(room);
+                endTurn(room, player, msg.cardsPlayed);
             }
             break;
     }
@@ -337,27 +340,67 @@ function playCard(room, player, cardValue, position) {
 
     if (validMove) {
         player.cards.splice(cardIndex, 1);
+        player.cardsPlayedThisTurn++;
         checkGameStatus(room);
-        nextTurn(room);
+        broadcastGameState(room);
     }
 }
 
-function drawCard(room, player) {
-    if (room.gameState.deck.length > 0) {
-        player.cards.push(room.gameState.deck.pop());
-        nextTurn(room);
-    } else {
+function returnCards(room, player, cards) {
+    cards.forEach(cardInfo => {
+        // Buscar la carta en el tablero y devolverla a la mano del jugador
+        if (cardInfo.position.includes('asc')) {
+            const index = cardInfo.position === 'asc1' ? 0 : 1;
+            if (room.gameState.board.ascending[index] === cardInfo.value) {
+                room.gameState.board.ascending[index] = cardInfo.position === 'asc1' ? 1 : 1;
+                player.cards.push(cardInfo.value);
+                player.cardsPlayedThisTurn--;
+            }
+        } else {
+            const index = cardInfo.position === 'desc1' ? 0 : 1;
+            if (room.gameState.board.descending[index] === cardInfo.value) {
+                room.gameState.board.descending[index] = cardInfo.position === 'desc1' ? 100 : 100;
+                player.cards.push(cardInfo.value);
+                player.cardsPlayedThisTurn--;
+            }
+        }
+    });
+    broadcastGameState(room);
+}
+
+function endTurn(room, player, cardsPlayed) {
+    // Verificar mínimo de cartas jugadas
+    const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+    if (player.cardsPlayedThisTurn < minCardsRequired) {
         player.ws.send(JSON.stringify({
             type: 'invalid_move',
-            reason: 'No quedan cartas en el mazo'
+            reason: `Debes jugar al menos ${minCardsRequired} cartas este turno`
         }));
+        return;
     }
-}
 
-function nextTurn(room) {
+    // Robar cartas automáticamente
+    if (player.cardsPlayedThisTurn > 0 && room.gameState.deck.length > 0) {
+        const cardsToDraw = Math.min(player.cardsPlayedThisTurn, room.gameState.deck.length);
+        for (let i = 0; i < cardsToDraw; i++) {
+            player.cards.push(room.gameState.deck.pop());
+        }
+
+        // Si el mazo se acaba, notificar a todos
+        if (room.gameState.deck.length === 0) {
+            broadcastToRoom(room, {
+                type: 'deck_empty'
+            });
+        }
+    }
+
+    // Pasar al siguiente turno
     const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
     const nextIndex = (currentIndex + 1) % room.players.length;
     room.gameState.currentTurn = room.players[nextIndex].id;
+
+    // Reiniciar contador de cartas jugadas
+    player.cardsPlayedThisTurn = 0;
 
     broadcastGameState(room);
 }
