@@ -3,24 +3,40 @@ const WebSocket = require('ws');
 const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const cors = require('cors'); // Añade esta línea
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// Configuración CORS para Express
+app.use(cors({
+    origin: [
+        'https://the-game-2xks.onrender.com',
+        'https://the-game-server.onrender.com'
+    ],
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type']
+}));
+
+// Middleware para parsear JSON
+app.use(express.json());
+
+// Servir archivos estáticos desde la carpeta client
+app.use(express.static(path.join(__dirname, 'client')));
+
 // Almacenamiento de salas en memoria
 const rooms = new Map();
-
-// Middleware
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'client'))); // Sirve archivos estáticos desde /client
 
 // Endpoint para crear sala
 app.post('/create-room', (req, res) => {
     const { playerName } = req.body;
 
     if (!playerName) {
-        return res.status(400).json({ success: false, message: 'Nombre de jugador requerido' });
+        return res.status(400).json({
+            success: false,
+            message: 'Nombre de jugador requerido'
+        });
     }
 
     const roomId = generateRoomId();
@@ -37,7 +53,10 @@ app.post('/create-room', (req, res) => {
         host: hostPlayer.id
     });
 
-    res.json({ success: true, roomId });
+    res.json({
+        success: true,
+        roomId
+    });
 });
 
 // Endpoint para unirse a sala
@@ -45,11 +64,17 @@ app.post('/join-room', (req, res) => {
     const { playerName, roomId } = req.body;
 
     if (!playerName || !roomId) {
-        return res.status(400).json({ success: false, message: 'Nombre de jugador y código de sala requeridos' });
+        return res.status(400).json({
+            success: false,
+            message: 'Nombre de jugador y código de sala requeridos'
+        });
     }
 
     if (!rooms.has(roomId)) {
-        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+        return res.status(404).json({
+            success: false,
+            message: 'Sala no encontrada'
+        });
     }
 
     const room = rooms.get(roomId);
@@ -62,11 +87,25 @@ app.post('/join-room', (req, res) => {
 
     room.players.push(newPlayer);
 
-    res.json({ success: true });
+    res.json({
+        success: true
+    });
 });
 
-// WebSocket connection
+// Configuración CORS para WebSocket
 wss.on('connection', (ws, req) => {
+    // Verificación de origen para WebSocket
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+        'https://the-game-2xks.onrender.com',
+        'https://the-game-server.onrender.com'
+    ];
+
+    if (!allowedOrigins.includes(origin)) {
+        ws.close();
+        return;
+    }
+
     const urlParams = new URLSearchParams(req.url.split('?')[1]);
     const roomId = urlParams.get('roomId');
     const playerName = urlParams.get('playerName');
