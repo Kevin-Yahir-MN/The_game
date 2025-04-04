@@ -266,6 +266,18 @@ function updateGameState(newState) {
         );
     });
 
+    // Marcar cartas jugadas este turno
+    if (newState.cardsPlayedThisTurn) {
+        gameState.yourCards.forEach(card => {
+            card.isPlayedThisTurn = newState.cardsPlayedThisTurn.some(
+                playedCard => playedCard.value === card.value
+            );
+            card.isMostRecent = newState.cardsPlayedThisTurn.some(
+                playedCard => playedCard.value === card.value && playedCard.isMostRecent
+            );
+        });
+    }
+
     if (!isYourTurn) {
         selectedCard = null;
         gameState.cardsPlayedThisTurn = [];
@@ -332,7 +344,8 @@ function playCard(cardValue, position) {
     // Actualizar el estado local inmediatamente
     gameState.cardsPlayedThisTurn.push({
         value: cardValue,
-        position: position
+        position: position,
+        isMostRecent: true
     });
 
     // Eliminar la carta de la mano

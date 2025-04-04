@@ -355,12 +355,22 @@ function handlePlayCard(room, player, msg) {
     player.cards.splice(player.cards.indexOf(msg.cardValue), 1);
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
-        position: msg.position
+        position: msg.position,
+        isMostRecent: true
+    });
+
+    // Marcar las cartas anteriores como no más recientes
+    player.cardsPlayedThisTurn.forEach(card => {
+        if (card.value !== msg.cardValue) {
+            card.isMostRecent = false;
+        }
     });
 
     checkGameStatus(room);
     broadcastGameState(room);
 }
+
+// ... (el resto del código permanece igual)
 
 function returnCard(room, player, cardValue, position) {
     const board = room.gameState.board;
