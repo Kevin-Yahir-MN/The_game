@@ -353,24 +353,22 @@ function handlePlayCard(room, player, msg) {
     }
 
     player.cards.splice(player.cards.indexOf(msg.cardValue), 1);
+
+    // Resetear isMostRecent en todas las cartas jugadas este turno
+    player.cardsPlayedThisTurn.forEach(card => {
+        card.isMostRecent = false;
+    });
+
+    // Agregar nueva carta jugada
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
         position: msg.position,
         isMostRecent: true
     });
 
-    // Marcar las cartas anteriores como no más recientes
-    player.cardsPlayedThisTurn.forEach(card => {
-        if (card.value !== msg.cardValue) {
-            card.isMostRecent = false;
-        }
-    });
-
     checkGameStatus(room);
     broadcastGameState(room);
 }
-
-// ... (el resto del código permanece igual)
 
 function returnCard(room, player, cardValue, position) {
     const board = room.gameState.board;
@@ -560,6 +558,7 @@ function sendGameState(room, player) {
                     cardCount: p.cards.length
                 })),
                 remainingDeck: room.gameState.deck.length,
+                cardsPlayedThisTurn: player.cardsPlayedThisTurn,
                 isYourTurn: room.gameState.currentTurn === player.id
             }
         }));

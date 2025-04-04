@@ -69,9 +69,10 @@ class Card {
 
         // Fondo de la carta
         let fillColor = '#FFFFFF';
-        if (this === selectedCard) fillColor = '#FFFF99';
-        else if (this.isPlayedThisTurn) {
-            fillColor = this.isMostRecent ? '#ADD8E6' : '#A0C0E0';
+        if (this === selectedCard) {
+            fillColor = '#FFFF99'; // Amarillo para seleccionada
+        } else if (this.isPlayedThisTurn) {
+            fillColor = this.isMostRecent ? '#ADD8E6' : '#A0C0E0'; // Azul claro para más reciente, azul normal para otras
         }
 
         ctx.fillStyle = fillColor;
@@ -158,7 +159,6 @@ function connectWebSocket() {
                     break;
                 case 'invalid_move':
                     showNotification(message.reason, true);
-                    // Revertir cambios locales si el movimiento fue inválido
                     if (message.cardValue) {
                         gameState.yourCards.push(new Card(message.cardValue, 0, 0, false));
                         gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
@@ -167,7 +167,6 @@ function connectWebSocket() {
                     }
                     break;
                 case 'card_played':
-                    // Confirmación del servidor de que se jugó una carta
                     showNotification(`Carta ${message.cardValue} colocada correctamente`, false);
                     break;
                 case 'init_state':
@@ -251,30 +250,36 @@ function updateGameState(newState) {
     const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
     const startY = canvas.height - CARD_HEIGHT - 20;
 
-    gameState.yourCards = gameState.yourCards.map((value, index) => {
-        if (value instanceof Card) {
-            value.x = startX + index * (CARD_WIDTH + CARD_SPACING);
-            value.y = startY;
-            value.isPlayable = isYourTurn && canPlayCard(value.value);
-            return value;
+    gameState.yourCards = gameState.yourCards.map((card, index) => {
+        if (typeof card === 'number') {
+            return new Card(
+                card,
+                startX + index * (CARD_WIDTH + CARD_SPACING),
+                startY,
+                isYourTurn && canPlayCard(card)
+            );
         }
-        return new Card(
-            value,
-            startX + index * (CARD_WIDTH + CARD_SPACING),
-            startY,
-            isYourTurn && canPlayCard(value)
-        );
+
+        card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
+        card.y = startY;
+        card.isPlayable = isYourTurn && canPlayCard(card.value);
+        return card;
+    });
+
+    // Resetear estado de cartas jugadas
+    gameState.yourCards.forEach(card => {
+        card.isPlayedThisTurn = false;
+        card.isMostRecent = false;
     });
 
     // Marcar cartas jugadas este turno
-    if (newState.cardsPlayedThisTurn) {
-        gameState.yourCards.forEach(card => {
-            card.isPlayedThisTurn = newState.cardsPlayedThisTurn.some(
-                playedCard => playedCard.value === card.value
-            );
-            card.isMostRecent = newState.cardsPlayedThisTurn.some(
-                playedCard => playedCard.value === card.value && playedCard.isMostRecent
-            );
+    if (newState.cardsPlayedThisTurn && Array.isArray(newState.cardsPlayedThisTurn)) {
+        newState.cardsPlayedThisTurn.forEach(playedCard => {
+            const card = gameState.yourCards.find(c => c.value === playedCard.value);
+            if (card) {
+                card.isPlayedThisTurn = true;
+                card.isMostRecent = playedCard.isMostRecent || false;
+            }
         });
     }
 
@@ -341,19 +346,6 @@ function playCard(cardValue, position) {
         return;
     }
 
-    // Actualizar el estado local inmediatamente
-    gameState.cardsPlayedThisTurn.push({
-        value: cardValue,
-        position: position,
-        isMostRecent: true
-    });
-
-    // Eliminar la carta de la mano
-    const cardIndex = gameState.yourCards.findIndex(card => card.value === cardValue);
-    if (cardIndex !== -1) {
-        gameState.yourCards.splice(cardIndex, 1);
-    }
-
     // Enviar jugada al servidor
     socket.send(JSON.stringify({
         type: 'play_card',
@@ -363,7 +355,6 @@ function playCard(cardValue, position) {
     }));
 
     selectedCard = null;
-    showNotification(`Carta ${cardValue} jugada en ${position}`, false);
 }
 
 // Terminar turno
@@ -431,11 +422,9 @@ function drawGameInfo() {
     ctx.fillText(`Turno: ${currentTurnPlayer?.name || 'Esperando...'}`, 20, 20);
     ctx.fillText(`Cartas en la baraja: ${gameState.remainingDeck}`, 20, 50);
 
-    // Contador de cartas jugadas con color condicional
     ctx.fillStyle = gameState.cardsPlayedThisTurn.length >= minCardsRequired ? '#00FF00' : '#FFFF00';
     ctx.fillText(`Cartas jugadas: ${gameState.cardsPlayedThisTurn.length}/${minCardsRequired}`, 20, 80);
 
-    // Mostrar cartas faltantes si es necesario
     if (cardsNeeded > 0 && gameState.currentTurn === currentPlayer.id) {
         ctx.fillStyle = '#FF0000';
         ctx.fillText(`Faltan ${cardsNeeded} carta(s)`, 20, 110);
