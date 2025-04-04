@@ -384,6 +384,15 @@ function handlePlayCard(room, player, msg) {
         position: msg.position
     });
 
+    // Nuevo: Notificar a todos sobre la carta jugada
+    broadcastToRoom(room, {
+        type: 'card_played',
+        cardValue: msg.cardValue,
+        position: msg.position,
+        playerId: player.id,
+        playerName: player.name
+    });
+
     checkGameStatus(room);
     broadcastGameState(room);
 }
