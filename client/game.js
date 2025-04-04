@@ -33,9 +33,9 @@ let gameState = {
     animatingCards: []
 };
 
-// Clase Card optimizada con colores dinámicos
+// Clase Card optimizada con solo color azul
 class Card {
-    constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false, isFromCurrentTurn = false) {
+    constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
         this.value = value;
         this.x = x;
         this.y = y;
@@ -43,20 +43,9 @@ class Card {
         this.height = CARD_HEIGHT;
         this.isPlayable = isPlayable;
         this.isPlayedThisTurn = isPlayedThisTurn;
-        this.isFromCurrentTurn = isFromCurrentTurn;
         this.radius = 5;
         this.shakeOffset = 0;
-        this.updateBackgroundColor();
-    }
-
-    updateBackgroundColor() {
-        if (this.isFromCurrentTurn) {
-            this.backgroundColor = '#99CCFF'; // Azul para turno actual
-        } else if (this.isPlayedThisTurn) {
-            this.backgroundColor = '#FFCCCC'; // Rojo suave para turnos anteriores
-        } else {
-            this.backgroundColor = '#FFFFFF'; // Blanco por defecto
-        }
+        this.backgroundColor = isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
     }
 
     draw() {
@@ -166,7 +155,7 @@ function animateInvalidCard(card) {
     if (!card) return;
 
     const shakeAmount = 5;
-    const shakeDuration = 300; // Más rápido
+    const shakeDuration = 300;
     const startTime = Date.now();
 
     function shake() {
@@ -186,15 +175,6 @@ function animateInvalidCard(card) {
 }
 
 function handleTurnChanged(message) {
-    // Actualizar colores de cartas al cambiar turno
-    gameState.yourCards.forEach(card => {
-        if (card.isFromCurrentTurn) {
-            card.isFromCurrentTurn = false;
-            card.isPlayedThisTurn = true;
-            card.updateBackgroundColor();
-        }
-    });
-
     gameState.currentTurn = message.newTurn;
     gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
         card => card.playerId !== currentPlayer.id
@@ -227,7 +207,6 @@ function handleMoveUndone(message) {
             0,
             0,
             true,
-            false,
             false
         );
         gameState.yourCards.push(card);
@@ -297,11 +276,9 @@ function handleOpponentCardPlayed(message) {
             cardPosition.x,
             cardPosition.y,
             false,
-            false,
             true
         );
 
-        // Animación más rápida (300ms) desde arriba para oponentes
         gameState.animatingCards.push({
             card: opponentCard,
             startTime: Date.now(),
@@ -309,15 +286,14 @@ function handleOpponentCardPlayed(message) {
             targetX: cardPosition.x,
             targetY: cardPosition.y,
             fromX: cardPosition.x,
-            fromY: -CARD_HEIGHT // Desde arriba
+            fromY: -CARD_HEIGHT
         });
 
         gameState.cardsPlayedThisTurn.push({
             value: message.cardValue,
             position: message.position,
             playerId: message.playerId,
-            isPlayedThisTurn: true,
-            isFromCurrentTurn: true
+            isPlayedThisTurn: true
         });
 
         showNotification(`${message.playerName} jugó un ${value}`);
@@ -340,28 +316,21 @@ function updatePlayerCards(cards) {
             move => move.value === value && move.playerId === currentPlayer.id
         );
 
-        const isFromCurrentTurn = gameState.cardsPlayedThisTurn.some(
-            move => move.value === value && move.isFromCurrentTurn
-        );
-
         if (card instanceof Card) {
             card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
             card.y = startY;
             card.isPlayable = playable;
             card.isPlayedThisTurn = isPlayedThisTurn;
-            card.isFromCurrentTurn = isFromCurrentTurn;
-            card.updateBackgroundColor();
+            card.backgroundColor = isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
             return card;
         } else {
-            const newCard = new Card(
+            return new Card(
                 value,
                 startX + index * (CARD_WIDTH + CARD_SPACING),
                 startY,
                 playable,
-                isPlayedThisTurn,
-                isFromCurrentTurn
+                isPlayedThisTurn
             );
-            return newCard;
         }
     });
 }
@@ -422,15 +391,13 @@ function playCard(cardValue, position) {
         value: cardValue,
         position,
         playerId: currentPlayer.id,
-        previousValue,
-        isFromCurrentTurn: true
+        previousValue
     });
 
-    selectedCard.isFromCurrentTurn = true;
-    selectedCard.updateBackgroundColor();
+    selectedCard.isPlayedThisTurn = true;
+    selectedCard.backgroundColor = '#99CCFF';
 
     const cardPosition = getColumnPosition(position);
-    // Animación más rápida (300ms)
     gameState.animatingCards.push({
         card: selectedCard,
         startTime: Date.now(),
@@ -539,11 +506,10 @@ function drawBoard() {
         const card = new Card(
             gameState.board.ascending[i],
             BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i,
-            BOARD_POSITION.y
+            BOARD_POSITION.y,
+            false,
+            gameState.cardsPlayedThisTurn.some(c => c.value === gameState.board.ascending[i])
         );
-        card.isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(c => c.value === card.value);
-        card.isFromCurrentTurn = gameState.cardsPlayedThisTurn.some(c => c.value === card.value && c.isFromCurrentTurn);
-        card.updateBackgroundColor();
         card.draw();
     });
 
@@ -552,11 +518,10 @@ function drawBoard() {
         const card = new Card(
             gameState.board.descending[i],
             BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * (i + 2),
-            BOARD_POSITION.y
+            BOARD_POSITION.y,
+            false,
+            gameState.cardsPlayedThisTurn.some(c => c.value === gameState.board.descending[i])
         );
-        card.isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(c => c.value === card.value);
-        card.isFromCurrentTurn = gameState.cardsPlayedThisTurn.some(c => c.value === card.value && c.isFromCurrentTurn);
-        card.updateBackgroundColor();
         card.draw();
     });
 }
