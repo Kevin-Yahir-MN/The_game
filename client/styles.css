@@ -91,9 +91,10 @@ body {
 
 /* ===== INSTRUCCIONES ===== */
 .game-instructions {
-    position: absolute;
-    bottom: 30px;
-    left: 30px;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    /* Cambiado de left a right */
     background-color: rgba(255, 255, 255, 0.9);
     padding: 15px 20px;
     border-radius: 10px;
@@ -101,6 +102,8 @@ body {
     max-width: 300px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     z-index: 100;
+    border: 1px solid #ddd;
+    /* Borde sutil */
 }
 
 .game-instructions h3 {

@@ -622,7 +622,7 @@ function initGame() {
     }
 
     canvas.width = 800;
-    canvas.height = 700;
+    canvas.height = 600;
     endTurnButton.addEventListener('click', endTurn);
     undoButton.addEventListener('click', undoLastMove);
     canvas.addEventListener('click', handleCanvasClick);
