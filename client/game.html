@@ -7,30 +7,27 @@
     <title>Partida - The Game</title>
     <link rel="stylesheet" href="styles.css">
     <style>
-        .game-instructions {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            background-color: rgba(255, 255, 255, 0.9);
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 14px;
-            max-width: 300px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-        }
-
-        .game-instructions h3 {
-            margin: 0 0 8px 0;
-            color: #2c3e50;
-        }
-
-        .game-instructions ul {
+        body {
             margin: 0;
-            padding-left: 20px;
+            padding: 0;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
         }
 
-        .game-instructions li {
-            margin-bottom: 5px;
+        #gameContainer {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            margin: 20px auto;
+        }
+
+        #gameCanvas {
+            display: block;
+            background-color: #228B22;
+            border: 3px solid #2c3e50;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
         }
 
         #endTurnBtn {
@@ -44,12 +41,60 @@
             border-radius: 5px;
             font-size: 16px;
             cursor: pointer;
-            transition: background-color 0.3s;
+            transition: all 0.3s;
             z-index: 100;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
 
         #endTurnBtn:hover {
             background-color: #c0392b;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        #endTurnBtn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .game-instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            max-width: 300px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+            border: 1px solid #ddd;
+        }
+
+        .game-instructions h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 16px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        .game-instructions ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .game-instructions li {
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .color-sample {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            margin-right: 5px;
+            border: 1px solid #ccc;
         }
     </style>
 </head>
@@ -58,17 +103,17 @@
     <div id="gameContainer">
         <button id="endTurnBtn">Terminar Turno</button>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
-    </div>
 
-    <div class="game-instructions">
-        <h3>Instrucciones:</h3>
-        <ul>
-            <li><strong>Carta seleccionada:</strong> Amarillo</li>
-            <li><strong>Cartas jugadas este turno:</strong> Azul</li>
-            <li><strong>Última carta jugada:</strong> Azul claro</li>
-            <li>Debes jugar al menos 2 cartas por turno (1 si no quedan cartas en la baraja)</li>
-            <li>Presiona "Terminar Turno" cuando hayas terminado</li>
-        </ul>
+        <div class="game-instructions">
+            <h3>Instrucciones y Colores</h3>
+            <ul>
+                <li><span class="color-sample" style="background-color: #FFFF99;"></span> Carta seleccionada</li>
+                <li><span class="color-sample" style="background-color: #A0C0E0;"></span> Carta jugada este turno</li>
+                <li><span class="color-sample" style="background-color: #ADD8E6;"></span> Última carta jugada</li>
+                <li>Debes jugar al menos 2 cartas por turno</li>
+                <li>Haz clic en "Terminar Turno" cuando hayas terminado</li>
+            </ul>
+        </div>
     </div>
 
     <script src="game.js"></script>

@@ -352,7 +352,7 @@ function handlePlayCard(room, player, msg) {
         board.descending[target] = msg.cardValue;
     }
 
-    player.cards.splice(player.cards.indexOf(msg.cardValue), 1);
+    player.cards = player.cards.filter(c => c !== msg.cardValue);
 
     // Resetear isMostRecent en todas las cartas jugadas este turno
     player.cardsPlayedThisTurn.forEach(card => {

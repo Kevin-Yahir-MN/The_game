@@ -19,8 +19,8 @@ let gameState = {
     players: [],
     yourCards: [],
     board: {
-        ascending: [1, 1],    // [asc1, asc2]
-        descending: [100, 100] // [desc1, desc2]
+        ascending: [1, 1],
+        descending: [100, 100]
     },
     currentTurn: null,
     remainingDeck: 98,
@@ -72,7 +72,25 @@ class Card {
         if (this === selectedCard) {
             fillColor = '#FFFF99'; // Amarillo para seleccionada
         } else if (this.isPlayedThisTurn) {
-            fillColor = this.isMostRecent ? '#ADD8E6' : '#A0C0E0'; // Azul claro para más reciente, azul normal para otras
+            if (this.isMostRecent) {
+                // Degradado para la carta más reciente
+                const gradient = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y + this.height);
+                gradient.addColorStop(0, '#ADD8E6');
+                gradient.addColorStop(1, '#89CFF0');
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                ctx.restore();
+                return;
+            } else {
+                // Degradado para cartas jugadas este turno
+                const gradient = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y + this.height);
+                gradient.addColorStop(0, '#A0C0E0');
+                gradient.addColorStop(1, '#7DAFD2');
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                ctx.restore();
+                return;
+            }
         }
 
         ctx.fillStyle = fillColor;
@@ -275,10 +293,10 @@ function updateGameState(newState) {
     // Marcar cartas jugadas este turno
     if (newState.cardsPlayedThisTurn && Array.isArray(newState.cardsPlayedThisTurn)) {
         newState.cardsPlayedThisTurn.forEach(playedCard => {
-            const card = gameState.yourCards.find(c => c.value === playedCard.value);
-            if (card) {
-                card.isPlayedThisTurn = true;
-                card.isMostRecent = playedCard.isMostRecent || false;
+            const cardIndex = gameState.yourCards.findIndex(c => c.value === playedCard.value);
+            if (cardIndex !== -1) {
+                gameState.yourCards[cardIndex].isPlayedThisTurn = true;
+                gameState.yourCards[cardIndex].isMostRecent = playedCard.isMostRecent;
             }
         });
     }
