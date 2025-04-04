@@ -95,7 +95,7 @@ function connectWebSocket() {
                     updatePlayerCards(message.cards);
                     break;
                 case 'game_over':
-                    alert(message.message);
+                    handleGameOver(message);
                     break;
                 case 'notification':
                     showNotification(message.message, message.isError);
@@ -178,6 +178,28 @@ function handleTurnChanged(message) {
     );
 
     showNotification(`Ahora es el turno de ${gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador'}`);
+}
+
+// Función para manejar fin del juego
+function handleGameOver(message) {
+    // Detener el juego
+    canvas.style.pointerEvents = 'none';
+    endTurnButton.disabled = true;
+
+    // Mostrar mensaje de fin de juego
+    const gameOverDiv = document.createElement('div');
+    gameOverDiv.className = 'game-over-notification';
+    gameOverDiv.innerHTML = `
+        <h2>¡JUEGO TERMINADO!</h2>
+        <p>${message.message}</p>
+        <button id="returnToLobby">Volver al Lobby</button>
+    `;
+    document.body.appendChild(gameOverDiv);
+
+    // Manejar el botón de volver al lobby
+    document.getElementById('returnToLobby').addEventListener('click', () => {
+        window.location.href = '/';
+    });
 }
 
 // Actualización del estado

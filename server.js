@@ -125,6 +125,15 @@ function getNextActivePlayerIndex(currentIndex, players) {
     return currentIndex;
 }
 
+function getPlayableCards(playerCards, board) {
+    return playerCards.filter(card => {
+        return (card > board.ascending[0] || card === board.ascending[0] - 10) ||
+            (card > board.ascending[1] || card === board.ascending[1] - 10) ||
+            (card < board.descending[0] || card === board.descending[0] + 10) ||
+            (card < board.descending[1] || card === board.descending[1] + 10);
+    });
+}
+
 // Rutas API
 app.post('/create-room', (req, res) => {
     const { playerName } = req.body;
@@ -468,6 +477,7 @@ function handleUndoMove(room, player, msg) {
     });
 
     broadcastGameState(room);
+    checkGameStatus(room);
 }
 
 function endTurn(room, player) {
@@ -500,7 +510,20 @@ function endTurn(room, player) {
 
     const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
     const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
-    room.gameState.currentTurn = room.players[nextIndex].id;
+    const nextPlayer = room.players[nextIndex];
+    room.gameState.currentTurn = nextPlayer.id;
+
+    // Verificar si el siguiente jugador puede jugar
+    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
+
+    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
+        return broadcastToRoom(room, {
+            type: 'game_over',
+            result: 'lose',
+            message: `¡${nextPlayer.name} no puede jugar las cartas requeridas!`
+        });
+    }
 
     player.cardsPlayedThisTurn = [];
 
@@ -508,10 +531,10 @@ function endTurn(room, player) {
 
     broadcastToRoom(room, {
         type: 'turn_changed',
-        newTurn: room.players[nextIndex].id,
+        newTurn: nextPlayer.id,
         previousPlayer: player.id,
         cardsPlayedThisTurn: 0,
-        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+        minCardsRequired: requiredCards
     });
 }
 
@@ -522,6 +545,7 @@ function broadcastGameState(room) {
 }
 
 function checkGameStatus(room) {
+    // Verificar si todos han jugado sus cartas
     const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
     if (allPlayersEmpty && room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
@@ -529,13 +553,22 @@ function checkGameStatus(room) {
             result: 'win',
             message: '¡Todos ganan! Todas las cartas jugadas.'
         });
+        return;
+    }
 
-        setTimeout(() => {
-            const roomId = reverseRoomMap.get(room);
-            rooms.delete(roomId);
-            boardHistory.delete(roomId);
-            reverseRoomMap.delete(room);
-        }, 30000);
+    // Verificar si el jugador actual puede jugar
+    const currentPlayer = room.players.find(p => p.id === room.gameState.currentTurn);
+    if (currentPlayer) {
+        const playableCards = getPlayableCards(currentPlayer.cards, room.gameState.board);
+        const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
+
+        if (playableCards.length < requiredCards && currentPlayer.cards.length > 0) {
+            broadcastToRoom(room, {
+                type: 'game_over',
+                result: 'lose',
+                message: `¡${currentPlayer.name} no puede jugar las cartas requeridas!`
+            });
+        }
     }
 }
 

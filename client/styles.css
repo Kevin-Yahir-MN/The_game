@@ -311,7 +311,6 @@ h3 {
     text-shadow: 1px 1px 1px #000;
 }
 
-/* Añadir al final del archivo */
 @keyframes cardPlayed {
     0% {
         transform: scale(1);
@@ -394,4 +393,40 @@ h3 {
 #undoBtn:disabled {
     background-color: #95a5a6;
     cursor: not-allowed;
+}
+
+/* Añade al final del archivo */
+.game-over-notification {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 30px;
+    border-radius: 10px;
+    text-align: center;
+    z-index: 1000;
+    max-width: 80%;
+    width: 400px;
+}
+
+.game-over-notification h2 {
+    color: #e74c3c;
+    margin-top: 0;
+}
+
+.game-over-notification button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    margin-top: 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.game-over-notification button:hover {
+    background-color: #2980b9;
 }
