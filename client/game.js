@@ -3,6 +3,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const WS_URL = 'wss://the-game-2xks.onrender.com';
 const endTurnButton = document.getElementById('endTurnBtn');
+const undoButton = document.getElementById('undoBtn');
 
 // Constantes de diseño
 const CARD_WIDTH = 80;
@@ -34,13 +35,14 @@ let gameState = {
 
 // Clase Card optimizada
 class Card {
-    constructor(value, x, y, isPlayable = false) {
+    constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
         this.value = value;
         this.x = x;
         this.y = y;
         this.width = CARD_WIDTH;
         this.height = CARD_HEIGHT;
         this.isPlayable = isPlayable;
+        this.isPlayedThisTurn = isPlayedThisTurn;
         this.radius = 5;
         this.shakeOffset = 0;
     }
@@ -51,7 +53,8 @@ class Card {
 
         ctx.beginPath();
         ctx.roundRect(this.x, this.y, this.width, this.height, this.radius);
-        ctx.fillStyle = this === selectedCard ? '#FFFF99' : '#FFFFFF';
+        ctx.fillStyle = this === selectedCard ? '#FFFF99' :
+            this.isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
         ctx.fill();
         ctx.strokeStyle = this.isPlayable ? '#00FF00' : '#000000';
         ctx.lineWidth = this.isPlayable ? 3 : 1;
@@ -111,6 +114,9 @@ function connectWebSocket() {
                 case 'turn_changed':
                     handleTurnChanged(message);
                     break;
+                case 'move_undone':
+                    handleMoveUndone(message);
+                    break;
             }
         } catch (error) {
             console.error('Error procesando mensaje:', error);
@@ -168,7 +174,6 @@ function animateInvalidCard(card) {
     shake();
 }
 
-// Nueva función para manejar cambio de turno
 function handleTurnChanged(message) {
     gameState.currentTurn = message.newTurn;
 
@@ -177,18 +182,52 @@ function handleTurnChanged(message) {
         card => card.playerId !== currentPlayer.id
     );
 
+    // Actualizar estado del botón deshacer
+    undoButton.disabled = true;
+
     showNotification(`Ahora es el turno de ${gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador'}`);
 }
 
-// Función para manejar fin del juego
+function handleMoveUndone(message) {
+    if (message.playerId === currentPlayer.id) {
+        // Actualizar el estado local
+        const moveIndex = gameState.cardsPlayedThisTurn.findIndex(
+            move => move.value === message.cardValue &&
+                move.position === message.position
+        );
+
+        if (moveIndex !== -1) {
+            gameState.cardsPlayedThisTurn.splice(moveIndex, 1);
+        }
+
+        // Actualizar el tablero
+        if (message.position.includes('asc')) {
+            const idx = message.position === 'asc1' ? 0 : 1;
+            gameState.board.ascending[idx] = message.previousValue;
+        } else {
+            const idx = message.position === 'desc1' ? 0 : 1;
+            gameState.board.descending[idx] = message.previousValue;
+        }
+
+        // Actualizar las cartas del jugador
+        const card = new Card(
+            message.cardValue,
+            0, // x será actualizado en updatePlayerCards
+            0, // y será actualizado en updatePlayerCards
+            true, // isPlayable
+            false // isPlayedThisTurn
+        );
+        gameState.yourCards.push(card);
+        updatePlayerCards(gameState.yourCards.map(c => c.value));
+    }
+}
+
 function handleGameOver(message) {
-    // Solo mostrar game over si es por no cumplir el mínimo de cartas
     if (message.reason === 'min_cards_not_met') {
-        // Detener interacciones con el juego
         canvas.style.pointerEvents = 'none';
         endTurnButton.disabled = true;
+        undoButton.disabled = true;
 
-        // Crear elemento de game over
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
         gameOverDiv.innerHTML = `
@@ -198,14 +237,12 @@ function handleGameOver(message) {
         `;
         document.body.appendChild(gameOverDiv);
 
-        // Manejar click en el botón
         document.getElementById('returnToLobby').addEventListener('click', () => {
             window.location.href = '/';
         });
     }
 }
 
-// Actualización del estado
 function updateGameState(newState) {
     if (!newState) return;
 
@@ -222,6 +259,11 @@ function updateGameState(newState) {
     if (gameState.currentTurn !== currentPlayer.id) {
         selectedCard = null;
     }
+
+    // Actualizar estado del botón deshacer
+    undoButton.disabled =
+        gameState.currentTurn !== currentPlayer.id ||
+        gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length === 0;
 }
 
 function handleOpponentCardPlayed(message) {
@@ -240,7 +282,8 @@ function handleOpponentCardPlayed(message) {
         gameState.cardsPlayedThisTurn.push({
             value: message.cardValue,
             position: message.position,
-            playerId: message.playerId
+            playerId: message.playerId,
+            isPlayedThisTurn: true
         });
 
         showNotification(`${message.playerName} jugó un ${value}`);
@@ -259,17 +302,24 @@ function updatePlayerCards(cards) {
             isValidMove(value, 'desc1') || isValidMove(value, 'desc2')
         );
 
+        // Verificar si la carta fue jugada este turno
+        const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
+            move => move.value === value && move.playerId === currentPlayer.id
+        );
+
         return card instanceof Card
             ? Object.assign(card, {
                 x: startX + index * (CARD_WIDTH + CARD_SPACING),
                 y: startY,
-                isPlayable: playable
+                isPlayable: playable,
+                isPlayedThisTurn: isPlayedThisTurn
             })
             : new Card(
                 value,
                 startX + index * (CARD_WIDTH + CARD_SPACING),
                 startY,
-                playable
+                playable,
+                gameState.cardsPlayedThisTurn.some(move => move.value === value && move.playerId === currentPlayer.id)
             );
     });
 }
@@ -323,11 +373,17 @@ function playCard(cardValue, position) {
         return;
     }
 
+    // Guardar el valor anterior del tablero
+    const previousValue = position.includes('asc')
+        ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
+        : gameState.board.descending[position === 'desc1' ? 0 : 1];
+
     // Actualizar contador local
     gameState.cardsPlayedThisTurn.push({
         value: cardValue,
         position,
-        playerId: currentPlayer.id
+        playerId: currentPlayer.id,
+        previousValue
     });
 
     // Eliminar carta de la mano localmente
@@ -353,7 +409,34 @@ function playCard(cardValue, position) {
         position
     }));
 
+    // Actualizar estado del botón deshacer
+    undoButton.disabled = false;
+
     selectedCard = null;
+}
+
+function undoLastMove() {
+    if (gameState.currentTurn !== currentPlayer.id ||
+        gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length === 0) {
+        return;
+    }
+
+    // Encontrar la última jugada del jugador actual
+    const lastMove = [...gameState.cardsPlayedThisTurn]
+        .reverse()
+        .find(move => move.playerId === currentPlayer.id);
+
+    if (!lastMove) {
+        return showNotification('No hay movimientos para deshacer', true);
+    }
+
+    // Enviar solicitud de deshacer al servidor
+    socket.send(JSON.stringify({
+        type: 'undo_move',
+        playerId: currentPlayer.id,
+        cardValue: lastMove.value,
+        position: lastMove.position
+    }));
 }
 
 function endTurn() {
@@ -450,6 +533,7 @@ function initGame() {
     canvas.width = 800;
     canvas.height = 600;
     endTurnButton.addEventListener('click', endTurn);
+    undoButton.addEventListener('click', undoLastMove);
     canvas.addEventListener('click', handleCanvasClick);
     connectWebSocket();
     gameLoop();

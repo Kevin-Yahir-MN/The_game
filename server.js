@@ -414,7 +414,8 @@ function handlePlayCard(room, player, msg) {
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
         position: msg.position,
-        previousValue
+        previousValue,
+        isPlayedThisTurn: true
     });
 
     broadcastToRoom(room, {
@@ -455,8 +456,10 @@ function handleUndoMove(room, player, msg) {
 
     const lastMove = player.cardsPlayedThisTurn[lastMoveIndex];
 
+    // Devolver carta a la mano del jugador
     player.cards.push(msg.cardValue);
 
+    // Revertir el tablero
     if (msg.position.includes('asc')) {
         const idx = msg.position === 'asc1' ? 0 : 1;
         room.gameState.board.ascending[idx] = lastMove.previousValue;
@@ -465,6 +468,7 @@ function handleUndoMove(room, player, msg) {
         room.gameState.board.descending[idx] = lastMove.previousValue;
     }
 
+    // Eliminar de las jugadas este turno
     player.cardsPlayedThisTurn.splice(lastMoveIndex, 1);
 
     broadcastToRoom(room, {
@@ -474,10 +478,7 @@ function handleUndoMove(room, player, msg) {
         cardValue: msg.cardValue,
         position: msg.position,
         previousValue: lastMove.previousValue
-    });
-
-    broadcastGameState(room);
-    checkGameStatus(room);
+    }, { includeGameState: true });
 }
 
 function endTurn(room, player) {
