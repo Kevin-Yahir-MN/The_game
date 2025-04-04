@@ -3,42 +3,24 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const WS_URL = 'wss://the-game-2xks.onrender.com';
 
-// Elementos de la interfaz
-const endTurnButton = document.getElementById('endTurnBtn');
-const returnCardBtn = document.getElementById('returnCardBtn');
-
-// Variables del juego
-let socket;
-let currentPlayer = {
-    id: sessionStorage.getItem('playerId'),
-    name: sessionStorage.getItem('playerName'),
-    isHost: sessionStorage.getItem('isHost') === 'true'
-};
-let roomId = sessionStorage.getItem('roomId');
-let selectedCard = null;
-let gameState = {
-    players: [],
-    yourCards: [],
-    board: {
-        ascending: [1, 1],
-        descending: [100, 100]
+// Constantes de colores centralizadas
+const CARD_COLORS = {
+    SELECTED: 'rgba(255, 255, 153, 0.7)',
+    PLAYED_CURRENT: {
+        MOST_RECENT: 'rgba(100, 200, 255, 0.7)',
+        REGULAR: 'rgba(100, 180, 240, 0.5)'
     },
-    currentTurn: null,
-    remainingDeck: 98,
-    cardsPlayedThisTurn: []
+    PLAYED_OTHER: {
+        MOST_RECENT: 'rgba(255, 150, 150, 0.7)',
+        REGULAR: 'rgba(220, 120, 120, 0.5)'
+    },
+    BORDER: {
+        PLAYABLE: '#00FF00',
+        DEFAULT: '#000000'
+    }
 };
 
-// Constantes de diseño
-const CARD_WIDTH = 80;
-const CARD_HEIGHT = 120;
-const COLUMN_SPACING = 60;
-const CARD_SPACING = 10;
-const BOARD_POSITION = {
-    x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
-    y: canvas.height / 2 - CARD_HEIGHT / 2
-};
-
-// Clase Card para representar las cartas
+// Clase Card modificada
 class Card {
     constructor(value, x, y, isPlayable = false) {
         this.value = value;
@@ -69,45 +51,37 @@ class Card {
         ctx.quadraticCurveTo(this.x, this.y, this.x + this.radius, this.y);
         ctx.closePath();
 
-        // Fondo blanco sólido para todas las cartas
+        // Fondo blanco sólido
         ctx.fillStyle = '#FFFFFF';
         ctx.fill();
 
-        // Resaltado para carta seleccionada (amarillo semitransparente)
+        // Resaltado para carta seleccionada
         if (this === selectedCard) {
-            ctx.fillStyle = 'rgba(255, 255, 153, 0.7)';
+            ctx.fillStyle = CARD_COLORS.SELECTED;
             ctx.fill();
         }
         // Resaltado para cartas jugadas este turno
         else if (this.isPlayedThisTurn) {
-            const isCurrentPlayerTurn = gameState.currentTurn === currentPlayer.id;
-
-            if (this.playedByCurrentPlayer) {
-                if (isCurrentPlayerTurn) {
-                    // Jugador en turno ve azul para sus propias cartas jugadas
-                    if (this.isMostRecent) {
-                        ctx.fillStyle = 'rgba(173, 216, 230, 0.7)'; // Azul claro
-                    } else {
-                        ctx.fillStyle = 'rgba(160, 192, 224, 0.5)'; // Azul medio
-                    }
-                } else {
-                    // Otros jugadores ven rojo para cartas del jugador en turno
-                    if (this.isMostRecent) {
-                        ctx.fillStyle = 'rgba(255, 200, 200, 0.7)'; // Rojo claro
-                    } else {
-                        ctx.fillStyle = 'rgba(255, 150, 150, 0.5)'; // Rojo medio
-                    }
-                }
-                ctx.fill();
+            if (this.isMostRecent) {
+                ctx.fillStyle = this.playedByCurrentPlayer
+                    ? CARD_COLORS.PLAYED_CURRENT.MOST_RECENT
+                    : CARD_COLORS.PLAYED_OTHER.MOST_RECENT;
+            } else {
+                ctx.fillStyle = this.playedByCurrentPlayer
+                    ? CARD_COLORS.PLAYED_CURRENT.REGULAR
+                    : CARD_COLORS.PLAYED_OTHER.REGULAR;
             }
+            ctx.fill();
         }
 
         // Borde
-        ctx.strokeStyle = this.isPlayable ? '#00FF00' : '#000000';
+        ctx.strokeStyle = this.isPlayable
+            ? CARD_COLORS.BORDER.PLAYABLE
+            : CARD_COLORS.BORDER.DEFAULT;
         ctx.lineWidth = this.isPlayable ? 3 : 1;
         ctx.stroke();
 
-        // Valor de la carta (siempre negro sobre los colores)
+        // Valor de la carta
         ctx.fillStyle = '#000000';
         ctx.font = 'bold 24px Arial';
         ctx.textAlign = 'center';
