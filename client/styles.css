@@ -426,3 +426,13 @@ h3 {
 .game-over-notification button:hover {
     background-color: #2980b9;
 }
+
+.card-animation {
+    transition: all 0.3s ease-out;
+    z-index: 10;
+}
+
+.played-card {
+    background-color: #99CCFF !important;
+    box-shadow: 0 0 10px rgba(0, 0, 255, 0.5);
+}
