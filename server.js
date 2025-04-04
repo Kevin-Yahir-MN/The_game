@@ -513,7 +513,7 @@ function endTurn(room, player) {
     const nextPlayer = room.players[nextIndex];
     room.gameState.currentTurn = nextPlayer.id;
 
-    // Verificar si el siguiente jugador puede jugar
+    // Verificación estricta para game over
     const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
     const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
 
@@ -521,7 +521,8 @@ function endTurn(room, player) {
         return broadcastToRoom(room, {
             type: 'game_over',
             result: 'lose',
-            message: `¡${nextPlayer.name} no puede jugar las cartas requeridas!`
+            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
+            reason: 'min_cards_not_met'
         });
     }
 
@@ -545,30 +546,15 @@ function broadcastGameState(room) {
 }
 
 function checkGameStatus(room) {
-    // Verificar si todos han jugado sus cartas
+    // Verificación de victoria (todas las cartas jugadas)
     const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
     if (allPlayersEmpty && room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
             type: 'game_over',
             result: 'win',
-            message: '¡Todos ganan! Todas las cartas jugadas.'
+            message: '¡Todos ganan! Todas las cartas jugadas.',
+            reason: 'all_cards_played'
         });
-        return;
-    }
-
-    // Verificar si el jugador actual puede jugar
-    const currentPlayer = room.players.find(p => p.id === room.gameState.currentTurn);
-    if (currentPlayer) {
-        const playableCards = getPlayableCards(currentPlayer.cards, room.gameState.board);
-        const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
-
-        if (playableCards.length < requiredCards && currentPlayer.cards.length > 0) {
-            broadcastToRoom(room, {
-                type: 'game_over',
-                result: 'lose',
-                message: `¡${currentPlayer.name} no puede jugar las cartas requeridas!`
-            });
-        }
     }
 }
 

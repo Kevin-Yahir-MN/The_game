@@ -182,24 +182,27 @@ function handleTurnChanged(message) {
 
 // Función para manejar fin del juego
 function handleGameOver(message) {
-    // Detener el juego
-    canvas.style.pointerEvents = 'none';
-    endTurnButton.disabled = true;
+    // Solo mostrar game over si es por no cumplir el mínimo de cartas
+    if (message.reason === 'min_cards_not_met') {
+        // Detener interacciones con el juego
+        canvas.style.pointerEvents = 'none';
+        endTurnButton.disabled = true;
 
-    // Mostrar mensaje de fin de juego
-    const gameOverDiv = document.createElement('div');
-    gameOverDiv.className = 'game-over-notification';
-    gameOverDiv.innerHTML = `
-        <h2>¡JUEGO TERMINADO!</h2>
-        <p>${message.message}</p>
-        <button id="returnToLobby">Volver al Lobby</button>
-    `;
-    document.body.appendChild(gameOverDiv);
+        // Crear elemento de game over
+        const gameOverDiv = document.createElement('div');
+        gameOverDiv.className = 'game-over-notification';
+        gameOverDiv.innerHTML = `
+            <h2>¡GAME OVER!</h2>
+            <p>${message.message}</p>
+            <button id="returnToLobby">Volver al Lobby</button>
+        `;
+        document.body.appendChild(gameOverDiv);
 
-    // Manejar el botón de volver al lobby
-    document.getElementById('returnToLobby').addEventListener('click', () => {
-        window.location.href = '/';
-    });
+        // Manejar click en el botón
+        document.getElementById('returnToLobby').addEventListener('click', () => {
+            window.location.href = '/';
+        });
+    }
 }
 
 // Actualización del estado
