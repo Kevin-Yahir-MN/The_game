@@ -6,19 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Partida - The Game</title>
     <link rel="stylesheet" href="styles.css">
-    <style>
-        .game-instructions {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            background-color: rgba(255, 255, 255, 0.9);
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 14px;
-            max-width: 300px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-        }
-    </style>
 </head>
 
 <body>
@@ -28,20 +15,19 @@
             <button id="undoBtn" disabled>Deshacer</button>
             <button id="endTurnBtn">Terminar Turno</button>
         </div>
-    </div>
-
-    <div class="game-instructions">
-        <h3>Instrucciones:</h3>
-        <ul>
-            <li>Haz click en una carta para seleccionarla (amarillo)</li>
-            <li>Haz click en una columna para jugar la carta seleccionada</li>
-            <li>En pilas ascendentes (↑): juega cartas mayores</li>
-            <li>En pilas descendentes (↓): juega cartas menores</li>
-            <li>Puedes jugar exactamente 10 menos/más en cada pila</li>
-            <li>Debes jugar al menos 2 cartas por turno (1 si no quedan cartas)</li>
-            <li>Recibirás cartas nuevas hasta tener 6 (o 5 para 4-5 jugadores)</li>
-            <li>¡Colabora para jugar todas las cartas!</li>
-        </ul>
+        <div class="game-instructions">
+            <h3>Instrucciones:</h3>
+            <ul>
+                <li>Haz click en una carta para seleccionarla (amarillo)</li>
+                <li>Haz click en una columna para jugar la carta seleccionada</li>
+                <li>En pilas ascendentes (↑): juega cartas mayores</li>
+                <li>En pilas descendentes (↓): juega cartas menores</li>
+                <li>Puedes jugar exactamente 10 menos/más en cada pila</li>
+                <li>Debes jugar al menos 2 cartas por turno (1 si no quedan cartas)</li>
+                <li>Recibirás cartas nuevas hasta tener 6 (o 5 para 4-5 jugadores)</li>
+                <li>¡Colabora para jugar todas las cartas!</li>
+            </ul>
+        </div>
     </div>
 
     <script src="game.js"></script>

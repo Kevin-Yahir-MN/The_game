@@ -9,10 +9,10 @@ const undoButton = document.getElementById('undoBtn');
 const CARD_WIDTH = 80;
 const CARD_HEIGHT = 120;
 const COLUMN_SPACING = 60;
-const CARD_SPACING = 10;
+const CARD_SPACING = 15;
 const BOARD_POSITION = {
     x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
-    y: canvas.height / 2 - CARD_HEIGHT / 2
+    y: canvas.height / 2 - CARD_HEIGHT / 2 - 40
 };
 
 // Estado del juego
@@ -33,7 +33,7 @@ let gameState = {
     animatingCards: []
 };
 
-// Clase Card
+// Clase Card mejorada
 class Card {
     constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
         this.value = value;
@@ -43,28 +43,41 @@ class Card {
         this.height = CARD_HEIGHT;
         this.isPlayable = isPlayable;
         this.isPlayedThisTurn = isPlayedThisTurn;
-        this.radius = 5;
+        this.radius = 10;
         this.shakeOffset = 0;
+        this.hoverOffset = 0;
         this.backgroundColor = isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
+        this.shadowColor = 'rgba(0, 0, 0, 0.3)';
     }
 
     draw() {
         ctx.save();
         ctx.translate(this.shakeOffset, 0);
 
+        // Sombra
+        ctx.shadowColor = this.shadowColor;
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 4;
+
+        // Cuerpo de la carta
         ctx.beginPath();
-        ctx.roundRect(this.x, this.y, this.width, this.height, this.radius);
+        ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
         ctx.fillStyle = this === selectedCard ? '#FFFF99' : this.backgroundColor;
         ctx.fill();
-        ctx.strokeStyle = this.isPlayable ? '#00FF00' : '#000000';
-        ctx.lineWidth = this.isPlayable ? 3 : 1;
+
+        // Borde
+        ctx.strokeStyle = this.isPlayable ? '#27ae60' : '#34495e';
+        ctx.lineWidth = this.isPlayable ? 3 : 2;
         ctx.stroke();
 
-        ctx.fillStyle = '#000000';
-        ctx.font = 'bold 24px Arial';
+        // Texto
+        ctx.fillStyle = '#2c3e50';
+        ctx.font = 'bold 28px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(this.value.toString(), this.x + this.width / 2, this.y + this.height / 2);
+        ctx.shadowColor = 'transparent';
+        ctx.fillText(this.value.toString(), this.x + this.width / 2, this.y + this.height / 2 - this.hoverOffset);
+
         ctx.restore();
     }
 
@@ -80,9 +93,19 @@ let socket;
 function connectWebSocket() {
     socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
 
-    socket.onopen = () => socket.send(JSON.stringify({ type: 'get_game_state' }));
-    socket.onclose = () => setTimeout(connectWebSocket, 2000);
-    socket.onerror = console.error;
+    socket.onopen = () => {
+        console.log('Conexión WebSocket establecida');
+        socket.send(JSON.stringify({ type: 'get_game_state' }));
+    };
+
+    socket.onclose = () => {
+        console.log('Conexión WebSocket cerrada - Reconectando...');
+        setTimeout(connectWebSocket, 2000);
+    };
+
+    socket.onerror = (error) => {
+        console.error('Error en WebSocket:', error);
+    };
 
     socket.onmessage = (event) => {
         try {
@@ -93,6 +116,7 @@ function connectWebSocket() {
                     break;
                 case 'game_started':
                     updateGameState(message.state);
+                    showNotification('¡El juego ha comenzado!');
                     break;
                 case 'your_cards':
                     updatePlayerCards(message.cards);
@@ -117,6 +141,8 @@ function connectWebSocket() {
                 case 'move_undone':
                     handleMoveUndone(message);
                     break;
+                default:
+                    console.log('Mensaje no reconocido:', message);
             }
         } catch (error) {
             console.error('Error procesando mensaje:', error);
@@ -154,8 +180,8 @@ function getColumnPosition(position) {
 function animateInvalidCard(card) {
     if (!card) return;
 
-    const shakeAmount = 5;
-    const shakeDuration = 300;
+    const shakeAmount = 8;
+    const shakeDuration = 400;
     const startTime = Date.now();
 
     function shake() {
@@ -174,20 +200,22 @@ function animateInvalidCard(card) {
     shake();
 }
 
+// Funciones de manejo del juego
 function handleTurnChanged(message) {
     gameState.currentTurn = message.newTurn;
     gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
         card => card.playerId !== currentPlayer.id
     );
     undoButton.disabled = true;
-    showNotification(`Ahora es el turno de ${gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador'}`);
+
+    const playerName = gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador';
+    showNotification(`Ahora es el turno de ${playerName}`);
 }
 
 function handleMoveUndone(message) {
     if (message.playerId === currentPlayer.id) {
         const moveIndex = gameState.cardsPlayedThisTurn.findIndex(
-            move => move.value === message.cardValue &&
-                move.position === message.position
+            move => move.value === message.cardValue && move.position === message.position
         );
 
         if (moveIndex !== -1) {
@@ -202,37 +230,29 @@ function handleMoveUndone(message) {
             gameState.board.descending[idx] = message.previousValue;
         }
 
-        const card = new Card(
-            message.cardValue,
-            0,
-            0,
-            true,
-            false
-        );
+        const card = new Card(message.cardValue, 0, 0, true, false);
         gameState.yourCards.push(card);
         updatePlayerCards(gameState.yourCards.map(c => c.value));
     }
 }
 
 function handleGameOver(message) {
-    if (message.reason === 'min_cards_not_met') {
-        canvas.style.pointerEvents = 'none';
-        endTurnButton.disabled = true;
-        undoButton.disabled = true;
+    canvas.style.pointerEvents = 'none';
+    endTurnButton.disabled = true;
+    undoButton.disabled = true;
 
-        const gameOverDiv = document.createElement('div');
-        gameOverDiv.className = 'game-over-notification';
-        gameOverDiv.innerHTML = `
-            <h2>¡GAME OVER!</h2>
-            <p>${message.message}</p>
-            <button id="returnToLobby">Volver al Lobby</button>
-        `;
-        document.body.appendChild(gameOverDiv);
+    const gameOverDiv = document.createElement('div');
+    gameOverDiv.className = 'game-over-notification';
+    gameOverDiv.innerHTML = `
+        <h2>¡GAME OVER!</h2>
+        <p>${message.message}</p>
+        <button id="returnToLobby">Volver al Lobby</button>
+    `;
+    document.body.appendChild(gameOverDiv);
 
-        document.getElementById('returnToLobby').addEventListener('click', () => {
-            window.location.href = '/';
-        });
-    }
+    document.getElementById('returnToLobby').addEventListener('click', () => {
+        window.location.href = '/';
+    });
 }
 
 function updateGameState(newState) {
@@ -271,18 +291,12 @@ function handleOpponentCardPlayed(message) {
         }
 
         const cardPosition = getColumnPosition(position);
-        const opponentCard = new Card(
-            value,
-            cardPosition.x,
-            cardPosition.y,
-            false,
-            true
-        );
+        const opponentCard = new Card(value, cardPosition.x, cardPosition.y, false, true);
 
         gameState.animatingCards.push({
             card: opponentCard,
             startTime: Date.now(),
-            duration: 300,
+            duration: 400,
             targetX: cardPosition.x,
             targetY: cardPosition.y,
             fromX: cardPosition.x,
@@ -303,7 +317,7 @@ function handleOpponentCardPlayed(message) {
 function updatePlayerCards(cards) {
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
     const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
-    const startY = canvas.height - CARD_HEIGHT - 100; // Ajustado para los botones
+    const startY = canvas.height - CARD_HEIGHT - 100;
 
     gameState.yourCards = cards.map((card, index) => {
         const value = card instanceof Card ? card.value : card;
@@ -335,6 +349,7 @@ function updatePlayerCards(cards) {
     });
 }
 
+// Funciones de interacción
 function handleCanvasClick(event) {
     if (gameState.currentTurn !== currentPlayer.id) {
         return showNotification('No es tu turno', true);
@@ -401,7 +416,7 @@ function playCard(cardValue, position) {
     gameState.animatingCards.push({
         card: selectedCard,
         startTime: Date.now(),
-        duration: 300,
+        duration: 400,
         targetX: cardPosition.x,
         targetY: cardPosition.y,
         fromX: selectedCard.x,
@@ -470,64 +485,98 @@ function endTurn() {
     }));
 }
 
-function drawGameInfo() {
-    const currentTurnPlayer = gameState.players.find(p => p.id === gameState.currentTurn);
-    const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-    const currentPlayerCardsPlayed = gameState.currentTurn === currentPlayer.id
-        ? gameState.cardsPlayedThisTurn.filter(card => card.playerId === currentPlayer.id).length
-        : 0;
-    const cardsNeeded = Math.max(0, minCardsRequired - currentPlayerCardsPlayed);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 24px Arial';
-    ctx.textAlign = 'left';
-
-    ctx.fillText(`Turno: ${currentTurnPlayer?.name || 'Esperando...'}`, 20, 20);
-    ctx.fillText(`Baraja: ${gameState.remainingDeck}`, 20, 50);
-
-    if (gameState.currentTurn === currentPlayer.id) {
-        ctx.fillStyle = currentPlayerCardsPlayed >= minCardsRequired ? '#00FF00' : '#FFFF00';
-        ctx.fillText(`Cartas: ${currentPlayerCardsPlayed}/${minCardsRequired}`, 20, 80);
-
-        if (cardsNeeded > 0) {
-            ctx.fillStyle = '#FF0000';
-            ctx.fillText(`Faltan ${cardsNeeded}`, 20, 110);
-        }
-    }
-}
-
+// Funciones de renderizado
 function drawBoard() {
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 32px Arial';
-    ctx.textAlign = 'center';
+    // Fondo del área del tablero
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+    ctx.beginPath();
+    ctx.roundRect(
+        BOARD_POSITION.x - 25,
+        BOARD_POSITION.y - 40,
+        CARD_WIDTH * 4 + COLUMN_SPACING * 3 + 50,
+        CARD_HEIGHT + 80,
+        15
+    );
+    ctx.fill();
 
-    ['asc1', 'asc2'].forEach((col, i) => {
-        ctx.fillText('↑', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
+    // Títulos de columnas
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 36px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetY = 2;
+
+    ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
+        const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2;
+        ctx.fillText(i < 2 ? '↑' : '↓', x, BOARD_POSITION.y - 25);
+    });
+
+    ctx.shadowColor = 'transparent';
+
+    // Cartas del tablero
+    ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
+        const value = i < 2 ? gameState.board.ascending[i % 2] : gameState.board.descending[i % 2];
         const card = new Card(
-            gameState.board.ascending[i],
+            value,
             BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i,
             BOARD_POSITION.y,
             false,
-            gameState.cardsPlayedThisTurn.some(c => c.value === gameState.board.ascending[i])
-        );
-        card.draw();
-    });
-
-    ['desc1', 'desc2'].forEach((col, i) => {
-        ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * (i + 2) + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-        const card = new Card(
-            gameState.board.descending[i],
-            BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * (i + 2),
-            BOARD_POSITION.y,
-            false,
-            gameState.cardsPlayedThisTurn.some(c => c.value === gameState.board.descending[i])
+            gameState.cardsPlayedThisTurn.some(c => c.value === value)
         );
         card.draw();
     });
 }
 
 function drawPlayerCards() {
-    gameState.yourCards.forEach(card => card?.draw());
+    // Fondo del área de cartas
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    ctx.beginPath();
+    ctx.roundRect(
+        50,
+        canvas.height - CARD_HEIGHT - 80,
+        canvas.width - 100,
+        CARD_HEIGHT + 40,
+        15
+    );
+    ctx.fill();
+
+    // Cartas del jugador
+    gameState.yourCards.forEach(card => {
+        if (card) {
+            card.hoverOffset = card === selectedCard ? 10 : 0;
+            card.draw();
+        }
+    });
+}
+
+function drawGameInfo() {
+    // Fondo del área de información
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.beginPath();
+    ctx.roundRect(20, 20, 360, 120, 15);
+    ctx.fill();
+
+    // Texto de información
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
+    ctx.fillText(`Turno actual: ${currentPlayerName}`, 40, 50);
+
+    ctx.fillText(`Cartas restantes: ${gameState.remainingDeck}`, 40, 80);
+
+    if (gameState.currentTurn === currentPlayer.id) {
+        const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
+        const required = gameState.remainingDeck > 0 ? 2 : 1;
+        const color = cardsPlayed >= required ? '#2ecc71' : '#f1c40f';
+
+        ctx.fillStyle = color;
+        ctx.fillText(`Cartas jugadas: ${cardsPlayed}/${required}`, 40, 110);
+    }
 }
 
 function handleCardAnimations() {
@@ -548,18 +597,24 @@ function handleCardAnimations() {
     }
 }
 
+// Bucle principal del juego
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#228B22';
+
+    // Fondo verde
+    ctx.fillStyle = '#1a6b1a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Elementos del juego
     drawGameInfo();
     drawBoard();
     handleCardAnimations();
     drawPlayerCards();
+
     requestAnimationFrame(gameLoop);
 }
 
+// Inicialización del juego
 function initGame() {
     if (!canvas || !ctx || !currentPlayer.id || !roomId) {
         alert('Error: No se pudo inicializar el juego. Vuelve a la sala.');
@@ -567,12 +622,14 @@ function initGame() {
     }
 
     canvas.width = 800;
-    canvas.height = 700; // Aumentado para acomodar los botones
+    canvas.height = 700;
     endTurnButton.addEventListener('click', endTurn);
     undoButton.addEventListener('click', undoLastMove);
     canvas.addEventListener('click', handleCanvasClick);
+
     connectWebSocket();
     gameLoop();
 }
 
+// Iniciar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', initGame);
