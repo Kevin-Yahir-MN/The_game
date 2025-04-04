@@ -397,8 +397,9 @@ function handleReturnCard() {
         return;
     }
 
-    // Encontrar la última carta jugada
-    const lastPlayedCard = [...gameState.cardsPlayedThisTurn].reverse()
+    // Encontrar la última carta jugada este turno
+    const lastPlayedCard = [...gameState.cardsPlayedThisTurn]
+        .reverse()
         .find(card => card.value !== undefined);
 
     if (!lastPlayedCard) {
