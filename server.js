@@ -270,11 +270,6 @@ wss.on('connection', (ws, req) => {
                         endTurn(room, player);
                     }
                     break;
-                case 'undo_move':
-                    if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        handleUndoMove(room, player, msg);
-                    }
-                    break;
                 case 'get_game_state':
                     if (room.gameState.gameStarted) sendGameState(room, player);
                     break;
@@ -390,11 +385,6 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
-    // Guardar valor anterior para posible deshacer
-    const previousValue = msg.position.includes('asc') ?
-        board.ascending[targetIdx] :
-        board.descending[targetIdx];
-
     // Actualizar el tablero
     if (msg.position.includes('asc')) {
         board.ascending[targetIdx] = msg.cardValue;
@@ -408,8 +398,7 @@ function handlePlayCard(room, player, msg) {
     // Añadir al contador de cartas jugadas este turno
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
-        position: msg.position,
-        previousValue // Guardar valor anterior
+        position: msg.position
     });
 
     // Notificar a todos los jugadores
@@ -422,67 +411,9 @@ function handlePlayCard(room, player, msg) {
         cardsPlayedCount: player.cardsPlayedThisTurn.length
     });
 
-    // Actualizar historial del tablero
-    updateBoardHistory(room, msg.position, msg.cardValue);
-
     // Enviar estado actualizado a todos
     broadcastGameState(room);
     checkGameStatus(room);
-}
-
-function handleUndoMove(room, player, msg) {
-    // Verificar que la última jugada fue de este jugador
-    if (player.cardsPlayedThisTurn.length === 0) {
-        return safeSend(player.ws, {
-            type: 'notification',
-            message: 'No hay jugadas para deshacer',
-            isError: true
-        });
-    }
-
-    // Buscar la última jugada del jugador
-    const lastMoveIndex = player.cardsPlayedThisTurn.findIndex(
-        move => move.value === msg.cardValue &&
-            move.position === msg.position
-    );
-
-    if (lastMoveIndex === -1) {
-        return safeSend(player.ws, {
-            type: 'notification',
-            message: 'No se encontró la jugada para deshacer',
-            isError: true
-        });
-    }
-
-    const lastMove = player.cardsPlayedThisTurn[lastMoveIndex];
-
-    // Devolver la carta a la mano del jugador
-    player.cards.push(msg.cardValue);
-
-    // Restaurar el valor anterior en el tablero
-    if (msg.position.includes('asc')) {
-        const idx = msg.position === 'asc1' ? 0 : 1;
-        room.gameState.board.ascending[idx] = lastMove.previousValue;
-    } else {
-        const idx = msg.position === 'desc1' ? 0 : 1;
-        room.gameState.board.descending[idx] = lastMove.previousValue;
-    }
-
-    // Eliminar del contador de cartas jugadas
-    player.cardsPlayedThisTurn.splice(lastMoveIndex, 1);
-
-    // Notificar a todos los jugadores
-    broadcastToRoom(room, {
-        type: 'move_undone',
-        playerId: player.id,
-        playerName: player.name,
-        cardValue: msg.cardValue,
-        position: msg.position,
-        previousValue: lastMove.previousValue
-    });
-
-    // Enviar estado actualizado
-    broadcastGameState(room);
 }
 
 function endTurn(room, player) {
@@ -517,7 +448,7 @@ function endTurn(room, player) {
     const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
     room.gameState.currentTurn = room.players[nextIndex].id;
 
-    // Reiniciar contador de cartas jugadas
+    // Reiniciar contador de cartas jugadas para el jugador
     player.cardsPlayedThisTurn = [];
 
     broadcastToRoom(room, {
