@@ -303,7 +303,7 @@ function handleOpponentCardPlayed(message) {
 function updatePlayerCards(cards) {
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
     const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
-    const startY = canvas.height - CARD_HEIGHT - 60; // Ajustado para los botones
+    const startY = canvas.height - CARD_HEIGHT - 100; // Ajustado para los botones
 
     gameState.yourCards = cards.map((card, index) => {
         const value = card instanceof Card ? card.value : card;
@@ -567,7 +567,7 @@ function initGame() {
     }
 
     canvas.width = 800;
-    canvas.height = 650; // Aumentado para acomodar los botones
+    canvas.height = 700; // Aumentado para acomodar los botones
     endTurnButton.addEventListener('click', endTurn);
     undoButton.addEventListener('click', undoLastMove);
     canvas.addEventListener('click', handleCanvasClick);
