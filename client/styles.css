@@ -194,7 +194,7 @@ h3 {
 #endTurnBtn,
 #undoBtn {
     padding: 10px 20px;
-    background-color: #3498db;
+    background-color: #e74c3c;
     color: white;
     border: none;
     border-radius: 5px;
@@ -206,7 +206,7 @@ h3 {
 
 #endTurnBtn:hover,
 #undoBtn:hover:not(:disabled) {
-    background-color: #2980b9;
+    background-color: #c0392b;
     transform: translateY(-2px);
 }
 
