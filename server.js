@@ -424,7 +424,8 @@ function handlePlayCard(room, player, msg) {
         position: msg.position,
         playerId: player.id,
         playerName: player.name,
-        cardsPlayedCount: player.cardsPlayedThisTurn.length
+        cardsPlayedCount: player.cardsPlayedThisTurn.length,
+        isPlayedThisTurn: true
     });
 
     updateBoardHistory(room, msg.position, msg.cardValue);
@@ -456,10 +457,8 @@ function handleUndoMove(room, player, msg) {
 
     const lastMove = player.cardsPlayedThisTurn[lastMoveIndex];
 
-    // Devolver carta a la mano del jugador
     player.cards.push(msg.cardValue);
 
-    // Revertir el tablero
     if (msg.position.includes('asc')) {
         const idx = msg.position === 'asc1' ? 0 : 1;
         room.gameState.board.ascending[idx] = lastMove.previousValue;
@@ -468,7 +467,6 @@ function handleUndoMove(room, player, msg) {
         room.gameState.board.descending[idx] = lastMove.previousValue;
     }
 
-    // Eliminar de las jugadas este turno
     player.cardsPlayedThisTurn.splice(lastMoveIndex, 1);
 
     broadcastToRoom(room, {
@@ -514,7 +512,6 @@ function endTurn(room, player) {
     const nextPlayer = room.players[nextIndex];
     room.gameState.currentTurn = nextPlayer.id;
 
-    // Verificación estricta para game over
     const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
     const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
 
@@ -547,7 +544,6 @@ function broadcastGameState(room) {
 }
 
 function checkGameStatus(room) {
-    // Verificación de victoria (todas las cartas jugadas)
     const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
     if (allPlayersEmpty && room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
