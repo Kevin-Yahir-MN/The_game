@@ -306,9 +306,11 @@ function startGame(room) {
     }
 
     room.gameState.gameStarted = true;
+    const cardsToDeal = room.players.length <= 3 ? 6 : 5;
+
     room.players.forEach(player => {
         player.cards = [];
-        for (let i = 0; i < 6 && room.gameState.deck.length > 0; i++) {
+        for (let i = 0; i < cardsToDeal && room.gameState.deck.length > 0; i++) {
             player.cards.push(room.gameState.deck.pop());
         }
     });
@@ -396,19 +398,22 @@ function endTurn(room, player) {
         });
     }
 
-    if (player.cardsPlayedThisTurn.length > 0 && room.gameState.deck.length > 0) {
-        const cardsToDraw = Math.min(player.cardsPlayedThisTurn.length, room.gameState.deck.length);
-        for (let i = 0; i < cardsToDraw; i++) {
-            player.cards.push(room.gameState.deck.pop());
-        }
+    const targetCardCount = room.players.length <= 3 ? 6 : 5;
+    const cardsToDraw = Math.min(
+        targetCardCount - player.cards.length,
+        room.gameState.deck.length
+    );
 
-        if (room.gameState.deck.length === 0) {
-            broadcastToRoom(room, {
-                type: 'notification',
-                message: '¡El mazo se ha agotado!',
-                isError: false
-            });
-        }
+    for (let i = 0; i < cardsToDraw; i++) {
+        player.cards.push(room.gameState.deck.pop());
+    }
+
+    if (room.gameState.deck.length === 0) {
+        broadcastToRoom(room, {
+            type: 'notification',
+            message: '¡El mazo se ha agotado!',
+            isError: false
+        });
     }
 
     const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
