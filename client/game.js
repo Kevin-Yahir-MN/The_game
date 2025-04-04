@@ -33,7 +33,7 @@ let gameState = {
     animatingCards: []
 };
 
-// Clase Card optimizada con solo color azul
+// Clase Card
 class Card {
     constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
         this.value = value;
@@ -303,7 +303,7 @@ function handleOpponentCardPlayed(message) {
 function updatePlayerCards(cards) {
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
     const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
-    const startY = canvas.height - CARD_HEIGHT - 80; // Ajustado para los botones
+    const startY = canvas.height - CARD_HEIGHT - 60; // Ajustado para los botones
 
     gameState.yourCards = cards.map((card, index) => {
         const value = card instanceof Card ? card.value : card;
@@ -567,7 +567,7 @@ function initGame() {
     }
 
     canvas.width = 800;
-    canvas.height = 600;
+    canvas.height = 650; // Aumentado para acomodar los botones
     endTurnButton.addEventListener('click', endTurn);
     undoButton.addEventListener('click', undoLastMove);
     canvas.addEventListener('click', handleCanvasClick);
