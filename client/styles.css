@@ -576,3 +576,51 @@ h1 {
         transform: translateX(calc(-50% - 5px));
     }
 }
+
+/* Añadir al final del archivo */
+#gameControls {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.game-button {
+    padding: 12px 24px;
+    font-size: 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+    color: white;
+}
+
+#returnCardBtn {
+    background-color: #3498db;
+}
+
+#returnCardBtn:hover:not(:disabled) {
+    background-color: #2980b9;
+}
+
+#endTurnBtn {
+    background-color: #e74c3c;
+}
+
+#endTurnBtn:hover:not(:disabled) {
+    background-color: #c0392b;
+}
+
+.game-button:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+}
+
+.game-instructions {
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 15px;
+    border-radius: 10px;
+    max-width: 800px;
+    margin: 20px auto;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+}

@@ -266,6 +266,62 @@ function handleGameMessage(room, player, msg) {
                 sendGameState(room, player);
             }
             break;
+        case 'return_card':
+            if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                returnCard(room, player, msg.cardValue, msg.position);
+            }
+            break;
+    }
+}
+
+// Implementar la función returnCard
+function returnCard(room, player, cardValue, position) {
+    const board = room.gameState.board;
+    let currentValue;
+
+    if (position.includes('asc')) {
+        const index = position === 'asc1' ? 0 : 1;
+        currentValue = board.ascending[index];
+    } else {
+        const index = position === 'desc1' ? 0 : 1;
+        currentValue = board.descending[index];
+    }
+
+    if (currentValue !== cardValue) {
+        return sendError(player, 'La carta ya no está en esa posición');
+    }
+
+    if (!player.cardsPlayedThisTurn.some(c => c.value === cardValue && c.position === position)) {
+        return sendError(player, 'No puedes devolver cartas que no hayas jugado este turno');
+    }
+
+    const previousValue = findPreviousValue(room, position, cardValue);
+
+    if (position.includes('asc')) {
+        const index = position === 'asc1' ? 0 : 1;
+        board.ascending[index] = previousValue || 1;
+    } else {
+        const index = position === 'desc1' ? 0 : 1;
+        board.descending[index] = previousValue || 100;
+    }
+
+    player.cards.push(cardValue);
+    player.cardsPlayedThisTurn = player.cardsPlayedThisTurn.filter(
+        c => !(c.value === cardValue && c.position === position)
+    );
+
+    broadcastGameState(room);
+    sendNotification(player, `Carta ${cardValue} devuelta a tu mano`);
+}
+
+// Añadir función auxiliar
+function sendNotification(player, message) {
+    if (player.ws?.readyState === WebSocket.OPEN) {
+        player.ws.send(JSON.stringify({
+            type: 'notification',
+            message: message,
+            isError: false
+        }));
     }
 }
 

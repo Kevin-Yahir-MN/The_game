@@ -5,6 +5,7 @@ const WS_URL = 'wss://the-game-2xks.onrender.com';
 
 // Elementos de la interfaz
 const endTurnButton = document.getElementById('endTurnBtn');
+const returnCardBtn = document.getElementById('returnCardBtn');
 
 // Variables del juego
 let socket;
@@ -143,6 +144,7 @@ function initGame() {
     }
 
     endTurnButton.addEventListener('click', endTurn);
+    returnCardBtn.addEventListener('click', handleReturnCard);
     connectWebSocket();
     canvas.addEventListener('click', handleCanvasClick);
     gameLoop();
@@ -186,6 +188,9 @@ function connectWebSocket() {
                     break;
                 case 'card_played':
                     showNotification(`Carta ${message.cardValue} colocada correctamente`, false);
+                    break;
+                case 'card_returned':
+                    showNotification(message.message, false);
                     break;
                 case 'init_state':
                     gameState = { ...gameState, ...message.state };
@@ -301,6 +306,11 @@ function updateGameState(newState) {
         });
     }
 
+    // Actualizar estado del botón de regresar carta
+    returnCardBtn.disabled = !(isYourTurn &&
+        gameState.cardsPlayedThisTurn &&
+        gameState.cardsPlayedThisTurn.length > 0);
+
     if (!isYourTurn) {
         selectedCard = null;
         gameState.cardsPlayedThisTurn = [];
@@ -373,6 +383,36 @@ function playCard(cardValue, position) {
     }));
 
     selectedCard = null;
+}
+
+// Manejar devolución de carta
+function handleReturnCard() {
+    if (gameState.currentTurn !== currentPlayer.id) {
+        showNotification('No es tu turno', true);
+        return;
+    }
+
+    if (!gameState.cardsPlayedThisTurn || gameState.cardsPlayedThisTurn.length === 0) {
+        showNotification('No has jugado cartas este turno', true);
+        return;
+    }
+
+    // Encontrar la última carta jugada
+    const lastPlayedCard = [...gameState.cardsPlayedThisTurn].reverse()
+        .find(card => card.value !== undefined);
+
+    if (!lastPlayedCard) {
+        showNotification('No hay cartas para regresar', true);
+        return;
+    }
+
+    // Enviar mensaje al servidor
+    socket.send(JSON.stringify({
+        type: 'return_card',
+        playerId: currentPlayer.id,
+        cardValue: lastPlayedCard.value,
+        position: lastPlayedCard.position
+    }));
 }
 
 // Terminar turno
@@ -458,17 +498,38 @@ function drawBoard() {
 
     // Dibujar flechas y cartas ascendentes
     ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    new Card(gameState.board.ascending[0], BOARD_POSITION.x, BOARD_POSITION.y).draw();
+    const asc1Card = new Card(gameState.board.ascending[0], BOARD_POSITION.x, BOARD_POSITION.y);
+    markIfPlayedThisTurn(asc1Card, 'asc1');
+    asc1Card.draw();
 
     ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    new Card(gameState.board.ascending[1], BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, BOARD_POSITION.y).draw();
+    const asc2Card = new Card(gameState.board.ascending[1], BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, BOARD_POSITION.y);
+    markIfPlayedThisTurn(asc2Card, 'asc2');
+    asc2Card.draw();
 
     // Dibujar flechas y cartas descendentes
     ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    new Card(gameState.board.descending[0], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, BOARD_POSITION.y).draw();
+    const desc1Card = new Card(gameState.board.descending[0], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, BOARD_POSITION.y);
+    markIfPlayedThisTurn(desc1Card, 'desc1');
+    desc1Card.draw();
 
     ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    new Card(gameState.board.descending[1], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, BOARD_POSITION.y).draw();
+    const desc2Card = new Card(gameState.board.descending[1], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, BOARD_POSITION.y);
+    markIfPlayedThisTurn(desc2Card, 'desc2');
+    desc2Card.draw();
+}
+
+// Marcar cartas en el tablero como jugadas este turno
+function markIfPlayedThisTurn(card, position) {
+    if (gameState.cardsPlayedThisTurn && Array.isArray(gameState.cardsPlayedThisTurn)) {
+        const playedCard = gameState.cardsPlayedThisTurn.find(c =>
+            c.position === position && c.value === card.value
+        );
+        if (playedCard) {
+            card.isPlayedThisTurn = true;
+            card.isMostRecent = playedCard.isMostRecent;
+        }
+    }
 }
 
 // Dibujar las cartas del jugador
