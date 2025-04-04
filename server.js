@@ -92,12 +92,10 @@ function sendGameState(room, player) {
                 id: p.id,
                 name: p.name,
                 cardCount: p.cards.length,
-                cardsPlayedThisTurn: p.id === room.gameState.currentTurn ?
-                    p.cardsPlayedThisTurn.length : 0
+                cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
             })),
             remainingDeck: room.gameState.deck.length,
-            cardsPlayedThisTurn: player.id === room.gameState.currentTurn ?
-                player.cardsPlayedThisTurn : []
+            isYourTurn: room.gameState.currentTurn === player.id
         }
     });
 }
@@ -125,26 +123,6 @@ function getNextActivePlayerIndex(currentIndex, players) {
         }
     }
     return currentIndex;
-}
-
-// Función mejorada para cambiar de turno
-function changeTurn(room) {
-    const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
-    const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
-
-    // Reiniciar contador del jugador actual
-    room.players[currentIndex].cardsPlayedThisTurn = [];
-
-    room.gameState.currentTurn = room.players[nextIndex].id;
-
-    broadcastToRoom(room, {
-        type: 'turn_changed',
-        newPlayerId: room.players[nextIndex].id,
-        previousPlayerId: room.players[currentIndex].id,
-        cardsPlayedCount: 0
-    }, { includeGameState: true });
-
-    return room.players[nextIndex];
 }
 
 // Rutas API
@@ -249,30 +227,28 @@ wss.on('connection', (ws, req) => {
     player.ws = ws;
     console.log(`✔ ${player.name} conectado a sala ${roomId}`);
 
-    // Manejo de reconexión
     const response = {
-        type: room.gameState.gameStarted ? 'reconnect_game' : 'init_game',
+        type: 'init_game',
         playerId: player.id,
         roomId,
         isHost: player.isHost,
         gameState: {
             board: room.gameState.board,
             currentTurn: room.gameState.currentTurn,
-            remainingDeck: room.gameState.deck.length,
-            players: room.players.map(p => ({
-                id: p.id,
-                name: p.name,
-                cardCount: p.cards.length,
-                cardsPlayedThisTurn: p.id === room.gameState.currentTurn ?
-                    p.cardsPlayedThisTurn.length : 0
-            })),
-            cardsPlayedThisTurn: player.id === room.gameState.currentTurn ?
-                player.cardsPlayedThisTurn : []
-        }
+            gameStarted: room.gameState.gameStarted,
+            remainingDeck: room.gameState.deck.length
+        },
+        isYourTurn: room.gameState.currentTurn === player.id
     };
 
     if (room.gameState.gameStarted) {
         response.yourCards = player.cards;
+        response.players = room.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            cardCount: p.cards.length,
+            cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
+        }));
     }
 
     safeSend(ws, response);
@@ -344,7 +320,6 @@ function startGame(room) {
         for (let i = 0; i < cardsToDeal && room.gameState.deck.length > 0; i++) {
             player.cards.push(room.gameState.deck.pop());
         }
-        player.cardsPlayedThisTurn = [];
     });
 
     broadcastToRoom(room, {
@@ -357,7 +332,7 @@ function startGame(room) {
                 id: p.id,
                 name: p.name,
                 cardCount: p.cards.length,
-                cardsPlayedThisTurn: 0
+                cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
             }))
         }
     });
@@ -368,15 +343,6 @@ function startGame(room) {
 }
 
 function handlePlayCard(room, player, msg) {
-    // Verificar si la carta ya fue jugada este turno
-    if (player.cardsPlayedThisTurn.some(move => move.value === msg.cardValue)) {
-        return safeSend(player.ws, {
-            type: 'notification',
-            message: 'Ya jugaste esta carta este turno',
-            isError: true
-        });
-    }
-
     if (!validPositions.includes(msg.position)) {
         safeSend(player.ws, {
             type: 'notification',
@@ -443,7 +409,7 @@ function handlePlayCard(room, player, msg) {
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
         position: msg.position,
-        previousValue
+        previousValue // Guardar valor anterior
     });
 
     // Notificar a todos los jugadores
@@ -530,22 +496,35 @@ function endTurn(room, player) {
     }
 
     const targetCardCount = room.players.length <= 3 ? 6 : 5;
-    if (player.cards.length < targetCardCount) {
-        const cardsToDraw = Math.min(
-            targetCardCount - player.cards.length,
-            room.gameState.deck.length
-        );
-        for (let i = 0; i < cardsToDraw; i++) {
-            player.cards.push(room.gameState.deck.pop());
-        }
+    const cardsToDraw = Math.min(
+        targetCardCount - player.cards.length,
+        room.gameState.deck.length
+    );
+
+    for (let i = 0; i < cardsToDraw; i++) {
+        player.cards.push(room.gameState.deck.pop());
     }
 
-    const nextPlayer = changeTurn(room);
+    if (room.gameState.deck.length === 0) {
+        broadcastToRoom(room, {
+            type: 'notification',
+            message: '¡El mazo se ha agotado!',
+            isError: false
+        });
+    }
+
+    const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
+    const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
+    room.gameState.currentTurn = room.players[nextIndex].id;
+
+    // Reiniciar contador de cartas jugadas
+    player.cardsPlayedThisTurn = [];
+
     broadcastToRoom(room, {
         type: 'notification',
-        message: `Ahora es el turno de ${nextPlayer.name}`,
+        message: `Ahora es el turno de ${room.players[nextIndex].name}`,
         isError: false
-    });
+    }, { includeGameState: true });
 }
 
 function broadcastGameState(room) {
