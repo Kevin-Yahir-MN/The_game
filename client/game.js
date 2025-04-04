@@ -33,9 +33,9 @@ let gameState = {
     animatingCards: []
 };
 
-// Clase Card optimizada con color azul para cartas jugadas
+// Clase Card optimizada con colores dinámicos
 class Card {
-    constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
+    constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false, isFromCurrentTurn = false) {
         this.value = value;
         this.x = x;
         this.y = y;
@@ -43,9 +43,20 @@ class Card {
         this.height = CARD_HEIGHT;
         this.isPlayable = isPlayable;
         this.isPlayedThisTurn = isPlayedThisTurn;
+        this.isFromCurrentTurn = isFromCurrentTurn;
         this.radius = 5;
         this.shakeOffset = 0;
-        this.backgroundColor = isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
+        this.updateBackgroundColor();
+    }
+
+    updateBackgroundColor() {
+        if (this.isFromCurrentTurn) {
+            this.backgroundColor = '#99CCFF'; // Azul para turno actual
+        } else if (this.isPlayedThisTurn) {
+            this.backgroundColor = '#FFCCCC'; // Rojo suave para turnos anteriores
+        } else {
+            this.backgroundColor = '#FFFFFF'; // Blanco por defecto
+        }
     }
 
     draw() {
@@ -155,7 +166,7 @@ function animateInvalidCard(card) {
     if (!card) return;
 
     const shakeAmount = 5;
-    const shakeDuration = 400;
+    const shakeDuration = 300; // Más rápido
     const startTime = Date.now();
 
     function shake() {
@@ -175,6 +186,15 @@ function animateInvalidCard(card) {
 }
 
 function handleTurnChanged(message) {
+    // Actualizar colores de cartas al cambiar turno
+    gameState.yourCards.forEach(card => {
+        if (card.isFromCurrentTurn) {
+            card.isFromCurrentTurn = false;
+            card.isPlayedThisTurn = true;
+            card.updateBackgroundColor();
+        }
+    });
+
     gameState.currentTurn = message.newTurn;
     gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
         card => card.playerId !== currentPlayer.id
@@ -207,9 +227,9 @@ function handleMoveUndone(message) {
             0,
             0,
             true,
+            false,
             false
         );
-        card.backgroundColor = '#FFFFFF';
         gameState.yourCards.push(card);
         updatePlayerCards(gameState.yourCards.map(c => c.value));
     }
@@ -277,25 +297,27 @@ function handleOpponentCardPlayed(message) {
             cardPosition.x,
             cardPosition.y,
             false,
+            false,
             true
         );
-        opponentCard.backgroundColor = '#99CCFF';
 
+        // Animación más rápida (300ms) desde arriba para oponentes
         gameState.animatingCards.push({
             card: opponentCard,
             startTime: Date.now(),
-            duration: 1000,
+            duration: 300,
             targetX: cardPosition.x,
             targetY: cardPosition.y,
             fromX: cardPosition.x,
-            fromY: canvas.height
+            fromY: -CARD_HEIGHT // Desde arriba
         });
 
         gameState.cardsPlayedThisTurn.push({
             value: message.cardValue,
             position: message.position,
             playerId: message.playerId,
-            isPlayedThisTurn: true
+            isPlayedThisTurn: true,
+            isFromCurrentTurn: true
         });
 
         showNotification(`${message.playerName} jugó un ${value}`);
@@ -318,21 +340,28 @@ function updatePlayerCards(cards) {
             move => move.value === value && move.playerId === currentPlayer.id
         );
 
+        const isFromCurrentTurn = gameState.cardsPlayedThisTurn.some(
+            move => move.value === value && move.isFromCurrentTurn
+        );
+
         if (card instanceof Card) {
             card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
             card.y = startY;
             card.isPlayable = playable;
             card.isPlayedThisTurn = isPlayedThisTurn;
-            card.backgroundColor = isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
+            card.isFromCurrentTurn = isFromCurrentTurn;
+            card.updateBackgroundColor();
             return card;
         } else {
-            return new Card(
+            const newCard = new Card(
                 value,
                 startX + index * (CARD_WIDTH + CARD_SPACING),
                 startY,
                 playable,
-                isPlayedThisTurn
+                isPlayedThisTurn,
+                isFromCurrentTurn
             );
+            return newCard;
         }
     });
 }
@@ -393,17 +422,19 @@ function playCard(cardValue, position) {
         value: cardValue,
         position,
         playerId: currentPlayer.id,
-        previousValue
+        previousValue,
+        isFromCurrentTurn: true
     });
 
-    selectedCard.backgroundColor = '#99CCFF';
-    selectedCard.isPlayedThisTurn = true;
+    selectedCard.isFromCurrentTurn = true;
+    selectedCard.updateBackgroundColor();
 
     const cardPosition = getColumnPosition(position);
+    // Animación más rápida (300ms)
     gameState.animatingCards.push({
         card: selectedCard,
         startTime: Date.now(),
-        duration: 500,
+        duration: 300,
         targetX: cardPosition.x,
         targetY: cardPosition.y,
         fromX: selectedCard.x,
@@ -505,17 +536,27 @@ function drawBoard() {
 
     ['asc1', 'asc2'].forEach((col, i) => {
         ctx.fillText('↑', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-        const card = new Card(gameState.board.ascending[i], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i, BOARD_POSITION.y);
+        const card = new Card(
+            gameState.board.ascending[i],
+            BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i,
+            BOARD_POSITION.y
+        );
         card.isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(c => c.value === card.value);
-        card.backgroundColor = card.isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
+        card.isFromCurrentTurn = gameState.cardsPlayedThisTurn.some(c => c.value === card.value && c.isFromCurrentTurn);
+        card.updateBackgroundColor();
         card.draw();
     });
 
     ['desc1', 'desc2'].forEach((col, i) => {
         ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * (i + 2) + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-        const card = new Card(gameState.board.descending[i], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * (i + 2), BOARD_POSITION.y);
+        const card = new Card(
+            gameState.board.descending[i],
+            BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * (i + 2),
+            BOARD_POSITION.y
+        );
         card.isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(c => c.value === card.value);
-        card.backgroundColor = card.isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
+        card.isFromCurrentTurn = gameState.cardsPlayedThisTurn.some(c => c.value === card.value && c.isFromCurrentTurn);
+        card.updateBackgroundColor();
         card.draw();
     });
 }

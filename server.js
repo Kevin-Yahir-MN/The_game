@@ -415,7 +415,8 @@ function handlePlayCard(room, player, msg) {
         value: msg.cardValue,
         position: msg.position,
         previousValue,
-        isPlayedThisTurn: true
+        isPlayedThisTurn: true,
+        isFromCurrentTurn: true
     });
 
     broadcastToRoom(room, {
@@ -425,7 +426,8 @@ function handlePlayCard(room, player, msg) {
         playerId: player.id,
         playerName: player.name,
         cardsPlayedCount: player.cardsPlayedThisTurn.length,
-        isPlayedThisTurn: true
+        isPlayedThisTurn: true,
+        isFromCurrentTurn: true
     });
 
     updateBoardHistory(room, msg.position, msg.cardValue);
