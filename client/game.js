@@ -29,7 +29,7 @@ let gameState = {
     currentTurn: null,
     remainingDeck: 98,
     cardsPlayedThisTurn: [],
-    animatingCards: [] // Solo para animaciones en progreso
+    animatingCards: []
 };
 
 // Clase Card optimizada
@@ -169,14 +169,12 @@ function animateInvalidCard(card) {
 function updateGameState(newState) {
     if (!newState) return;
 
-    // Actualizar el estado del tablero primero
     gameState.board = newState.board || gameState.board;
     gameState.currentTurn = newState.currentTurn || gameState.currentTurn;
     gameState.remainingDeck = newState.remainingDeck || gameState.remainingDeck;
     gameState.players = newState.players || gameState.players;
     gameState.cardsPlayedThisTurn = newState.cardsPlayedThisTurn || gameState.cardsPlayedThisTurn;
 
-    // Actualizar cartas del jugador
     if (newState.yourCards) {
         updatePlayerCards(newState.yourCards);
     }
@@ -188,7 +186,6 @@ function updateGameState(newState) {
 
 function handleOpponentCardPlayed(message) {
     if (message.playerId !== currentPlayer.id) {
-        // Actualizar el tablero inmediatamente para el oponente
         const position = message.position;
         const value = message.cardValue;
 
@@ -199,6 +196,12 @@ function handleOpponentCardPlayed(message) {
             const idx = position === 'desc1' ? 0 : 1;
             gameState.board.descending[idx] = value;
         }
+
+        gameState.cardsPlayedThisTurn.push({
+            value: message.cardValue,
+            position: message.position,
+            playerId: message.playerId
+        });
 
         showNotification(`${message.playerName} jugó un ${value}`);
     }
@@ -274,20 +277,26 @@ function getClickedColumn(x, y) {
 function playCard(cardValue, position) {
     if (!selectedCard) return;
 
-    // Verificar movimiento válido localmente primero
     if (!isValidMove(cardValue, position)) {
         showNotification('Movimiento inválido', true);
         animateInvalidCard(selectedCard);
         return;
     }
 
-    // Animación local inmediata
+    // Actualizar contador local
+    gameState.cardsPlayedThisTurn.push({
+        value: cardValue,
+        position,
+        playerId: currentPlayer.id
+    });
+
+    // Eliminar carta de la mano localmente
     const cardIndex = gameState.yourCards.findIndex(c => c.value === cardValue);
     if (cardIndex !== -1) {
         gameState.yourCards.splice(cardIndex, 1);
     }
 
-    // Actualizar el tablero localmente
+    // Actualizar tablero localmente
     if (position.includes('asc')) {
         const idx = position === 'asc1' ? 0 : 1;
         gameState.board.ascending[idx] = cardValue;
@@ -309,8 +318,12 @@ function playCard(cardValue, position) {
 
 function endTurn() {
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-    if (gameState.cardsPlayedThisTurn.length < minCardsRequired) {
-        return showNotification(`Juega ${minCardsRequired - gameState.cardsPlayedThisTurn.length} carta(s) más`, true);
+    const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+        card => card.playerId === currentPlayer.id
+    ).length;
+
+    if (currentPlayerCardsPlayed < minCardsRequired) {
+        return showNotification(`Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`, true);
     }
 
     socket.send(JSON.stringify({
@@ -318,15 +331,19 @@ function endTurn() {
         playerId: currentPlayer.id
     }));
 
-    gameState.cardsPlayedThisTurn = [];
-    selectedCard = null;
+    // No limpiar cardsPlayedThisTurn aquí, esperar confirmación del servidor
 }
 
 // Renderizado del juego
 function drawGameInfo() {
     const currentTurnPlayer = gameState.players.find(p => p.id === gameState.currentTurn);
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-    const cardsNeeded = Math.max(0, minCardsRequired - gameState.cardsPlayedThisTurn.length);
+
+    const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+        card => card.playerId === gameState.currentTurn
+    ).length;
+
+    const cardsNeeded = Math.max(0, minCardsRequired - currentPlayerCardsPlayed);
 
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 24px Arial';
@@ -334,8 +351,8 @@ function drawGameInfo() {
 
     ctx.fillText(`Turno: ${currentTurnPlayer?.name || 'Esperando...'}`, 20, 20);
     ctx.fillText(`Baraja: ${gameState.remainingDeck}`, 20, 50);
-    ctx.fillStyle = gameState.cardsPlayedThisTurn.length >= minCardsRequired ? '#00FF00' : '#FFFF00';
-    ctx.fillText(`Cartas: ${gameState.cardsPlayedThisTurn.length}/${minCardsRequired}`, 20, 80);
+    ctx.fillStyle = currentPlayerCardsPlayed >= minCardsRequired ? '#00FF00' : '#FFFF00';
+    ctx.fillText(`Cartas: ${currentPlayerCardsPlayed}/${minCardsRequired}`, 20, 80);
 
     if (cardsNeeded > 0 && gameState.currentTurn === currentPlayer.id) {
         ctx.fillStyle = '#FF0000';

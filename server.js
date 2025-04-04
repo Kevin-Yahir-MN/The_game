@@ -91,7 +91,8 @@ function sendGameState(room, player) {
             players: room.players.map(p => ({
                 id: p.id,
                 name: p.name,
-                cardCount: p.cards.length
+                cardCount: p.cards.length,
+                cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
             })),
             remainingDeck: room.gameState.deck.length,
             isYourTurn: room.gameState.currentTurn === player.id
@@ -245,7 +246,8 @@ wss.on('connection', (ws, req) => {
         response.players = room.players.map(p => ({
             id: p.id,
             name: p.name,
-            cardCount: p.cards.length
+            cardCount: p.cards.length,
+            cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
         }));
     }
 
@@ -324,7 +326,8 @@ function startGame(room) {
             players: room.players.map(p => ({
                 id: p.id,
                 name: p.name,
-                cardCount: p.cards.length
+                cardCount: p.cards.length,
+                cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
             }))
         }
     });
@@ -391,6 +394,8 @@ function handlePlayCard(room, player, msg) {
 
     // Eliminar carta de la mano del jugador
     player.cards.splice(player.cards.indexOf(msg.cardValue), 1);
+
+    // Añadir al contador de cartas jugadas este turno
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
         position: msg.position
@@ -402,7 +407,8 @@ function handlePlayCard(room, player, msg) {
         cardValue: msg.cardValue,
         position: msg.position,
         playerId: player.id,
-        playerName: player.name
+        playerName: player.name,
+        cardsPlayedCount: player.cardsPlayedThisTurn.length
     });
 
     // Enviar estado actualizado a todos
@@ -441,6 +447,8 @@ function endTurn(room, player) {
     const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
     const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
     room.gameState.currentTurn = room.players[nextIndex].id;
+
+    // Reiniciar contador de cartas jugadas para el jugador
     player.cardsPlayedThisTurn = [];
 
     broadcastToRoom(room, {
