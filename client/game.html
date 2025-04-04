@@ -9,7 +9,7 @@
     <style>
         .game-instructions {
             position: fixed;
-            bottom: 10px;
+            bottom: 100px;
             left: 10px;
             background-color: rgba(255, 255, 255, 0.9);
             padding: 10px 15px;
@@ -37,11 +37,13 @@
 
 <body>
     <div id="gameContainer">
-        <div class="game-controls">
-            <button id="undoBtn" disabled>Deshacer</button>
-            <button id="endTurnBtn">Terminar Turno</button>
-        </div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div class="game-controls">
+            <div class="buttons-container">
+                <button id="undoBtn" disabled>Deshacer</button>
+                <button id="endTurnBtn">Terminar Turno</button>
+            </div>
+        </div>
     </div>
 
     <div class="game-instructions">

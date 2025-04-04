@@ -303,7 +303,7 @@ function handleOpponentCardPlayed(message) {
 function updatePlayerCards(cards) {
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
     const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
-    const startY = canvas.height - CARD_HEIGHT - 20;
+    const startY = canvas.height - CARD_HEIGHT - 80; // Ajustado para los botones
 
     gameState.yourCards = cards.map((card, index) => {
         const value = card instanceof Card ? card.value : card;
@@ -527,9 +527,6 @@ function drawBoard() {
 }
 
 function drawPlayerCards() {
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 20px Arial';
-    ctx.fillText('Tu mano', canvas.width / 2, canvas.height - CARD_HEIGHT - 50);
     gameState.yourCards.forEach(card => card?.draw());
 }
 
