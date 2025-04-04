@@ -7,137 +7,68 @@
     <title>Partida - The Game</title>
     <link rel="stylesheet" href="styles.css">
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #f0f0f0;
-            font-family: Arial, sans-serif;
-        }
-
-        #gameContainer {
-            width: 800px;
-            margin: 20px auto;
-            text-align: center;
-        }
-
-        #gameCanvas {
-            display: block;
-            background-color: #228B22;
-            border: 3px solid #2c3e50;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-            margin: 0 auto;
-        }
-
-        #gameControls {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        .game-button {
-            padding: 12px 24px;
-            font-size: 16px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: all 0.3s;
-            color: white;
-        }
-
-        #endTurnBtn {
-            background-color: #e74c3c;
-        }
-
-        #endTurnBtn:hover:not(:disabled) {
-            background-color: #c0392b;
-        }
-
-        #returnCardBtn {
-            background-color: #3498db;
-        }
-
-        #returnCardBtn:hover:not(:disabled) {
-            background-color: #2980b9;
-        }
-
-        .game-button:disabled {
-            background-color: #95a5a6;
-            cursor: not-allowed;
-        }
-
         .game-instructions {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
             background-color: rgba(255, 255, 255, 0.9);
-            padding: 15px;
-            border-radius: 10px;
+            padding: 10px 15px;
+            border-radius: 8px;
             font-size: 14px;
-            max-width: 800px;
-            margin: 20px auto;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-            border: 1px solid #ddd;
+            max-width: 300px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
 
         .game-instructions h3 {
-            margin: 0 0 10px 0;
+            margin: 0 0 8px 0;
             color: #2c3e50;
-            font-size: 16px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
         }
 
         .game-instructions ul {
             margin: 0;
             padding-left: 20px;
-            text-align: left;
         }
 
         .game-instructions li {
-            margin-bottom: 8px;
-            line-height: 1.4;
-            display: flex;
-            align-items: center;
+            margin-bottom: 5px;
         }
 
-        .color-sample {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border-radius: 4px;
-            margin-right: 10px;
-            border: 1px solid #ccc;
+        #endTurnBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            z-index: 100;
+        }
+
+        #endTurnBtn:hover {
+            background-color: #c0392b;
         }
     </style>
 </head>
 
 <body>
     <div id="gameContainer">
+        <button id="endTurnBtn">Terminar Turno</button>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
+    </div>
 
-        <div id="gameControls">
-            <button id="returnCardBtn" class="game-button">Regresar Carta a Mano</button>
-            <button id="endTurnBtn" class="game-button">Terminar Turno</button>
-        </div>
-
-        <div class="game-instructions">
-            <h3>Instrucciones y Colores</h3>
-            <ul>
-                <li><span class="color-sample" style="background-color: rgba(255, 255, 153, 0.7);"></span> Carta
-                    seleccionada</li>
-                <li><span class="color-sample" style="background-color: rgba(160, 192, 224, 0.5);"></span> Tus cartas
-                    jugadas este turno</li>
-                <li><span class="color-sample" style="background-color: rgba(173, 216, 230, 0.7);"></span> Tu última
-                    carta jugada</li>
-                <li><span class="color-sample" style="background-color: rgba(255, 150, 150, 0.5);"></span> Cartas
-                    jugadas por el jugador en turno (vista de otros)</li>
-                <li><span class="color-sample" style="background-color: rgba(255, 200, 200, 0.7);"></span> Última carta
-                    jugada por el jugador en turno (vista de otros)</li>
-                <li>Haz clic en una carta para seleccionarla y luego en una columna para jugarla</li>
-                <li>Usa "Regresar Carta a Mano" para devolver cartas jugadas este turno</li>
-                <li>Debes jugar al menos 2 cartas por turno (1 si no quedan en la baraja)</li>
-                <li>Haz clic en "Terminar Turno" cuando hayas terminado</li>
-            </ul>
-        </div>
+    <div class="game-instructions">
+        <h3>Instrucciones:</h3>
+        <ul>
+            <li>Haz click en una carta para seleccionarla (amarillo)</li>
+            <li>Haz click en una columna para jugar la carta seleccionada</li>
+            <li>Las cartas jugadas este turno aparecen en azul</li>
+            <li>Debes jugar al menos 2 cartas por turno (1 si no quedan cartas en la baraja)</li>
+            <li>Presiona "Terminar Turno" cuando hayas terminado</li>
+        </ul>
     </div>
 
     <script src="game.js"></script>

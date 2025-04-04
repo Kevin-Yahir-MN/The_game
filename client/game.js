@@ -5,7 +5,6 @@ const WS_URL = 'wss://the-game-2xks.onrender.com';
 
 // Elementos de la interfaz
 const endTurnButton = document.getElementById('endTurnBtn');
-const returnCardBtn = document.getElementById('returnCardBtn');
 
 // Variables del juego
 let socket;
@@ -20,8 +19,8 @@ let gameState = {
     players: [],
     yourCards: [],
     board: {
-        ascending: [1, 1],
-        descending: [100, 100]
+        ascending: [1, 1],    // [asc1, asc2]
+        descending: [100, 100] // [desc1, desc2]
     },
     currentTurn: null,
     remainingDeck: 98,
@@ -49,7 +48,6 @@ class Card {
         this.isPlayable = isPlayable;
         this.isPlayedThisTurn = false;
         this.isMostRecent = false;
-        this.playedByCurrentPlayer = false;
         this.radius = 5;
     }
 
@@ -69,45 +67,22 @@ class Card {
         ctx.quadraticCurveTo(this.x, this.y, this.x + this.radius, this.y);
         ctx.closePath();
 
-        // Fondo blanco sólido para todas las cartas
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fill();
-
-        // Resaltado para carta seleccionada (amarillo semitransparente)
-        if (this === selectedCard) {
-            ctx.fillStyle = 'rgba(255, 255, 153, 0.7)';
-            ctx.fill();
-        }
-        // Resaltado para cartas jugadas este turno
+        // Fondo de la carta
+        let fillColor = '#FFFFFF';
+        if (this === selectedCard) fillColor = '#FFFF99';
         else if (this.isPlayedThisTurn) {
-            const isCurrentPlayerTurn = gameState.currentTurn === currentPlayer.id;
-
-            if (this.playedByCurrentPlayer) {
-                if (isCurrentPlayerTurn) {
-                    // Jugador en turno ve azul para sus propias cartas jugadas
-                    if (this.isMostRecent) {
-                        ctx.fillStyle = 'rgba(173, 216, 230, 0.7)'; // Azul claro
-                    } else {
-                        ctx.fillStyle = 'rgba(160, 192, 224, 0.5)'; // Azul medio
-                    }
-                } else {
-                    // Otros jugadores ven rojo para cartas del jugador en turno
-                    if (this.isMostRecent) {
-                        ctx.fillStyle = 'rgba(255, 200, 200, 0.7)'; // Rojo claro
-                    } else {
-                        ctx.fillStyle = 'rgba(255, 150, 150, 0.5)'; // Rojo medio
-                    }
-                }
-                ctx.fill();
-            }
+            fillColor = this.isMostRecent ? '#ADD8E6' : '#A0C0E0';
         }
+
+        ctx.fillStyle = fillColor;
+        ctx.fill();
 
         // Borde
         ctx.strokeStyle = this.isPlayable ? '#00FF00' : '#000000';
         ctx.lineWidth = this.isPlayable ? 3 : 1;
         ctx.stroke();
 
-        // Valor de la carta (siempre negro sobre los colores)
+        // Valor de la carta
         ctx.fillStyle = '#000000';
         ctx.font = 'bold 24px Arial';
         ctx.textAlign = 'center';
@@ -149,7 +124,6 @@ function initGame() {
     }
 
     endTurnButton.addEventListener('click', endTurn);
-    returnCardBtn.addEventListener('click', handleReturnCard);
     connectWebSocket();
     canvas.addEventListener('click', handleCanvasClick);
     gameLoop();
@@ -177,31 +151,24 @@ function connectWebSocket() {
                     updateGameState(message.state);
                     break;
                 case 'your_cards':
-                    gameState.yourCards = message.cards.map(value => {
-                        const card = new Card(value, 0, 0, false);
-                        card.playedByCurrentPlayer = true;
-                        return card;
-                    });
+                    gameState.yourCards = message.cards.map(value => new Card(value, 0, 0, false));
                     break;
                 case 'game_over':
                     alert(message.message);
                     break;
                 case 'invalid_move':
                     showNotification(message.reason, true);
+                    // Revertir cambios locales si el movimiento fue inválido
                     if (message.cardValue) {
-                        const card = new Card(message.cardValue, 0, 0, false);
-                        card.playedByCurrentPlayer = true;
-                        gameState.yourCards.push(card);
+                        gameState.yourCards.push(new Card(message.cardValue, 0, 0, false));
                         gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
                             c => c.value !== message.cardValue
                         );
                     }
                     break;
                 case 'card_played':
+                    // Confirmación del servidor de que se jugó una carta
                     showNotification(`Carta ${message.cardValue} colocada correctamente`, false);
-                    break;
-                case 'card_returned':
-                    showNotification(message.message, false);
                     break;
                 case 'init_state':
                     gameState = { ...gameState, ...message.state };
@@ -284,47 +251,20 @@ function updateGameState(newState) {
     const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
     const startY = canvas.height - CARD_HEIGHT - 20;
 
-    gameState.yourCards = gameState.yourCards.map((card, index) => {
-        if (typeof card === 'number') {
-            const newCard = new Card(
-                card,
-                startX + index * (CARD_WIDTH + CARD_SPACING),
-                startY,
-                isYourTurn && canPlayCard(card)
-            );
-            newCard.playedByCurrentPlayer = true;
-            return newCard;
+    gameState.yourCards = gameState.yourCards.map((value, index) => {
+        if (value instanceof Card) {
+            value.x = startX + index * (CARD_WIDTH + CARD_SPACING);
+            value.y = startY;
+            value.isPlayable = isYourTurn && canPlayCard(value.value);
+            return value;
         }
-
-        card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
-        card.y = startY;
-        card.isPlayable = isYourTurn && canPlayCard(card.value);
-        card.playedByCurrentPlayer = true;
-        return card;
+        return new Card(
+            value,
+            startX + index * (CARD_WIDTH + CARD_SPACING),
+            startY,
+            isYourTurn && canPlayCard(value)
+        );
     });
-
-    // Resetear estado de cartas jugadas
-    gameState.yourCards.forEach(card => {
-        card.isPlayedThisTurn = false;
-        card.isMostRecent = false;
-    });
-
-    // Marcar cartas jugadas este turno
-    if (newState.cardsPlayedThisTurn && Array.isArray(newState.cardsPlayedThisTurn)) {
-        newState.cardsPlayedThisTurn.forEach(playedCard => {
-            const cardIndex = gameState.yourCards.findIndex(c => c.value === playedCard.value);
-            if (cardIndex !== -1) {
-                gameState.yourCards[cardIndex].isPlayedThisTurn = true;
-                gameState.yourCards[cardIndex].isMostRecent = playedCard.isMostRecent;
-                gameState.yourCards[cardIndex].playedByCurrentPlayer = playedCard.playedBy === currentPlayer.id;
-            }
-        });
-    }
-
-    // Actualizar estado del botón de regresar carta
-    returnCardBtn.disabled = !(isYourTurn &&
-        gameState.cardsPlayedThisTurn &&
-        gameState.cardsPlayedThisTurn.length > 0);
 
     if (!isYourTurn) {
         selectedCard = null;
@@ -389,6 +329,18 @@ function playCard(cardValue, position) {
         return;
     }
 
+    // Actualizar el estado local inmediatamente
+    gameState.cardsPlayedThisTurn.push({
+        value: cardValue,
+        position: position
+    });
+
+    // Eliminar la carta de la mano
+    const cardIndex = gameState.yourCards.findIndex(card => card.value === cardValue);
+    if (cardIndex !== -1) {
+        gameState.yourCards.splice(cardIndex, 1);
+    }
+
     // Enviar jugada al servidor
     socket.send(JSON.stringify({
         type: 'play_card',
@@ -398,37 +350,7 @@ function playCard(cardValue, position) {
     }));
 
     selectedCard = null;
-}
-
-// Manejar devolución de carta
-function handleReturnCard() {
-    if (gameState.currentTurn !== currentPlayer.id) {
-        showNotification('No es tu turno', true);
-        return;
-    }
-
-    if (!gameState.cardsPlayedThisTurn || gameState.cardsPlayedThisTurn.length === 0) {
-        showNotification('No has jugado cartas este turno', true);
-        return;
-    }
-
-    // Encontrar la última carta jugada este turno
-    const lastPlayedCard = [...gameState.cardsPlayedThisTurn]
-        .reverse()
-        .find(card => card.value !== undefined);
-
-    if (!lastPlayedCard) {
-        showNotification('No hay cartas para regresar', true);
-        return;
-    }
-
-    // Enviar mensaje al servidor
-    socket.send(JSON.stringify({
-        type: 'return_card',
-        playerId: currentPlayer.id,
-        cardValue: lastPlayedCard.value,
-        position: lastPlayedCard.position
-    }));
+    showNotification(`Carta ${cardValue} jugada en ${position}`, false);
 }
 
 // Terminar turno
@@ -496,9 +418,11 @@ function drawGameInfo() {
     ctx.fillText(`Turno: ${currentTurnPlayer?.name || 'Esperando...'}`, 20, 20);
     ctx.fillText(`Cartas en la baraja: ${gameState.remainingDeck}`, 20, 50);
 
+    // Contador de cartas jugadas con color condicional
     ctx.fillStyle = gameState.cardsPlayedThisTurn.length >= minCardsRequired ? '#00FF00' : '#FFFF00';
     ctx.fillText(`Cartas jugadas: ${gameState.cardsPlayedThisTurn.length}/${minCardsRequired}`, 20, 80);
 
+    // Mostrar cartas faltantes si es necesario
     if (cardsNeeded > 0 && gameState.currentTurn === currentPlayer.id) {
         ctx.fillStyle = '#FF0000';
         ctx.fillText(`Faltan ${cardsNeeded} carta(s)`, 20, 110);
@@ -514,39 +438,17 @@ function drawBoard() {
 
     // Dibujar flechas y cartas ascendentes
     ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    const asc1Card = new Card(gameState.board.ascending[0], BOARD_POSITION.x, BOARD_POSITION.y);
-    markIfPlayedThisTurn(asc1Card, 'asc1');
-    asc1Card.draw();
+    new Card(gameState.board.ascending[0], BOARD_POSITION.x, BOARD_POSITION.y).draw();
 
     ctx.fillText('↑', BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    const asc2Card = new Card(gameState.board.ascending[1], BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, BOARD_POSITION.y);
-    markIfPlayedThisTurn(asc2Card, 'asc2');
-    asc2Card.draw();
+    new Card(gameState.board.ascending[1], BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, BOARD_POSITION.y).draw();
 
     // Dibujar flechas y cartas descendentes
     ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    const desc1Card = new Card(gameState.board.descending[0], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, BOARD_POSITION.y);
-    markIfPlayedThisTurn(desc1Card, 'desc1');
-    desc1Card.draw();
+    new Card(gameState.board.descending[0], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, BOARD_POSITION.y).draw();
 
     ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3 + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
-    const desc2Card = new Card(gameState.board.descending[1], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, BOARD_POSITION.y);
-    markIfPlayedThisTurn(desc2Card, 'desc2');
-    desc2Card.draw();
-}
-
-// Marcar cartas en el tablero como jugadas este turno
-function markIfPlayedThisTurn(card, position) {
-    if (gameState.cardsPlayedThisTurn && Array.isArray(gameState.cardsPlayedThisTurn)) {
-        const playedCard = gameState.cardsPlayedThisTurn.find(c =>
-            c.position === position && c.value === card.value
-        );
-        if (playedCard) {
-            card.isPlayedThisTurn = true;
-            card.isMostRecent = playedCard.isMostRecent;
-            card.playedByCurrentPlayer = playedCard.playedBy === currentPlayer.id;
-        }
-    }
+    new Card(gameState.board.descending[1], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, BOARD_POSITION.y).draw();
 }
 
 // Dibujar las cartas del jugador

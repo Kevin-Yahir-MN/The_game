@@ -352,17 +352,10 @@ function handlePlayCard(room, player, msg) {
         board.descending[target] = msg.cardValue;
     }
 
-    player.cards = player.cards.filter(c => c !== msg.cardValue);
-
-    player.cardsPlayedThisTurn.forEach(card => {
-        card.isMostRecent = false;
-    });
-
+    player.cards.splice(player.cards.indexOf(msg.cardValue), 1);
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
-        position: msg.position,
-        isMostRecent: true,
-        playedBy: player.id
+        position: msg.position
     });
 
     checkGameStatus(room);
@@ -370,57 +363,47 @@ function handlePlayCard(room, player, msg) {
 }
 
 function returnCard(room, player, cardValue, position) {
-    // Verificar que es el turno del jugador y el juego ha comenzado
-    if (player.id !== room.gameState.currentTurn || !room.gameState.gameStarted) {
-        return sendError(player, 'No es tu turno o el juego no ha comenzado');
-    }
-
-    // Encontrar la última carta jugada este turno en la posición especificada
-    const lastPlayedCard = [...player.cardsPlayedThisTurn]
-        .reverse()
-        .find(card => card.position === position && card.value === cardValue);
-
-    if (!lastPlayedCard) {
-        return sendError(player, 'No has jugado esa carta en esa posición este turno');
-    }
-
-    // Verificar que la carta está actualmente en la posición del tablero
     const board = room.gameState.board;
     let currentValue;
 
-    if (position === 'asc1') currentValue = board.ascending[0];
-    else if (position === 'asc2') currentValue = board.ascending[1];
-    else if (position === 'desc1') currentValue = board.descending[0];
-    else if (position === 'desc2') currentValue = board.descending[1];
-    else return sendError(player, 'Posición inválida');
+    if (position.includes('asc')) {
+        const index = position === 'asc1' ? 0 : 1;
+        currentValue = board.ascending[index];
+    } else {
+        const index = position === 'desc1' ? 0 : 1;
+        currentValue = board.descending[index];
+    }
 
     if (currentValue !== cardValue) {
         return sendError(player, 'La carta ya no está en esa posición');
     }
 
-    // Obtener el valor anterior del historial del tablero
+    if (!player.cardsPlayedThisTurn.some(c => c.value === cardValue && c.position === position)) {
+        return sendError(player, 'No puedes devolver cartas que no hayas jugado este turno');
+    }
+
     const previousValue = findPreviousValue(room, position, cardValue);
 
-    // Actualizar el tablero con el valor anterior
-    if (position === 'asc1') board.ascending[0] = previousValue || 1;
-    else if (position === 'asc2') board.ascending[1] = previousValue || 1;
-    else if (position === 'desc1') board.descending[0] = previousValue || 100;
-    else if (position === 'desc2') board.descending[1] = previousValue || 100;
+    if (position.includes('asc')) {
+        const index = position === 'asc1' ? 0 : 1;
+        board.ascending[index] = previousValue || 1;
+    } else {
+        const index = position === 'desc1' ? 0 : 1;
+        board.descending[index] = previousValue || 100;
+    }
 
-    // Devolver la carta a la mano del jugador
     player.cards.push(cardValue);
-
-    // Eliminar la carta de las jugadas este turno
     player.cardsPlayedThisTurn = player.cardsPlayedThisTurn.filter(
         c => !(c.value === cardValue && c.position === position)
     );
 
-    // Actualizar el historial del tablero
-    updateBoardHistory(room, position, board);
-
-    // Notificar al jugador y actualizar el estado del juego
-    sendNotification(player, `Carta ${cardValue} devuelta a tu mano`);
     broadcastGameState(room);
+    player.ws.send(JSON.stringify({
+        type: 'card_returned',
+        message: 'Carta devuelta a tu mano',
+        cardValue: cardValue,
+        position: position
+    }));
 }
 
 function endTurn(room, player) {
@@ -534,23 +517,11 @@ function getLastHistoryValue(history, position) {
 }
 
 function sendError(player, message) {
-    if (player.ws?.readyState === WebSocket.OPEN) {
-        player.ws.send(JSON.stringify({
-            type: 'notification',
-            message: message,
-            isError: true
-        }));
-    }
-}
-
-function sendNotification(player, message) {
-    if (player.ws?.readyState === WebSocket.OPEN) {
-        player.ws.send(JSON.stringify({
-            type: 'notification',
-            message: message,
-            isError: false
-        }));
-    }
+    player.ws.send(JSON.stringify({
+        type: 'notification',
+        message: message,
+        isError: true
+    }));
 }
 
 function broadcastToRoom(room, message) {
@@ -579,7 +550,6 @@ function sendGameState(room, player) {
                     cardCount: p.cards.length
                 })),
                 remainingDeck: room.gameState.deck.length,
-                cardsPlayedThisTurn: player.cardsPlayedThisTurn,
                 isYourTurn: room.gameState.currentTurn === player.id
             }
         }));
@@ -588,29 +558,7 @@ function sendGameState(room, player) {
 
 function broadcastGameState(room) {
     room.players.forEach(player => {
-        if (player.ws?.readyState === WebSocket.OPEN) {
-            player.ws.send(JSON.stringify({
-                type: 'game_state',
-                state: {
-                    board: room.gameState.board,
-                    currentTurn: room.gameState.currentTurn,
-                    yourCards: player.cards,
-                    players: room.players.map(p => ({
-                        id: p.id,
-                        name: p.name,
-                        cardCount: p.cards.length
-                    })),
-                    remainingDeck: room.gameState.deck.length,
-                    cardsPlayedThisTurn: player.cardsPlayedThisTurn.map(c => ({
-                        value: c.value,
-                        position: c.position,
-                        isMostRecent: c.isMostRecent,
-                        playedBy: c.playedBy
-                    })),
-                    isYourTurn: room.gameState.currentTurn === player.id
-                }
-            }));
-        }
+        sendGameState(room, player);
     });
 }
 
