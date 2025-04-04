@@ -7,11 +7,15 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 
+// Configuración
+const PORT = process.env.PORT || 3000;
 const allowedOrigins = [
     'https://the-game-2xks.onrender.com',
     'http://localhost:3000'
 ];
+const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
 
+// Middleware CORS
 app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (allowedOrigins.includes(origin)) {
@@ -23,6 +27,7 @@ app.use((req, res, next) => {
     next();
 });
 
+// WebSocket Server
 const wss = new WebSocket.Server({
     server,
     verifyClient: (info, done) => {
@@ -37,14 +42,15 @@ const wss = new WebSocket.Server({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client')));
 
+// Estructuras de datos
 const rooms = new Map();
+const reverseRoomMap = new WeakMap();
 const boardHistory = new Map();
 
+// Funciones auxiliares
 function initializeDeck() {
     const deck = [];
-    for (let i = 2; i < 100; i++) {
-        deck.push(i);
-    }
+    for (let i = 2; i < 100; i++) deck.push(i);
     return shuffleArray(deck);
 }
 
@@ -56,19 +62,78 @@ function shuffleArray(array) {
     return array;
 }
 
+function safeSend(ws, message) {
+    try {
+        if (ws?.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(message));
+        }
+    } catch (error) {
+        console.error('Error enviando mensaje:', error);
+    }
+}
+
+function broadcastToRoom(room, message, options = {}) {
+    const { includeGameState = false } = options;
+
+    room.players.forEach(player => {
+        safeSend(player.ws, message);
+        if (includeGameState) sendGameState(room, player);
+    });
+}
+
+function sendGameState(room, player) {
+    safeSend(player.ws, {
+        type: 'game_state',
+        state: {
+            board: room.gameState.board,
+            currentTurn: room.gameState.currentTurn,
+            yourCards: player.cards,
+            players: room.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                cardCount: p.cards.length
+            })),
+            remainingDeck: room.gameState.deck.length,
+            isYourTurn: room.gameState.currentTurn === player.id
+        }
+    });
+}
+
+function updateBoardHistory(room, position, newValue) {
+    const roomId = reverseRoomMap.get(room);
+    const history = boardHistory.get(roomId);
+    const historyKey = {
+        'asc1': 'ascending1',
+        'asc2': 'ascending2',
+        'desc1': 'descending1',
+        'desc2': 'descending2'
+    }[position];
+
+    if (history[historyKey].slice(-1)[0] !== newValue) {
+        history[historyKey].push(newValue);
+    }
+}
+
+function getNextActivePlayerIndex(currentIndex, players) {
+    for (let offset = 1; offset < players.length; offset++) {
+        const nextIndex = (currentIndex + offset) % players.length;
+        if (players[nextIndex].ws?.readyState === WebSocket.OPEN) {
+            return nextIndex;
+        }
+    }
+    return currentIndex;
+}
+
+// Rutas API
 app.post('/create-room', (req, res) => {
     const { playerName } = req.body;
     if (!playerName) {
-        return res.status(400).json({
-            success: false,
-            message: 'Se requiere nombre de jugador'
-        });
+        return res.status(400).json({ success: false, message: 'Se requiere nombre de jugador' });
     }
 
     const roomId = Math.floor(1000 + Math.random() * 9000).toString();
     const playerId = uuidv4();
-
-    rooms.set(roomId, {
+    const room = {
         players: [{
             id: playerId,
             name: playerName,
@@ -79,28 +144,20 @@ app.post('/create-room', (req, res) => {
         }],
         gameState: {
             deck: initializeDeck(),
-            board: {
-                ascending: [1, 1],
-                descending: [100, 100]
-            },
+            board: { ascending: [1, 1], descending: [100, 100] },
             currentTurn: playerId,
             gameStarted: false
         }
-    });
+    };
 
+    rooms.set(roomId, room);
+    reverseRoomMap.set(room, roomId);
     boardHistory.set(roomId, {
-        ascending1: [1],
-        ascending2: [1],
-        descending1: [100],
-        descending2: [100]
+        ascending1: [1], ascending2: [1],
+        descending1: [100], descending2: [100]
     });
 
-    res.json({
-        success: true,
-        roomId,
-        playerId,
-        playerName
-    });
+    res.json({ success: true, roomId, playerId, playerName });
 });
 
 app.post('/join-room', (req, res) => {
@@ -113,10 +170,7 @@ app.post('/join-room', (req, res) => {
     }
 
     if (!rooms.has(roomId)) {
-        return res.status(404).json({
-            success: false,
-            message: 'Sala no encontrada'
-        });
+        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
     }
 
     const room = rooms.get(roomId);
@@ -131,22 +185,13 @@ app.post('/join-room', (req, res) => {
     };
 
     room.players.push(newPlayer);
-
-    res.json({
-        success: true,
-        playerId,
-        playerName,
-        host: room.players.find(p => p.isHost).name
-    });
+    res.json({ success: true, playerId, playerName });
 });
 
 app.get('/room-info/:roomId', (req, res) => {
     const roomId = req.params.roomId;
     if (!rooms.has(roomId)) {
-        return res.status(404).json({
-            success: false,
-            message: 'Sala no encontrada'
-        });
+        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
     }
 
     const room = rooms.get(roomId);
@@ -164,6 +209,7 @@ app.get('/room-info/:roomId', (req, res) => {
     });
 });
 
+// WebSocket Handlers
 wss.on('connection', (ws, req) => {
     const params = new URLSearchParams(req.url.split('?')[1]);
     const roomId = params.get('roomId');
@@ -180,12 +226,10 @@ wss.on('connection', (ws, req) => {
     player.ws = ws;
     console.log(`✔ ${player.name} conectado a sala ${roomId}`);
 
-    broadcastRoomUpdate(room);
-
     const response = {
         type: 'init_game',
         playerId: player.id,
-        roomId: roomId,
+        roomId,
         isHost: player.isHost,
         gameState: {
             board: room.gameState.board,
@@ -205,12 +249,29 @@ wss.on('connection', (ws, req) => {
         }));
     }
 
-    ws.send(JSON.stringify(response));
+    safeSend(ws, response);
 
     ws.on('message', (message) => {
         try {
             const msg = JSON.parse(message);
-            handleGameMessage(room, player, msg);
+            switch (msg.type) {
+                case 'start_game':
+                    if (player.isHost && !room.gameState.gameStarted) startGame(room);
+                    break;
+                case 'play_card':
+                    if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                        handlePlayCard(room, player, msg);
+                    }
+                    break;
+                case 'end_turn':
+                    if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                        endTurn(room, player);
+                    }
+                    break;
+                case 'get_game_state':
+                    if (room.gameState.gameStarted) sendGameState(room, player);
+                    break;
+            }
         } catch (error) {
             console.error('Error procesando mensaje:', error);
         }
@@ -219,7 +280,6 @@ wss.on('connection', (ws, req) => {
     ws.on('close', () => {
         console.log(`✖ ${player.name} desconectado`);
         player.ws = null;
-        broadcastRoomUpdate(room);
 
         if (player.isHost && room.players.length > 1) {
             const newHost = room.players.find(p => p.id !== player.id && p.ws?.readyState === WebSocket.OPEN);
@@ -235,58 +295,21 @@ wss.on('connection', (ws, req) => {
     });
 });
 
-function handleGameMessage(room, player, msg) {
-    switch (msg.type) {
-        case 'start_game':
-            if (player.isHost && !room.gameState.gameStarted) {
-                startGame(room);
-            }
-            break;
-
-        case 'play_card':
-            if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                handlePlayCard(room, player, msg);
-            }
-            break;
-
-        case 'return_card':
-            if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                returnCard(room, player, msg.cardValue, msg.position);
-            }
-            break;
-
-        case 'end_turn':
-            if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                endTurn(room, player);
-            }
-            break;
-
-        case 'get_game_state':
-            if (room.gameState.gameStarted) {
-                sendGameState(room, player);
-            }
-            break;
-    }
-}
-
+// Lógica del juego
 function startGame(room) {
     if (room.players.length < 2) {
-        broadcastToRoom(room, {
+        return broadcastToRoom(room, {
             type: 'notification',
             message: 'Se necesitan al menos 2 jugadores para comenzar',
             isError: true
         });
-        return;
     }
 
     room.gameState.gameStarted = true;
-
     room.players.forEach(player => {
         player.cards = [];
-        for (let i = 0; i < 6; i++) {
-            if (room.gameState.deck.length > 0) {
-                player.cards.push(room.gameState.deck.pop());
-            }
+        for (let i = 0; i < 6 && room.gameState.deck.length > 0; i++) {
+            player.cards.push(room.gameState.deck.pop());
         }
     });
 
@@ -305,51 +328,52 @@ function startGame(room) {
     });
 
     room.players.forEach(player => {
-        if (player.ws?.readyState === WebSocket.OPEN) {
-            player.ws.send(JSON.stringify({
-                type: 'your_cards',
-                cards: player.cards
-            }));
-        }
+        safeSend(player.ws, { type: 'your_cards', cards: player.cards });
     });
 }
 
 function handlePlayCard(room, player, msg) {
-    const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
     if (!validPositions.includes(msg.position)) {
-        return sendError(player, 'Posición inválida');
+        return safeSend(player.ws, {
+            type: 'notification',
+            message: 'Posición inválida',
+            isError: true
+        });
     }
 
     if (!player.cards.includes(msg.cardValue)) {
-        return sendError(player, 'No tienes esa carta');
+        return safeSend(player.ws, {
+            type: 'notification',
+            message: 'No tienes esa carta',
+            isError: true
+        });
     }
 
     const board = room.gameState.board;
-    let validMove = false;
-    let targetValue;
+    const targetIdx = msg.position.includes('asc') ?
+        (msg.position === 'asc1' ? 0 : 1) :
+        (msg.position === 'desc1' ? 0 : 1);
+    const targetValue = msg.position.includes('asc') ?
+        board.ascending[targetIdx] :
+        board.descending[targetIdx];
+    const isValid = msg.position.includes('asc') ?
+        (msg.cardValue > targetValue || msg.cardValue === targetValue - 10) :
+        (msg.cardValue < targetValue || msg.cardValue === targetValue + 10);
 
-    if (msg.position.includes('asc')) {
-        const target = msg.position === 'asc1' ? 0 : 1;
-        targetValue = board.ascending[target];
-        validMove = msg.cardValue > targetValue || msg.cardValue === targetValue - 10;
-    } else {
-        const target = msg.position === 'desc1' ? 0 : 1;
-        targetValue = board.descending[target];
-        validMove = msg.cardValue < targetValue || msg.cardValue === targetValue + 10;
+    if (!isValid) {
+        return safeSend(player.ws, {
+            type: 'notification',
+            message: `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'} que ${targetValue} o igual a ${msg.position.includes('asc') ? targetValue - 10 : targetValue + 10}`,
+            isError: true
+        });
     }
 
-    if (!validMove) {
-        return sendError(player, `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'} que ${targetValue} o igual a ${msg.position.includes('asc') ? targetValue - 10 : targetValue + 10}`);
-    }
-
-    updateBoardHistory(room, msg.position, board);
+    updateBoardHistory(room, msg.position, msg.cardValue);
 
     if (msg.position.includes('asc')) {
-        const target = msg.position === 'asc1' ? 0 : 1;
-        board.ascending[target] = msg.cardValue;
+        board.ascending[targetIdx] = msg.cardValue;
     } else {
-        const target = msg.position === 'desc1' ? 0 : 1;
-        board.descending[target] = msg.cardValue;
+        board.descending[targetIdx] = msg.cardValue;
     }
 
     player.cards.splice(player.cards.indexOf(msg.cardValue), 1);
@@ -362,54 +386,14 @@ function handlePlayCard(room, player, msg) {
     broadcastGameState(room);
 }
 
-function returnCard(room, player, cardValue, position) {
-    const board = room.gameState.board;
-    let currentValue;
-
-    if (position.includes('asc')) {
-        const index = position === 'asc1' ? 0 : 1;
-        currentValue = board.ascending[index];
-    } else {
-        const index = position === 'desc1' ? 0 : 1;
-        currentValue = board.descending[index];
-    }
-
-    if (currentValue !== cardValue) {
-        return sendError(player, 'La carta ya no está en esa posición');
-    }
-
-    if (!player.cardsPlayedThisTurn.some(c => c.value === cardValue && c.position === position)) {
-        return sendError(player, 'No puedes devolver cartas que no hayas jugado este turno');
-    }
-
-    const previousValue = findPreviousValue(room, position, cardValue);
-
-    if (position.includes('asc')) {
-        const index = position === 'asc1' ? 0 : 1;
-        board.ascending[index] = previousValue || 1;
-    } else {
-        const index = position === 'desc1' ? 0 : 1;
-        board.descending[index] = previousValue || 100;
-    }
-
-    player.cards.push(cardValue);
-    player.cardsPlayedThisTurn = player.cardsPlayedThisTurn.filter(
-        c => !(c.value === cardValue && c.position === position)
-    );
-
-    broadcastGameState(room);
-    player.ws.send(JSON.stringify({
-        type: 'card_returned',
-        message: 'Carta devuelta a tu mano',
-        cardValue: cardValue,
-        position: position
-    }));
-}
-
 function endTurn(room, player) {
     const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
     if (player.cardsPlayedThisTurn.length < minCardsRequired) {
-        return sendError(player, `Debes jugar al menos ${minCardsRequired} cartas este turno`);
+        return safeSend(player.ws, {
+            type: 'notification',
+            message: `Debes jugar al menos ${minCardsRequired} cartas este turno`,
+            isError: true
+        });
     }
 
     if (player.cardsPlayedThisTurn.length > 0 && room.gameState.deck.length > 0) {
@@ -428,12 +412,7 @@ function endTurn(room, player) {
     }
 
     const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
-    let nextIndex = (currentIndex + 1) % room.players.length;
-
-    while (nextIndex !== currentIndex && (!room.players[nextIndex].ws || room.players[nextIndex].ws.readyState !== WebSocket.OPEN)) {
-        nextIndex = (nextIndex + 1) % room.players.length;
-    }
-
+    const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
     room.gameState.currentTurn = room.players[nextIndex].id;
     player.cardsPlayedThisTurn = [];
 
@@ -441,14 +420,11 @@ function endTurn(room, player) {
         type: 'notification',
         message: `Ahora es el turno de ${room.players[nextIndex].name}`,
         isError: false
-    });
-
-    broadcastGameState(room);
+    }, { includeGameState: true });
 }
 
 function checkGameStatus(room) {
     const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
-
     if (allPlayersEmpty && room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
             type: 'game_over',
@@ -457,126 +433,15 @@ function checkGameStatus(room) {
         });
 
         setTimeout(() => {
-            const roomId = Array.from(rooms.entries()).find(([id, r]) => r === room)[0];
+            const roomId = reverseRoomMap.get(room);
             rooms.delete(roomId);
             boardHistory.delete(roomId);
+            reverseRoomMap.delete(room);
         }, 30000);
     }
 }
 
-function updateBoardHistory(room, position, board) {
-    const roomId = Array.from(rooms.entries()).find(([id, r]) => r === room)[0];
-    const history = boardHistory.get(roomId);
-    let currentValue;
-
-    if (position === 'asc1') currentValue = board.ascending[0];
-    else if (position === 'asc2') currentValue = board.ascending[1];
-    else if (position === 'desc1') currentValue = board.descending[0];
-    else if (position === 'desc2') currentValue = board.descending[1];
-    else return;
-
-    const lastValue = getLastHistoryValue(history, position);
-    if (currentValue !== lastValue) {
-        if (position === 'asc1') history.ascending1.push(currentValue);
-        else if (position === 'asc2') history.ascending2.push(currentValue);
-        else if (position === 'desc1') history.descending1.push(currentValue);
-        else if (position === 'desc2') history.descending2.push(currentValue);
-    }
-}
-
-function findPreviousValue(room, position, currentValue) {
-    const roomId = Array.from(rooms.entries()).find(([id, r]) => r === room)[0];
-    const history = boardHistory.get(roomId);
-
-    switch (position) {
-        case 'asc1':
-            const asc1Index = history.ascending1.lastIndexOf(currentValue);
-            return asc1Index > 0 ? history.ascending1[asc1Index - 1] : null;
-        case 'asc2':
-            const asc2Index = history.ascending2.lastIndexOf(currentValue);
-            return asc2Index > 0 ? history.ascending2[asc2Index - 1] : null;
-        case 'desc1':
-            const desc1Index = history.descending1.lastIndexOf(currentValue);
-            return desc1Index > 0 ? history.descending1[desc1Index - 1] : null;
-        case 'desc2':
-            const desc2Index = history.descending2.lastIndexOf(currentValue);
-            return desc2Index > 0 ? history.descending2[desc2Index - 1] : null;
-        default:
-            return null;
-    }
-}
-
-function getLastHistoryValue(history, position) {
-    switch (position) {
-        case 'asc1': return history.ascending1[history.ascending1.length - 1];
-        case 'asc2': return history.ascending2[history.ascending2.length - 1];
-        case 'desc1': return history.descending1[history.descending1.length - 1];
-        case 'desc2': return history.descending2[history.descending2.length - 1];
-        default: return null;
-    }
-}
-
-function sendError(player, message) {
-    player.ws.send(JSON.stringify({
-        type: 'notification',
-        message: message,
-        isError: true
-    }));
-}
-
-function broadcastToRoom(room, message) {
-    room.players.forEach(player => {
-        if (player.ws?.readyState === WebSocket.OPEN) {
-            try {
-                player.ws.send(JSON.stringify(message));
-            } catch (error) {
-                console.error(`Error enviando mensaje a ${player.name}:`, error);
-            }
-        }
-    });
-}
-
-function sendGameState(room, player) {
-    if (player.ws?.readyState === WebSocket.OPEN) {
-        player.ws.send(JSON.stringify({
-            type: 'game_state',
-            state: {
-                board: room.gameState.board,
-                currentTurn: room.gameState.currentTurn,
-                yourCards: player.cards,
-                players: room.players.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    cardCount: p.cards.length
-                })),
-                remainingDeck: room.gameState.deck.length,
-                isYourTurn: room.gameState.currentTurn === player.id
-            }
-        }));
-    }
-}
-
-function broadcastGameState(room) {
-    room.players.forEach(player => {
-        sendGameState(room, player);
-    });
-}
-
-function broadcastRoomUpdate(room) {
-    broadcastToRoom(room, {
-        type: 'room_update',
-        players: room.players.map(p => ({
-            id: p.id,
-            name: p.name,
-            isHost: p.isHost,
-            cardCount: p.cards.length,
-            connected: p.ws !== null
-        })),
-        gameStarted: room.gameState.gameStarted
-    });
-}
-
-const PORT = process.env.PORT || 3000;
+// Iniciar servidor
 server.listen(PORT, () => {
     console.log(`🚀 Servidor iniciado en puerto ${PORT}`);
     console.log(`🌍 Orígenes permitidos: ${allowedOrigins.join(', ')}`);
