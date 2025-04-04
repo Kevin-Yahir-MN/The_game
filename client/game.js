@@ -79,15 +79,24 @@ class Card {
         }
         // Resaltado para cartas jugadas este turno
         else if (this.isPlayedThisTurn) {
-            if (this.isMostRecent) {
-                // Resaltado azul más intenso para la más reciente
-                ctx.fillStyle = 'rgba(173, 216, 230, 0.7)';
-                ctx.fill();
+            const isCurrentPlayerTurn = gameState.currentTurn === currentPlayer.id;
+
+            if (isCurrentPlayerTurn) {
+                // Jugador en turno ve azul
+                if (this.isMostRecent) {
+                    ctx.fillStyle = 'rgba(173, 216, 230, 0.7)'; // Azul claro
+                } else {
+                    ctx.fillStyle = 'rgba(160, 192, 224, 0.5)'; // Azul medio
+                }
             } else {
-                // Resaltado azul normal para otras jugadas este turno
-                ctx.fillStyle = 'rgba(160, 192, 224, 0.5)';
-                ctx.fill();
+                // Otros jugadores ven rojo
+                if (this.isMostRecent) {
+                    ctx.fillStyle = 'rgba(255, 200, 200, 0.7)'; // Rojo claro
+                } else {
+                    ctx.fillStyle = 'rgba(255, 150, 150, 0.5)'; // Rojo medio
+                }
             }
+            ctx.fill();
         }
 
         // Borde
