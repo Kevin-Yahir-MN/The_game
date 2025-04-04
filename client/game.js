@@ -5,14 +5,25 @@ const WS_URL = 'wss://the-game-2xks.onrender.com';
 const endTurnButton = document.getElementById('endTurnBtn');
 const undoButton = document.getElementById('undoBtn');
 
+// Asegurar que el canvas tenga el tamaño correcto
+function resizeCanvas() {
+    const container = document.getElementById('gameContainer');
+    canvas.width = container.clientWidth - 40; // Margen para dispositivos móviles
+    canvas.height = Math.min(window.innerHeight - 200, 600); // Altura máxima 600px
+
+    // Recalcular posición del tablero
+    BOARD_POSITION.x = canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2;
+    BOARD_POSITION.y = canvas.height / 2 - CARD_HEIGHT / 2;
+}
+
 // Constantes de diseño
 const CARD_WIDTH = 80;
 const CARD_HEIGHT = 120;
 const COLUMN_SPACING = 60;
 const CARD_SPACING = 10;
-const BOARD_POSITION = {
-    x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
-    y: canvas.height / 2 - CARD_HEIGHT / 2
+let BOARD_POSITION = {
+    x: 0,
+    y: 0
 };
 
 // Estado del juego
@@ -79,13 +90,25 @@ let socket;
 function connectWebSocket() {
     socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
 
-    socket.onopen = () => socket.send(JSON.stringify({ type: 'get_game_state' }));
-    socket.onclose = () => setTimeout(connectWebSocket, 2000);
-    socket.onerror = console.error;
+    socket.onopen = () => {
+        console.log('Conexión WebSocket establecida');
+        socket.send(JSON.stringify({ type: 'get_game_state' }));
+    };
+
+    socket.onclose = () => {
+        console.log('Conexión WebSocket cerrada. Reconectando...');
+        setTimeout(connectWebSocket, 2000);
+    };
+
+    socket.onerror = (error) => {
+        console.error('Error en WebSocket:', error);
+    };
 
     socket.onmessage = (event) => {
         try {
             const message = JSON.parse(event.data);
+            console.log('Mensaje recibido:', message.type);
+
             switch (message.type) {
                 case 'game_state':
                     updateGameState(message.state);
@@ -113,6 +136,8 @@ function connectWebSocket() {
                 case 'move_undone':
                     handleUndoMove(message);
                     break;
+                default:
+                    console.warn('Tipo de mensaje desconocido:', message.type);
             }
         } catch (error) {
             console.error('Error procesando mensaje:', error);
@@ -122,6 +147,7 @@ function connectWebSocket() {
 
 // Funciones de utilidad
 function showNotification(message, isError = false) {
+    console.log(`Notificación: ${message}`, isError ? '(Error)' : '');
     const notification = document.createElement('div');
     notification.className = `notification ${isError ? 'error' : ''}`;
     notification.textContent = message;
@@ -172,7 +198,12 @@ function animateInvalidCard(card) {
 
 // Actualización del estado
 function updateGameState(newState) {
-    if (!newState) return;
+    if (!newState) {
+        console.warn('Intento de actualizar estado con datos nulos');
+        return;
+    }
+
+    console.log('Actualizando estado del juego:', newState);
 
     gameState.board = newState.board || gameState.board;
     gameState.currentTurn = newState.currentTurn || gameState.currentTurn;
@@ -214,7 +245,6 @@ function handleOpponentCardPlayed(message) {
 
 function handleUndoMove(message) {
     if (message.playerId !== currentPlayer.id) {
-        // Actualizar el tablero para otros jugadores
         if (message.position.includes('asc')) {
             const idx = message.position === 'asc1' ? 0 : 1;
             gameState.board.ascending[idx] = message.previousValue;
@@ -223,7 +253,6 @@ function handleUndoMove(message) {
             gameState.board.descending[idx] = message.previousValue;
         }
 
-        // Actualizar contador
         const moveIndex = gameState.cardsPlayedThisTurn.findIndex(
             card => card.playerId === message.playerId &&
                 card.value === message.cardValue &&
@@ -238,6 +267,8 @@ function handleUndoMove(message) {
 }
 
 function updatePlayerCards(cards) {
+    console.log('Actualizando cartas del jugador:', cards);
+
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
     const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
     const startY = canvas.height - CARD_HEIGHT - 20;
@@ -481,7 +512,12 @@ function drawPlayerCards() {
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 20px Arial';
     ctx.fillText('Tu mano', canvas.width / 2, canvas.height - CARD_HEIGHT - 50);
-    gameState.yourCards.forEach(card => card?.draw());
+
+    if (gameState.yourCards && gameState.yourCards.length > 0) {
+        gameState.yourCards.forEach(card => {
+            if (card) card.draw();
+        });
+    }
 }
 
 // Bucle principal
@@ -498,18 +534,36 @@ function gameLoop() {
 
 // Inicialización
 function initGame() {
-    if (!canvas || !ctx || !currentPlayer.id || !roomId) {
+    console.log('Inicializando juego...');
+
+    if (!canvas || !ctx) {
+        console.error('Canvas no disponible');
+        alert('Error: No se pudo acceder al canvas del juego.');
+        return;
+    }
+
+    if (!currentPlayer.id || !roomId) {
+        console.error('Falta información de jugador o sala');
         alert('Error: No se pudo inicializar el juego. Vuelve a la sala.');
         return;
     }
 
-    canvas.width = 800;
-    canvas.height = 600;
+    // Configurar tamaño del canvas
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Configurar eventos
     endTurnButton.addEventListener('click', endTurn);
     undoButton.addEventListener('click', undoLastMove);
     canvas.addEventListener('click', handleCanvasClick);
+
+    // Iniciar conexión y juego
     connectWebSocket();
     gameLoop();
 }
 
-document.addEventListener('DOMContentLoaded', initGame);
+// Iniciar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM cargado, iniciando juego...');
+    initGame();
+});
