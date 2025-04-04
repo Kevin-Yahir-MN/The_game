@@ -5,37 +5,88 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Partida - The Game</title>
-    <link rel="stylesheet" href="styles.css">
     <style>
-        /* Estilos anteriores... */
-
-        .game-instructions ul {
+        body {
             margin: 0;
-            padding-left: 20px;
-            text-align: left;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            overflow-x: hidden;
         }
 
-        .game-instructions li {
-            margin-bottom: 8px;
-            line-height: 1.4;
+        #gameContainer {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            background-color: #228B22;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            touch-action: none;
+        }
+
+        #gameControls {
             display: flex;
-            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
         }
 
-        .color-sample {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border-radius: 4px;
-            margin-right: 10px;
-            border: 1px solid #ccc;
+        .game-button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: white;
+            min-width: 180px;
+        }
+
+        #endTurnBtn {
+            background-color: #e74c3c;
+        }
+
+        #endTurnBtn:hover:not(:disabled) {
+            background-color: #c0392b;
+        }
+
+        #returnCardBtn {
+            background-color: #3498db;
+        }
+
+        #returnCardBtn:hover:not(:disabled) {
+            background-color: #2980b9;
+        }
+
+        .game-button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .game-instructions {
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            margin: 20px auto;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+            border: 1px solid #ddd;
+            max-width: 800px;
         }
     </style>
 </head>
 
 <body>
     <div id="gameContainer">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <canvas id="gameCanvas"></canvas>
 
         <div id="gameControls">
             <button id="returnCardBtn" class="game-button">Regresar Carta a Mano</button>
@@ -43,22 +94,12 @@
         </div>
 
         <div class="game-instructions">
-            <h3>Instrucciones y Colores</h3>
+            <h3>Instrucciones</h3>
+            <p>Selecciona cartas de tu mano y colócalas en las pilas correspondientes:</p>
             <ul>
-                <li><span class="color-sample" style="background-color: rgba(255, 255, 153, 0.7);"></span> Carta
-                    seleccionada</li>
-                <li><span class="color-sample" style="background-color: rgba(100, 180, 240, 0.5);"></span> Tus cartas
-                    jugadas este turno</li>
-                <li><span class="color-sample" style="background-color: rgba(100, 200, 255, 0.7);"></span> Tu última
-                    carta jugada</li>
-                <li><span class="color-sample" style="background-color: rgba(220, 120, 120, 0.5);"></span> Cartas
-                    jugadas por el jugador en turno</li>
-                <li><span class="color-sample" style="background-color: rgba(255, 150, 150, 0.7);"></span> Última carta
-                    del jugador en turno</li>
-                <li>Haz clic en una carta para seleccionarla y luego en una columna para jugarla</li>
-                <li>Usa "Regresar Carta a Mano" para devolver cartas jugadas este turno</li>
-                <li>Debes jugar al menos 2 cartas por turno (1 si no quedan en la baraja)</li>
-                <li>Haz clic en "Terminar Turno" cuando hayas terminado</li>
+                <li>Pilas ↑: Deben aumentar de valor (o ser exactamente 10 menos)</li>
+                <li>Pilas ↓: Deben disminuir de valor (o ser exactamente 10 más)</li>
+                <li>Juega al menos 2 cartas por turno (1 si no quedan en la baraja)</li>
             </ul>
         </div>
     </div>
