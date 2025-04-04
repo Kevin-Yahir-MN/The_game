@@ -3,6 +3,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const WS_URL = 'wss://the-game-2xks.onrender.com';
 const endTurnButton = document.getElementById('endTurnBtn');
+const undoButton = document.getElementById('undoBtn');
 
 // Constantes de diseño
 const CARD_WIDTH = 80;
@@ -29,6 +30,7 @@ let gameState = {
     currentTurn: null,
     remainingDeck: 98,
     cardsPlayedThisTurn: [],
+    moveHistory: [],
     animatingCards: []
 };
 
@@ -107,6 +109,9 @@ function connectWebSocket() {
                     if (message.playerId === currentPlayer.id && selectedCard) {
                         animateInvalidCard(selectedCard);
                     }
+                    break;
+                case 'move_undone':
+                    handleUndoMove(message);
                     break;
             }
         } catch (error) {
@@ -207,6 +212,31 @@ function handleOpponentCardPlayed(message) {
     }
 }
 
+function handleUndoMove(message) {
+    if (message.playerId !== currentPlayer.id) {
+        // Actualizar el tablero para otros jugadores
+        if (message.position.includes('asc')) {
+            const idx = message.position === 'asc1' ? 0 : 1;
+            gameState.board.ascending[idx] = message.previousValue;
+        } else {
+            const idx = message.position === 'desc1' ? 0 : 1;
+            gameState.board.descending[idx] = message.previousValue;
+        }
+
+        // Actualizar contador
+        const moveIndex = gameState.cardsPlayedThisTurn.findIndex(
+            card => card.playerId === message.playerId &&
+                card.value === message.cardValue &&
+                card.position === message.position
+        );
+        if (moveIndex !== -1) {
+            gameState.cardsPlayedThisTurn.splice(moveIndex, 1);
+        }
+
+        showNotification(`${message.playerName} deshizo una jugada`);
+    }
+}
+
 function updatePlayerCards(cards) {
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
     const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
@@ -283,20 +313,31 @@ function playCard(cardValue, position) {
         return;
     }
 
-    // Actualizar contador local
+    // Guardar en el historial
+    const previousValue = position.includes('asc')
+        ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
+        : gameState.board.descending[position === 'desc1' ? 0 : 1];
+
+    gameState.moveHistory.push({
+        cardValue,
+        position,
+        previousValue
+    });
+
+    // Actualizar contador
     gameState.cardsPlayedThisTurn.push({
         value: cardValue,
         position,
         playerId: currentPlayer.id
     });
 
-    // Eliminar carta de la mano localmente
+    // Eliminar carta de la mano
     const cardIndex = gameState.yourCards.findIndex(c => c.value === cardValue);
     if (cardIndex !== -1) {
         gameState.yourCards.splice(cardIndex, 1);
     }
 
-    // Actualizar tablero localmente
+    // Actualizar tablero
     if (position.includes('asc')) {
         const idx = position === 'asc1' ? 0 : 1;
         gameState.board.ascending[idx] = cardValue;
@@ -316,6 +357,60 @@ function playCard(cardValue, position) {
     selectedCard = null;
 }
 
+function undoLastMove() {
+    if (gameState.currentTurn !== currentPlayer.id) {
+        return showNotification('Solo puedes deshacer en tu turno', true);
+    }
+
+    if (gameState.moveHistory.length === 0) {
+        return showNotification('No hay jugadas para deshacer', true);
+    }
+
+    const lastMove = gameState.moveHistory.pop();
+    const { cardValue, position, previousValue } = lastMove;
+
+    // Devolver carta a la mano
+    gameState.yourCards.push(new Card(
+        cardValue,
+        0, // Posición temporal
+        0, // Se actualizará en updatePlayerCards
+        true
+    ));
+
+    // Restaurar valor anterior en el tablero
+    if (position.includes('asc')) {
+        const idx = position === 'asc1' ? 0 : 1;
+        gameState.board.ascending[idx] = previousValue;
+    } else {
+        const idx = position === 'desc1' ? 0 : 1;
+        gameState.board.descending[idx] = previousValue;
+    }
+
+    // Actualizar contador
+    const moveIndex = gameState.cardsPlayedThisTurn.findIndex(
+        card => card.playerId === currentPlayer.id &&
+            card.value === cardValue &&
+            card.position === position
+    );
+    if (moveIndex !== -1) {
+        gameState.cardsPlayedThisTurn.splice(moveIndex, 1);
+    }
+
+    // Actualizar mano
+    updatePlayerCards(gameState.yourCards.map(card => card.value));
+
+    // Notificar al servidor
+    socket.send(JSON.stringify({
+        type: 'undo_move',
+        playerId: currentPlayer.id,
+        cardValue,
+        position,
+        previousValue
+    }));
+
+    showNotification('Última jugada deshecha', false);
+}
+
 function endTurn() {
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
     const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
@@ -331,7 +426,8 @@ function endTurn() {
         playerId: currentPlayer.id
     }));
 
-    // No limpiar cardsPlayedThisTurn aquí, esperar confirmación del servidor
+    // Limpiar historial al terminar turno
+    gameState.moveHistory = [];
 }
 
 // Renderizado del juego
@@ -344,6 +440,9 @@ function drawGameInfo() {
     ).length;
 
     const cardsNeeded = Math.max(0, minCardsRequired - currentPlayerCardsPlayed);
+
+    // Actualizar estado del botón Deshacer
+    undoButton.disabled = gameState.moveHistory.length === 0 || gameState.currentTurn !== currentPlayer.id;
 
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 24px Arial';
@@ -407,6 +506,7 @@ function initGame() {
     canvas.width = 800;
     canvas.height = 600;
     endTurnButton.addEventListener('click', endTurn);
+    undoButton.addEventListener('click', undoLastMove);
     canvas.addEventListener('click', handleCanvasClick);
     connectWebSocket();
     gameLoop();
