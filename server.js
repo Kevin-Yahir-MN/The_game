@@ -336,18 +336,26 @@ function startGame(room) {
 
 function handlePlayCard(room, player, msg) {
     if (!validPositions.includes(msg.position)) {
-        return safeSend(player.ws, {
+        safeSend(player.ws, {
             type: 'notification',
             message: 'Posición inválida',
             isError: true
         });
+        return safeSend(player.ws, {
+            type: 'invalid_move',
+            playerId: player.id
+        });
     }
 
     if (!player.cards.includes(msg.cardValue)) {
-        return safeSend(player.ws, {
+        safeSend(player.ws, {
             type: 'notification',
             message: 'No tienes esa carta',
             isError: true
+        });
+        return safeSend(player.ws, {
+            type: 'invalid_move',
+            playerId: player.id
         });
     }
 
@@ -363,13 +371,18 @@ function handlePlayCard(room, player, msg) {
         (msg.cardValue < targetValue || msg.cardValue === targetValue + 10);
 
     if (!isValid) {
-        return safeSend(player.ws, {
+        safeSend(player.ws, {
             type: 'notification',
             message: `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'} que ${targetValue} o igual a ${msg.position.includes('asc') ? targetValue - 10 : targetValue + 10}`,
             isError: true
         });
+        return safeSend(player.ws, {
+            type: 'invalid_move',
+            playerId: player.id
+        });
     }
 
+    // Si llegamos aquí, el movimiento es válido
     updateBoardHistory(room, msg.position, msg.cardValue);
 
     if (msg.position.includes('asc')) {
@@ -384,7 +397,7 @@ function handlePlayCard(room, player, msg) {
         position: msg.position
     });
 
-    // Nuevo: Notificar a todos sobre la carta jugada
+    // Notificar a todos sobre la carta jugada
     broadcastToRoom(room, {
         type: 'card_played',
         cardValue: msg.cardValue,
@@ -393,6 +406,7 @@ function handlePlayCard(room, player, msg) {
         playerName: player.name
     });
 
+    // Actualizar estado del juego para todos
     checkGameStatus(room);
     broadcastGameState(room);
 }

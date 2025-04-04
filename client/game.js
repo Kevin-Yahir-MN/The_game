@@ -29,7 +29,8 @@ let gameState = {
     currentTurn: null,
     remainingDeck: 98,
     cardsPlayedThisTurn: [],
-    lastPlayedCards: [] // Nuevo: para animaciones de cartas jugadas
+    lastPlayedCards: [],
+    invalidCards: [] // Nuevo: para animaciones de cartas inválidas
 };
 
 // Clase Card optimizada
@@ -42,10 +43,14 @@ class Card {
         this.height = CARD_HEIGHT;
         this.isPlayable = isPlayable;
         this.radius = 5;
+        this.shakeOffset = 0; // Para animación de invalidación
     }
 
     draw() {
         ctx.save();
+        // Aplicar desplazamiento para animación de invalidación
+        ctx.translate(this.shakeOffset, 0);
+
         // Dibujar fondo de la carta
         ctx.beginPath();
         ctx.roundRect(this.x, this.y, this.width, this.height, this.radius);
@@ -98,7 +103,6 @@ function connectWebSocket() {
                     showNotification(message.message, message.isError);
                     break;
                 case 'card_played':
-                    // Nuevo: Manejar cartas jugadas por otros jugadores
                     if (message.playerId !== currentPlayer.id) {
                         gameState.lastPlayedCards.push({
                             value: message.cardValue,
@@ -107,9 +111,15 @@ function connectWebSocket() {
                             y: canvas.height / 2,
                             targetX: getColumnPosition(message.position).x,
                             targetY: BOARD_POSITION.y,
-                            alpha: 1.0
+                            alpha: 1.0,
+                            shouldRemove: true
                         });
                         showNotification(`${message.playerName} jugó un ${message.cardValue}`);
+                    }
+                    break;
+                case 'invalid_move':
+                    if (message.playerId === currentPlayer.id && selectedCard) {
+                        animateInvalidCard(selectedCard);
                     }
                     break;
             }
@@ -138,7 +148,6 @@ function isValidMove(cardValue, position) {
         : (cardValue < target || cardValue === target + 10);
 }
 
-// Nueva función para obtener posición de columna
 function getColumnPosition(position) {
     const index = ['asc1', 'asc2', 'desc1', 'desc2'].indexOf(position);
     return {
@@ -147,12 +156,46 @@ function getColumnPosition(position) {
     };
 }
 
+// Animación para carta inválida
+function animateInvalidCard(card) {
+    if (!card) return;
+
+    const originalX = card.x;
+    let shakeDirection = 1;
+    const shakeAmount = 5;
+    const shakeDuration = 300; // ms
+    const startTime = Date.now();
+
+    function shake() {
+        const elapsed = Date.now() - startTime;
+        const progress = elapsed / shakeDuration;
+
+        if (progress >= 1) {
+            card.shakeOffset = 0;
+            return;
+        }
+
+        // Oscilación suave
+        card.shakeOffset = Math.sin(progress * Math.PI * 8) * shakeAmount * (1 - progress);
+        requestAnimationFrame(shake);
+    }
+
+    shake();
+}
+
 // Actualización del estado
 function updateGameState(newState) {
     if (!newState?.board) return;
 
-    // Verificar si hay nuevas cartas jugadas
-    if (newState.lastPlayedCards && newState.lastPlayedCards.length > 0) {
+    // Actualizar el tablero primero
+    gameState.board = newState.board || gameState.board;
+    gameState.currentTurn = newState.currentTurn || gameState.currentTurn;
+    gameState.remainingDeck = newState.remainingDeck || gameState.remainingDeck;
+    gameState.players = newState.players || gameState.players;
+    gameState.cardsPlayedThisTurn = newState.cardsPlayedThisTurn || gameState.cardsPlayedThisTurn;
+
+    // Manejar cartas jugadas por otros jugadores
+    if (newState.lastPlayedCards) {
         newState.lastPlayedCards.forEach(card => {
             if (!gameState.lastPlayedCards.some(c =>
                 c.value === card.value && c.position === card.position)) {
@@ -163,18 +206,20 @@ function updateGameState(newState) {
                     y: canvas.height / 2,
                     targetX: getColumnPosition(card.position).x,
                     targetY: BOARD_POSITION.y,
-                    alpha: 1.0
+                    alpha: 1.0,
+                    shouldRemove: true
                 });
             }
         });
     }
 
-    gameState = { ...gameState, ...newState };
-    updatePlayerCards(gameState.yourCards);
+    // Actualizar cartas del jugador
+    if (newState.yourCards) {
+        updatePlayerCards(newState.yourCards);
+    }
 
     if (gameState.currentTurn !== currentPlayer.id) {
         selectedCard = null;
-        gameState.cardsPlayedThisTurn = [];
     }
 }
 
@@ -224,7 +269,10 @@ function handleCanvasClick(event) {
     const clickedCard = gameState.yourCards.find(card => card.contains(x, y));
     if (clickedCard) {
         selectedCard = clickedCard.isPlayable ? clickedCard : null;
-        if (!clickedCard.isPlayable) showNotification('No puedes jugar esta carta ahora', true);
+        if (!clickedCard.isPlayable) {
+            showNotification('No puedes jugar esta carta ahora', true);
+            animateInvalidCard(clickedCard);
+        }
     }
 }
 
@@ -243,8 +291,13 @@ function getClickedColumn(x, y) {
 }
 
 function playCard(cardValue, position) {
-    if (!selectedCard || !isValidMove(cardValue, position)) {
-        return showNotification('Movimiento inválido', true);
+    if (!selectedCard) return;
+
+    // Verificar movimiento válido localmente primero
+    if (!isValidMove(cardValue, position)) {
+        showNotification('Movimiento inválido', true);
+        animateInvalidCard(selectedCard);
+        return;
     }
 
     // Añadir visualización temporal local
@@ -255,12 +308,11 @@ function playCard(cardValue, position) {
         y: selectedCard.y,
         targetX: getColumnPosition(position).x,
         targetY: BOARD_POSITION.y,
-        alpha: 1.0
+        alpha: 1.0,
+        shouldRemove: false // No eliminar hasta confirmación del servidor
     });
 
-    // Eliminar la carta de la mano localmente
-    gameState.yourCards = gameState.yourCards.filter(card => card.value !== cardValue);
-
+    // Enviar al servidor
     socket.send(JSON.stringify({
         type: 'play_card',
         playerId: currentPlayer.id,
@@ -332,10 +384,9 @@ function drawPlayerCards() {
     gameState.yourCards.forEach(card => card?.draw());
 }
 
-// Nueva función para dibujar cartas jugadas recientemente
 function drawLastPlayedCards() {
     ctx.save();
-    gameState.lastPlayedCards.forEach((card, index) => {
+    gameState.lastPlayedCards.forEach((card, index, array) => {
         ctx.globalAlpha = card.alpha;
         new Card(
             card.value,
@@ -351,7 +402,12 @@ function drawLastPlayedCards() {
 
         // Eliminar cuando la animación termina
         if (card.alpha <= 0) {
-            gameState.lastPlayedCards.splice(index, 1);
+            array.splice(index, 1);
+            // Si es una carta del jugador actual y no debería eliminarse (por invalidación)
+            if (!card.shouldRemove) {
+                // Restaurar la carta a la mano
+                updatePlayerCards([...gameState.yourCards, card.value]);
+            }
         }
     });
     ctx.restore();
@@ -366,7 +422,7 @@ function gameLoop() {
     drawGameInfo();
     drawBoard();
     drawPlayerCards();
-    drawLastPlayedCards(); // Nueva función para animaciones
+    drawLastPlayedCards();
     requestAnimationFrame(gameLoop);
 }
 
