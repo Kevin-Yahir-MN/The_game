@@ -68,41 +68,34 @@ class Card {
         ctx.quadraticCurveTo(this.x, this.y, this.x + this.radius, this.y);
         ctx.closePath();
 
-        // Fondo de la carta
-        let fillColor = '#FFFFFF';
+        // Fondo blanco sólido para todas las cartas
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
+
+        // Resaltado para carta seleccionada (amarillo semitransparente)
         if (this === selectedCard) {
-            fillColor = '#FFFF99'; // Amarillo para seleccionada
-        } else if (this.isPlayedThisTurn) {
+            ctx.fillStyle = 'rgba(255, 255, 153, 0.7)';
+            ctx.fill();
+        }
+        // Resaltado para cartas jugadas este turno
+        else if (this.isPlayedThisTurn) {
             if (this.isMostRecent) {
-                // Degradado para la carta más reciente
-                const gradient = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y + this.height);
-                gradient.addColorStop(0, '#ADD8E6');
-                gradient.addColorStop(1, '#89CFF0');
-                ctx.fillStyle = gradient;
+                // Resaltado azul más intenso para la más reciente
+                ctx.fillStyle = 'rgba(173, 216, 230, 0.7)';
                 ctx.fill();
-                ctx.restore();
-                return;
             } else {
-                // Degradado para cartas jugadas este turno
-                const gradient = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y + this.height);
-                gradient.addColorStop(0, '#A0C0E0');
-                gradient.addColorStop(1, '#7DAFD2');
-                ctx.fillStyle = gradient;
+                // Resaltado azul normal para otras jugadas este turno
+                ctx.fillStyle = 'rgba(160, 192, 224, 0.5)';
                 ctx.fill();
-                ctx.restore();
-                return;
             }
         }
-
-        ctx.fillStyle = fillColor;
-        ctx.fill();
 
         // Borde
         ctx.strokeStyle = this.isPlayable ? '#00FF00' : '#000000';
         ctx.lineWidth = this.isPlayable ? 3 : 1;
         ctx.stroke();
 
-        // Valor de la carta
+        // Valor de la carta (siempre negro sobre los colores)
         ctx.fillStyle = '#000000';
         ctx.font = 'bold 24px Arial';
         ctx.textAlign = 'center';
