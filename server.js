@@ -390,29 +390,24 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
-    // Guardar valor anterior para posible deshacer
     const previousValue = msg.position.includes('asc') ?
         board.ascending[targetIdx] :
         board.descending[targetIdx];
 
-    // Actualizar el tablero
     if (msg.position.includes('asc')) {
         board.ascending[targetIdx] = msg.cardValue;
     } else {
         board.descending[targetIdx] = msg.cardValue;
     }
 
-    // Eliminar carta de la mano del jugador
     player.cards.splice(player.cards.indexOf(msg.cardValue), 1);
 
-    // Añadir al contador de cartas jugadas este turno
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
         position: msg.position,
-        previousValue // Guardar valor anterior
+        previousValue
     });
 
-    // Notificar a todos los jugadores
     broadcastToRoom(room, {
         type: 'card_played',
         cardValue: msg.cardValue,
@@ -422,16 +417,12 @@ function handlePlayCard(room, player, msg) {
         cardsPlayedCount: player.cardsPlayedThisTurn.length
     });
 
-    // Actualizar historial del tablero
     updateBoardHistory(room, msg.position, msg.cardValue);
-
-    // Enviar estado actualizado a todos
     broadcastGameState(room);
     checkGameStatus(room);
 }
 
 function handleUndoMove(room, player, msg) {
-    // Verificar que la última jugada fue de este jugador
     if (player.cardsPlayedThisTurn.length === 0) {
         return safeSend(player.ws, {
             type: 'notification',
@@ -440,7 +431,6 @@ function handleUndoMove(room, player, msg) {
         });
     }
 
-    // Buscar la última jugada del jugador
     const lastMoveIndex = player.cardsPlayedThisTurn.findIndex(
         move => move.value === msg.cardValue &&
             move.position === msg.position
@@ -456,10 +446,8 @@ function handleUndoMove(room, player, msg) {
 
     const lastMove = player.cardsPlayedThisTurn[lastMoveIndex];
 
-    // Devolver la carta a la mano del jugador
     player.cards.push(msg.cardValue);
 
-    // Restaurar el valor anterior en el tablero
     if (msg.position.includes('asc')) {
         const idx = msg.position === 'asc1' ? 0 : 1;
         room.gameState.board.ascending[idx] = lastMove.previousValue;
@@ -468,10 +456,8 @@ function handleUndoMove(room, player, msg) {
         room.gameState.board.descending[idx] = lastMove.previousValue;
     }
 
-    // Eliminar del contador de cartas jugadas
     player.cardsPlayedThisTurn.splice(lastMoveIndex, 1);
 
-    // Notificar a todos los jugadores
     broadcastToRoom(room, {
         type: 'move_undone',
         playerId: player.id,
@@ -481,7 +467,6 @@ function handleUndoMove(room, player, msg) {
         previousValue: lastMove.previousValue
     });
 
-    // Enviar estado actualizado
     broadcastGameState(room);
 }
 
@@ -517,14 +502,17 @@ function endTurn(room, player) {
     const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
     room.gameState.currentTurn = room.players[nextIndex].id;
 
-    // Reiniciar contador de cartas jugadas
     player.cardsPlayedThisTurn = [];
 
+    broadcastGameState(room);
+
     broadcastToRoom(room, {
-        type: 'notification',
-        message: `Ahora es el turno de ${room.players[nextIndex].name}`,
-        isError: false
-    }, { includeGameState: true });
+        type: 'turn_changed',
+        newTurn: room.players[nextIndex].id,
+        previousPlayer: player.id,
+        cardsPlayedThisTurn: 0,
+        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+    });
 }
 
 function broadcastGameState(room) {

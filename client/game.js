@@ -108,6 +108,9 @@ function connectWebSocket() {
                         animateInvalidCard(selectedCard);
                     }
                     break;
+                case 'turn_changed':
+                    handleTurnChanged(message);
+                    break;
             }
         } catch (error) {
             console.error('Error procesando mensaje:', error);
@@ -163,6 +166,18 @@ function animateInvalidCard(card) {
     }
 
     shake();
+}
+
+// Nueva función para manejar cambio de turno
+function handleTurnChanged(message) {
+    gameState.currentTurn = message.newTurn;
+
+    // Filtrar solo las cartas del jugador actual
+    gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
+        card => card.playerId !== currentPlayer.id
+    );
+
+    showNotification(`Ahora es el turno de ${gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador'}`);
 }
 
 // Actualización del estado
@@ -330,8 +345,6 @@ function endTurn() {
         type: 'end_turn',
         playerId: currentPlayer.id
     }));
-
-    // No limpiar cardsPlayedThisTurn aquí, esperar confirmación del servidor
 }
 
 // Renderizado del juego
@@ -339,9 +352,10 @@ function drawGameInfo() {
     const currentTurnPlayer = gameState.players.find(p => p.id === gameState.currentTurn);
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
 
-    const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
-        card => card.playerId === gameState.currentTurn
-    ).length;
+    // Contar solo las cartas del jugador actual si es nuestro turno
+    const currentPlayerCardsPlayed = gameState.currentTurn === currentPlayer.id
+        ? gameState.cardsPlayedThisTurn.filter(card => card.playerId === currentPlayer.id).length
+        : 0;
 
     const cardsNeeded = Math.max(0, minCardsRequired - currentPlayerCardsPlayed);
 
@@ -351,12 +365,16 @@ function drawGameInfo() {
 
     ctx.fillText(`Turno: ${currentTurnPlayer?.name || 'Esperando...'}`, 20, 20);
     ctx.fillText(`Baraja: ${gameState.remainingDeck}`, 20, 50);
-    ctx.fillStyle = currentPlayerCardsPlayed >= minCardsRequired ? '#00FF00' : '#FFFF00';
-    ctx.fillText(`Cartas: ${currentPlayerCardsPlayed}/${minCardsRequired}`, 20, 80);
 
-    if (cardsNeeded > 0 && gameState.currentTurn === currentPlayer.id) {
-        ctx.fillStyle = '#FF0000';
-        ctx.fillText(`Faltan ${cardsNeeded}`, 20, 110);
+    // Mostrar contador solo si es nuestro turno
+    if (gameState.currentTurn === currentPlayer.id) {
+        ctx.fillStyle = currentPlayerCardsPlayed >= minCardsRequired ? '#00FF00' : '#FFFF00';
+        ctx.fillText(`Cartas: ${currentPlayerCardsPlayed}/${minCardsRequired}`, 20, 80);
+
+        if (cardsNeeded > 0) {
+            ctx.fillStyle = '#FF0000';
+            ctx.fillText(`Faltan ${cardsNeeded}`, 20, 110);
+        }
     }
 }
 
