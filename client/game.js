@@ -49,6 +49,7 @@ class Card {
         this.isPlayable = isPlayable;
         this.isPlayedThisTurn = false;
         this.isMostRecent = false;
+        this.playedByCurrentPlayer = false;
         this.radius = 5;
     }
 
@@ -81,22 +82,24 @@ class Card {
         else if (this.isPlayedThisTurn) {
             const isCurrentPlayerTurn = gameState.currentTurn === currentPlayer.id;
 
-            if (isCurrentPlayerTurn) {
-                // Jugador en turno ve azul
-                if (this.isMostRecent) {
-                    ctx.fillStyle = 'rgba(173, 216, 230, 0.7)'; // Azul claro
+            if (this.playedByCurrentPlayer) {
+                if (isCurrentPlayerTurn) {
+                    // Jugador en turno ve azul para sus propias cartas jugadas
+                    if (this.isMostRecent) {
+                        ctx.fillStyle = 'rgba(173, 216, 230, 0.7)'; // Azul claro
+                    } else {
+                        ctx.fillStyle = 'rgba(160, 192, 224, 0.5)'; // Azul medio
+                    }
                 } else {
-                    ctx.fillStyle = 'rgba(160, 192, 224, 0.5)'; // Azul medio
+                    // Otros jugadores ven rojo para cartas del jugador en turno
+                    if (this.isMostRecent) {
+                        ctx.fillStyle = 'rgba(255, 200, 200, 0.7)'; // Rojo claro
+                    } else {
+                        ctx.fillStyle = 'rgba(255, 150, 150, 0.5)'; // Rojo medio
+                    }
                 }
-            } else {
-                // Otros jugadores ven rojo
-                if (this.isMostRecent) {
-                    ctx.fillStyle = 'rgba(255, 200, 200, 0.7)'; // Rojo claro
-                } else {
-                    ctx.fillStyle = 'rgba(255, 150, 150, 0.5)'; // Rojo medio
-                }
+                ctx.fill();
             }
-            ctx.fill();
         }
 
         // Borde
@@ -174,7 +177,11 @@ function connectWebSocket() {
                     updateGameState(message.state);
                     break;
                 case 'your_cards':
-                    gameState.yourCards = message.cards.map(value => new Card(value, 0, 0, false));
+                    gameState.yourCards = message.cards.map(value => {
+                        const card = new Card(value, 0, 0, false);
+                        card.playedByCurrentPlayer = true;
+                        return card;
+                    });
                     break;
                 case 'game_over':
                     alert(message.message);
@@ -182,7 +189,9 @@ function connectWebSocket() {
                 case 'invalid_move':
                     showNotification(message.reason, true);
                     if (message.cardValue) {
-                        gameState.yourCards.push(new Card(message.cardValue, 0, 0, false));
+                        const card = new Card(message.cardValue, 0, 0, false);
+                        card.playedByCurrentPlayer = true;
+                        gameState.yourCards.push(card);
                         gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
                             c => c.value !== message.cardValue
                         );
@@ -277,17 +286,20 @@ function updateGameState(newState) {
 
     gameState.yourCards = gameState.yourCards.map((card, index) => {
         if (typeof card === 'number') {
-            return new Card(
+            const newCard = new Card(
                 card,
                 startX + index * (CARD_WIDTH + CARD_SPACING),
                 startY,
                 isYourTurn && canPlayCard(card)
             );
+            newCard.playedByCurrentPlayer = true;
+            return newCard;
         }
 
         card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
         card.y = startY;
         card.isPlayable = isYourTurn && canPlayCard(card.value);
+        card.playedByCurrentPlayer = true;
         return card;
     });
 
@@ -304,6 +316,7 @@ function updateGameState(newState) {
             if (cardIndex !== -1) {
                 gameState.yourCards[cardIndex].isPlayedThisTurn = true;
                 gameState.yourCards[cardIndex].isMostRecent = playedCard.isMostRecent;
+                gameState.yourCards[cardIndex].playedByCurrentPlayer = playedCard.playedBy === currentPlayer.id;
             }
         });
     }
@@ -531,6 +544,7 @@ function markIfPlayedThisTurn(card, position) {
         if (playedCard) {
             card.isPlayedThisTurn = true;
             card.isMostRecent = playedCard.isMostRecent;
+            card.playedByCurrentPlayer = playedCard.playedBy === currentPlayer.id;
         }
     }
 }

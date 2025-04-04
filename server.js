@@ -361,7 +361,8 @@ function handlePlayCard(room, player, msg) {
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
         position: msg.position,
-        isMostRecent: true
+        isMostRecent: true,
+        playedBy: player.id
     });
 
     checkGameStatus(room);
@@ -585,9 +586,32 @@ function sendGameState(room, player) {
     }
 }
 
+// Modificar la función broadcastGameState:
 function broadcastGameState(room) {
     room.players.forEach(player => {
-        sendGameState(room, player);
+        if (player.ws?.readyState === WebSocket.OPEN) {
+            player.ws.send(JSON.stringify({
+                type: 'game_state',
+                state: {
+                    board: room.gameState.board,
+                    currentTurn: room.gameState.currentTurn,
+                    yourCards: player.cards,
+                    players: room.players.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        cardCount: p.cards.length
+                    })),
+                    remainingDeck: room.gameState.deck.length,
+                    cardsPlayedThisTurn: player.cardsPlayedThisTurn.map(c => ({
+                        value: c.value,
+                        position: c.position,
+                        isMostRecent: c.isMostRecent,
+                        playedBy: c.playedBy
+                    })),
+                    isYourTurn: room.gameState.currentTurn === player.id
+                }
+            }));
+        }
     });
 }
 
