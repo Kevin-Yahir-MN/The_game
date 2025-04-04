@@ -586,7 +586,6 @@ function sendGameState(room, player) {
     }
 }
 
-// Modificar la función broadcastGameState:
 function broadcastGameState(room) {
     room.players.forEach(player => {
         if (player.ws?.readyState === WebSocket.OPEN) {
