@@ -399,31 +399,6 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
-    // Nueva verificación de suficientes cartas jugables después de esta jugada
-    const simulatedBoard = JSON.parse(JSON.stringify(room.gameState.board));
-    if (msg.position.includes('asc')) {
-        simulatedBoard.ascending[msg.position === 'asc1' ? 0 : 1] = msg.cardValue;
-    } else {
-        simulatedBoard.descending[msg.position === 'desc1' ? 0 : 1] = msg.cardValue;
-    }
-
-    const remainingCards = player.cards.filter(c => c !== msg.cardValue);
-    const playableAfterMove = remainingCards.filter(card => {
-        return (card > simulatedBoard.ascending[0] || card === simulatedBoard.ascending[0] - 10) ||
-            (card > simulatedBoard.ascending[1] || card === simulatedBoard.ascending[1] - 10) ||
-            (card < simulatedBoard.descending[0] || card === simulatedBoard.descending[0] + 10) ||
-            (card < simulatedBoard.descending[1] || card === simulatedBoard.descending[1] + 10);
-    }).length;
-
-    const minRequired = room.gameState.deck.length > 0 ? 2 : 1;
-    if (player.cardsPlayedThisTurn.length + 1 + playableAfterMove < minRequired) {
-        return safeSend(player.ws, {
-            type: 'notification',
-            message: 'No puedes jugar esa carta: no tendrías suficientes jugadas para terminar el turno',
-            isError: true
-        });
-    }
-
     const previousValue = msg.position.includes('asc') ?
         board.ascending[targetIdx] :
         board.descending[targetIdx];

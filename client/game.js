@@ -127,57 +127,14 @@ function showNotification(message, isError = false) {
     setTimeout(() => notification.remove(), 3000);
 }
 
-// Función modificada para verificar movimientos válidos
 function isValidMove(cardValue, position) {
-    // Verificación básica de reglas del juego
     const target = position.includes('asc')
         ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
         : gameState.board.descending[position === 'desc1' ? 0 : 1];
 
-    const basicValid = position.includes('asc')
+    return position.includes('asc')
         ? (cardValue > target || cardValue === target - 10)
         : (cardValue < target || cardValue === target + 10);
-
-    if (!basicValid) return false;
-
-    // Verificación adicional: ¿esta jugada dejaría suficientes cartas jugables?
-    return hasEnoughPlayableCardsAfterMove(cardValue, position);
-}
-
-// Nueva función auxiliar
-function hasEnoughPlayableCardsAfterMove(cardValue, position) {
-    if (gameState.remainingDeck === 0) return true; // No hay mínimo si el mazo está vacío
-
-    // Simular el estado después de la jugada
-    const simulatedBoard = JSON.parse(JSON.stringify(gameState.board));
-    if (position.includes('asc')) {
-        const idx = position === 'asc1' ? 0 : 1;
-        simulatedBoard.ascending[idx] = cardValue;
-    } else {
-        const idx = position === 'desc1' ? 0 : 1;
-        simulatedBoard.descending[idx] = cardValue;
-    }
-
-    // Obtener cartas que quedarían en la mano (excluyendo la que se jugaría)
-    const remainingCards = gameState.yourCards.filter(card => card.value !== cardValue);
-
-    // Calcular cartas jugables después de esta jugada
-    const playableAfterMove = remainingCards.filter(card => {
-        return (card.value > simulatedBoard.ascending[0] || card.value === simulatedBoard.ascending[0] - 10) ||
-            (card.value > simulatedBoard.ascending[1] || card.value === simulatedBoard.ascending[1] - 10) ||
-            (card.value < simulatedBoard.descending[0] || card.value === simulatedBoard.descending[0] + 10) ||
-            (card.value < simulatedBoard.descending[1] || card.value === simulatedBoard.descending[1] + 10);
-    }).length;
-
-    // El mínimo requerido es 2 si hay cartas en el mazo, 1 si no
-    const minRequired = gameState.remainingDeck > 0 ? 2 : 1;
-
-    // Verificar si las cartas jugables después de esta jugada + las ya jugadas cumplen el mínimo
-    const cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
-        c => c.playerId === currentPlayer.id
-    ).length;
-
-    return (cardsPlayedThisTurn + 1 + playableAfterMove) >= minRequired;
 }
 
 function getColumnPosition(position) {
@@ -211,19 +168,27 @@ function animateInvalidCard(card) {
     shake();
 }
 
+// Nueva función para manejar cambio de turno
 function handleTurnChanged(message) {
     gameState.currentTurn = message.newTurn;
+
+    // Filtrar solo las cartas del jugador actual
     gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
         card => card.playerId !== currentPlayer.id
     );
+
     showNotification(`Ahora es el turno de ${gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador'}`);
 }
 
+// Función para manejar fin del juego
 function handleGameOver(message) {
+    // Solo mostrar game over si es por no cumplir el mínimo de cartas
     if (message.reason === 'min_cards_not_met') {
+        // Detener interacciones con el juego
         canvas.style.pointerEvents = 'none';
         endTurnButton.disabled = true;
 
+        // Crear elemento de game over
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
         gameOverDiv.innerHTML = `
@@ -233,12 +198,14 @@ function handleGameOver(message) {
         `;
         document.body.appendChild(gameOverDiv);
 
+        // Manejar click en el botón
         document.getElementById('returnToLobby').addEventListener('click', () => {
             window.location.href = '/';
         });
     }
 }
 
+// Actualización del estado
 function updateGameState(newState) {
     if (!newState) return;
 
@@ -307,6 +274,7 @@ function updatePlayerCards(cards) {
     });
 }
 
+// Manejo de interacciones
 function handleCanvasClick(event) {
     if (gameState.currentTurn !== currentPlayer.id) {
         return showNotification('No es tu turno', true);
@@ -349,18 +317,8 @@ function getClickedColumn(x, y) {
 function playCard(cardValue, position) {
     if (!selectedCard) return;
 
-    const basicValid = position.includes('asc')
-        ? (cardValue > gameState.board[position.includes('asc') ? 'ascending' : 'descending'][position === 'asc1' || position === 'desc1' ? 0 : 1] ||
-            cardValue === gameState.board[position.includes('asc') ? 'ascending' : 'descending'][position === 'asc1' || position === 'desc1' ? 0 : 1] - (position.includes('asc') ? 10 : -10))
-        : (cardValue < gameState.board[position.includes('asc') ? 'ascending' : 'descending'][position === 'asc1' || position === 'desc1' ? 0 : 1] ||
-            cardValue === gameState.board[position.includes('asc') ? 'ascending' : 'descending'][position === 'asc1' || position === 'desc1' ? 0 : 1] + (position.includes('asc') ? -10 : 10));
-
     if (!isValidMove(cardValue, position)) {
-        if (!basicValid) {
-            showNotification('Movimiento inválido', true);
-        } else {
-            showNotification('No puedes jugar esta carta: no tendrías suficientes jugadas para terminar el turno', true);
-        }
+        showNotification('Movimiento inválido', true);
         animateInvalidCard(selectedCard);
         return;
     }
@@ -414,10 +372,12 @@ function endTurn() {
     }));
 }
 
+// Renderizado del juego
 function drawGameInfo() {
     const currentTurnPlayer = gameState.players.find(p => p.id === gameState.currentTurn);
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
 
+    // Contar solo las cartas del jugador actual si es nuestro turno
     const currentPlayerCardsPlayed = gameState.currentTurn === currentPlayer.id
         ? gameState.cardsPlayedThisTurn.filter(card => card.playerId === currentPlayer.id).length
         : 0;
@@ -431,6 +391,7 @@ function drawGameInfo() {
     ctx.fillText(`Turno: ${currentTurnPlayer?.name || 'Esperando...'}`, 20, 20);
     ctx.fillText(`Baraja: ${gameState.remainingDeck}`, 20, 50);
 
+    // Mostrar contador solo si es nuestro turno
     if (gameState.currentTurn === currentPlayer.id) {
         ctx.fillStyle = currentPlayerCardsPlayed >= minCardsRequired ? '#00FF00' : '#FFFF00';
         ctx.fillText(`Cartas: ${currentPlayerCardsPlayed}/${minCardsRequired}`, 20, 80);
@@ -447,11 +408,13 @@ function drawBoard() {
     ctx.font = 'bold 32px Arial';
     ctx.textAlign = 'center';
 
+    // Dibujar pilas ascendentes
     ['asc1', 'asc2'].forEach((col, i) => {
         ctx.fillText('↑', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
         new Card(gameState.board.ascending[i], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i, BOARD_POSITION.y).draw();
     });
 
+    // Dibujar pilas descendentes
     ['desc1', 'desc2'].forEach((col, i) => {
         ctx.fillText('↓', BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * (i + 2) + CARD_WIDTH / 2, BOARD_POSITION.y - 15);
         new Card(gameState.board.descending[i], BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * (i + 2), BOARD_POSITION.y).draw();
@@ -465,6 +428,7 @@ function drawPlayerCards() {
     gameState.yourCards.forEach(card => card?.draw());
 }
 
+// Bucle principal
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#228B22';
@@ -476,6 +440,7 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+// Inicialización
 function initGame() {
     if (!canvas || !ctx || !currentPlayer.id || !roomId) {
         alert('Error: No se pudo inicializar el juego. Vuelve a la sala.');
