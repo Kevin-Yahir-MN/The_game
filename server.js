@@ -382,22 +382,21 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
-    // Si llegamos aquí, el movimiento es válido
-    updateBoardHistory(room, msg.position, msg.cardValue);
-
+    // Actualizar el tablero
     if (msg.position.includes('asc')) {
         board.ascending[targetIdx] = msg.cardValue;
     } else {
         board.descending[targetIdx] = msg.cardValue;
     }
 
+    // Eliminar carta de la mano del jugador
     player.cards.splice(player.cards.indexOf(msg.cardValue), 1);
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
         position: msg.position
     });
 
-    // Notificar a todos sobre la carta jugada
+    // Notificar a todos los jugadores
     broadcastToRoom(room, {
         type: 'card_played',
         cardValue: msg.cardValue,
@@ -406,9 +405,9 @@ function handlePlayCard(room, player, msg) {
         playerName: player.name
     });
 
-    // Actualizar estado del juego para todos
-    checkGameStatus(room);
+    // Enviar estado actualizado a todos
     broadcastGameState(room);
+    checkGameStatus(room);
 }
 
 function endTurn(room, player) {
@@ -449,6 +448,12 @@ function endTurn(room, player) {
         message: `Ahora es el turno de ${room.players[nextIndex].name}`,
         isError: false
     }, { includeGameState: true });
+}
+
+function broadcastGameState(room) {
+    room.players.forEach(player => {
+        sendGameState(room, player);
+    });
 }
 
 function checkGameStatus(room) {
