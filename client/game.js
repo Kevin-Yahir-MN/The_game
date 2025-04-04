@@ -108,11 +108,40 @@ function connectWebSocket() {
                         animateInvalidCard(selectedCard);
                     }
                     break;
+                case 'turn_changed':
+                    gameState.cardsPlayedThisTurn = [];
+                    gameState.currentTurn = message.newPlayerId;
+                    if (message.newPlayerId === currentPlayer.id) {
+                        showNotification('¡Es tu turno!');
+                    }
+                    break;
+                case 'reconnect_game':
+                    handleReconnect(message);
+                    break;
             }
         } catch (error) {
             console.error('Error procesando mensaje:', error);
         }
     };
+}
+
+function handleReconnect(message) {
+    gameState = {
+        ...gameState,
+        yourCards: message.yourCards,
+        board: message.gameState.board,
+        currentTurn: message.gameState.currentTurn,
+        remainingDeck: message.gameState.remainingDeck,
+        players: message.gameState.players,
+        cardsPlayedThisTurn: message.gameState.cardsPlayedThisTurn || []
+    };
+
+    if (message.gameState.currentTurn === currentPlayer.id) {
+        showNotification('Reconectado - ¡Es tu turno!');
+    } else {
+        const currentPlayerName = gameState.players.find(p => p.id === message.gameState.currentTurn)?.name;
+        showNotification(`Reconectado - Turno de ${currentPlayerName}`);
+    }
 }
 
 // Funciones de utilidad
@@ -169,11 +198,21 @@ function animateInvalidCard(card) {
 function updateGameState(newState) {
     if (!newState) return;
 
+    // Verificar si es un nuevo turno nuestro
+    const isNewOurTurn = newState.currentTurn === currentPlayer.id &&
+        gameState.currentTurn !== currentPlayer.id;
+
     gameState.board = newState.board || gameState.board;
     gameState.currentTurn = newState.currentTurn || gameState.currentTurn;
     gameState.remainingDeck = newState.remainingDeck || gameState.remainingDeck;
     gameState.players = newState.players || gameState.players;
-    gameState.cardsPlayedThisTurn = newState.cardsPlayedThisTurn || gameState.cardsPlayedThisTurn;
+
+    // Reiniciar conteo si es nuestro nuevo turno
+    if (isNewOurTurn) {
+        gameState.cardsPlayedThisTurn = [];
+    } else {
+        gameState.cardsPlayedThisTurn = newState.cardsPlayedThisTurn || gameState.cardsPlayedThisTurn;
+    }
 
     if (newState.yourCards) {
         updatePlayerCards(newState.yourCards);
@@ -197,11 +236,14 @@ function handleOpponentCardPlayed(message) {
             gameState.board.descending[idx] = value;
         }
 
-        gameState.cardsPlayedThisTurn.push({
-            value: message.cardValue,
-            position: message.position,
-            playerId: message.playerId
-        });
+        // Solo agregar al conteo si es del jugador actual
+        if (message.playerId === gameState.currentTurn) {
+            gameState.cardsPlayedThisTurn.push({
+                value: message.cardValue,
+                position: message.position,
+                playerId: message.playerId
+            });
+        }
 
         showNotification(`${message.playerName} jugó un ${value}`);
     }
@@ -330,8 +372,6 @@ function endTurn() {
         type: 'end_turn',
         playerId: currentPlayer.id
     }));
-
-    // No limpiar cardsPlayedThisTurn aquí, esperar confirmación del servidor
 }
 
 // Renderizado del juego
@@ -339,6 +379,7 @@ function drawGameInfo() {
     const currentTurnPlayer = gameState.players.find(p => p.id === gameState.currentTurn);
     const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
 
+    // Contar solo las cartas del jugador actual
     const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
         card => card.playerId === gameState.currentTurn
     ).length;
@@ -351,8 +392,10 @@ function drawGameInfo() {
 
     ctx.fillText(`Turno: ${currentTurnPlayer?.name || 'Esperando...'}`, 20, 20);
     ctx.fillText(`Baraja: ${gameState.remainingDeck}`, 20, 50);
+
+    // Mostrar diferente color según si cumplió con las cartas requeridas
     ctx.fillStyle = currentPlayerCardsPlayed >= minCardsRequired ? '#00FF00' : '#FFFF00';
-    ctx.fillText(`Cartas: ${currentPlayerCardsPlayed}/${minCardsRequired}`, 20, 80);
+    ctx.fillText(`Cartas jugadas: ${currentPlayerCardsPlayed}/${minCardsRequired}`, 20, 80);
 
     if (cardsNeeded > 0 && gameState.currentTurn === currentPlayer.id) {
         ctx.fillStyle = '#FF0000';
