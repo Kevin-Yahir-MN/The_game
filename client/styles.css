@@ -165,11 +165,10 @@ h3 {
     display: none;
 }
 
-/* ===== PANTALLA DE JUEGO ===== */
 #gameContainer {
     position: relative;
     width: 800px;
-    height: 650px;
+    height: 700px;
     margin: 0 auto;
 }
 
@@ -184,6 +183,7 @@ h3 {
 .game-controls {
     position: absolute;
     bottom: 40px;
+    /* Aumentado para más espacio */
     left: 50%;
     transform: translateX(-50%);
     display: flex;
