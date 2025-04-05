@@ -185,11 +185,18 @@ body {
 
 .join-section {
     display: flex;
+    flex-direction: column;
     gap: 0.5rem;
 }
 
 .join-section .form-group {
-    flex: 1;
+    width: 100%;
+    margin-bottom: 0;
+}
+
+#joinRoom {
+    width: 100%;
+    margin-top: 0.5rem;
 }
 
 .game-info {
@@ -383,7 +390,7 @@ body {
     box-shadow: 0 6px 12px rgba(192, 57, 43, 0.3);
 }
 
-/* ===== JUEGO (game.html) - ESTILOS ORIGINALES PRESERVADOS ===== */
+/* ===== JUEGO (game.html) - ESTILOS ORIGINALES ===== */
 #gameContainer {
     position: relative;
     width: 800px;
@@ -598,12 +605,7 @@ body {
     }
 
     .join-section {
-        flex-direction: column;
-    }
-
-    .room-code {
-        flex-direction: column;
-        gap: 0.5rem;
+        width: 100%;
     }
 
     .game-controls {
