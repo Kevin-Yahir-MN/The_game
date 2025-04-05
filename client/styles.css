@@ -215,7 +215,7 @@ body {
 @media (max-width: 500px) {
     .game-controls {
         flex-direction: column;
-        bottom: -10px;
+        bottom: 10px;
         gap: 10px;
         padding: 10px;
         width: 90%;
