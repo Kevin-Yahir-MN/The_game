@@ -1,4 +1,4 @@
-/* ===== ESTILOS BASE ===== */
+/* ===== VARIABLES Y ESTILOS GENERALES ===== */
 :root {
     --primary: #3498db;
     --secondary: #2ecc71;
@@ -12,23 +12,50 @@
     --danger: #e74c3c;
 }
 
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+* {
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
-    min-height: 100vh;
 }
 
-/* ===== DISEÑO LOBBY (index.html) ===== */
-.lobby-container {
-    background: linear-gradient(135deg, var(--dark), var(--darker));
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     min-height: 100vh;
+    background: linear-gradient(135deg, var(--dark), var(--darker));
+    color: var(--light);
+    line-height: 1.6;
+}
+
+/* ===== ESTILOS PARA INDEX.HTML (LOBBY) ===== */
+.lobby-container {
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    min-height: 100vh;
     padding: 2rem;
-    color: var(--light);
+}
+
+.lobby-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    animation: fadeIn 0.8s ease-out;
+}
+
+.lobby-header h1 {
+    font-size: 3.5rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(to right, var(--primary), var(--secondary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    letter-spacing: 1px;
+}
+
+.lobby-header p {
+    font-size: 1.1rem;
+    color: var(--gray);
 }
 
 .lobby-card {
@@ -41,28 +68,6 @@ body {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.1);
     animation: fadeIn 0.6s ease-out;
-}
-
-.lobby-header {
-    text-align: center;
-    margin-bottom: 2.5rem;
-}
-
-.lobby-header h1 {
-    font-size: 3.5rem;
-    font-weight: 800;
-    margin: 0;
-    background: linear-gradient(to right, var(--primary), var(--secondary));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    letter-spacing: 1px;
-}
-
-.lobby-header p {
-    font-size: 1.1rem;
-    color: var(--gray);
-    margin-top: 0.5rem;
 }
 
 .login-form {
@@ -98,8 +103,8 @@ body {
 }
 
 .action-buttons {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr;
     gap: 1rem;
     margin-top: 1.5rem;
 }
@@ -112,32 +117,54 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
+    text-align: center;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
 }
 
+.btn::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.btn:hover::after {
+    opacity: 1;
+}
+
 .btn-primary {
     background-color: var(--primary);
     color: white;
+    box-shadow: 0 4px 6px rgba(52, 152, 219, 0.2);
 }
 
 .btn-primary:hover {
     background-color: #2980b9;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(41, 128, 185, 0.4);
+    box-shadow: 0 6px 12px rgba(41, 128, 185, 0.3);
 }
 
 .btn-secondary {
     background-color: var(--secondary);
     color: white;
+    box-shadow: 0 4px 6px rgba(46, 204, 113, 0.2);
 }
 
 .btn-secondary:hover {
     background-color: #27ae60;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(46, 204, 113, 0.4);
+    box-shadow: 0 6px 12px rgba(39, 174, 96, 0.3);
 }
 
 .separator {
@@ -194,12 +221,12 @@ body {
     color: var(--gray);
 }
 
-/* ===== DISEÑO SALA (sala.html) ===== */
+/* ===== ESTILOS PARA SALA.HTML (SALA DE ESPERA) ===== */
 .room-container {
-    background: linear-gradient(135deg, var(--dark), var(--darker));
     min-height: 100vh;
     padding: 2rem;
-    color: var(--light);
+    max-width: 800px;
+    margin: 0 auto;
 }
 
 .room-header {
@@ -211,16 +238,14 @@ body {
 .room-header h1 {
     font-size: 2.5rem;
     font-weight: 700;
-    margin: 0 0 1rem;
-    color: var(--light);
+    margin-bottom: 1rem;
 }
 
 .room-code-container {
     background: rgba(0, 0, 0, 0.3);
     padding: 1.5rem;
     border-radius: 12px;
-    margin: 0 auto;
-    max-width: 500px;
+    margin-bottom: 2rem;
     border: 1px dashed rgba(255, 255, 255, 0.3);
 }
 
@@ -278,13 +303,12 @@ body {
     background: rgba(0, 0, 0, 0.3);
     border-radius: 12px;
     padding: 1.5rem;
-    margin: 2rem auto;
-    max-width: 500px;
-    animation: fadeIn 0.8s ease-out;
+    margin-bottom: 2rem;
 }
 
 .players-section h2 {
     margin-top: 0;
+    margin-bottom: 1rem;
     color: var(--light);
     font-size: 1.5rem;
     display: flex;
@@ -295,16 +319,14 @@ body {
 .players-list {
     list-style: none;
     padding: 0;
-    margin: 1rem 0 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+    margin: 0;
 }
 
 .player-item {
     background: rgba(255, 255, 255, 0.1);
     padding: 1rem;
     border-radius: 8px;
+    margin-bottom: 0.75rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -338,7 +360,7 @@ body {
     background-color: var(--danger);
 }
 
-.start-game-btn {
+#startGame {
     background: var(--accent);
     color: white;
     border: none;
@@ -348,131 +370,30 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
-    margin: 1rem auto;
+    margin: 0 auto;
+    display: none;
+    box-shadow: 0 4px 6px rgba(231, 76, 60, 0.2);
+}
+
+#startGame.visible {
     display: block;
     animation: pulse 2s infinite;
 }
 
-.start-game-btn:hover {
+#startGame:hover {
     background: #c0392b;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+    box-shadow: 0 6px 12px rgba(192, 57, 43, 0.3);
 }
 
-/* ===== ANIMACIONES ===== */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes pulse {
-    0% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.05);
-    }
-
-    100% {
-        transform: scale(1);
-    }
-}
-
-/* ===== NOTIFICACIONES ===== */
-.notification {
-    position: fixed;
-    top: 30px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 15px 30px;
-    background-color: var(--success);
-    color: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    z-index: 1000;
-    animation: fadeIn 0.3s ease-out;
-    max-width: 80%;
-    text-align: center;
-    font-size: 16px;
-    font-weight: bold;
-}
-
-.notification.error {
-    background-color: var(--danger);
-    animation: shake 0.5s ease-in-out;
-}
-
-@keyframes shake {
-
-    0%,
-    100% {
-        transform: translateX(-50%);
-    }
-
-    20%,
-    60% {
-        transform: translateX(calc(-50% + 8px));
-    }
-
-    40%,
-    80% {
-        transform: translateX(calc(-50% - 8px));
-    }
-}
-
-/* ===== RESPONSIVE ===== */
-@media (max-width: 768px) {
-    .lobby-header h1 {
-        font-size: 2.5rem;
-    }
-
-    .room-header h1 {
-        font-size: 2rem;
-    }
-
-    .code-display {
-        font-size: 2rem;
-    }
-
-    .join-section {
-        flex-direction: column;
-    }
-}
-
-@media (max-width: 480px) {
-
-    .lobby-card,
-    .room-code-container,
-    .players-section {
-        padding: 1.5rem;
-    }
-
-    .room-code {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-
-    .code-display {
-        font-size: 1.8rem;
-        padding: 0.5rem 1rem;
-    }
-}
-
-/* ===== ESTILOS ORIGINALES DE GAME.HTML (MANTENIDOS SIN CAMBIOS) ===== */
+/* ===== ESTILOS PARA GAME.HTML (MANTENIENDO DISEÑO ORIGINAL) ===== */
 #gameContainer {
     position: relative;
     width: 800px;
     height: 800px;
     margin: 20px auto;
     overflow: visible;
+    background: transparent;
 }
 
 #gameCanvas {
@@ -569,4 +490,164 @@ body {
     line-height: 1.4;
 }
 
-/* Mantener todas las animaciones y responsive originales de game.html */
+/* ===== ANIMACIONES Y EFECTOS ===== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.notification {
+    position: fixed;
+    top: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 15px 30px;
+    background-color: var(--success);
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    animation: fadeIn 0.3s ease-out;
+    max-width: 80%;
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.notification.error {
+    background-color: var(--danger);
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(-50%);
+    }
+
+    20%,
+    60% {
+        transform: translateX(calc(-50% + 8px));
+    }
+
+    40%,
+    80% {
+        transform: translateX(calc(-50% - 8px));
+    }
+}
+
+/* ===== DISEÑO RESPONSIVE ===== */
+@media (max-width: 850px) {
+    #gameContainer {
+        width: 95%;
+        height: auto;
+        padding: 10px;
+    }
+
+    #gameCanvas {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 800/700;
+    }
+
+    .game-controls {
+        position: relative;
+        bottom: auto;
+        margin-top: 20px;
+        padding: 10px 15px;
+        gap: 15px;
+    }
+}
+
+@media (max-width: 600px) {
+
+    .lobby-container,
+    .room-container {
+        padding: 1.5rem;
+    }
+
+    .lobby-header h1 {
+        font-size: 2.5rem;
+    }
+
+    .room-header h1 {
+        font-size: 2rem;
+    }
+
+    .code-display {
+        font-size: 2rem;
+    }
+
+    .join-section {
+        flex-direction: column;
+    }
+
+    .room-code {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .game-controls {
+        flex-direction: row;
+        width: 100%;
+        padding: 10px;
+        gap: 10px;
+    }
+
+    #endTurnBtn,
+    #undoBtn {
+        padding: 10px;
+        min-width: auto;
+        flex: 1;
+    }
+
+    .game-instructions {
+        position: relative;
+        max-width: 100%;
+        bottom: auto;
+        right: auto;
+        margin: 15px 0;
+    }
+}
+
+@media (max-width: 400px) {
+    .lobby-card {
+        padding: 1.5rem;
+    }
+
+    .lobby-header h1 {
+        font-size: 2rem;
+    }
+
+    .code-display {
+        font-size: 1.5rem;
+        padding: 0.5rem 1rem;
+    }
+
+    .btn {
+        padding: 0.8rem;
+        font-size: 0.9rem;
+    }
+}
