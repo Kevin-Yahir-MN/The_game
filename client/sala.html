@@ -6,23 +6,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sala de Juego - The Game</title>
     <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
-    <div class="container">
-        <h1>Sala de Juego</h1>
-        <div class="room-info">
-            <h2>Código de Sala: <span id="roomIdDisplay"></span></h2>
-            <p>Comparte este código con otros jugadores</p>
+    <div class="room-container">
+        <div class="room-header">
+            <h1>SALA DE JUEGO</h1>
+            <div class="room-code">
+                <span>Código:</span>
+                <div id="roomIdDisplay" class="code-display"></div>
+                <button class="copy-btn" onclick="copyRoomCode()">Copiar</button>
+            </div>
+            <p class="instruction">Comparte este código con otros jugadores</p>
         </div>
 
-        <div class="players-list">
-            <h3>Jugadores Conectados:</h3>
-            <ul id="playersList"></ul>
-        </div>
+        <div class="room-content">
+            <div class="players-section">
+                <h2>Jugadores <span id="playersCount">(0)</span></h2>
+                <div class="players-list-container">
+                    <ul id="playersList" class="players-list"></ul>
+                </div>
+            </div>
 
-        <button id="startGame" class="hidden">Iniciar Juego</button>
+            <div class="game-controls">
+                <button id="startGame" class="btn-start hidden">
+                    <span class="icon">▶</span> Iniciar Juego
+                </button>
+            </div>
+        </div>
     </div>
+
+    <script>
+        function copyRoomCode() {
+            const code = document.getElementById('roomIdDisplay').textContent;
+            navigator.clipboard.writeText(code);
+
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = '¡Código copiado!';
+            document.body.appendChild(notification);
+
+            setTimeout(() => notification.remove(), 2000);
+        }
+    </script>
     <script src="sala.js"></script>
 </body>
 
