@@ -17,9 +17,8 @@ body {
     width: 800px;
     height: 700px;
     margin: 20px auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    padding-bottom: 120px;
+    /* Espacio adicional para botones */
 }
 
 #gameCanvas {
@@ -29,8 +28,6 @@ body {
     border: 4px solid #34495e;
     border-radius: 12px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    margin-bottom: 40px;
-    /* Aumentado para más espacio */
 }
 
 /* ===== INSTRUCCIONES ===== */
@@ -69,15 +66,17 @@ body {
 /* ===== CONTROLES DEL JUEGO ===== */
 .game-controls {
     position: absolute;
-    bottom: 70px;
-    /* Ajustado para mayor separación */
+    bottom: 80px;
+    /* Posición desde abajo del contenedor */
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     gap: 25px;
     z-index: 100;
-    padding: 15px 0;
-    /* Espacio adicional */
+    width: 100%;
+    justify-content: center;
+    margin-top: 40px;
+    /* Espacio sobre los botones */
 }
 
 #endTurnBtn {
@@ -91,6 +90,7 @@ body {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
     transition: all 0.3s;
     cursor: pointer;
+    min-width: 150px;
 }
 
 #undoBtn {
@@ -104,6 +104,7 @@ body {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
     transition: all 0.3s;
     cursor: pointer;
+    min-width: 150px;
 }
 
 #endTurnBtn:hover:not(:disabled),
@@ -218,14 +219,13 @@ body {
         width: 95%;
         height: auto;
         padding: 10px;
+        padding-bottom: 100px;
     }
 
     #gameCanvas {
         width: 100%;
         height: auto;
         aspect-ratio: 800/700;
-        margin-bottom: 60px;
-        /* Más espacio en móvil */
     }
 
     .game-instructions {
@@ -233,7 +233,7 @@ body {
         max-width: 100%;
         bottom: auto;
         right: auto;
-        margin-top: 15px;
+        margin: 15px 0;
     }
 
     .game-controls {
@@ -241,9 +241,8 @@ body {
         bottom: auto;
         left: auto;
         transform: none;
-        margin: 30px 0;
-        /* Más margen en móvil */
-        padding: 20px 0;
+        margin: 40px 0;
+        flex-wrap: wrap;
     }
 }
 
@@ -251,19 +250,17 @@ body {
     .game-controls {
         flex-direction: column;
         gap: 15px;
-        /* Más espacio entre botones */
         align-items: center;
+        margin: 30px 0;
     }
 
     #endTurnBtn,
     #undoBtn {
         width: 80%;
-        padding: 15px 30px;
-        /* Botones más grandes */
+        padding: 15px;
     }
 
-    #gameCanvas {
-        margin-bottom: 80px;
-        /* Extra espacio en móviles pequeños */
+    #gameContainer {
+        padding-bottom: 80px;
     }
 }
