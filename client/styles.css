@@ -11,14 +11,18 @@ body {
     min-height: 100vh;
 }
 
-/* ===== CONTENEDOR DEL JUEGO ===== */
+/* ===== CONTENEDOR PRINCIPAL ===== */
 #gameContainer {
     position: relative;
+    /* ¡Esencial para posicionar los botones! */
     width: 800px;
     height: 700px;
     margin: 20px auto;
+    overflow: visible;
+    /* Permite que los botones se superpongan */
 }
 
+/* ===== CANVAS DEL JUEGO ===== */
 #gameCanvas {
     background-color: #1a6b1a;
     display: block;
@@ -28,6 +32,71 @@ body {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     position: relative;
     z-index: 1;
+    /* Canvas detrás de los botones */
+}
+
+/* ===== CONTROLES DEL JUEGO ===== */
+.game-controls {
+    /* Posicionamiento */
+    position: absolute;
+    bottom: -20px;
+    /* Ajusta este valor para subir/bajar los botones */
+    left: 50%;
+    transform: translateX(-50%);
+
+    /* Estilos de contenedor */
+    display: flex;
+    gap: 25px;
+    z-index: 2;
+    /* Encima del canvas */
+    padding: 15px 25px;
+    background: rgba(42, 52, 65, 0.9);
+    /* Fondo semitransparente */
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.2);
+
+    /* Transición para animar cambios de posición */
+    transition: bottom 0.3s ease;
+}
+
+/* Botones individuales */
+#endTurnBtn,
+#undoBtn {
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 12px 30px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    min-width: 150px;
+    transition: all 0.3s;
+}
+
+#endTurnBtn {
+    background-color: #e74c3c;
+}
+
+#undoBtn {
+    background-color: #3498db;
+}
+
+/* Efectos hover */
+#endTurnBtn:hover:not(:disabled),
+#undoBtn:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Estados deshabilitados */
+#endTurnBtn:disabled,
+#undoBtn:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+    opacity: 0.7;
 }
 
 /* ===== INSTRUCCIONES ===== */
@@ -42,12 +111,11 @@ body {
     max-width: 300px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     z-index: 100;
-    color: #000000;
+    color: #000;
     border: 1px solid #ddd;
 }
 
 .game-instructions h3 {
-    color: #000000;
     margin: 0 0 10px 0;
     font-size: 18px;
 }
@@ -55,69 +123,11 @@ body {
 .game-instructions ul {
     margin: 0;
     padding-left: 20px;
-    color: #000000;
 }
 
 .game-instructions li {
     margin-bottom: 8px;
     line-height: 1.4;
-}
-
-/* ===== CONTROLES DEL JUEGO ===== */
-.game-controls {
-    position: absolute;
-    bottom: -10px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 25px;
-    z-index: 2;
-    /* Por encima del canvas */
-    width: 100%;
-    justify-content: center;
-}
-
-#endTurnBtn {
-    background-color: #e74c3c;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: bold;
-    padding: 12px 30px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-    transition: all 0.3s;
-    cursor: pointer;
-    min-width: 150px;
-}
-
-#undoBtn {
-    background-color: #3498db;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: bold;
-    padding: 12px 30px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-    transition: all 0.3s;
-    cursor: pointer;
-    min-width: 150px;
-}
-
-#endTurnBtn:hover:not(:disabled),
-#undoBtn:hover:not(:disabled) {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
-}
-
-#endTurnBtn:disabled,
-#undoBtn:disabled {
-    background-color: #95a5a6;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-    opacity: 0.7;
 }
 
 /* ===== NOTIFICACIONES ===== */
@@ -142,42 +152,6 @@ body {
 .notification.error {
     background-color: #e74c3c;
     animation: shake 0.5s ease-in-out;
-}
-
-.game-over-notification {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: rgba(255, 255, 255, 0.95);
-    padding: 30px;
-    border-radius: 10px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-    z-index: 1000;
-    text-align: center;
-    color: #2c3e50;
-    max-width: 80%;
-}
-
-.game-over-notification h2 {
-    color: #e74c3c;
-    margin-top: 0;
-}
-
-.game-over-notification button {
-    background-color: #3498db;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
-    margin-top: 15px;
-    transition: background-color 0.3s;
-}
-
-.game-over-notification button:hover {
-    background-color: #2980b9;
 }
 
 /* ===== ANIMACIONES ===== */
@@ -225,35 +199,35 @@ body {
         aspect-ratio: 800/700;
     }
 
-    .game-instructions {
-        position: relative;
-        max-width: 100%;
-        bottom: auto;
-        right: auto;
-        margin: 15px 0;
+    .game-controls {
+        bottom: -15px;
+        padding: 10px 15px;
+        gap: 15px;
     }
 
-    .game-controls {
-        position: relative;
-        bottom: auto;
-        left: auto;
-        transform: none;
-        margin: 30px 0;
-        flex-wrap: wrap;
+    #endTurnBtn,
+    #undoBtn {
+        padding: 10px 20px;
+        min-width: 120px;
     }
 }
 
 @media (max-width: 500px) {
     .game-controls {
         flex-direction: column;
-        gap: 15px;
-        align-items: center;
-        margin: 20px 0;
+        bottom: -10px;
+        gap: 10px;
+        padding: 10px;
+        width: 90%;
+        left: 50%;
+        transform: translateX(-50%);
     }
 
-    #endTurnBtn,
-    #undoBtn {
-        width: 80%;
-        padding: 15px;
+    .game-instructions {
+        position: relative;
+        max-width: 100%;
+        bottom: auto;
+        right: auto;
+        margin: 15px 0;
     }
 }
