@@ -14,12 +14,11 @@ body {
 /* ===== CONTENEDOR PRINCIPAL ===== */
 #gameContainer {
     position: relative;
-    /* ¡Esencial para posicionar los botones! */
     width: 800px;
-    height: 700px;
+    height: 800px;
+    /* Aumentado para espacio de botones */
     margin: 20px auto;
     overflow: visible;
-    /* Permite que los botones se superpongan */
 }
 
 /* ===== CANVAS DEL JUEGO ===== */
@@ -32,31 +31,24 @@ body {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     position: relative;
     z-index: 1;
-    /* Canvas detrás de los botones */
+    height: 700px;
+    /* Altura fija */
 }
 
 /* ===== CONTROLES DEL JUEGO ===== */
 .game-controls {
-    /* Posicionamiento */
     position: absolute;
-    bottom: -20px;
-    /* Ajusta este valor para subir/bajar los botones */
+    bottom: 0;
     left: 50%;
     transform: translateX(-50%);
-
-    /* Estilos de contenedor */
     display: flex;
     gap: 25px;
     z-index: 2;
-    /* Encima del canvas */
     padding: 15px 25px;
     background: rgba(42, 52, 65, 0.9);
-    /* Fondo semitransparente */
-    border-radius: 10px 10px 0 0;
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.2);
-
-    /* Transición para animar cambios de posición */
-    transition: bottom 0.3s ease;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    margin-top: 20px;
 }
 
 /* Botones individuales */
@@ -200,27 +192,27 @@ body {
     }
 
     .game-controls {
-        bottom: -15px;
+        position: relative;
+        bottom: auto;
+        margin-top: 20px;
         padding: 10px 15px;
         gap: 15px;
-    }
-
-    #endTurnBtn,
-    #undoBtn {
-        padding: 10px 20px;
-        min-width: 120px;
     }
 }
 
 @media (max-width: 500px) {
     .game-controls {
-        flex-direction: column;
-        bottom: 10px;
-        gap: 10px;
+        flex-direction: row;
+        width: 100%;
         padding: 10px;
-        width: 90%;
-        left: 50%;
-        transform: translateX(-50%);
+        gap: 10px;
+    }
+
+    #endTurnBtn,
+    #undoBtn {
+        padding: 10px;
+        min-width: auto;
+        flex: 1;
     }
 
     .game-instructions {
