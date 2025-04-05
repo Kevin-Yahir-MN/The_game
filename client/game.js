@@ -12,8 +12,10 @@ const COLUMN_SPACING = 60;
 const CARD_SPACING = 15;
 const BOARD_POSITION = {
     x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
-    y: canvas.height / 2 - CARD_HEIGHT / 2 - 100 // Ajustado para dejar más espacio abajo
+    y: canvas.height * 0.3 // Tablero más arriba
 };
+const PLAYER_CARDS_Y = canvas.height * 0.6; // Posición Y para cartas del jugador
+const BUTTONS_Y = canvas.height * 0.85; // Posición Y para los botones
 
 // Estado del juego
 const currentPlayer = {
@@ -33,7 +35,7 @@ let gameState = {
     animatingCards: []
 };
 
-// Clase Card mejorada
+// Clase Card
 class Card {
     constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
         this.value = value;
@@ -317,7 +319,7 @@ function handleOpponentCardPlayed(message) {
 function updatePlayerCards(cards) {
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
     const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
-    const startY = canvas.height * 0.8; // Cambiado de 0.6 a 0.8 (80% de la altura)
+    const startY = PLAYER_CARDS_Y;
 
     gameState.yourCards = cards.map((card, index) => {
         const value = card instanceof Card ? card.value : card;
@@ -530,30 +532,27 @@ function drawBoard() {
 }
 
 function drawPlayerCards() {
-    // Posición Y para el fondo (78% de la altura del canvas)
-    const backgroundY = canvas.height * 0.78;
+    // Fondo para las cartas del jugador
+    const backgroundHeight = CARD_HEIGHT + 30;
+    const backgroundWidth = gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 40;
 
-    // Dibujar fondo para las cartas
     ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
     ctx.beginPath();
     ctx.roundRect(
-        (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) - CARD_SPACING)) / 2 - 20,
-        backgroundY - 10,
-        gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 40,
-        CARD_HEIGHT + 20,
+        (canvas.width - backgroundWidth) / 2,
+        PLAYER_CARDS_Y - 15,
+        backgroundWidth,
+        backgroundHeight,
         15
     );
     ctx.fill();
-
-    // Posición Y para las cartas (80% de la altura del canvas)
-    const cardsY = canvas.height * 0.8;
 
     // Dibujar cada carta
     gameState.yourCards.forEach((card, index) => {
         if (card) {
             card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
                 index * (CARD_WIDTH + CARD_SPACING);
-            card.y = cardsY;
+            card.y = PLAYER_CARDS_Y;
             card.hoverOffset = card === selectedCard ? 10 : 0;
             card.draw();
         }
@@ -635,6 +634,12 @@ function initGame() {
     endTurnButton.addEventListener('click', endTurn);
     undoButton.addEventListener('click', undoLastMove);
     canvas.addEventListener('click', handleCanvasClick);
+
+    // Posicionar los botones
+    const controlsDiv = document.querySelector('.game-controls');
+    if (controlsDiv) {
+        controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
+    }
 
     connectWebSocket();
     gameLoop();

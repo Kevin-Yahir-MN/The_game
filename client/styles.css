@@ -5,6 +5,10 @@ body {
     padding: 0;
     background-color: #2c3e50;
     color: #ecf0f1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
 }
 
 /* ===== CONTENEDOR DEL JUEGO ===== */
@@ -13,6 +17,9 @@ body {
     width: 800px;
     height: 700px;
     margin: 20px auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 #gameCanvas {
@@ -22,6 +29,7 @@ body {
     border: 4px solid #34495e;
     border-radius: 12px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    margin-bottom: 20px;
 }
 
 /* ===== INSTRUCCIONES ===== */
@@ -37,13 +45,11 @@ body {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     z-index: 100;
     color: #000000;
-    /* Texto negro */
     border: 1px solid #ddd;
 }
 
 .game-instructions h3 {
     color: #000000;
-    /* Título negro */
     margin: 0 0 10px 0;
     font-size: 18px;
 }
@@ -52,7 +58,6 @@ body {
     margin: 0;
     padding-left: 20px;
     color: #000000;
-    /* Texto de items negro */
 }
 
 .game-instructions li {
@@ -63,7 +68,7 @@ body {
 /* ===== CONTROLES DEL JUEGO ===== */
 .game-controls {
     position: absolute;
-    bottom: 10px;
+    bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -97,54 +102,19 @@ body {
     cursor: pointer;
 }
 
-/* Resto de estilos permanecen igual... */
-
+#endTurnBtn:hover:not(:disabled),
 #undoBtn:hover:not(:disabled) {
-    background-color: #2980b9;
     transform: translateY(-3px);
     box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
 }
 
-#undoBtn:disabled,
-#endTurnBtn:disabled {
+#endTurnBtn:disabled,
+#undoBtn:disabled {
     background-color: #95a5a6;
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
     opacity: 0.7;
-}
-
-/* ===== INSTRUCCIONES ===== */
-.game-instructions {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    /* Cambiado de left a right */
-    background-color: rgba(255, 255, 255, 0.9);
-    padding: 15px 20px;
-    border-radius: 10px;
-    font-size: 14px;
-    max-width: 300px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    z-index: 100;
-    border: 1px solid #ddd;
-    /* Borde sutil */
-}
-
-.game-instructions h3 {
-    margin: 0 0 10px 0;
-    color: #000000;
-    font-size: 18px;
-}
-
-.game-instructions ul {
-    margin: 0;
-    padding-left: 20px;
-}
-
-.game-instructions li {
-    margin-bottom: 8px;
-    line-height: 1.4;
 }
 
 /* ===== NOTIFICACIONES ===== */
@@ -169,6 +139,42 @@ body {
 .notification.error {
     background-color: #e74c3c;
     animation: shake 0.5s ease-in-out;
+}
+
+.game-over-notification {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    text-align: center;
+    color: #2c3e50;
+    max-width: 80%;
+}
+
+.game-over-notification h2 {
+    color: #e74c3c;
+    margin-top: 0;
+}
+
+.game-over-notification button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 15px;
+    transition: background-color 0.3s;
+}
+
+.game-over-notification button:hover {
+    background-color: #2980b9;
 }
 
 /* ===== ANIMACIONES ===== */
@@ -214,13 +220,34 @@ body {
         width: 100%;
         height: auto;
         aspect-ratio: 800/700;
+        margin-bottom: 15px;
     }
 
     .game-instructions {
         position: relative;
         max-width: 100%;
         bottom: auto;
-        left: auto;
+        right: auto;
         margin-top: 15px;
+    }
+
+    .game-controls {
+        position: relative;
+        bottom: auto;
+        left: auto;
+        transform: none;
+        margin-top: 15px;
+    }
+}
+
+@media (max-width: 500px) {
+    .game-controls {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    #endTurnBtn,
+    #undoBtn {
+        width: 100%;
     }
 }
