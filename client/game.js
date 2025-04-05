@@ -317,7 +317,7 @@ function handleOpponentCardPlayed(message) {
 function updatePlayerCards(cards) {
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
     const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
-    const startY = canvas.height - CARD_HEIGHT - 20;
+    const startY = canvas.height * 0.6 + 10;
 
     gameState.yourCards = cards.map((card, index) => {
         const value = card instanceof Card ? card.value : card;
@@ -530,29 +530,36 @@ function drawBoard() {
 }
 
 function drawPlayerCards() {
-    // Calcular posición Y del fondo (20px desde el borde inferior del canvas)
-    const backgroundY = canvas.height - CARD_HEIGHT - 20;
+    // Posición Y entre las columnas y los botones (60% de la altura del canvas)
+    const backgroundY = canvas.height * 0.6;
 
     // Dibujar fondo para las cartas
     ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
     ctx.beginPath();
     ctx.roundRect(
         (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) - CARD_SPACING)) / 2 - 20,
-        backgroundY,
+        backgroundY - 10,
         gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 20,
         CARD_HEIGHT + 20,
         15
     );
     ctx.fill();
 
+    // Posición Y para las cartas (centradas en el fondo)
+    const cardsY = backgroundY + 10;
+
     // Dibujar cada carta
-    gameState.yourCards.forEach(card => {
+    gameState.yourCards.forEach((card, index) => {
         if (card) {
+            card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
+                index * (CARD_WIDTH + CARD_SPACING);
+            card.y = cardsY;
             card.hoverOffset = card === selectedCard ? 10 : 0;
             card.draw();
         }
     });
 }
+
 
 function drawGameInfo() {
     // Fondo del área de información
