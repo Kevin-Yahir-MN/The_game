@@ -12,7 +12,7 @@ const COLUMN_SPACING = 60;
 const CARD_SPACING = 15;
 const BOARD_POSITION = {
     x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
-    y: canvas.height / 2 - CARD_HEIGHT / 2 - 40
+    y: canvas.height / 2 - CARD_HEIGHT / 2 - 100 // Ajustado para dejar más espacio abajo
 };
 
 // Estado del juego
@@ -317,7 +317,7 @@ function handleOpponentCardPlayed(message) {
 function updatePlayerCards(cards) {
     const isYourTurn = gameState.currentTurn === currentPlayer.id;
     const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
-    const startY = canvas.height * 0.6 + 10;
+    const startY = canvas.height * 0.8; // Cambiado de 0.6 a 0.8 (80% de la altura)
 
     gameState.yourCards = cards.map((card, index) => {
         const value = card instanceof Card ? card.value : card;
@@ -530,8 +530,8 @@ function drawBoard() {
 }
 
 function drawPlayerCards() {
-    // Posición Y entre las columnas y los botones (60% de la altura del canvas)
-    const backgroundY = canvas.height * 0.6;
+    // Posición Y para el fondo (78% de la altura del canvas)
+    const backgroundY = canvas.height * 0.78;
 
     // Dibujar fondo para las cartas
     ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
@@ -539,14 +539,14 @@ function drawPlayerCards() {
     ctx.roundRect(
         (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) - CARD_SPACING)) / 2 - 20,
         backgroundY - 10,
-        gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 20,
+        gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 40,
         CARD_HEIGHT + 20,
         15
     );
     ctx.fill();
 
-    // Posición Y para las cartas (centradas en el fondo)
-    const cardsY = backgroundY + 10;
+    // Posición Y para las cartas (80% de la altura del canvas)
+    const cardsY = canvas.height * 0.8;
 
     // Dibujar cada carta
     gameState.yourCards.forEach((card, index) => {
@@ -559,7 +559,6 @@ function drawPlayerCards() {
         }
     });
 }
-
 
 function drawGameInfo() {
     // Fondo del área de información
