@@ -1,4 +1,4 @@
-/* ===== VARIABLES Y ESTILOS GENERALES ===== */
+/* ===== VARIABLES GLOBALES ===== */
 :root {
     --primary: #3498db;
     --secondary: #2ecc71;
@@ -12,21 +12,18 @@
     --danger: #e74c3c;
 }
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
+/* ===== ESTILOS BASE ===== */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     min-height: 100vh;
+    margin: 0;
+    padding: 0;
     background: linear-gradient(135deg, var(--dark), var(--darker));
     color: var(--light);
     line-height: 1.6;
 }
 
-/* ===== ESTILOS PARA INDEX.HTML (LOBBY) ===== */
+/* ===== LOBBY (index.html) ===== */
 .lobby-container {
     display: flex;
     flex-direction: column;
@@ -221,7 +218,7 @@ body {
     color: var(--gray);
 }
 
-/* ===== ESTILOS PARA SALA.HTML (SALA DE ESPERA) ===== */
+/* ===== SALA DE ESPERA (sala.html) ===== */
 .room-container {
     min-height: 100vh;
     padding: 2rem;
@@ -386,7 +383,7 @@ body {
     box-shadow: 0 6px 12px rgba(192, 57, 43, 0.3);
 }
 
-/* ===== ESTILOS PARA GAME.HTML (MANTENIENDO DISEÑO ORIGINAL) ===== */
+/* ===== JUEGO (game.html) - ESTILOS ORIGINALES PRESERVADOS ===== */
 #gameContainer {
     position: relative;
     width: 800px;
@@ -490,7 +487,7 @@ body {
     line-height: 1.4;
 }
 
-/* ===== ANIMACIONES Y EFECTOS ===== */
+/* ===== ANIMACIONES ===== */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -558,7 +555,7 @@ body {
     }
 }
 
-/* ===== DISEÑO RESPONSIVE ===== */
+/* ===== RESPONSIVE ===== */
 @media (max-width: 850px) {
     #gameContainer {
         width: 95%;
