@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Game - Lobby</title>
     <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -16,41 +17,45 @@
         </div>
 
         <div class="lobby-card">
-            <div class="form-group">
-                <label for="playerName">Tu nombre</label>
-                <input type="text" id="playerName" placeholder="Ej: Xx_Kevas_Pussy_Destroyer_xX" maxlength="20">
-            </div>
-
-            <div class="action-buttons">
-                <button id="createRoom" class="btn-large">
-                    <span class="btn-icon">+</span> Crear nueva sala
-                </button>
-
-                <div class="separator">
-                    <span>o</span>
+            <div class="login-form">
+                <div class="form-group">
+                    <label for="playerName">Tu nombre</label>
+                    <input type="text" id="playerName" placeholder="Ej: Juan" maxlength="20">
                 </div>
 
-                <div class="join-section">
-                    <div class="form-group">
-                        <input type="text" id="roomCode" placeholder="Código de sala">
-                    </div>
-                    <button id="joinRoom" class="btn-large">
-                        <span class="btn-icon">→</span> Unirse a sala
+                <div class="action-buttons">
+                    <button id="createRoom" class="btn btn-primary">
+                        <span class="btn-icon">+</span> Crear nueva sala
                     </button>
-                </div>
-            </div>
 
-            <div class="game-info">
-                <h3>¿Cómo se juega?</h3>
-                <ul>
-                    <li>Juego cooperativo para 2-5 jugadores</li>
-                    <li>Deben jugar todas las cartas del mazo</li>
-                    <li>Cartas ascendentes (↑) y descendentes (↓)</li>
-                    <li>¡Colabora para ganar!</li>
-                </ul>
+                    <div class="separator">
+                        <span>o</span>
+                    </div>
+
+                    <div class="join-section">
+                        <div class="form-group">
+                            <label for="roomCode">Código de sala</label>
+                            <input type="text" id="roomCode" placeholder="Ej: 5A2B" maxlength="4">
+                        </div>
+                        <button id="joinRoom" class="btn btn-secondary">
+                            <span class="btn-icon">→</span> Unirse a sala
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
-        <script src="lobby.js"></script>
+
+        <div class="game-info">
+            <h3><span class="btn-icon">ℹ️</span> ¿Cómo se juega?</h3>
+            <ul>
+                <li>Juego cooperativo para 2-5 jugadores</li>
+                <li>Deben jugar todas las cartas del mazo</li>
+                <li>Cartas ascendentes (↑) y descendentes (↓)</li>
+                <li>¡Colabora para ganar!</li>
+            </ul>
+        </div>
+    </div>
+    <script src="lobby.js"></script>
 </body>
 
 </html>
