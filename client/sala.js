@@ -2,24 +2,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_URL = 'https://the-game-2xks.onrender.com';
     const WS_URL = 'wss://the-game-2xks.onrender.com';
 
-    // Variables globales
     let socket;
     const roomId = sessionStorage.getItem('roomId');
     const playerId = sessionStorage.getItem('playerId');
     const playerName = sessionStorage.getItem('playerName');
     const isHost = sessionStorage.getItem('isHost') === 'true';
 
-    // Elementos del DOM
     const roomIdDisplay = document.getElementById('roomIdDisplay');
     const playersList = document.getElementById('playersList');
     const startBtn = document.getElementById('startGame');
     const gameSettings = document.getElementById('gameSettings');
     const initialCardsSelect = document.getElementById('initialCards');
 
-    // Configurar elementos iniciales
     roomIdDisplay.textContent = roomId;
 
-    // Mostrar configuración solo si es host
     if (isHost) {
         gameSettings.style.display = 'block';
         startBtn.classList.add('visible');
@@ -28,7 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
         startBtn.remove();
     }
 
-    // Iniciar conexión WebSocket
     initializeWebSocket();
     updatePlayersList();
     setInterval(updatePlayersList, 3000);
