@@ -3,6 +3,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const WS_URL = 'wss://the-game-2xks.onrender.com';
 const endTurnButton = document.getElementById('endTurnBtn');
+const undoButton = document.getElementById('undoBtn');
 
 // Constantes de diseño
 const CARD_WIDTH = 80;
@@ -11,10 +12,10 @@ const COLUMN_SPACING = 60;
 const CARD_SPACING = 15;
 const BOARD_POSITION = {
     x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
-    y: canvas.height * 0.2
+    y: canvas.height * 0.3 // Tablero más arriba
 };
-const PLAYER_CARDS_Y = canvas.height * 0.55;
-const BUTTONS_Y = canvas.height * 0.85;
+const PLAYER_CARDS_Y = canvas.height * 0.6; // Posición Y para cartas del jugador
+const BUTTONS_Y = canvas.height * 0.85; // Posición Y para los botones
 
 // Estado del juego
 const currentPlayer = {
@@ -139,6 +140,9 @@ function connectWebSocket() {
                 case 'turn_changed':
                     handleTurnChanged(message);
                     break;
+                case 'move_undone':
+                    handleMoveUndone(message);
+                    break;
                 default:
                     console.log('Mensaje no reconocido:', message);
             }
@@ -204,14 +208,40 @@ function handleTurnChanged(message) {
     gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
         card => card.playerId !== currentPlayer.id
     );
+    undoButton.disabled = true;
 
     const playerName = gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador';
     showNotification(`Ahora es el turno de ${playerName}`);
 }
 
+function handleMoveUndone(message) {
+    if (message.playerId === currentPlayer.id) {
+        const moveIndex = gameState.cardsPlayedThisTurn.findIndex(
+            move => move.value === message.cardValue && move.position === message.position
+        );
+
+        if (moveIndex !== -1) {
+            gameState.cardsPlayedThisTurn.splice(moveIndex, 1);
+        }
+
+        if (message.position.includes('asc')) {
+            const idx = message.position === 'asc1' ? 0 : 1;
+            gameState.board.ascending[idx] = message.previousValue;
+        } else {
+            const idx = message.position === 'desc1' ? 0 : 1;
+            gameState.board.descending[idx] = message.previousValue;
+        }
+
+        const card = new Card(message.cardValue, 0, 0, true, false);
+        gameState.yourCards.push(card);
+        updatePlayerCards(gameState.yourCards.map(c => c.value));
+    }
+}
+
 function handleGameOver(message) {
     canvas.style.pointerEvents = 'none';
     endTurnButton.disabled = true;
+    undoButton.disabled = true;
 
     const gameOverDiv = document.createElement('div');
     gameOverDiv.className = 'game-over-notification';
@@ -243,6 +273,10 @@ function updateGameState(newState) {
     if (gameState.currentTurn !== currentPlayer.id) {
         selectedCard = null;
     }
+
+    undoButton.disabled =
+        gameState.currentTurn !== currentPlayer.id ||
+        gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length === 0;
 }
 
 function handleOpponentCardPlayed(message) {
@@ -411,7 +445,30 @@ function playCard(cardValue, position) {
         position
     }));
 
+    undoButton.disabled = false;
     selectedCard = null;
+}
+
+function undoLastMove() {
+    if (gameState.currentTurn !== currentPlayer.id ||
+        gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length === 0) {
+        return;
+    }
+
+    const lastMove = [...gameState.cardsPlayedThisTurn]
+        .reverse()
+        .find(move => move.playerId === currentPlayer.id);
+
+    if (!lastMove) {
+        return showNotification('No hay movimientos para deshacer', true);
+    }
+
+    socket.send(JSON.stringify({
+        type: 'undo_move',
+        playerId: currentPlayer.id,
+        cardValue: lastMove.value,
+        position: lastMove.position
+    }));
 }
 
 function endTurn() {
@@ -573,9 +630,16 @@ function initGame() {
     }
 
     canvas.width = 800;
-    canvas.height = 600;
+    canvas.height = 700;
     endTurnButton.addEventListener('click', endTurn);
+    undoButton.addEventListener('click', undoLastMove);
     canvas.addEventListener('click', handleCanvasClick);
+
+    // Posicionar los botones
+    const controlsDiv = document.querySelector('.game-controls');
+    if (controlsDiv) {
+        controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
+    }
 
     connectWebSocket();
     gameLoop();
