@@ -279,6 +279,11 @@ wss.on('connection', (ws, req) => {
                         endTurn(room, player);
                     }
                     break;
+                case 'undo_move':
+                    if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                        handleUndoMove(room, player, msg);
+                    }
+                    break;
                 case 'get_game_state':
                     if (room.gameState.gameStarted) sendGameState(room, player);
                     break;
@@ -428,6 +433,52 @@ function handlePlayCard(room, player, msg) {
     updateBoardHistory(room, msg.position, msg.cardValue);
     broadcastGameState(room);
     checkGameStatus(room);
+}
+
+function handleUndoMove(room, player, msg) {
+    if (player.cardsPlayedThisTurn.length === 0) {
+        return safeSend(player.ws, {
+            type: 'notification',
+            message: 'No hay jugadas para deshacer',
+            isError: true
+        });
+    }
+
+    const lastMoveIndex = player.cardsPlayedThisTurn.findIndex(
+        move => move.value === msg.cardValue &&
+            move.position === msg.position
+    );
+
+    if (lastMoveIndex === -1) {
+        return safeSend(player.ws, {
+            type: 'notification',
+            message: 'No se encontró la jugada para deshacer',
+            isError: true
+        });
+    }
+
+    const lastMove = player.cardsPlayedThisTurn[lastMoveIndex];
+
+    player.cards.push(msg.cardValue);
+
+    if (msg.position.includes('asc')) {
+        const idx = msg.position === 'asc1' ? 0 : 1;
+        room.gameState.board.ascending[idx] = lastMove.previousValue;
+    } else {
+        const idx = msg.position === 'desc1' ? 0 : 1;
+        room.gameState.board.descending[idx] = lastMove.previousValue;
+    }
+
+    player.cardsPlayedThisTurn.splice(lastMoveIndex, 1);
+
+    broadcastToRoom(room, {
+        type: 'move_undone',
+        playerId: player.id,
+        playerName: player.name,
+        cardValue: msg.cardValue,
+        position: msg.position,
+        previousValue: lastMove.previousValue
+    }, { includeGameState: true });
 }
 
 function endTurn(room, player) {
