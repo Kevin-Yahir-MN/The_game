@@ -156,7 +156,8 @@ app.post('/create-room', (req, res) => {
             deck: initializeDeck(),
             board: { ascending: [1, 1], descending: [100, 100] },
             currentTurn: playerId,
-            gameStarted: false
+            gameStarted: false,
+            initialCards: 6
         }
     };
 
@@ -267,7 +268,7 @@ wss.on('connection', (ws, req) => {
             const msg = JSON.parse(message);
             switch (msg.type) {
                 case 'start_game':
-                    if (player.isHost && !room.gameState.gameStarted) startGame(room);
+                    if (player.isHost && !room.gameState.gameStarted) startGame(room, msg.initialCards);
                     break;
                 case 'play_card':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
@@ -312,7 +313,9 @@ wss.on('connection', (ws, req) => {
 });
 
 // Lógica del juego
-function startGame(room) {
+function startGame(room, initialCards = 6) {
+
+    /*
     if (room.players.length < 2) {
         return broadcastToRoom(room, {
             type: 'notification',
@@ -320,9 +323,10 @@ function startGame(room) {
             isError: true
         });
     }
+    */
 
     room.gameState.gameStarted = true;
-    const cardsToDeal = room.players.length <= 3 ? 6 : 5;
+    room.gameState.initialCards = initialCards;
 
     room.players.forEach(player => {
         player.cards = [];
@@ -491,7 +495,7 @@ function endTurn(room, player) {
         });
     }
 
-    const targetCardCount = room.players.length <= 3 ? 6 : 5;
+    const targetCardCount = room.gameState.initialCards;
     const cardsToDraw = Math.min(
         targetCardCount - player.cards.length,
         room.gameState.deck.length

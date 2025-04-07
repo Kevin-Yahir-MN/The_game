@@ -13,12 +13,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomIdDisplay = document.getElementById('roomIdDisplay');
     const playersList = document.getElementById('playersList');
     const startBtn = document.getElementById('startGame');
+    const gameSettings = document.getElementById('gameSettings');
+    const initialCardsSelect = document.getElementById('initialCards');
 
     // Configurar elementos iniciales
     roomIdDisplay.textContent = roomId;
 
-    // Mostrar botón solo si es host
+    // Mostrar configuración solo si es host
     if (isHost) {
+        gameSettings.style.display = 'block';
         startBtn.classList.add('visible');
         startBtn.addEventListener('click', handleStartGame);
     } else {
@@ -50,6 +53,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.location.href = 'game.html';
             } else if (message.type === 'room_update') {
                 updatePlayersUI(message.players);
+            } else if (message.type === 'notification') {
+                showNotification(message.message, message.isError);
             }
         };
 
@@ -64,6 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleStartGame() {
+        const initialCards = parseInt(initialCardsSelect.value);
+
         if (!socket || socket.readyState !== WebSocket.OPEN) {
             alert('Error: No hay conexión con el servidor. Reconectando...');
             initializeWebSocket();
@@ -78,7 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
             socket.send(JSON.stringify({
                 type: 'start_game',
                 playerId: playerId,
-                roomId: roomId
+                roomId: roomId,
+                initialCards: initialCards
             }));
         } catch (error) {
             console.error('Error al iniciar juego:', error);
@@ -86,6 +94,14 @@ document.addEventListener('DOMContentLoaded', () => {
             startBtn.textContent = 'Iniciar Juego';
             alert('Error al iniciar el juego. Intenta nuevamente.');
         }
+    }
+
+    function showNotification(message, isError = false) {
+        const notification = document.createElement('div');
+        notification.className = `notification ${isError ? 'error' : ''}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
     }
 
     async function updatePlayersList() {

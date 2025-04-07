@@ -30,6 +30,7 @@ let gameState = {
     board: { ascending: [1, 1], descending: [100, 100] },
     currentTurn: null,
     remainingDeck: 98,
+    initialCards: 6,
     cardsPlayedThisTurn: [],
     animatingCards: []
 };
@@ -261,6 +262,7 @@ function updateGameState(newState) {
     gameState.currentTurn = newState.currentTurn || gameState.currentTurn;
     gameState.remainingDeck = newState.remainingDeck || gameState.remainingDeck;
     gameState.players = newState.players || gameState.players;
+    gameState.initialCards = newState.initialCards || gameState.initialCards;
     gameState.cardsPlayedThisTurn = newState.cardsPlayedThisTurn || gameState.cardsPlayedThisTurn;
 
     if (newState.yourCards) {
@@ -566,7 +568,7 @@ function drawGameInfo() {
 
     const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
     ctx.fillText(`Turno actual: ${currentPlayerName}`, 40, 50);
-
+    ctx.fillText(`Cartas iniciales en mano: ${gameState.initialCards}`, 40, 140);
     ctx.fillText(`Cartas restantes: ${gameState.remainingDeck}`, 40, 80);
 
     if (gameState.currentTurn === currentPlayer.id) {

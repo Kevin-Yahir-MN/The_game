@@ -23,6 +23,19 @@
             <ul id="playersList"></ul>
         </div>
 
+        <div class="game-settings" id="gameSettings" style="display: none;">
+            <h3>Configuración del Juego</h3>
+            <div class="form-group">
+                <label for="initialCards">Cartas iniciales por jugador:</label>
+                <select id="initialCards" class="form-control">
+                    <option value="6">6 cartas</option>
+                    <option value="5">5 cartas</option>
+                    <option value="4">4 cartas</option>
+                    <option value="3">3 cartas</option>
+                </select>
+            </div>
+        </div>
+
         <button id="startGame">Iniciar Juego</button>
     </div>
     <script src="sala.js"></script>
