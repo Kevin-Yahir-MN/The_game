@@ -444,8 +444,6 @@ body {
     opacity: 0.7;
 }
 
-/* Eliminado todo el CSS relacionado con #undoBtn */
-
 .game-instructions {
     position: fixed;
     bottom: 20px;
