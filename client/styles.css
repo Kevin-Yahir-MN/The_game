@@ -401,27 +401,6 @@ body {
 }
 
 /* ===== JUEGO (game.html) - ESTILOS ORIGINALES ===== */
-#gameContainer {
-    position: relative;
-    width: 800px;
-    height: 800px;
-    margin: 20px auto;
-    overflow: visible;
-    background: transparent;
-}
-
-#gameCanvas {
-    background-color: #1a6b1a;
-    display: block;
-    margin: 0 auto;
-    border: 4px solid #34495e;
-    border-radius: 12px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    position: relative;
-    z-index: 1;
-    height: 700px;
-}
-
 .game-controls {
     position: absolute;
     bottom: 0;
@@ -437,8 +416,7 @@ body {
     margin-top: 20px;
 }
 
-#endTurnBtn,
-#undoBtn {
+#endTurnBtn {
     color: white;
     border: none;
     border-radius: 8px;
@@ -450,30 +428,23 @@ body {
     min-width: 150px;
     transition: all 0.3s;
     min-height: 50px;
-}
-
-#endTurnBtn {
     background-color: #e74c3c;
 }
 
-#undoBtn {
-    background-color: #3498db;
-}
-
-#endTurnBtn:hover:not(:disabled),
-#undoBtn:hover:not(:disabled) {
+#endTurnBtn:hover:not(:disabled) {
     transform: translateY(-3px);
     box-shadow: 0 6px 10px rgba(0, 0, 0, 0.3);
 }
 
-#endTurnBtn:disabled,
-#undoBtn:disabled {
+#endTurnBtn:disabled {
     background-color: #95a5a6;
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
     opacity: 0.7;
 }
+
+/* Eliminado todo el CSS relacionado con #undoBtn */
 
 .game-instructions {
     position: fixed;
