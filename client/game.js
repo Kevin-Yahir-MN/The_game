@@ -11,9 +11,9 @@ const COLUMN_SPACING = 60;
 const CARD_SPACING = 15;
 const BOARD_POSITION = {
     x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
-    y: canvas.height * 0.3
+    y: canvas.height * 0.2
 };
-const PLAYER_CARDS_Y = canvas.height * 0.6;
+const PLAYER_CARDS_Y = canvas.height * 0.55;
 const BUTTONS_Y = canvas.height * 0.85;
 
 // Estado del juego
@@ -573,15 +573,9 @@ function initGame() {
     }
 
     canvas.width = 800;
-    canvas.height = 700;
+    canvas.height = 600;
     endTurnButton.addEventListener('click', endTurn);
     canvas.addEventListener('click', handleCanvasClick);
-
-    // Posicionar los botones
-    const controlsDiv = document.querySelector('.game-controls');
-    if (controlsDiv) {
-        controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
-    }
 
     connectWebSocket();
     gameLoop();
