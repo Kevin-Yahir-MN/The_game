@@ -3,7 +3,6 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const WS_URL = 'wss://the-game-2xks.onrender.com';
 const endTurnButton = document.getElementById('endTurnBtn');
-const undoButton = document.getElementById('undoBtn');
 
 // Constantes de diseño
 const CARD_WIDTH = 80;
@@ -208,7 +207,6 @@ function handleTurnChanged(message) {
     gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
         card => card.playerId !== currentPlayer.id
     );
-    undoButton.disabled = true;
 
     const playerName = gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador';
     showNotification(`Ahora es el turno de ${playerName}`);
@@ -241,7 +239,6 @@ function handleMoveUndone(message) {
 function handleGameOver(message) {
     canvas.style.pointerEvents = 'none';
     endTurnButton.disabled = true;
-    undoButton.disabled = true;
 
     const gameOverDiv = document.createElement('div');
     gameOverDiv.className = 'game-over-notification';
@@ -273,10 +270,6 @@ function updateGameState(newState) {
     if (gameState.currentTurn !== currentPlayer.id) {
         selectedCard = null;
     }
-
-    undoButton.disabled =
-        gameState.currentTurn !== currentPlayer.id ||
-        gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length === 0;
 }
 
 function handleOpponentCardPlayed(message) {
@@ -445,7 +438,6 @@ function playCard(cardValue, position) {
         position
     }));
 
-    undoButton.disabled = false;
     selectedCard = null;
 }
 
