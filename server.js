@@ -216,13 +216,6 @@ app.get('/room-info/:roomId', (req, res) => {
 });
 
 function startGame(room, initialCards = 6) {
-    if (room.players.length < 2) {
-        return broadcastToRoom(room, {
-            type: 'notification',
-            message: 'Se necesitan al menos 2 jugadores para comenzar',
-            isError: true
-        });
-    }
 
     room.gameState.gameStarted = true;
     room.gameState.initialCards = initialCards;
