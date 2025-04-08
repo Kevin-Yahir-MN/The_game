@@ -16,10 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const BUTTONS_Y = canvas.height * 0.85;
     const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 20;
 
-    // Icono de historial
-    const HISTORY_ICON_IMAGE = new Image();
-    HISTORY_ICON_IMAGE.src = 'img/cards_icon.png'; // Ajusta la ruta según tu estructura
-
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
         name: sessionStorage.getItem('playerName'),
@@ -395,20 +391,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawHistoryIcons() {
-        if (!HISTORY_ICON_IMAGE.complete) return; // No dibujar si la imagen no está cargada
-
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
-            const y = HISTORY_ICON_Y;
 
-            // Dibujar área clickeable (solo para debug, puedes quitarlo después)
+            // Dibujar área clickeable
             ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
             ctx.beginPath();
-            ctx.arc(x + 20, y + 20, 22, 0, Math.PI * 2);
+            ctx.arc(x + 20, HISTORY_ICON_Y + 20, 22, 0, Math.PI * 2);
             ctx.fill();
 
-            // Dibujar el icono de imagen
-            ctx.drawImage(HISTORY_ICON_IMAGE, x, y, 40, 40);
+            // Dibujar icono SVG (simplificado)
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            // Círculo del reloj
+            ctx.arc(x + 20, HISTORY_ICON_Y + 20, 8, 0, Math.PI * 2);
+            ctx.fill();
+            // Aguja del reloj
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.beginPath();
+            ctx.moveTo(x + 20, HISTORY_ICON_Y + 20);
+            ctx.lineTo(x + 20, HISTORY_ICON_Y + 12);
+            ctx.lineTo(x + 24, HISTORY_ICON_Y + 12);
+            ctx.closePath();
+            ctx.fill();
         });
     }
 
@@ -423,7 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const iconY = HISTORY_ICON_Y + 20;
             const distance = Math.sqrt(Math.pow(x - iconX, 2) + Math.pow(y - iconY, 2));
 
-            if (distance <= 22) { // Radio del área clickeable
+            if (distance <= 22) { // Radio del icono
                 return showColumnHistory(col);
             }
         });
@@ -712,30 +717,19 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Precargar el icono
-        const iconLoaded = new Promise((resolve) => {
-            HISTORY_ICON_IMAGE.onload = resolve;
-            HISTORY_ICON_IMAGE.onerror = () => {
-                console.error('Error cargando el icono de historial');
-                resolve();
-            };
-        });
+        canvas.width = 800;
+        canvas.height = 700;
+        endTurnButton.addEventListener('click', endTurn);
+        canvas.addEventListener('click', handleCanvasClick);
+        document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
 
-        Promise.all([iconLoaded]).then(() => {
-            canvas.width = 800;
-            canvas.height = 700;
-            endTurnButton.addEventListener('click', endTurn);
-            canvas.addEventListener('click', handleCanvasClick);
-            document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
+        const controlsDiv = document.querySelector('.game-controls');
+        if (controlsDiv) {
+            controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
+        }
 
-            const controlsDiv = document.querySelector('.game-controls');
-            if (controlsDiv) {
-                controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
-            }
-
-            connectWebSocket();
-            gameLoop();
-        });
+        connectWebSocket();
+        gameLoop();
     }
 
     initGame();
