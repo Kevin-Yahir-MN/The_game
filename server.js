@@ -167,9 +167,9 @@ function handlePlayCard(room, player, msg) {
 
     // Aplicar el movimiento
     if (msg.position.includes('asc')) {
-        board.ascending[targetIdx] = msg.cardValue;
+        room.gameState.board.ascending[msg.position === 'asc1' ? 0 : 1] = msg.cardValue;
     } else {
-        board.descending[targetIdx] = msg.cardValue;
+        room.gameState.board.descending[msg.position === 'desc1' ? 0 : 1] = msg.cardValue;
     }
 
     player.cards.splice(player.cards.indexOf(msg.cardValue), 1);
@@ -189,7 +189,6 @@ function handlePlayCard(room, player, msg) {
 
     updateBoardHistory(room, msg.position, msg.cardValue);
     broadcastGameState(room);
-    checkGameStatus(room);
 }
 
 function handleUndoMove(room, player, msg) {
@@ -500,6 +499,21 @@ wss.on('connection', (ws, req) => {
                     break;
                 case 'get_game_state':
                     if (room.gameState.gameStarted) sendGameState(room, player);
+                    break;
+                case 'self_blocked':
+                    if (rooms.has(msg.roomId)) {
+                        const room = rooms.get(msg.roomId);
+                        const player = room.players.find(p => p.id === msg.playerId);
+
+                        if (player) {
+                            broadcastToRoom(room, {
+                                type: 'game_over',
+                                result: 'lose',
+                                message: `¡A ${player.name} se le avisó que se quedaria sin movimientos si hacia ese movimiento, pero le valio verga y siguió!`,
+                                reason: 'self_blocked'
+                            });
+                        }
+                    }
                     break;
                 case 'reset_room':
                     if (player.isHost && rooms.has(msg.roomId)) {

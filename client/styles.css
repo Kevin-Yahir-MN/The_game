@@ -790,3 +790,24 @@ body {
     z-index: 999;
     animation: fadeIn 0.3s ease-out;
 }
+
+/* Estilo para el mensaje de Game Over específico */
+.game-over-notification.self-blocked {
+    border-color: #e74c3c;
+    background: rgba(231, 76, 60, 0.1);
+}
+
+.game-over-notification.self-blocked h2 {
+    color: #e74c3c;
+    animation: pulse 0.5s infinite alternate;
+}
+
+@keyframes pulse {
+    from {
+        transform: scale(1);
+    }
+
+    to {
+        transform: scale(1.05);
+    }
+}
