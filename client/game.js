@@ -573,7 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawGameInfo() {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
         ctx.beginPath();
-        ctx.roundRect(20, 20, 360, 150, 15);
+        ctx.roundRect(20, 20, 360, 100, 15);
         ctx.fill();
 
         ctx.fillStyle = 'white';
