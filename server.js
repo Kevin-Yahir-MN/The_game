@@ -131,26 +131,18 @@ function getPlayableCards(playerCards, board) {
 
 function handlePlayCard(room, player, msg) {
     if (!validPositions.includes(msg.position)) {
-        safeSend(player.ws, {
+        return safeSend(player.ws, {
             type: 'notification',
             message: 'Posición inválida',
             isError: true
         });
-        return safeSend(player.ws, {
-            type: 'invalid_move',
-            playerId: player.id
-        });
     }
 
     if (!player.cards.includes(msg.cardValue)) {
-        safeSend(player.ws, {
+        return safeSend(player.ws, {
             type: 'notification',
             message: 'No tienes esa carta',
             isError: true
-        });
-        return safeSend(player.ws, {
-            type: 'invalid_move',
-            playerId: player.id
         });
     }
 
@@ -166,56 +158,14 @@ function handlePlayCard(room, player, msg) {
         (msg.cardValue < targetValue || msg.cardValue === targetValue + 10);
 
     if (!isValid) {
-        safeSend(player.ws, {
+        return safeSend(player.ws, {
             type: 'notification',
             message: `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'} que ${targetValue} o igual a ${msg.position.includes('asc') ? targetValue - 10 : targetValue + 10}`,
             isError: true
         });
-        return safeSend(player.ws, {
-            type: 'invalid_move',
-            playerId: player.id
-        });
     }
 
-    // Nueva validación para movimientos bloqueantes
-    if (room.gameState.deck.length > 0 && player.cardsPlayedThisTurn.length < 1) {
-        const remainingCards = player.cards.filter(c => c !== msg.cardValue);
-        const tempBoard = JSON.parse(JSON.stringify(room.gameState.board));
-
-        // Aplicar movimiento temporal
-        if (msg.position.includes('asc')) {
-            tempBoard.ascending[msg.position === 'asc1' ? 0 : 1] = msg.cardValue;
-        } else {
-            tempBoard.descending[msg.position === 'desc1' ? 0 : 1] = msg.cardValue;
-        }
-
-        // Verificar movimientos posibles después de este
-        const hasPossibleMoves = remainingCards.some(card => {
-            return validPositions.some(pos => {
-                const posIdx = pos === 'asc1' ? 0 : pos === 'asc2' ? 1 : pos === 'desc1' ? 0 : 1;
-                const posValue = pos.includes('asc') ?
-                    tempBoard.ascending[posIdx] :
-                    tempBoard.descending[posIdx];
-
-                return pos.includes('asc') ?
-                    (card > posValue || card === posValue - 10) :
-                    (card < posValue || card === posValue + 10);
-            });
-        });
-
-        if (!hasPossibleMoves && remainingCards.length > 0) {
-            return safeSend(player.ws, {
-                type: 'notification',
-                message: 'No puedes jugar esa carta ahora: te impediría cumplir el mínimo requerido',
-                isError: true
-            });
-        }
-    }
-
-    const previousValue = msg.position.includes('asc') ?
-        board.ascending[targetIdx] :
-        board.descending[targetIdx];
-
+    // Aplicar el movimiento
     if (msg.position.includes('asc')) {
         board.ascending[targetIdx] = msg.cardValue;
     } else {
@@ -223,13 +173,10 @@ function handlePlayCard(room, player, msg) {
     }
 
     player.cards.splice(player.cards.indexOf(msg.cardValue), 1);
-
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
         position: msg.position,
-        previousValue,
-        isPlayedThisTurn: true,
-        isFromCurrentTurn: true
+        isPlayedThisTurn: true
     });
 
     broadcastToRoom(room, {
@@ -237,10 +184,7 @@ function handlePlayCard(room, player, msg) {
         cardValue: msg.cardValue,
         position: msg.position,
         playerId: player.id,
-        playerName: player.name,
-        cardsPlayedCount: player.cardsPlayedThisTurn.length,
-        isPlayedThisTurn: true,
-        isFromCurrentTurn: true
+        playerName: player.name
     });
 
     updateBoardHistory(room, msg.position, msg.cardValue);
@@ -340,7 +284,6 @@ function endTurn(room, player) {
     }
 
     player.cardsPlayedThisTurn = [];
-
     broadcastGameState(room);
 
     broadcastToRoom(room, {
@@ -559,10 +502,8 @@ wss.on('connection', (ws, req) => {
                     if (room.gameState.gameStarted) sendGameState(room, player);
                     break;
                 case 'reset_room':
-                    if (rooms.has(msg.roomId)) {
+                    if (player.isHost && rooms.has(msg.roomId)) {
                         const room = rooms.get(msg.roomId);
-
-                        // Reiniciar el estado del juego pero mantener jugadores
                         room.gameState = {
                             deck: initializeDeck(),
                             board: { ascending: [1, 1], descending: [100, 100] },
@@ -571,7 +512,6 @@ wss.on('connection', (ws, req) => {
                             initialCards: room.gameState.initialCards || 6
                         };
 
-                        // Resetear estado de los jugadores
                         room.players.forEach(player => {
                             player.cards = [];
                             player.cardsPlayedThisTurn = [];
@@ -583,6 +523,8 @@ wss.on('connection', (ws, req) => {
                         });
                     }
                     break;
+                default:
+                    console.log('Tipo de mensaje no reconocido:', msg.type);
             }
         } catch (error) {
             console.error('Error procesando mensaje:', error);

@@ -157,42 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
 
-        // Validación básica de reglas del juego
         return position.includes('asc')
             ? (cardValue > target || cardValue === target - 10)
             : (cardValue < target || cardValue === target + 10);
-    }
-
-    function isMoveSafe(cardValue, position) {
-        // Si el mazo está vacío o ya jugaste suficiente, no hay restricciones
-        if (gameState.remainingDeck === 0 ||
-            gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length >= 1) {
-            return true;
-        }
-
-        // Simular el tablero después de este movimiento
-        const tempBoard = JSON.parse(JSON.stringify(gameState.board));
-        if (position.includes('asc')) {
-            tempBoard.ascending[position === 'asc1' ? 0 : 1] = cardValue;
-        } else {
-            tempBoard.descending[position === 'desc1' ? 0 : 1] = cardValue;
-        }
-
-        // Obtener cartas restantes (excluyendo la que se está jugando)
-        const remainingCards = gameState.yourCards.filter(c => c.value !== cardValue);
-
-        // Verificar si hay al menos una carta jugable después de este movimiento
-        return remainingCards.some(card => {
-            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
-                const posValue = pos.includes('asc')
-                    ? tempBoard.ascending[pos === 'asc1' ? 0 : 1]
-                    : tempBoard.descending[pos === 'desc1' ? 0 : 1];
-
-                return pos.includes('asc')
-                    ? (card.value > posValue || card.value === posValue - 10)
-                    : (card.value < posValue || card.value === posValue + 10);
-            });
-        });
     }
 
     function getColumnPosition(position) {
@@ -264,7 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.style.pointerEvents = 'none';
         endTurnButton.disabled = true;
 
-        // Crear fondo semitransparente
         const backdrop = document.createElement('div');
         backdrop.className = 'game-over-backdrop';
         document.body.appendChild(backdrop);
@@ -274,12 +240,11 @@ document.addEventListener('DOMContentLoaded', () => {
         gameOverDiv.innerHTML = `
             <h2>¡GAME OVER!</h2>
             <p>${message.message}</p>
-            <button id="returnToRoom">Volver al Lobby</button>
+            <button id="returnToRoom">Volver a la Sala</button>
         `;
         document.body.appendChild(gameOverDiv);
 
         document.getElementById('returnToRoom').addEventListener('click', () => {
-            // Enviar mensaje al servidor para reiniciar la sala
             socket.send(JSON.stringify({
                 type: 'reset_room',
                 roomId: roomId,
@@ -352,21 +317,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         gameState.yourCards = cards.map((card, index) => {
             const value = card instanceof Card ? card.value : card;
-            const basicPlayable = isYourTurn && (
+            const playable = isYourTurn && (
                 isValidMove(value, 'asc1') || isValidMove(value, 'asc2') ||
                 isValidMove(value, 'desc1') || isValidMove(value, 'desc2')
-            );
-
-            // Una carta es jugable si:
-            // 1. Pasa la validación básica Y
-            // 2. O el mazo está vacío Y ya jugaste al menos 1 carta
-            // 3. O es un movimiento "seguro" que no te dejará bloqueado
-            const playable = basicPlayable && (
-                gameState.remainingDeck === 0 ||
-                gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length >= 1 ||
-                ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
-                    isValidMove(value, pos) && isMoveSafe(value, pos)
-                )
             );
 
             const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
@@ -403,11 +356,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const clickedColumn = getClickedColumn(x, y);
         if (clickedColumn && selectedCard) {
+            if (gameState.remainingDeck > 0 &&
+                gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length === 0) {
+
+                const tempBoard = JSON.parse(JSON.stringify(gameState.board));
+                if (clickedColumn.includes('asc')) {
+                    tempBoard.ascending[clickedColumn === 'asc1' ? 0 : 1] = selectedCard.value;
+                } else {
+                    tempBoard.descending[clickedColumn === 'desc1' ? 0 : 1] = selectedCard.value;
+                }
+
+                const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
+                const hasOtherMoves = remainingCards.some(card => {
+                    return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+                        const posValue = pos.includes('asc')
+                            ? tempBoard.ascending[pos === 'asc1' ? 0 : 1]
+                            : tempBoard.descending[pos === 'desc1' ? 0 : 1];
+
+                        return pos.includes('asc')
+                            ? (card.value > posValue || card.value === posValue - 10)
+                            : (card.value < posValue || card.value === posValue + 10);
+                    });
+                });
+
+                if (!hasOtherMoves) {
+                    const confirmMove = confirm(
+                        'Jugar esta carta te dejará sin movimientos para cumplir el mínimo requerido. ¿Deseas continuar?'
+                    );
+                    if (!confirmMove) {
+                        return;
+                    }
+                }
+            }
+
             playCard(selectedCard.value, clickedColumn);
             return;
         }
+
         const clickedCard = gameState.yourCards.find(card => card.contains(x, y));
         if (clickedCard) {
+            selectedCard = clickedCard.isPlayable ? clickedCard : null;
             if (!clickedCard.isPlayable) {
                 const basicValid = ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
                     isValidMove(clickedCard.value, pos)
@@ -416,20 +404,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!basicValid) {
                     showNotification('No puedes jugar esta carta en ninguna columna', true);
                 } else {
-                    const safeMove = ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
-                        isValidMove(clickedCard.value, pos) && isMoveSafe(clickedCard.value, pos)
-                    );
-
-                    if (!safeMove) {
-                        showNotification('Jugar esta carta te impediría cumplir el mínimo de 2 cartas', true);
-                    } else {
-                        showNotification('No puedes jugar esta carta ahora', true);
-                    }
+                    showNotification('No puedes jugar esta carta ahora', true);
                 }
                 animateInvalidCard(clickedCard);
-                return;
             }
-            selectedCard = clickedCard;
         }
     }
 
@@ -502,28 +480,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
 
         selectedCard = null;
-    }
-
-    function undoLastMove() {
-        if (gameState.currentTurn !== currentPlayer.id ||
-            gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length === 0) {
-            return;
-        }
-
-        const lastMove = [...gameState.cardsPlayedThisTurn]
-            .reverse()
-            .find(move => move.playerId === currentPlayer.id);
-
-        if (!lastMove) {
-            return showNotification('No hay movimientos para deshacer', true);
-        }
-
-        socket.send(JSON.stringify({
-            type: 'undo_move',
-            playerId: currentPlayer.id,
-            cardValue: lastMove.value,
-            position: lastMove.position
-        }));
     }
 
     function endTurn() {
