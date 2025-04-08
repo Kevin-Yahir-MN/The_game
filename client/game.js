@@ -231,6 +231,11 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.style.pointerEvents = 'none';
         endTurnButton.disabled = true;
 
+        // Crear fondo semitransparente
+        const backdrop = document.createElement('div');
+        backdrop.className = 'game-over-backdrop';
+        document.body.appendChild(backdrop);
+
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
         gameOverDiv.innerHTML = `
