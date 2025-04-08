@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Icono de historial
     const HISTORY_ICON_IMAGE = new Image();
-    HISTORY_ICON_IMAGE.src = 'img/cards-icon.png'; // Ajusta la ruta según tu estructura
+    HISTORY_ICON_IMAGE.src = 'img/cards_icon.png'; // Ajusta la ruta según tu estructura
 
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
