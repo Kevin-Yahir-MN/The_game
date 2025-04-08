@@ -157,9 +157,39 @@ document.addEventListener('DOMContentLoaded', () => {
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
 
-        return position.includes('asc')
+        const isValid = position.includes('asc')
             ? (cardValue > target || cardValue === target - 10)
             : (cardValue < target || cardValue === target + 10);
+
+        // Verificar si el movimiento dejaría al jugador sin opciones para cumplir el mínimo
+        if (isValid && gameState.remainingDeck > 0 && gameState.cardsPlayedThisTurn.length < 1) {
+            const remainingCards = gameState.yourCards.filter(c => c.value !== cardValue);
+            const tempBoard = JSON.parse(JSON.stringify(gameState.board));
+
+            if (position.includes('asc')) {
+                tempBoard.ascending[position === 'asc1' ? 0 : 1] = cardValue;
+            } else {
+                tempBoard.descending[position === 'desc1' ? 0 : 1] = cardValue;
+            }
+
+            const hasOtherMoves = remainingCards.some(card => {
+                return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+                    const posValue = pos.includes('asc')
+                        ? tempBoard.ascending[pos === 'asc1' ? 0 : 1]
+                        : tempBoard.descending[pos === 'desc1' ? 0 : 1];
+
+                    return pos.includes('asc')
+                        ? (card.value > posValue || card.value === posValue - 10)
+                        : (card.value < posValue || card.value === posValue + 10);
+                });
+            });
+
+            if (!hasOtherMoves) {
+                return false;
+            }
+        }
+
+        return isValid;
     }
 
     function getColumnPosition(position) {
@@ -364,11 +394,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const clickedCard = gameState.yourCards.find(card => card.contains(x, y));
         if (clickedCard) {
-            selectedCard = clickedCard.isPlayable ? clickedCard : null;
             if (!clickedCard.isPlayable) {
-                showNotification('No puedes jugar esta carta ahora', true);
+                const playablePositions = ['asc1', 'asc2', 'desc1', 'desc2'].filter(pos =>
+                    isValidMove(clickedCard.value, pos)
+                );
+
+                if (playablePositions.length === 0) {
+                    showNotification('No puedes jugar esta carta en ninguna columna', true);
+                } else if (gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length >= 1 &&
+                    !playablePositions.some(pos => {
+                        // Verificar si jugar esta carta impediría cumplir el mínimo
+                        const tempBoard = JSON.parse(JSON.stringify(gameState.board));
+                        if (pos.includes('asc')) {
+                            tempBoard.ascending[pos === 'asc1' ? 0 : 1] = clickedCard.value;
+                        } else {
+                            tempBoard.descending[pos === 'desc1' ? 0 : 1] = clickedCard.value;
+                        }
+
+                        const remainingCards = gameState.yourCards.filter(c => c !== clickedCard);
+                        return remainingCards.some(card => {
+                            return ['asc1', 'asc2', 'desc1', 'desc2'].some(p => {
+                                const pValue = p.includes('asc')
+                                    ? tempBoard.ascending[p === 'asc1' ? 0 : 1]
+                                    : tempBoard.descending[p === 'desc1' ? 0 : 1];
+                                return p.includes('asc')
+                                    ? (card.value > pValue || card.value === pValue - 10)
+                                    : (card.value < pValue || card.value === pValue + 10);
+                            });
+                        });
+                    })) {
+                    showNotification('Jugar esta carta te impediría cumplir el mínimo requerido', true);
+                } else {
+                    showNotification('No puedes jugar esta carta ahora', true);
+                }
                 animateInvalidCard(clickedCard);
+                return;
             }
+            selectedCard = clickedCard;
         }
     }
 

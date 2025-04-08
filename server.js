@@ -180,14 +180,16 @@ function handlePlayCard(room, player, msg) {
     // Nueva validación para movimientos bloqueantes
     if (room.gameState.deck.length > 0 && player.cardsPlayedThisTurn.length < 1) {
         const remainingCards = player.cards.filter(c => c !== msg.cardValue);
-        const tempBoard = JSON.parse(JSON.stringify(board));
+        const tempBoard = JSON.parse(JSON.stringify(room.gameState.board));
 
+        // Aplicar el movimiento potencial
         if (msg.position.includes('asc')) {
-            tempBoard.ascending[targetIdx] = msg.cardValue;
+            tempBoard.ascending[msg.position === 'asc1' ? 0 : 1] = msg.cardValue;
         } else {
-            tempBoard.descending[targetIdx] = msg.cardValue;
+            tempBoard.descending[msg.position === 'desc1' ? 0 : 1] = msg.cardValue;
         }
 
+        // Verificar si quedan movimientos posibles con las cartas restantes
         const hasPossibleMoves = remainingCards.some(card => {
             return validPositions.some(pos => {
                 const posIdx = pos === 'asc1' ? 0 : pos === 'asc2' ? 1 : pos === 'desc1' ? 0 : 1;
@@ -202,15 +204,10 @@ function handlePlayCard(room, player, msg) {
         });
 
         if (!hasPossibleMoves) {
-            safeSend(player.ws, {
+            return safeSend(player.ws, {
                 type: 'notification',
                 message: 'No puedes jugar esa carta: te quedarías sin movimientos posibles para cumplir el mínimo requerido',
                 isError: true
-            });
-            return safeSend(player.ws, {
-                type: 'invalid_move',
-                playerId: player.id,
-                reason: 'no_remaining_moves'
             });
         }
     }
