@@ -167,9 +167,9 @@ function handlePlayCard(room, player, msg) {
 
     // Aplicar el movimiento
     if (msg.position.includes('asc')) {
-        room.gameState.board.ascending[msg.position === 'asc1' ? 0 : 1] = msg.cardValue;
+        board.ascending[targetIdx] = msg.cardValue;
     } else {
-        room.gameState.board.descending[msg.position === 'desc1' ? 0 : 1] = msg.cardValue;
+        board.descending[targetIdx] = msg.cardValue;
     }
 
     player.cards.splice(player.cards.indexOf(msg.cardValue), 1);
@@ -189,6 +189,7 @@ function handlePlayCard(room, player, msg) {
 
     updateBoardHistory(room, msg.position, msg.cardValue);
     broadcastGameState(room);
+    checkGameStatus(room);
 }
 
 function handleUndoMove(room, player, msg) {
@@ -509,7 +510,7 @@ wss.on('connection', (ws, req) => {
                             broadcastToRoom(room, {
                                 type: 'game_over',
                                 result: 'lose',
-                                message: `¡A ${player.name} se le avisó que se quedaria sin movimientos si hacia ese movimiento, pero le valio verga y siguió!`,
+                                message: `¡${player.name} se quedó sin movimientos posibles!`,
                                 reason: 'self_blocked'
                             });
                         }

@@ -135,6 +135,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'move_undone':
                         handleMoveUndone(message);
                         break;
+                    case 'room_reset':
+                        // No necesitamos hacer nada aquí, ya que redirigimos a sala.html
+                        break;
                     default:
                         console.log('Mensaje no reconocido:', message);
                 }
@@ -387,10 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     );
 
                     if (confirmMove) {
-                        // Jugar la carta y forzar Game Over
                         playCard(selectedCard.value, clickedColumn);
-
-                        // Enviar mensaje de Game Over al servidor
                         socket.send(JSON.stringify({
                             type: 'self_blocked',
                             playerId: currentPlayer.id,
@@ -398,28 +398,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         }));
                         return;
                     } else {
-                        return; // Cancelar el movimiento
+                        return;
                     }
                 }
-
-                playCard(selectedCard.value, clickedColumn);
-                return;
             }
-        };
+
+            playCard(selectedCard.value, clickedColumn);
+            return;
+        }
 
         const clickedCard = gameState.yourCards.find(card => card.contains(x, y));
         if (clickedCard) {
             selectedCard = clickedCard.isPlayable ? clickedCard : null;
             if (!clickedCard.isPlayable) {
-                const basicValid = ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
-                    isValidMove(clickedCard.value, pos)
-                );
-
-                if (!basicValid) {
-                    showNotification('No puedes jugar esta carta en ninguna columna', true);
-                } else {
-                    showNotification('No puedes jugar esta carta ahora', true);
-                }
+                showNotification('No puedes jugar esta carta ahora', true);
                 animateInvalidCard(clickedCard);
             }
         }
