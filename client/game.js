@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const WS_URL = 'wss://the-game-2xks.onrender.com';
     const endTurnButton = document.getElementById('endTurnBtn');
 
+    // Dimensiones y posiciones
     const CARD_WIDTH = 80;
     const CARD_HEIGHT = 120;
     const COLUMN_SPACING = 60;
@@ -16,12 +17,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const BUTTONS_Y = canvas.height * 0.85;
     const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 20;
 
+    // Icono de historial
+    const historyIcon = new Image();
+    historyIcon.src = 'assets/icons/history-icon.png'; // Ajusta esta ruta
+
+    // Datos del jugador
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
         name: sessionStorage.getItem('playerName'),
         isHost: sessionStorage.getItem('isHost') === 'true'
     };
     const roomId = sessionStorage.getItem('roomId');
+
+    // Estado del juego
     let selectedCard = null;
     let gameState = {
         players: [],
@@ -40,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // Clase para las cartas
     class Card {
         constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
             this.value = value;
@@ -89,8 +98,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Conexión WebSocket
     let socket;
-
     function connectWebSocket() {
         socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
 
@@ -111,49 +120,53 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.onmessage = (event) => {
             try {
                 const message = JSON.parse(event.data);
-                switch (message.type) {
-                    case 'game_state':
-                        updateGameState(message.state);
-                        break;
-                    case 'game_started':
-                        updateGameState(message.state);
-                        showNotification('¡El juego ha comenzado!');
-                        break;
-                    case 'your_cards':
-                        updatePlayerCards(message.cards);
-                        break;
-                    case 'game_over':
-                        handleGameOver(message);
-                        break;
-                    case 'notification':
-                        showNotification(message.message, message.isError);
-                        break;
-                    case 'card_played':
-                        handleOpponentCardPlayed(message);
-                        break;
-                    case 'invalid_move':
-                        if (message.playerId === currentPlayer.id && selectedCard) {
-                            animateInvalidCard(selectedCard);
-                        }
-                        break;
-                    case 'turn_changed':
-                        handleTurnChanged(message);
-                        break;
-                    case 'move_undone':
-                        handleMoveUndone(message);
-                        break;
-                    case 'room_reset':
-                        // No necesitamos hacer nada aquí, ya que redirigimos a sala.html
-                        break;
-                    default:
-                        console.log('Mensaje no reconocido:', message);
-                }
+                handleSocketMessage(message);
             } catch (error) {
                 console.error('Error procesando mensaje:', error);
             }
         };
     }
 
+    function handleSocketMessage(message) {
+        switch (message.type) {
+            case 'game_state':
+                updateGameState(message.state);
+                break;
+            case 'game_started':
+                updateGameState(message.state);
+                showNotification('¡El juego ha comenzado!');
+                break;
+            case 'your_cards':
+                updatePlayerCards(message.cards);
+                break;
+            case 'game_over':
+                handleGameOver(message);
+                break;
+            case 'notification':
+                showNotification(message.message, message.isError);
+                break;
+            case 'card_played':
+                handleOpponentCardPlayed(message);
+                break;
+            case 'invalid_move':
+                if (message.playerId === currentPlayer.id && selectedCard) {
+                    animateInvalidCard(selectedCard);
+                }
+                break;
+            case 'turn_changed':
+                handleTurnChanged(message);
+                break;
+            case 'move_undone':
+                handleMoveUndone(message);
+                break;
+            case 'room_reset':
+                break;
+            default:
+                console.log('Mensaje no reconocido:', message);
+        }
+    }
+
+    // Funciones de UI
     function showNotification(message, isError = false) {
         const notification = document.createElement('div');
         notification.className = `notification ${isError ? 'error' : ''}`;
@@ -194,6 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('modalBackdrop').style.display = 'none';
     }
 
+    // Funciones del juego
     function isValidMove(cardValue, position) {
         const target = position.includes('asc')
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
@@ -348,9 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 isPlayedThisTurn: true
             });
 
-            // Actualizar historial
             gameState.columnHistory[message.position].push(message.cardValue);
-
             showNotification(`${message.playerName} jugó un ${value}`);
         }
     }
@@ -390,30 +402,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Dibujado del juego
     function drawHistoryIcons() {
+        if (!historyIcon.complete || !historyIcon.naturalWidth) return;
+
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
+            const y = HISTORY_ICON_Y;
 
-            // Dibujar área clickeable
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.beginPath();
-            ctx.arc(x + 20, HISTORY_ICON_Y + 20, 22, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Dibujar icono SVG (simplificado)
-            ctx.fillStyle = 'white';
-            ctx.beginPath();
-            // Círculo del reloj
-            ctx.arc(x + 20, HISTORY_ICON_Y + 20, 8, 0, Math.PI * 2);
-            ctx.fill();
-            // Aguja del reloj
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.beginPath();
-            ctx.moveTo(x + 20, HISTORY_ICON_Y + 20);
-            ctx.lineTo(x + 20, HISTORY_ICON_Y + 12);
-            ctx.lineTo(x + 24, HISTORY_ICON_Y + 12);
-            ctx.closePath();
-            ctx.fill();
+            ctx.drawImage(historyIcon, x, y, 40, 40);
         });
     }
 
@@ -422,13 +419,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
 
-        // Verificar si se hizo click en un icono de historial
+        // Verificar clicks en los iconos de historial
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
-            const iconX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2;
-            const iconY = HISTORY_ICON_Y + 20;
-            const distance = Math.sqrt(Math.pow(x - iconX, 2) + Math.pow(y - iconY, 2));
+            const iconX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
+            const iconY = HISTORY_ICON_Y;
 
-            if (distance <= 22) { // Radio del icono
+            if (x >= iconX && x <= iconX + 40 && y >= iconY && y <= iconY + 40) {
                 return showColumnHistory(col);
             }
         });
@@ -439,51 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const clickedColumn = getClickedColumn(x, y);
         if (clickedColumn && selectedCard) {
-            if (gameState.remainingDeck > 0 &&
-                gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length === 0) {
-
-                const tempBoard = JSON.parse(JSON.stringify(gameState.board));
-                if (clickedColumn.includes('asc')) {
-                    tempBoard.ascending[clickedColumn === 'asc1' ? 0 : 1] = selectedCard.value;
-                } else {
-                    tempBoard.descending[clickedColumn === 'desc1' ? 0 : 1] = selectedCard.value;
-                }
-
-                const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
-                const hasOtherMoves = remainingCards.some(card => {
-                    return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
-                        const posValue = pos.includes('asc')
-                            ? tempBoard.ascending[pos === 'asc1' ? 0 : 1]
-                            : tempBoard.descending[pos === 'desc1' ? 0 : 1];
-
-                        return pos.includes('asc')
-                            ? (card.value > posValue || card.value === posValue - 10)
-                            : (card.value < posValue || card.value === posValue + 10);
-                    });
-                });
-
-                if (!hasOtherMoves) {
-                    const confirmMove = confirm(
-                        'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\n' +
-                        'Si continúas, el juego terminará con derrota.\n\n' +
-                        '¿Deseas continuar?'
-                    );
-
-                    if (confirmMove) {
-                        playCard(selectedCard.value, clickedColumn);
-                        socket.send(JSON.stringify({
-                            type: 'self_blocked',
-                            playerId: currentPlayer.id,
-                            roomId: roomId
-                        }));
-                        return;
-                    } else {
-                        return;
-                    }
-                }
-            }
-
-            playCard(selectedCard.value, clickedColumn);
+            handleCardPlay(clickedColumn);
             return;
         }
 
@@ -495,6 +447,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 animateInvalidCard(clickedCard);
             }
         }
+    }
+
+    function handleCardPlay(clickedColumn) {
+        if (gameState.remainingDeck > 0 &&
+            gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length === 0) {
+
+            const tempBoard = JSON.parse(JSON.stringify(gameState.board));
+            if (clickedColumn.includes('asc')) {
+                tempBoard.ascending[clickedColumn === 'asc1' ? 0 : 1] = selectedCard.value;
+            } else {
+                tempBoard.descending[clickedColumn === 'desc1' ? 0 : 1] = selectedCard.value;
+            }
+
+            const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
+            const hasOtherMoves = remainingCards.some(card => {
+                return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+                    const posValue = pos.includes('asc')
+                        ? tempBoard.ascending[pos === 'asc1' ? 0 : 1]
+                        : tempBoard.descending[pos === 'desc1' ? 0 : 1];
+
+                    return pos.includes('asc')
+                        ? (card.value > posValue || card.value === posValue - 10)
+                        : (card.value < posValue || card.value === posValue + 10);
+                });
+            });
+
+            if (!hasOtherMoves) {
+                const confirmMove = confirm(
+                    'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\n' +
+                    'Si continúas, el juego terminará con derrota.\n\n' +
+                    '¿Deseas continuar?'
+                );
+
+                if (confirmMove) {
+                    playCard(selectedCard.value, clickedColumn);
+                    socket.send(JSON.stringify({
+                        type: 'self_blocked',
+                        playerId: currentPlayer.id,
+                        roomId: roomId
+                    }));
+                    return;
+                } else {
+                    return;
+                }
+            }
+        }
+
+        playCard(selectedCard.value, clickedColumn);
     }
 
     function getClickedColumn(x, y) {
@@ -512,8 +512,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function playCard(cardValue, position) {
-        if (!selectedCard) return;
-
         if (!isValidMove(cardValue, position)) {
             showNotification('Movimiento inválido', true);
             animateInvalidCard(selectedCard);
@@ -531,7 +529,6 @@ document.addEventListener('DOMContentLoaded', () => {
             previousValue
         });
 
-        // Actualizar historial
         gameState.columnHistory[position].push(cardValue);
 
         selectedCard.isPlayedThisTurn = true;
@@ -717,19 +714,30 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        canvas.width = 800;
-        canvas.height = 700;
-        endTurnButton.addEventListener('click', endTurn);
-        canvas.addEventListener('click', handleCanvasClick);
-        document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
+        // Precargar el icono antes de iniciar
+        const loadIcon = new Promise((resolve) => {
+            historyIcon.onload = resolve;
+            historyIcon.onerror = () => {
+                console.error('Error cargando el icono de historial');
+                resolve();
+            };
+        });
 
-        const controlsDiv = document.querySelector('.game-controls');
-        if (controlsDiv) {
-            controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
-        }
+        loadIcon.then(() => {
+            canvas.width = 800;
+            canvas.height = 700;
+            endTurnButton.addEventListener('click', endTurn);
+            canvas.addEventListener('click', handleCanvasClick);
+            document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
 
-        connectWebSocket();
-        gameLoop();
+            const controlsDiv = document.querySelector('.game-controls');
+            if (controlsDiv) {
+                controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
+            }
+
+            connectWebSocket();
+            gameLoop();
+        });
     }
 
     initGame();
