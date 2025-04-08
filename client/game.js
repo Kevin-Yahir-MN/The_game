@@ -583,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
         ctx.fillText(`Turno actual: ${currentPlayerName}`, 40, 50);
-        ctx.fillText(`Cartas restantes: ${gameState.remainingDeck}`, 40, 65);
+        ctx.fillText(`Cartas restantes: ${gameState.remainingDeck}`, 40, 80);
 
         if (gameState.currentTurn === currentPlayer.id) {
             const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
@@ -591,7 +591,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const color = cardsPlayed >= required ? '#2ecc71' : '#f1c40f';
 
             ctx.fillStyle = color;
-            ctx.fillText(`Cartas jugadas: ${cardsPlayed}/${required}`, 40, 140);
+            ctx.fillText(`Cartas jugadas: ${cardsPlayed}/${required}`, 40, 110);
         }
     }
 
