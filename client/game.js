@@ -157,39 +157,42 @@ document.addEventListener('DOMContentLoaded', () => {
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
 
-        const isValid = position.includes('asc')
+        // Validación básica de reglas del juego
+        return position.includes('asc')
             ? (cardValue > target || cardValue === target - 10)
             : (cardValue < target || cardValue === target + 10);
+    }
 
-        // Verificar si el movimiento dejaría al jugador sin opciones para cumplir el mínimo
-        if (isValid && gameState.remainingDeck > 0 && gameState.cardsPlayedThisTurn.length < 1) {
-            const remainingCards = gameState.yourCards.filter(c => c.value !== cardValue);
-            const tempBoard = JSON.parse(JSON.stringify(gameState.board));
-
-            if (position.includes('asc')) {
-                tempBoard.ascending[position === 'asc1' ? 0 : 1] = cardValue;
-            } else {
-                tempBoard.descending[position === 'desc1' ? 0 : 1] = cardValue;
-            }
-
-            const hasOtherMoves = remainingCards.some(card => {
-                return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
-                    const posValue = pos.includes('asc')
-                        ? tempBoard.ascending[pos === 'asc1' ? 0 : 1]
-                        : tempBoard.descending[pos === 'desc1' ? 0 : 1];
-
-                    return pos.includes('asc')
-                        ? (card.value > posValue || card.value === posValue - 10)
-                        : (card.value < posValue || card.value === posValue + 10);
-                });
-            });
-
-            if (!hasOtherMoves) {
-                return false;
-            }
+    function isMoveSafe(cardValue, position) {
+        // Si el mazo está vacío o ya jugaste suficiente, no hay restricciones
+        if (gameState.remainingDeck === 0 ||
+            gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length >= 1) {
+            return true;
         }
 
-        return isValid;
+        // Simular el tablero después de este movimiento
+        const tempBoard = JSON.parse(JSON.stringify(gameState.board));
+        if (position.includes('asc')) {
+            tempBoard.ascending[position === 'asc1' ? 0 : 1] = cardValue;
+        } else {
+            tempBoard.descending[position === 'desc1' ? 0 : 1] = cardValue;
+        }
+
+        // Obtener cartas restantes (excluyendo la que se está jugando)
+        const remainingCards = gameState.yourCards.filter(c => c.value !== cardValue);
+
+        // Verificar si hay al menos una carta jugable después de este movimiento
+        return remainingCards.some(card => {
+            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+                const posValue = pos.includes('asc')
+                    ? tempBoard.ascending[pos === 'asc1' ? 0 : 1]
+                    : tempBoard.descending[pos === 'desc1' ? 0 : 1];
+
+                return pos.includes('asc')
+                    ? (card.value > posValue || card.value === posValue - 10)
+                    : (card.value < posValue || card.value === posValue + 10);
+            });
+        });
     }
 
     function getColumnPosition(position) {
@@ -349,9 +352,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         gameState.yourCards = cards.map((card, index) => {
             const value = card instanceof Card ? card.value : card;
-            const playable = isYourTurn && (
+            const basicPlayable = isYourTurn && (
                 isValidMove(value, 'asc1') || isValidMove(value, 'asc2') ||
                 isValidMove(value, 'desc1') || isValidMove(value, 'desc2')
+            );
+
+            // Una carta es jugable si:
+            // 1. Pasa la validación básica Y
+            // 2. O el mazo está vacío Y ya jugaste al menos 1 carta
+            // 3. O es un movimiento "seguro" que no te dejará bloqueado
+            const playable = basicPlayable && (
+                gameState.remainingDeck === 0 ||
+                gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length >= 1 ||
+                ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
+                    isValidMove(value, pos) && isMoveSafe(value, pos)
+                )
             );
 
             const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
@@ -391,41 +406,25 @@ document.addEventListener('DOMContentLoaded', () => {
             playCard(selectedCard.value, clickedColumn);
             return;
         }
-
         const clickedCard = gameState.yourCards.find(card => card.contains(x, y));
         if (clickedCard) {
             if (!clickedCard.isPlayable) {
-                const playablePositions = ['asc1', 'asc2', 'desc1', 'desc2'].filter(pos =>
+                const basicValid = ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
                     isValidMove(clickedCard.value, pos)
                 );
 
-                if (playablePositions.length === 0) {
+                if (!basicValid) {
                     showNotification('No puedes jugar esta carta en ninguna columna', true);
-                } else if (gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length >= 1 &&
-                    !playablePositions.some(pos => {
-                        // Verificar si jugar esta carta impediría cumplir el mínimo
-                        const tempBoard = JSON.parse(JSON.stringify(gameState.board));
-                        if (pos.includes('asc')) {
-                            tempBoard.ascending[pos === 'asc1' ? 0 : 1] = clickedCard.value;
-                        } else {
-                            tempBoard.descending[pos === 'desc1' ? 0 : 1] = clickedCard.value;
-                        }
-
-                        const remainingCards = gameState.yourCards.filter(c => c !== clickedCard);
-                        return remainingCards.some(card => {
-                            return ['asc1', 'asc2', 'desc1', 'desc2'].some(p => {
-                                const pValue = p.includes('asc')
-                                    ? tempBoard.ascending[p === 'asc1' ? 0 : 1]
-                                    : tempBoard.descending[p === 'desc1' ? 0 : 1];
-                                return p.includes('asc')
-                                    ? (card.value > pValue || card.value === pValue - 10)
-                                    : (card.value < pValue || card.value === pValue + 10);
-                            });
-                        });
-                    })) {
-                    showNotification('Jugar esta carta te impediría cumplir el mínimo requerido', true);
                 } else {
-                    showNotification('No puedes jugar esta carta ahora', true);
+                    const safeMove = ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
+                        isValidMove(clickedCard.value, pos) && isMoveSafe(clickedCard.value, pos)
+                    );
+
+                    if (!safeMove) {
+                        showNotification('Jugar esta carta te impediría cumplir el mínimo de 2 cartas', true);
+                    } else {
+                        showNotification('No puedes jugar esta carta ahora', true);
+                    }
                 }
                 animateInvalidCard(clickedCard);
                 return;

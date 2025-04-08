@@ -182,14 +182,14 @@ function handlePlayCard(room, player, msg) {
         const remainingCards = player.cards.filter(c => c !== msg.cardValue);
         const tempBoard = JSON.parse(JSON.stringify(room.gameState.board));
 
-        // Aplicar el movimiento potencial
+        // Aplicar movimiento temporal
         if (msg.position.includes('asc')) {
             tempBoard.ascending[msg.position === 'asc1' ? 0 : 1] = msg.cardValue;
         } else {
             tempBoard.descending[msg.position === 'desc1' ? 0 : 1] = msg.cardValue;
         }
 
-        // Verificar si quedan movimientos posibles con las cartas restantes
+        // Verificar movimientos posibles después de este
         const hasPossibleMoves = remainingCards.some(card => {
             return validPositions.some(pos => {
                 const posIdx = pos === 'asc1' ? 0 : pos === 'asc2' ? 1 : pos === 'desc1' ? 0 : 1;
@@ -203,10 +203,10 @@ function handlePlayCard(room, player, msg) {
             });
         });
 
-        if (!hasPossibleMoves) {
+        if (!hasPossibleMoves && remainingCards.length > 0) {
             return safeSend(player.ws, {
                 type: 'notification',
-                message: 'No puedes jugar esa carta: te quedarías sin movimientos posibles para cumplir el mínimo requerido',
+                message: 'No puedes jugar esa carta ahora: te impediría cumplir el mínimo requerido',
                 isError: true
             });
         }
