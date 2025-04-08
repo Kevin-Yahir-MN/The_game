@@ -127,6 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'invalid_move':
                         if (message.playerId === currentPlayer.id && selectedCard) {
                             animateInvalidCard(selectedCard);
+                            if (message.reason === 'no_remaining_moves') {
+                                showNotification('No puedes jugar esa carta: bloquearía tus movimientos restantes', true);
+                            }
                         }
                         break;
                     case 'turn_changed':
@@ -384,52 +387,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const previousValue = position.includes('asc')
-            ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
-            : gameState.board.descending[position === 'desc1' ? 0 : 1];
-
-        gameState.cardsPlayedThisTurn.push({
-            value: cardValue,
-            position,
-            playerId: currentPlayer.id,
-            previousValue
-        });
-
-        selectedCard.isPlayedThisTurn = true;
-        selectedCard.backgroundColor = '#99CCFF';
-
-        const cardPosition = getColumnPosition(position);
-        gameState.animatingCards.push({
-            card: selectedCard,
-            startTime: Date.now(),
-            duration: 400,
-            targetX: cardPosition.x,
-            targetY: cardPosition.y,
-            fromX: selectedCard.x,
-            fromY: selectedCard.y
-        });
-
-        const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
-        if (cardIndex !== -1) {
-            gameState.yourCards.splice(cardIndex, 1);
-        }
-
-        if (position.includes('asc')) {
-            const idx = position === 'asc1' ? 0 : 1;
-            gameState.board.ascending[idx] = cardValue;
-        } else {
-            const idx = position === 'desc1' ? 0 : 1;
-            gameState.board.descending[idx] = cardValue;
-        }
-
         socket.send(JSON.stringify({
             type: 'play_card',
             playerId: currentPlayer.id,
             cardValue,
             position
         }));
-
-        selectedCard = null;
     }
 
     function undoLastMove() {
