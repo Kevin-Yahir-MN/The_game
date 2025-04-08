@@ -125,12 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         handleOpponentCardPlayed(message);
                         break;
                     case 'invalid_move':
-                        if (message.playerId === currentPlayer.id) {
-                            if (message.reason === 'no_remaining_moves') {
-                                showNotification('No puedes jugar esa carta: te quedarías sin movimientos posibles para cumplir el mínimo requerido', true);
-                            }
+                        if (message.playerId === currentPlayer.id && selectedCard) {
                             animateInvalidCard(selectedCard);
-                            selectedCard = null;
                         }
                         break;
                     case 'turn_changed':
@@ -166,38 +162,6 @@ document.addEventListener('DOMContentLoaded', () => {
             : (cardValue < target || cardValue === target + 10);
     }
 
-    function wouldBlockRemainingMoves(cardValue, position) {
-        if (gameState.remainingDeck === 0 ||
-            gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length >= 1) {
-            return false;
-        }
-
-        const simulatedBoard = JSON.parse(JSON.stringify(gameState.board));
-        if (position.includes('asc')) {
-            const idx = position === 'asc1' ? 0 : 1;
-            simulatedBoard.ascending[idx] = cardValue;
-        } else {
-            const idx = position === 'desc1' ? 0 : 1;
-            simulatedBoard.descending[idx] = cardValue;
-        }
-
-        const remainingCards = gameState.yourCards
-            .filter(c => c.value !== cardValue)
-            .map(c => c.value);
-
-        return !remainingCards.some(card => {
-            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
-                const target = pos.includes('asc') ?
-                    simulatedBoard.ascending[pos === 'asc1' ? 0 : 1] :
-                    simulatedBoard.descending[pos === 'desc1' ? 0 : 1];
-
-                return pos.includes('asc') ?
-                    (card > target || card === target - 10) :
-                    (card < target || card === target + 10);
-            });
-        });
-    }
-
     function getColumnPosition(position) {
         const index = ['asc1', 'asc2', 'desc1', 'desc2'].indexOf(position);
         return {
@@ -209,31 +173,24 @@ document.addEventListener('DOMContentLoaded', () => {
     function animateInvalidCard(card) {
         if (!card) return;
 
-        const originalX = card.x;
-        const originalColor = card.backgroundColor;
+        const shakeAmount = 8;
+        const shakeDuration = 400;
         const startTime = Date.now();
-        const duration = 600;
 
-        function animate() {
+        function shake() {
             const elapsed = Date.now() - startTime;
-            const progress = Math.min(elapsed / duration, 1);
+            const progress = elapsed / shakeDuration;
 
-            card.shakeOffset = Math.sin(progress * Math.PI * 10) * 10 * (1 - progress);
-            card.backgroundColor = progress < 0.5 ?
-                `rgb(255, ${Math.floor(200 * (1 - progress * 2))}, ${Math.floor(200 * (1 - progress * 2))})` :
-                originalColor;
-            card.hoverOffset = -5 * Math.sin(progress * Math.PI * 4);
-
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
+            if (progress >= 1) {
                 card.shakeOffset = 0;
-                card.hoverOffset = 0;
-                card.backgroundColor = originalColor;
+                return;
             }
+
+            card.shakeOffset = Math.sin(progress * Math.PI * 8) * shakeAmount * (1 - progress);
+            requestAnimationFrame(shake);
         }
 
-        animate();
+        shake();
     }
 
     function handleTurnChanged(message) {
@@ -427,10 +384,42 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (wouldBlockRemainingMoves(cardValue, position)) {
-            showNotification('No puedes jugar esa carta: te quedarías sin movimientos posibles', true);
-            animateInvalidCard(selectedCard);
-            return;
+        const previousValue = position.includes('asc')
+            ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
+            : gameState.board.descending[position === 'desc1' ? 0 : 1];
+
+        gameState.cardsPlayedThisTurn.push({
+            value: cardValue,
+            position,
+            playerId: currentPlayer.id,
+            previousValue
+        });
+
+        selectedCard.isPlayedThisTurn = true;
+        selectedCard.backgroundColor = '#99CCFF';
+
+        const cardPosition = getColumnPosition(position);
+        gameState.animatingCards.push({
+            card: selectedCard,
+            startTime: Date.now(),
+            duration: 400,
+            targetX: cardPosition.x,
+            targetY: cardPosition.y,
+            fromX: selectedCard.x,
+            fromY: selectedCard.y
+        });
+
+        const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
+        if (cardIndex !== -1) {
+            gameState.yourCards.splice(cardIndex, 1);
+        }
+
+        if (position.includes('asc')) {
+            const idx = position === 'asc1' ? 0 : 1;
+            gameState.board.ascending[idx] = cardValue;
+        } else {
+            const idx = position === 'desc1' ? 0 : 1;
+            gameState.board.descending[idx] = cardValue;
         }
 
         socket.send(JSON.stringify({
@@ -438,6 +427,30 @@ document.addEventListener('DOMContentLoaded', () => {
             playerId: currentPlayer.id,
             cardValue,
             position
+        }));
+
+        selectedCard = null;
+    }
+
+    function undoLastMove() {
+        if (gameState.currentTurn !== currentPlayer.id ||
+            gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length === 0) {
+            return;
+        }
+
+        const lastMove = [...gameState.cardsPlayedThisTurn]
+            .reverse()
+            .find(move => move.playerId === currentPlayer.id);
+
+        if (!lastMove) {
+            return showNotification('No hay movimientos para deshacer', true);
+        }
+
+        socket.send(JSON.stringify({
+            type: 'undo_move',
+            playerId: currentPlayer.id,
+            cardValue: lastMove.value,
+            position: lastMove.position
         }));
     }
 
