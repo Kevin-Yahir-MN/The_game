@@ -177,7 +177,7 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
-    // Nueva validación para movimientos que bloquean jugadas futuras
+    // Nueva validación para movimientos bloqueantes
     if (room.gameState.deck.length > 0 && player.cardsPlayedThisTurn.length < 1) {
         const remainingCards = player.cards.filter(c => c !== msg.cardValue);
         const tempBoard = JSON.parse(JSON.stringify(board));
@@ -371,6 +371,124 @@ function checkGameStatus(room) {
             reason: 'all_cards_played'
         });
     }
+}
+
+app.post('/create-room', (req, res) => {
+    const { playerName } = req.body;
+    if (!playerName) {
+        return res.status(400).json({ success: false, message: 'Se requiere nombre de jugador' });
+    }
+
+    const roomId = Math.floor(1000 + Math.random() * 9000).toString();
+    const playerId = uuidv4();
+    const room = {
+        players: [{
+            id: playerId,
+            name: playerName,
+            isHost: true,
+            ws: null,
+            cards: [],
+            cardsPlayedThisTurn: []
+        }],
+        gameState: {
+            deck: initializeDeck(),
+            board: { ascending: [1, 1], descending: [100, 100] },
+            currentTurn: playerId,
+            gameStarted: false,
+            initialCards: 6
+        }
+    };
+
+    rooms.set(roomId, room);
+    reverseRoomMap.set(room, roomId);
+    boardHistory.set(roomId, {
+        ascending1: [1], ascending2: [1],
+        descending1: [100], descending2: [100]
+    });
+
+    res.json({ success: true, roomId, playerId, playerName });
+});
+
+app.post('/join-room', (req, res) => {
+    const { playerName, roomId } = req.body;
+    if (!playerName || !roomId) {
+        return res.status(400).json({
+            success: false,
+            message: 'Nombre de jugador y código de sala requeridos'
+        });
+    }
+
+    if (!rooms.has(roomId)) {
+        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+    }
+
+    const room = rooms.get(roomId);
+    const playerId = uuidv4();
+    const newPlayer = {
+        id: playerId,
+        name: playerName,
+        isHost: false,
+        ws: null,
+        cards: [],
+        cardsPlayedThisTurn: []
+    };
+
+    room.players.push(newPlayer);
+    res.json({ success: true, playerId, playerName });
+});
+
+app.get('/room-info/:roomId', (req, res) => {
+    const roomId = req.params.roomId;
+    if (!rooms.has(roomId)) {
+        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+    }
+
+    const room = rooms.get(roomId);
+    res.json({
+        success: true,
+        players: room.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            isHost: p.isHost,
+            cardCount: p.cards.length,
+            connected: p.ws !== null
+        })),
+        gameStarted: room.gameState.gameStarted,
+        currentTurn: room.gameState.currentTurn,
+        initialCards: room.gameState.initialCards
+    });
+});
+
+function startGame(room, initialCards = 6) {
+    room.gameState.gameStarted = true;
+    room.gameState.initialCards = initialCards;
+
+    room.players.forEach(player => {
+        player.cards = [];
+        for (let i = 0; i < initialCards && room.gameState.deck.length > 0; i++) {
+            player.cards.push(room.gameState.deck.pop());
+        }
+    });
+
+    broadcastToRoom(room, {
+        type: 'game_started',
+        state: {
+            board: room.gameState.board,
+            currentTurn: room.players[0].id,
+            remainingDeck: room.gameState.deck.length,
+            initialCards: initialCards,
+            players: room.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                cardCount: p.cards.length,
+                cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
+            }))
+        }
+    });
+
+    room.players.forEach(player => {
+        safeSend(player.ws, { type: 'your_cards', cards: player.cards });
+    });
 }
 
 wss.on('connection', (ws, req) => {
