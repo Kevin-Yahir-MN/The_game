@@ -583,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
         ctx.fillText(`Turno actual: ${currentPlayerName}`, 40, 50);
-        ctx.fillText(`Cartas restantes: ${gameState.remainingDeck}`, 40, 80);
+        ctx.fillText(`Cartas restantes: ${gameState.remainingDeck}`, 40, 65);
 
         if (gameState.currentTurn === currentPlayer.id) {
             const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
