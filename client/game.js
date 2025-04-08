@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const PLAYER_CARDS_Y = canvas.height * 0.6;
     const BUTTONS_Y = canvas.height * 0.85;
+    const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 20;
 
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
@@ -30,7 +31,13 @@ document.addEventListener('DOMContentLoaded', () => {
         remainingDeck: 98,
         initialCards: 6,
         cardsPlayedThisTurn: [],
-        animatingCards: []
+        animatingCards: [],
+        columnHistory: {
+            asc1: [],
+            asc2: [],
+            desc1: [],
+            desc2: []
+        }
     };
 
     class Card {
@@ -153,6 +160,38 @@ document.addEventListener('DOMContentLoaded', () => {
         notification.textContent = message;
         document.body.appendChild(notification);
         setTimeout(() => notification.remove(), 3000);
+    }
+
+    function showColumnHistory(columnId) {
+        const modal = document.getElementById('historyModal');
+        const backdrop = document.getElementById('modalBackdrop');
+        const title = document.getElementById('historyColumnTitle');
+        const container = document.getElementById('historyCardsContainer');
+
+        const columnNames = {
+            asc1: 'Pila Ascendente 1 (↑)',
+            asc2: 'Pila Ascendente 2 (↑)',
+            desc1: 'Pila Descendente 1 (↓)',
+            desc2: 'Pila Descendente 2 (↓)'
+        };
+
+        title.textContent = columnNames[columnId];
+        container.innerHTML = '';
+
+        gameState.columnHistory[columnId].forEach((card, index) => {
+            const cardElement = document.createElement('div');
+            cardElement.className = `history-card ${index === gameState.columnHistory[columnId].length - 1 ? 'recent' : ''}`;
+            cardElement.textContent = card;
+            container.appendChild(cardElement);
+        });
+
+        modal.style.display = 'block';
+        backdrop.style.display = 'block';
+    }
+
+    function closeHistoryModal() {
+        document.getElementById('historyModal').style.display = 'none';
+        document.getElementById('modalBackdrop').style.display = 'none';
     }
 
     function isValidMove(cardValue, position) {
@@ -309,6 +348,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 isPlayedThisTurn: true
             });
 
+            // Actualizar historial
+            gameState.columnHistory[message.position].push(message.cardValue);
+
             showNotification(`${message.playerName} jugó un ${value}`);
         }
     }
@@ -348,14 +390,52 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function handleCanvasClick(event) {
-        if (gameState.currentTurn !== currentPlayer.id) {
-            return showNotification('No es tu turno', true);
-        }
+    function drawHistoryIcons() {
+        ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
+            const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
 
+            // Dibujar área clickeable
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.beginPath();
+            ctx.arc(x + 20, HISTORY_ICON_Y + 20, 22, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Dibujar icono SVG (simplificado)
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            // Círculo del reloj
+            ctx.arc(x + 20, HISTORY_ICON_Y + 20, 8, 0, Math.PI * 2);
+            ctx.fill();
+            // Aguja del reloj
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.beginPath();
+            ctx.moveTo(x + 20, HISTORY_ICON_Y + 20);
+            ctx.lineTo(x + 20, HISTORY_ICON_Y + 12);
+            ctx.lineTo(x + 24, HISTORY_ICON_Y + 12);
+            ctx.closePath();
+            ctx.fill();
+        });
+    }
+
+    function handleCanvasClick(event) {
         const rect = canvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
+
+        // Verificar si se hizo click en un icono de historial
+        ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
+            const iconX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2;
+            const iconY = HISTORY_ICON_Y + 20;
+            const distance = Math.sqrt(Math.pow(x - iconX, 2) + Math.pow(y - iconY, 2));
+
+            if (distance <= 22) { // Radio del icono
+                return showColumnHistory(col);
+            }
+        });
+
+        if (gameState.currentTurn !== currentPlayer.id) {
+            return showNotification('No es tu turno', true);
+        }
 
         const clickedColumn = getClickedColumn(x, y);
         if (clickedColumn && selectedCard) {
@@ -450,6 +530,9 @@ document.addEventListener('DOMContentLoaded', () => {
             playerId: currentPlayer.id,
             previousValue
         });
+
+        // Actualizar historial
+        gameState.columnHistory[position].push(cardValue);
 
         selectedCard.isPlayedThisTurn = true;
         selectedCard.backgroundColor = '#99CCFF';
@@ -621,6 +704,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         drawGameInfo();
         drawBoard();
+        drawHistoryIcons();
         handleCardAnimations();
         drawPlayerCards();
 
@@ -637,6 +721,7 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.height = 700;
         endTurnButton.addEventListener('click', endTurn);
         canvas.addEventListener('click', handleCanvasClick);
+        document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
 
         const controlsDiv = document.querySelector('.game-controls');
         if (controlsDiv) {

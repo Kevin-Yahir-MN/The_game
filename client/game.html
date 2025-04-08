@@ -29,6 +29,18 @@
         </div>
     </div>
 
+    <svg style="display: none;">
+        <symbol id="history-icon" viewBox="0 0 24 24">
+            <path d="M12 8v5h5m-5 7a9 9 0 1 1 0-18 9 9 0 0 1 0 18zm1-12h-1v1h1v-1z" />
+        </symbol>
+    </svg>
+
+    <div id="historyModal" class="history-modal" style="display: none;">
+        <h3>Historial de Cartas - <span id="historyColumnTitle"></span></h3>
+        <div id="historyCardsContainer" class="history-cards"></div>
+    </div>
+    <div id="modalBackdrop" class="modal-backdrop" style="display: none;"></div>
+
     <script src="game.js"></script>
 </body>
 
