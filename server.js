@@ -177,47 +177,44 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
-    // Validación de movimientos bloqueantes
-    const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
-    const remainingCards = player.cards.filter(c => c !== msg.cardValue);
-    const tempBoard = JSON.parse(JSON.stringify(board));
+    // Nueva validación para movimientos bloqueantes
+    if (room.gameState.deck.length > 0 && player.cardsPlayedThisTurn.length < 1) {
+        const remainingCards = player.cards.filter(c => c !== msg.cardValue);
+        const tempBoard = JSON.parse(JSON.stringify(board));
 
-    // Aplicar el movimiento temporalmente
-    if (msg.position.includes('asc')) {
-        tempBoard.ascending[targetIdx] = msg.cardValue;
-    } else {
-        tempBoard.descending[targetIdx] = msg.cardValue;
+        if (msg.position.includes('asc')) {
+            tempBoard.ascending[targetIdx] = msg.cardValue;
+        } else {
+            tempBoard.descending[targetIdx] = msg.cardValue;
+        }
+
+        const hasPossibleMoves = remainingCards.some(card => {
+            return validPositions.some(pos => {
+                const posIdx = pos === 'asc1' ? 0 : pos === 'asc2' ? 1 : pos === 'desc1' ? 0 : 1;
+                const posValue = pos.includes('asc') ?
+                    tempBoard.ascending[posIdx] :
+                    tempBoard.descending[posIdx];
+
+                return pos.includes('asc') ?
+                    (card > posValue || card === posValue - 10) :
+                    (card < posValue || card === posValue + 10);
+            });
+        });
+
+        if (!hasPossibleMoves) {
+            safeSend(player.ws, {
+                type: 'notification',
+                message: 'No puedes jugar esa carta: te quedarías sin movimientos posibles para cumplir el mínimo requerido',
+                isError: true
+            });
+            return safeSend(player.ws, {
+                type: 'invalid_move',
+                playerId: player.id,
+                reason: 'no_remaining_moves'
+            });
+        }
     }
 
-    // Verificar si quedan movimientos posibles con las cartas restantes
-    const hasPossibleMoves = remainingCards.some(card => {
-        return validPositions.some(pos => {
-            const posIdx = pos === 'asc1' ? 0 : pos === 'asc2' ? 1 : pos === 'desc1' ? 0 : 1;
-            const posValue = pos.includes('asc') ?
-                tempBoard.ascending[posIdx] :
-                tempBoard.descending[posIdx];
-
-            return pos.includes('asc') ?
-                (card > posValue || card === posValue - 10) :
-                (card < posValue || card === posValue + 10);
-        });
-    });
-
-    // Si no hay movimientos posibles y no se ha cumplido el mínimo requerido
-    if (!hasPossibleMoves && (player.cardsPlayedThisTurn.length + 1) < minCardsRequired) {
-        safeSend(player.ws, {
-            type: 'notification',
-            message: `No puedes jugar esa carta: te quedarías sin movimientos posibles para cumplir el mínimo de ${minCardsRequired} cartas`,
-            isError: true
-        });
-        return safeSend(player.ws, {
-            type: 'invalid_move',
-            playerId: player.id,
-            reason: 'no_remaining_moves'
-        });
-    }
-
-    // Si el movimiento es válido, proceder
     const previousValue = msg.position.includes('asc') ?
         board.ascending[targetIdx] :
         board.descending[targetIdx];
