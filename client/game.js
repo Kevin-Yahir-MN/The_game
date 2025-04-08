@@ -241,12 +241,18 @@ document.addEventListener('DOMContentLoaded', () => {
         gameOverDiv.innerHTML = `
             <h2>¡GAME OVER!</h2>
             <p>${message.message}</p>
-            <button id="returnToLobby">Volver al Lobby</button>
+            <button id="returnToRoom">Volver al Lobby</button>
         `;
         document.body.appendChild(gameOverDiv);
 
-        document.getElementById('returnToLobby').addEventListener('click', () => {
-            window.location.href = '/';
+        document.getElementById('returnToRoom').addEventListener('click', () => {
+            // Enviar mensaje al servidor para reiniciar la sala
+            socket.send(JSON.stringify({
+                type: 'reset_room',
+                roomId: roomId,
+                playerId: currentPlayer.id
+            }));
+            window.location.href = 'sala.html';
         });
     }
 

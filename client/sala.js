@@ -50,6 +50,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 updatePlayersUI(message.players);
             } else if (message.type === 'notification') {
                 showNotification(message.message, message.isError);
+            } else if (message.type === 'room_reset') {
+                showNotification(message.message);
+                updatePlayersList();
             }
         };
 

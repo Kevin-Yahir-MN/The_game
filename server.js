@@ -561,6 +561,31 @@ wss.on('connection', (ws, req) => {
                 case 'get_game_state':
                     if (room.gameState.gameStarted) sendGameState(room, player);
                     break;
+                case 'reset_room':
+                    if (rooms.has(msg.roomId)) {
+                        const room = rooms.get(msg.roomId);
+
+                        // Reiniciar el estado del juego pero mantener jugadores
+                        room.gameState = {
+                            deck: initializeDeck(),
+                            board: { ascending: [1, 1], descending: [100, 100] },
+                            currentTurn: room.players[0].id,
+                            gameStarted: false,
+                            initialCards: room.gameState.initialCards || 6
+                        };
+
+                        // Resetear estado de los jugadores
+                        room.players.forEach(player => {
+                            player.cards = [];
+                            player.cardsPlayedThisTurn = [];
+                        });
+
+                        broadcastToRoom(room, {
+                            type: 'room_reset',
+                            message: 'La sala ha sido reiniciada para una nueva partida'
+                        });
+                    }
+                    break;
             }
         } catch (error) {
             console.error('Error procesando mensaje:', error);
