@@ -17,9 +17,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const BUTTONS_Y = canvas.height * 0.85;
     const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
 
-    // Icono de historial
+    // Variables de estado para drag and drop
+    let isDragging = false;
+    let dragCard = null;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    // Icono de historial (SVG en base64 como fallback)
     const historyIcon = new Image();
-    historyIcon.src = 'cards-icon.png';
+    historyIcon.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE5IDNINWMtMS4xIDAtMiAuOS0yIDJ2MTRjMCAxLjEuOSAyIDIgMmgxNGMxLjEgMCAyLS45IDItMlY1YzAtMS4xLS45LTItMi0yem0wIDE2SDVWNWgxNHYxNHptLTctMmw1LTUtMS40MS0xLjRMMTIgMTMuMTkgOS40MSAxMC42IDggMTJsNCA0eiIvPjwvc3ZnPg==';
 
     // Datos del jugador
     const currentPlayer = {
@@ -33,10 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeNotifications = [];
     const NOTIFICATION_COOLDOWN = 3000;
     let selectedCard = null;
-    let dragState = {
-        active: false,
-        card: null
-    };
 
     let gameState = {
         players: [],
@@ -70,9 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
             this.backgroundColor = isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
 
             // Drag & Drop
-            this.isDragging = false;
-            this.dragOffsetX = 0;
-            this.dragOffsetY = 0;
+            this.isBeingDragged = false;
+            this.dragX = 0;
+            this.dragY = 0;
             this.originalX = x;
             this.originalY = y;
 
@@ -83,45 +87,40 @@ document.addEventListener('DOMContentLoaded', () => {
             this.rotation = 0;
             this.scale = 1.0;
             this.zIndex = 0;
-
-            // Animación
-            this.animation = {
-                active: false,
-                startTime: 0,
-                duration: 0,
-                fromX: 0,
-                fromY: 0,
-                fromRotation: 0,
-                targetX: 0,
-                targetY: 0,
-                targetRotation: 0
-            };
+            this.alpha = 1.0;
         }
 
         draw(ctx) {
-            // Actualizar animación si está activa
-            this.updateAnimation();
+            const drawX = this.isBeingDragged ? this.dragX : this.x + this.shakeOffset;
+            const drawY = this.isBeingDragged ? this.dragY : this.y;
 
             ctx.save();
 
-            // Aplicar transformaciones
-            const shakeX = this.isDragging ? 0 : this.shakeOffset;
-            ctx.translate(this.x + this.width / 2 + shakeX, this.y + this.height / 2);
+            // Configuración de sombras y transparencia
+            if (this.isBeingDragged) {
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                ctx.shadowBlur = 20;
+                ctx.shadowOffsetY = 10;
+                ctx.globalAlpha = 0.9;
+            } else {
+                ctx.shadowColor = this.shadowColor;
+                ctx.shadowBlur = this.shadowBlur;
+                ctx.shadowOffsetY = this.hoverOffset > 0 ? 8 : 4;
+                ctx.globalAlpha = this.alpha;
+            }
+
+            // Transformaciones
+            ctx.translate(drawX + this.width / 2, drawY + this.height / 2);
             ctx.rotate(this.rotation * Math.PI / 180);
             ctx.scale(this.scale, this.scale);
             ctx.translate(-this.width / 2, -this.height / 2);
-
-            // Sombra
-            ctx.shadowColor = this.shadowColor;
-            ctx.shadowBlur = this.isDragging ? 20 : this.shadowBlur;
-            ctx.shadowOffsetY = this.isDragging ? 15 : (this.hoverOffset > 0 ? 8 : 4);
 
             // Cuerpo de la carta
             ctx.beginPath();
             ctx.roundRect(0, -this.hoverOffset, this.width, this.height, this.radius);
 
             // Color basado en estado
-            if (this.isDragging) {
+            if (this.isBeingDragged) {
                 ctx.fillStyle = '#FFFFE0';
             } else if (this.hoverOffset > 0) {
                 ctx.fillStyle = '#FFFF99';
@@ -162,94 +161,41 @@ document.addEventListener('DOMContentLoaded', () => {
         startDrag(mouseX, mouseY) {
             if (!this.isPlayable) return false;
 
-            this.isDragging = true;
-            this.dragOffsetX = mouseX - this.x;
-            this.dragOffsetY = mouseY - this.y;
-            this.originalX = this.x;
-            this.originalY = this.y;
+            this.isBeingDragged = true;
+            this.dragX = this.x;
+            this.dragY = this.y;
+            dragOffsetX = mouseX - this.x;
+            dragOffsetY = mouseY - this.y;
 
             // Efecto visual al agarrar
-            this.applyGrabEffect();
+            this.scale = 1.1;
+            this.rotation = (Math.random() * 10) - 5; // Pequeña rotación aleatoria
+            this.zIndex = 100;
+
             return true;
         }
 
         updateDrag(mouseX, mouseY) {
-            if (!this.isDragging) return;
+            if (!this.isBeingDragged) return;
 
-            const targetX = mouseX - this.dragOffsetX;
-            const targetY = mouseY - this.dragOffsetY - 20; // Elevación
+            // Movimiento suavizado con interpolación
+            const targetX = mouseX - dragOffsetX;
+            const targetY = mouseY - dragOffsetY - 20; // Elevación al arrastrar
 
-            this.x += (targetX - this.x) * 0.3;
-            this.y += (targetY - this.y) * 0.3;
+            this.dragX += (targetX - this.dragX) * 0.3;
+            this.dragY += (targetY - this.dragY) * 0.3;
 
-            const dx = targetX - this.x;
+            // Rotación dinámica basada en movimiento
+            const dx = targetX - this.dragX;
             this.rotation = dx * 0.1;
         }
 
-        endDrag(success) {
-            if (!this.isDragging) return;
-
-            this.isDragging = false;
-            this.resetCardStyle();
-
-            if (!success) {
-                this.animateReturn();
-            }
-        }
-
-        applyGrabEffect() {
-            this.shadowBlur = 20;
-            this.shadowColor = 'rgba(0, 0, 0, 0.6)';
-            this.rotation = Math.random() * 8 - 4;
-            this.scale = 1.1;
-            this.zIndex = 100;
-        }
-
-        resetCardStyle() {
-            this.shadowBlur = 8;
-            this.shadowColor = 'rgba(0, 0, 0, 0.3)';
-            this.rotation = 0;
+        endDrag() {
+            this.isBeingDragged = false;
             this.scale = 1.0;
+            this.rotation = 0;
             this.zIndex = 0;
-        }
-
-        animateReturn() {
-            this.animation = {
-                active: true,
-                startTime: Date.now(),
-                duration: 600,
-                fromX: this.x,
-                fromY: this.y,
-                fromRotation: this.rotation,
-                targetX: this.originalX,
-                targetY: this.originalY,
-                targetRotation: 0
-            };
-        }
-
-        updateAnimation() {
-            if (!this.animation.active) return;
-
-            const elapsed = Date.now() - this.animation.startTime;
-            const progress = Math.min(elapsed / this.animation.duration, 1);
-
-            const elasticProgress = this.easeOutElastic(progress);
-
-            this.x = this.animation.fromX +
-                (this.animation.targetX - this.animation.fromX) * elasticProgress;
-            this.y = this.animation.fromY +
-                (this.animation.targetY - this.animation.fromY) * elasticProgress;
-            this.rotation = this.animation.fromRotation +
-                (this.animation.targetRotation - this.animation.fromRotation) * elasticProgress;
-
-            if (progress === 1) {
-                this.animation.active = false;
-            }
-        }
-
-        easeOutElastic(t) {
-            const p = 0.3;
-            return Math.pow(2, -10 * t) * Math.sin((t - p / 4) * (2 * Math.PI) / p) + 1;
+            this.alpha = 1.0;
         }
 
         animateShake() {
@@ -281,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function connectWebSocket() {
-        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
+        const socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
 
         socket.onopen = () => {
             console.log('Conexión WebSocket establecida');
@@ -326,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     case 'invalid_move':
                         if (message.playerId === currentPlayer.id && selectedCard) {
-                            animateInvalidCard(selectedCard);
+                            selectedCard.animateShake();
                         }
                         break;
                     case 'turn_changed':
@@ -436,29 +382,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    function animateInvalidCard(card) {
-        if (!card) return;
-
-        const shakeAmount = 8;
-        const shakeDuration = 400;
-        const startTime = Date.now();
-
-        function shake() {
-            const elapsed = Date.now() - startTime;
-            const progress = elapsed / shakeDuration;
-
-            if (progress >= 1) {
-                card.shakeOffset = 0;
-                return;
-            }
-
-            card.shakeOffset = Math.sin(progress * Math.PI * 8) * shakeAmount * (1 - progress);
-            requestAnimationFrame(shake);
-        }
-
-        shake();
-    }
-
     function handleTurnChanged(message) {
         gameState.currentTurn = message.newTurn;
         gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
@@ -512,11 +435,6 @@ document.addEventListener('DOMContentLoaded', () => {
         backdrop.appendChild(gameOverDiv);
 
         document.getElementById('returnToRoom').addEventListener('click', () => {
-            socket.send(JSON.stringify({
-                type: 'reset_room',
-                roomId: roomId,
-                playerId: currentPlayer.id
-            }));
             window.location.href = 'sala.html';
         });
     }
@@ -615,7 +533,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function drawHistoryIcons() {
         if (!historyIcon.complete || historyIcon.naturalWidth === 0) {
-            console.log('Icono de historial no cargado todavía');
             return;
         }
 
@@ -628,11 +545,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleCanvasClick(event) {
-        if (dragState.active) {
-            dragState.active = false;
-            if (dragState.card) {
-                dragState.card.endDrag(false);
-                dragState.card = null;
+        if (isDragging) {
+            isDragging = false;
+            if (dragCard) {
+                dragCard.endDrag();
+                animateCardReturn(dragCard);
+                dragCard = null;
             }
             return;
         }
@@ -689,11 +607,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (confirmMove) {
                         playCard(selectedCard.value, clickedColumn);
-                        socket.send(JSON.stringify({
-                            type: 'self_blocked',
-                            playerId: currentPlayer.id,
-                            roomId: roomId
-                        }));
                         return;
                     } else {
                         return;
@@ -778,13 +691,6 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.board.descending[idx] = cardValue;
         }
 
-        socket.send(JSON.stringify({
-            type: 'play_card',
-            playerId: currentPlayer.id,
-            cardValue,
-            position
-        }));
-
         selectedCard = null;
         updateGameInfo();
     }
@@ -799,10 +705,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return showNotification(`Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`, true);
         }
 
-        socket.send(JSON.stringify({
-            type: 'end_turn',
-            playerId: currentPlayer.id
-        }));
+        // Enviar mensaje para terminar turno
+        console.log("Terminando turno...");
     }
 
     function drawBoard() {
@@ -862,8 +766,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Ordenar cartas por z-index (excepto la que se está arrastrando)
         const cardsToDraw = [...gameState.yourCards].sort((a, b) => {
-            if (a.isDragging) return 1;
-            if (b.isDragging) return -1;
+            if (a.isBeingDragged) return 1;
+            if (b.isBeingDragged) return -1;
             return a.zIndex - b.zIndex;
         });
 
@@ -929,6 +833,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Precargar icono de historial
         const loadIcon = new Promise((resolve) => {
             historyIcon.onload = () => {
                 console.log('Icono de historial cargado correctamente');
@@ -955,6 +860,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             updateGameInfo();
 
+            // Posicionar controles
             const controlsDiv = document.querySelector('.game-controls');
             if (controlsDiv) {
                 controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
@@ -965,5 +871,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Iniciar el juego
     initGame();
 });
