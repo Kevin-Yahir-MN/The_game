@@ -678,15 +678,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function initGameInfoPanel() {
-        // Configurar toggle del panel
-        document.getElementById('toggleGameInfo').addEventListener('click', () => {
-            document.querySelector('.game-info-panel').classList.toggle('collapsed');
-            document.getElementById('toggleGameInfo').textContent =
-                document.querySelector('.game-info-panel').classList.contains('collapsed') ? '+' : '−';
-        });
-    }
-
     function handleCardAnimations() {
         const now = Date.now();
         for (let i = gameState.animatingCards.length - 1; i >= 0; i--) {
