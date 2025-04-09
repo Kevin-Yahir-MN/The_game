@@ -133,13 +133,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'game_over':
-                        handleGameOver(message);
+                        handleGameOver(message.message);
                         break;
                     case 'notification':
                         showNotification(message.message, message.isError);
                         break;
                     case 'card_played':
-                        handleOpponentCardPlayed(message);
+                        handleOpponentCardPlayed(mSessage);
                         updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'invalid_move':
@@ -287,15 +287,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const backdrop = document.createElement('div');
         backdrop.className = 'game-over-backdrop';
-        document.body.appendChild(backdrop);
 
         const gameOverDiv = document.createElement('div');
-        gameOverDiv.className = `game-over-notification ${message.reason === 'self_blocked' ? 'self-blocked' : ''}`;
+        gameOverDiv.className = 'game-over-notification';
         gameOverDiv.innerHTML = `
             <h2>¡GAME OVER!</h2>
-            <p>${message.message}</p>
+            <p>${message}</p>
             <button id="returnToRoom">Volver a la Sala</button>
         `;
+
+        document.body.appendChild(backdrop);
         document.body.appendChild(gameOverDiv);
 
         document.getElementById('returnToRoom').addEventListener('click', () => {

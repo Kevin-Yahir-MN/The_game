@@ -570,41 +570,39 @@ body {
     animation: shake 0.5s ease-in-out;
 }
 
-/* Game Over */
+/* ===== ESTILOS UNIFICADOS PARA GAME OVER ===== */
 .game-over-backdrop {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.85);
     z-index: 999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     animation: fadeIn 0.3s ease-out;
 }
 
 .game-over-notification {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
     background: rgba(42, 52, 65, 0.95);
-    padding: 2rem;
     border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    padding: 2rem;
+    width: 90%;
+    max-width: 500px;
     text-align: center;
-    max-width: 80%;
-    width: 400px;
-    z-index: 1000;
-    animation: fadeIn 0.5s ease-out;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    border-top: 5px solid var(--accent);
+    animation: slideIn 0.4s ease-out;
 }
 
 .game-over-notification h2 {
     color: var(--accent);
-    font-size: 2.5rem;
+    font-size: 2.2rem;
     margin-top: 0;
     margin-bottom: 1.5rem;
     text-transform: uppercase;
-    letter-spacing: 2px;
 }
 
 .game-over-notification p {
@@ -624,8 +622,6 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
-    width: 100%;
-    max-width: 200px;
     margin: 0 auto;
 }
 
@@ -635,15 +631,16 @@ body {
     box-shadow: 0 5px 15px rgba(192, 57, 43, 0.4);
 }
 
-.game-over-notification.self-blocked {
-    border: 3px solid var(--danger);
-    background: rgba(231, 76, 60, 0.1);
-    box-shadow: 0 10px 30px rgba(231, 76, 60, 0.3);
-}
+@keyframes slideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
 
-.game-over-notification.self-blocked h2 {
-    color: var(--danger);
-    animation: pulse 0.5s infinite alternate;
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 /* ===== ANIMACIONES ===== */
