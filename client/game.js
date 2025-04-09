@@ -17,33 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const BUTTONS_Y = canvas.height * 0.85;
     const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 20;
 
-    // Icono de historial con sistema de respaldo
+    // Icono de historial
     const historyIcon = new Image();
-    historyIcon.crossOrigin = "Anonymous";
-
-    // Ruta base dinámica para Render
-    const getBasePath = () => {
-        const isGitHubPages = window.location.host.includes('github.io');
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-        if (isLocal) {
-            return window.location.pathname.includes('/client') ? '..' : '';
-        }
-
-        return isGitHubPages ? '' : window.location.origin;
-    };
-
-    const basePath = getBasePath();
-
-    // Rutas posibles para el icono (priorizadas para producción)
-    const iconPaths = [
-        `${basePath}/assets/icons/cards-icon.png`,
-        './assets/icons/cards-icon.png',
-        'https://cdn-icons-png.flaticon.com/512/8616/8616159.png'
-    ];
-
-    // Icono de respaldo en BASE64 (versión SVG)
-    const backupIconSvg = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBmaWxsPSJ3aGl0ZSIgZD0iTTQ2NCA0OEg0OEMyMS41IDQ4IDAgNjkuNSAwIDk2djMyMGMwIDI2LjUgMjEuNSA0OCA0OCA0OGg0MTZjMjYuNSAwIDQ4LTIxLjUgNDgtNDhWOTZjMC0yNi41LTIxLjUtNDgtNDgtNDh6bS0yODAgMzY4Yy0xNy43IDAtMzItMTQuMy0zMi0zMnMxNC4zLTMyIDMyLTMyIDMyIDE0LjMgMzIgMzItMTQuMyAzMi0zMiAzMnptOTYgMGMtMTcuNyAwLTMyLTE4LjMtMzItMzJzMTQuMy0zMiAzMi0zMiAzMiAxNC4zIDMyIDMyLTE0LjMgMzItMzIgMzJ6bTk2IDBjLTE3LjcgMC0zMi0xNC4zLTMyLTMyczE0LjMtMzIgMzItMzIgMzIgMTQuMyAzMiAzMi0xNC4zIDMyLTMyIDMyem0xMjgtMTYwSDE2MFYxMjhoMjQ4djEyOHoiLz48L3N2Zz4=';
+    historyIcon.src = 'https://cdn-icons-png.flaticon.com/512/8616/8616159.png';
 
     // Datos del jugador
     const currentPlayer = {
@@ -419,51 +395,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawHistoryIcons() {
-        const iconSize = 40;
-        const iconRadius = 22;
+        if (!historyIcon.complete || historyIcon.naturalWidth === 0) {
+            console.log('Icono de historial no cargado todavía');
+            return;
+        }
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
-            const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - iconSize / 2;
+            const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const y = HISTORY_ICON_Y;
 
-            // Fondo circular
+            // Dibujar fondo circular para mejor visibilidad
             ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
             ctx.beginPath();
-            ctx.arc(x + iconSize / 2, y + iconSize / 2, iconRadius, 0, Math.PI * 2);
+            ctx.arc(x + 20, y + 20, 22, 0, Math.PI * 2);
             ctx.fill();
 
             // Dibujar el icono
-            if (historyIcon.complete) {
-                try {
-                    ctx.drawImage(historyIcon, x, y, iconSize, iconSize);
-                } catch (e) {
-                    console.error('Error al dibujar icono:', e);
-                    drawIconPlaceholder(x, y, iconSize);
-                }
-            } else {
-                drawIconPlaceholder(x, y, iconSize);
-            }
+            ctx.drawImage(historyIcon, x, y, 40, 40);
         });
-    }
-
-    function drawIconPlaceholder(x, y, size) {
-        // Fondo blanco
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.roundRect(x, y, size, size, size / 4);
-        ctx.fill();
-
-        // Símbolo de carta
-        ctx.fillStyle = '#3498db';
-        ctx.font = `bold ${size * 0.6}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🂠', x + size / 2, y + size / 2);
-
-        // Borde
-        ctx.strokeStyle = '#2c3e50';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, size, size);
     }
 
     function handleCanvasClick(event) {
@@ -758,59 +707,42 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(gameLoop);
     }
 
-    function loadIconWithFallbacks(iconElement, paths, successCallback, finalFallback) {
-        let currentTry = 0;
-
-        const tryLoad = () => {
-            if (currentTry >= paths.length) {
-                console.warn('Todos los intentos fallaron, usando icono de respaldo BASE64');
-                iconElement.src = finalFallback;
-                successCallback();
-                return;
-            }
-
-            const path = paths[currentTry] + '?v=' + Date.now();
-            console.log('Intentando cargar icono desde:', path);
-
-            iconElement.src = path;
-
-            iconElement.onload = () => {
-                console.log('Icono cargado exitosamente desde:', path);
-                successCallback();
-            };
-
-            iconElement.onerror = () => {
-                console.warn('Error al cargar icono desde:', path);
-                currentTry++;
-                setTimeout(tryLoad, currentTry * 200);
-            };
-        };
-
-        tryLoad();
-    }
-
     function initGame() {
         if (!canvas || !ctx || !currentPlayer.id || !roomId) {
             alert('Error: No se pudo inicializar el juego. Vuelve a la sala.');
             return;
         }
 
-        loadIconWithFallbacks(
-            historyIcon,
-            iconPaths,
-            () => {
-                canvas.width = 800;
-                canvas.height = 700;
+        // Precargar el icono antes de iniciar
+        const loadIcon = new Promise((resolve) => {
+            historyIcon.onload = () => {
+                console.log('Icono de historial cargado correctamente');
+                resolve();
+            };
+            historyIcon.onerror = () => {
+                console.error('Error cargando el icono de historial');
+                resolve();
+            };
+        });
 
-                endTurnButton.addEventListener('click', endTurn);
-                canvas.addEventListener('click', handleCanvasClick);
-                document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
+        loadIcon.then(() => {
+            canvas.width = 800;
+            canvas.height = 700;
 
-                connectWebSocket();
-                gameLoop();
-            },
-            backupIconSvg
-        );
+            // Configurar eventos
+            endTurnButton.addEventListener('click', endTurn);
+            canvas.addEventListener('click', handleCanvasClick);
+            document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
+
+            // Posicionar controles
+            const controlsDiv = document.querySelector('.game-controls');
+            if (controlsDiv) {
+                controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
+            }
+
+            connectWebSocket();
+            gameLoop();
+        });
     }
 
     initGame();
