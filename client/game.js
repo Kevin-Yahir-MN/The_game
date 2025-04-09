@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Icono de historial
     const historyIcon = new Image();
-    historyIcon.src = 'https://cdn-icons-png.flaticon.com/512/8616/8616159.png';
+    historyIcon.src = 'cards-icon.png';
 
     // Datos del jugador
     const currentPlayer = {
