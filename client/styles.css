@@ -454,7 +454,10 @@ body {
 }
 
 .progress-container {
-    margin: 20px 0 10px;
+    order: 1;
+    /* Mueve la barra después del texto */
+    margin-top: 5px;
+    margin-bottom: 15px;
 }
 
 .progress-bar {
@@ -462,6 +465,20 @@ body {
     background: var(--primary);
     border-radius: 5px;
     margin-bottom: 8px;
+}
+
+.progress-text {
+    order: 0;
+    /* Texto primero */
+    font-size: 1.1rem;
+    margin-bottom: 5px;
+}
+
+.progress-bar {
+    height: 12px;
+    background: var(--primary);
+    border-radius: 6px;
+    width: 100%;
 }
 
 /* Panel de Instrucciones */
