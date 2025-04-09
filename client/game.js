@@ -738,7 +738,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
 
             // Inicializar panel de información
-            initGameInfoPanel();
             updateGameInfo();
 
             // Posicionar controles
