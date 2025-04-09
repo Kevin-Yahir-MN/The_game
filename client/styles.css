@@ -434,85 +434,105 @@ body {
     line-height: 1.4;
 }
 
-/* Panel de información del juego */
+/* Panel de información */
 .game-info-panel {
     position: fixed;
     top: 20px;
     left: 20px;
     background: rgba(42, 52, 65, 0.95);
-    border-radius: 12px;
-    padding: 20px;
-    /* Aumentado de 15px */
-    width: 300px;
-    /* Aumentado de 260px */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(5px);
+    border-radius: 18px;
+    /* 12px * 1.5 */
+    padding: 22.5px;
+    /* 15px * 1.5 */
+    width: 390px;
+    /* 260px * 1.5 */
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+    /* 4px * 1.5 */
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(7.5px);
+    /* 5px * 1.5 */
     z-index: 10;
 }
 
 .game-info-panel h3 {
     margin: 0 0 15px 0;
-    /* Aumentado de 10px */
+    /* 10px * 1.5 */
     color: var(--primary);
-    font-size: 1.3rem;
-    /* Aumentado de 1.1rem */
+    font-size: 1.65rem;
+    /* 1.1rem * 1.5 */
     font-weight: 600;
 }
 
 .game-info-content {
     color: white;
-    font-size: 1.05rem;
-    /* Aumentado de 0.95rem */
-    line-height: 1.6;
-    /* Aumentado de 1.4 */
+    font-size: 1.425rem;
+    /* 0.95rem * 1.5 */
+    line-height: 1.8;
+    /* 1.2 * 1.5 */
 }
 
 .game-info-content p {
     margin: 12px 0;
-    /* Aumentado de 8px */
+    /* 8px * 1.5 */
 }
 
 .game-info-content strong {
-    font-size: 1.1rem;
-    /* Texto en negrita más grande */
+    font-size: 1.5rem;
+    /* Tamaño personalizado para negritas */
 }
 
 .progress-container {
-    margin-top: 15px;
-    /* Aumentado de 12px */
+    margin-top: 18px;
+    /* 12px * 1.5 */
 }
 
 .progress-bar {
-    height: 10px;
-    /* Aumentado de 8px */
+    height: 12px;
+    /* 8px * 1.5 */
+    border-radius: 6px;
+    /* 4px * 1.5 */
 }
 
 #progressText {
-    font-size: 0.95rem;
-    /* Aumentado de 0.85rem */
-    margin-top: 8px;
+    font-size: 1.275rem;
+    /* 0.85rem * 1.5 */
+    margin-top: 7.5px;
+    /* 5px * 1.5 */
 }
 
-/* Ajustes responsivos para el panel más grande */
+/* Ajustes responsivos */
+@media (max-width: 850px) {
+    .game-info-panel {
+        width: 340px;
+        padding: 18px;
+    }
+
+    #gameCanvas {
+        margin-top: 180px;
+        /* 120px * 1.5 */
+    }
+}
+
 @media (max-width: 600px) {
     .game-info-panel {
-        width: 260px;
+        width: 300px;
         padding: 15px;
     }
 
-    .game-info-panel h3 {
-        font-size: 1.2rem;
-    }
-
-    .game-info-content {
-        font-size: 1rem;
+    #gameCanvas {
+        margin-top: 150px;
+        /* 100px * 1.5 */
     }
 }
 
 @media (max-width: 400px) {
     .game-info-panel {
-        width: 240px;
+        width: 270px;
+    }
+
+    #gameCanvas {
+        margin-top: 120px;
+        /* 80px * 1.5 */
     }
 }
 
