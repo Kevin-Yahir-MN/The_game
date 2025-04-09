@@ -9,20 +9,6 @@
 </head>
 
 <body>
-    <!-- Panel de información del juego -->
-    <div class="game-info-panel">
-        <h3>Información del Juego</h3>
-        <div class="game-info-content">
-            <p><strong>Turno actual:</strong> <span id="currentTurn">Esperando...</span></p>
-            <p><strong>Cartas restantes:</strong> <span id="remainingDeck">98</span></p>
-            <p><strong>Tus cartas:</strong> <span id="yourCardsCount">6</span></p>
-            <div class="progress-container">
-                <div class="progress-bar" id="progressBar"></div>
-                <span id="progressText">0/2 cartas jugadas</span>
-            </div>
-        </div>
-    </div>
-
     <!-- Contenedor principal del juego -->
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="700"></canvas>
@@ -31,18 +17,36 @@
         </div>
     </div>
 
-    <div class="game-instructions-vertical">
-        <h4>Instrucciones</h4>
-        <ul>
-            <li>Click en carta para seleccionar</li>
-            <li>Click en columna para jugar</li>
-            <li>Click en icono para historial</li>
-            <li>Pilas ↑: cartas mayores</li>
-            <li>Pilas ↓: cartas menores</li>
-            <li>Jugar mínimo 2 cartas</li>
-            <li>¡Colabora para ganar!</li>
-        </ul>
+    <!-- Panel de Información -->
+    <div class="game-panel info-panel">
+        <h3>Información del Juego</h3>
+        <div class="panel-content">
+            <p><strong>Turno actual:</strong> <span id="currentTurn">Esperando...</span></p>
+            <p><strong>Cartas restantes:</strong> <span id="remainingDeck">98</span></p>
+            <p><strong>Tus cartas:</strong> <span id="yourCardsCount">0</span></p>
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+                <span id="progressText">0/2 cartas jugadas</span>
+            </div>
+        </div>
     </div>
+
+    <!-- Panel de Instrucciones -->
+    <div class="game-panel instructions-panel">
+        <h3>Instrucciones</h3>
+        <div class="panel-content">
+            <ul>
+                <li>Click en carta para seleccionar</li>
+                <li>Click en columna para jugar</li>
+                <li>Icono inferior para historial</li>
+                <li>Pilas ↑: cartas mayores</li>
+                <li>Pilas ↓: cartas menores</li>
+                <li>Mínimo 2 cartas por turno</li>
+                <li>¡Colabora para ganar!</li>
+            </ul>
+        </div>
+    </div>
+
     <!-- Modal para el historial -->
     <div id="historyModal" class="history-modal" style="display: none;">
         <h3>Historial de Cartas - <span id="historyColumnTitle"></span></h3>
