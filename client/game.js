@@ -32,6 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Estado del juego
     let activeNotifications = [];
     const NOTIFICATION_COOLDOWN = 3000;
+    let dragStartCard = null;
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
     let selectedCard = null;
     let gameState = {
         players: [],
@@ -449,6 +452,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleCanvasClick(event) {
+
+        if (isDragging) {
+            isDragging = false;
+            dragStartCard = null;
+            return;
+        }
+
         const rect = canvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
@@ -601,6 +611,66 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGameInfo(); // Actualizar panel de información
     }
 
+    function handleMouseDown(event) {
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        // Verificar si estamos haciendo clic en una carta del jugador
+        const clickedCard = gameState.yourCards.find(card => card.contains(x, y));
+
+        if (clickedCard && clickedCard.isPlayable && gameState.currentTurn === currentPlayer.id) {
+            dragStartCard = clickedCard;
+            isDragging = true;
+            selectedCard = clickedCard; // Mantener compatibilidad con el sistema de clic
+            dragOffset = {
+                x: x - clickedCard.x,
+                y: y - clickedCard.y
+            };
+        }
+    }
+
+    function handleMouseMove(event) {
+        if (!isDragging || !dragStartCard) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        // Actualizar posición de la carta mientras se arrastra
+        dragStartCard.x = x - dragOffset.x;
+        dragStartCard.y = y - dragOffset.y;
+
+        // Resaltar la columna objetivo si es válida
+        const targetColumn = getClickedColumn(x, y);
+        if (targetColumn && isValidMove(dragStartCard.value, targetColumn)) {
+            // Aquí podrías añadir un efecto visual para la columna objetivo
+        }
+    }
+
+    function handleMouseUp(event) {
+        if (!isDragging || !dragStartCard) {
+            isDragging = false;
+            dragStartCard = null;
+            return;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        const targetColumn = getClickedColumn(x, y);
+        if (targetColumn && dragStartCard && isValidMove(dragStartCard.value, targetColumn)) {
+            playCard(dragStartCard.value, targetColumn);
+        } else {
+            // Si no se soltó en una columna válida, volver a la posición original
+            updatePlayerCards(gameState.yourCards.map(c => c.value));
+        }
+
+        isDragging = false;
+        dragStartCard = null;
+    }
+
     function endTurn() {
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
@@ -671,6 +741,17 @@ document.addEventListener('DOMContentLoaded', () => {
             15
         );
         ctx.fill();
+
+        // Solo actualizar posiciones si no estamos arrastrando una carta
+        if (!isDragging) {
+            gameState.yourCards.forEach((card, index) => {
+                if (card) {
+                    card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
+                        index * (CARD_WIDTH + CARD_SPACING);
+                    card.y = PLAYER_CARDS_Y;
+                }
+            });
+        }
 
         gameState.yourCards.forEach((card, index) => {
             if (card) {
@@ -761,6 +842,12 @@ document.addEventListener('DOMContentLoaded', () => {
             endTurnButton.addEventListener('click', endTurn);
             canvas.addEventListener('click', handleCanvasClick);
             document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
+
+            // Añadir estos event listeners después de los existentes
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('mouseleave', handleMouseUp);
 
             // Inicializar panel de información
             updateGameInfo();

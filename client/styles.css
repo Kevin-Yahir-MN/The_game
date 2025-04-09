@@ -960,3 +960,18 @@ body {
         margin-top: 80px;
     }
 }
+
+/* Añadir a styles.css */
+#gameCanvas {
+    cursor: grab;
+}
+
+#gameCanvas:active {
+    cursor: grabbing;
+}
+
+.drag-target {
+    box-shadow: 0 0 15px rgba(46, 204, 113, 0.7);
+    transform: scale(1.05);
+    transition: all 0.2s;
+}
