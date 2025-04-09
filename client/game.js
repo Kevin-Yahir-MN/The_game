@@ -689,8 +689,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Actualizar elementos HTML
         document.getElementById('currentTurn').textContent = currentPlayerName;
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
-        document.getElementById('yourCardsCount').textContent = gameState.yourCards.length;
-
         // Actualizar barra de progreso si es tu turno
         if (gameState.currentTurn === currentPlayer.id) {
             const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
