@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         showNotification(message.message, message.isError);
                         break;
                     case 'card_played':
-                        handleOpponentCardPlayed(mSessage);
+                        handleOpponentCardPlayed(message);
                         updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'invalid_move':
