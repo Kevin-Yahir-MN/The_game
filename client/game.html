@@ -9,27 +9,43 @@
 </head>
 
 <body>
+    <!-- Panel de información del juego -->
+    <div class="game-info-panel">
+        <div class="game-info-header">
+            <h3>Información del Juego</h3>
+            <button id="toggleGameInfo">−</button>
+        </div>
+        <div class="game-info-content">
+            <p><strong>Turno actual:</strong> <span id="currentTurn">Esperando...</span></p>
+            <p><strong>Cartas restantes:</strong> <span id="remainingDeck">98</span></p>
+            <p><strong>Tus cartas:</strong> <span id="yourCardsCount">6</span></p>
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+                <span id="progressText">0/2 cartas jugadas</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenedor principal del juego -->
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="700"></canvas>
         <div class="game-controls">
             <button id="endTurnBtn">Terminar Turno</button>
         </div>
-        <div class="game-instructions">
-            <h3>Instrucciones:</h3>
-            <ul>
-                <li>Haz click en una carta para seleccionarla (amarillo)</li>
-                <li>Haz click en una columna para jugar la carta seleccionada</li>
-                <li>Haz click en el icono de cartas debajo de cada columna para ver el historial de cada una</li>
-                <li>En pilas ascendentes (↑): juega cartas mayores</li>
-                <li>En pilas descendentes (↓): juega cartas menores</li>
-                <li>Debes jugar al menos 2 cartas por turno (1 si no quedan cartas)</li>
-                <li>¡Colabora para jugar todas las cartas!</li>
-            </ul>
-        </div>
+    </div>
 
-        <!-- Contenedor para iconos de historial (alternativa HTML) -->
-        <div id="historyIconsContainer"
-            style="position: absolute; width: 100%; height: 100%; pointer-events: none; top: 0; left: 0;"></div>
+    <!-- Instrucciones del juego -->
+    <div class="game-instructions">
+        <h3>Instrucciones:</h3>
+        <ul>
+            <li>Haz click en una carta para seleccionarla (amarillo)</li>
+            <li>Haz click en una columna para jugar la carta seleccionada</li>
+            <li>Haz click en el icono de cartas debajo de cada columna para ver el historial de cada una</li>
+            <li>En pilas ascendentes (↑): juega cartas mayores</li>
+            <li>En pilas descendentes (↓): juega cartas menores</li>
+            <li>Debes jugar al menos 2 cartas por turno (1 si no quedan cartas)</li>
+            <li>¡Colabora para jugar todas las cartas!</li>
+        </ul>
     </div>
 
     <!-- Modal para el historial -->

@@ -925,3 +925,94 @@ body {
         margin-top: 80px;
     }
 }
+
+/* Panel de información del juego */
+.game-info-panel {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background: rgba(42, 52, 65, 0.95);
+    border-radius: 12px;
+    padding: 15px;
+    width: 260px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(5px);
+    z-index: 10;
+    transition: all 0.3s ease;
+}
+
+.game-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.game-info-header h3 {
+    margin: 0;
+    color: var(--primary);
+    font-size: 1.1rem;
+}
+
+#toggleGameInfo {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.game-info-content {
+    color: white;
+    font-size: 0.95rem;
+}
+
+.game-info-content p {
+    margin: 8px 0;
+    line-height: 1.4;
+}
+
+.progress-container {
+    margin-top: 12px;
+}
+
+.progress-bar {
+    height: 8px;
+    background: var(--primary);
+    border-radius: 4px;
+    margin-bottom: 5px;
+    transition: width 0.3s ease;
+}
+
+#progressText {
+    font-size: 0.85rem;
+    color: var(--gray);
+    display: block;
+    text-align: center;
+}
+
+/* Estado colapsado */
+.game-info-panel.collapsed {
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
+    padding: 8px;
+}
+
+.game-info-panel.collapsed .game-info-content,
+.game-info-panel.collapsed .game-info-header h3 {
+    display: none;
+}
+
+.game-info-panel.collapsed #toggleGameInfo {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+}

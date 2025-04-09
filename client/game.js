@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const PLAYER_CARDS_Y = canvas.height * 0.6;
     const BUTTONS_Y = canvas.height * 0.85;
-    const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
+    const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 20;
 
     // Icono de historial
     const historyIcon = new Image();
@@ -121,13 +121,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 switch (message.type) {
                     case 'game_state':
                         updateGameState(message.state);
+                        updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'game_started':
                         updateGameState(message.state);
                         showNotification('¡El juego ha comenzado!');
+                        updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'your_cards':
                         updatePlayerCards(message.cards);
+                        updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'game_over':
                         handleGameOver(message);
@@ -137,6 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     case 'card_played':
                         handleOpponentCardPlayed(message);
+                        updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'invalid_move':
                         if (message.playerId === currentPlayer.id && selectedCard) {
@@ -145,9 +149,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     case 'turn_changed':
                         handleTurnChanged(message);
+                        updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'move_undone':
                         handleMoveUndone(message);
+                        updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'room_reset':
                         break;
@@ -404,6 +410,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const y = HISTORY_ICON_Y;
 
+            // Dibujar fondo circular para mejor visibilidad
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.arc(x + 20, y + 20, 22, 0, Math.PI * 2);
+            ctx.fill();
+
             // Dibujar el icono
             ctx.drawImage(historyIcon, x, y, 40, 40);
         });
@@ -559,6 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
 
         selectedCard = null;
+        updateGameInfo(); // Actualizar panel de información
     }
 
     function endTurn() {
@@ -582,9 +595,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.beginPath();
         ctx.roundRect(
             BOARD_POSITION.x - 25,
-            BOARD_POSITION.y - 50,
+            BOARD_POSITION.y - 40,
             CARD_WIDTH * 4 + COLUMN_SPACING * 3 + 50,
-            CARD_HEIGHT + 110,
+            CARD_HEIGHT + 80,
             15
         );
         ctx.fill();
@@ -643,90 +656,35 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function drawGameInfo() {
-        const cornerRadius = 12;
-        const padding = 15;
-        const width = 280;
-        const height = 120;
-
-        // Fondo con transparencia y bordes redondeados
-        ctx.fillStyle = 'rgba(42, 52, 65, 0.85)';
-        ctx.beginPath();
-        ctx.roundRect(
-            padding,
-            padding,
-            width,
-            height,
-            cornerRadius
-        );
-        ctx.fill();
-
-        // Borde sutil
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Texto informativo
-        ctx.fillStyle = 'white';
-        ctx.font = '500 16px "Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-
+    function updateGameInfo() {
         const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
-        const lines = [
-            `Turno actual: ${currentPlayerName}`,
-            `Cartas restantes: ${gameState.remainingDeck}`,
-            `Tus cartas: ${gameState.yourCards.length}`
-        ];
 
-        // Posicionamiento del texto con espaciado uniforme
-        const lineHeight = 28;
-        const startY = padding * 2;
+        // Actualizar elementos HTML
+        document.getElementById('currentTurn').textContent = currentPlayerName;
+        document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
+        document.getElementById('yourCardsCount').textContent = gameState.yourCards.length;
 
-        lines.forEach((line, index) => {
-            ctx.fillText(line, padding * 2, startY + (index * lineHeight));
-        });
-
-        // Barra de progreso para cartas jugadas (si es tu turno)
+        // Actualizar barra de progreso si es tu turno
         if (gameState.currentTurn === currentPlayer.id) {
             const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
             const required = gameState.remainingDeck > 0 ? 2 : 1;
-            const progressWidth = width - (padding * 4);
+            const progress = Math.min(cardsPlayed / required, 1) * 100;
 
-            // Fondo de la barra
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.beginPath();
-            ctx.roundRect(
-                padding * 2,
-                startY + (lines.length * lineHeight) - 10,
-                progressWidth,
-                8,
-                4
-            );
-            ctx.fill();
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = `${progress}%`;
+            progressBar.style.backgroundColor = progress >= 100 ? 'var(--secondary)' : 'var(--primary)';
 
-            // Barra de progreso
-            const progress = Math.min(cardsPlayed / required, 1);
-            ctx.fillStyle = progress >= 1 ? '#2ecc71' : '#f39c12';
-            ctx.beginPath();
-            ctx.roundRect(
-                padding * 2,
-                startY + (lines.length * lineHeight) - 10,
-                progressWidth * progress,
-                8,
-                4
-            );
-            ctx.fill();
-
-            // Texto de progreso
-            ctx.fillStyle = 'white';
-            ctx.font = '500 14px "Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
-            ctx.fillText(
-                `Progreso: ${cardsPlayed}/${required} cartas jugadas`,
-                padding * 2,
-                startY + (lines.length * lineHeight) + 20
-            );
+            document.getElementById('progressText').textContent = `${cardsPlayed}/${required} cartas jugadas`;
         }
+    }
+
+    function initGameInfoPanel() {
+        // Configurar toggle del panel
+        document.getElementById('toggleGameInfo').addEventListener('click', () => {
+            document.querySelector('.game-info-panel').classList.toggle('collapsed');
+            document.getElementById('toggleGameInfo').textContent =
+                document.querySelector('.game-info-panel').classList.contains('collapsed') ? '+' : '−';
+        });
     }
 
     function handleCardAnimations() {
@@ -753,7 +711,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillStyle = '#1a6b1a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        drawGameInfo();
         drawBoard();
         drawHistoryIcons();
         handleCardAnimations();
@@ -788,6 +745,10 @@ document.addEventListener('DOMContentLoaded', () => {
             endTurnButton.addEventListener('click', endTurn);
             canvas.addEventListener('click', handleCanvasClick);
             document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
+
+            // Inicializar panel de información
+            initGameInfoPanel();
+            updateGameInfo();
 
             // Posicionar controles
             const controlsDiv = document.querySelector('.game-controls');
