@@ -584,7 +584,7 @@ document.addEventListener('DOMContentLoaded', () => {
             BOARD_POSITION.x - 25,
             BOARD_POSITION.y - 50,
             CARD_WIDTH * 4 + COLUMN_SPACING * 3 + 50,
-            CARD_HEIGHT + 100,
+            CARD_HEIGHT + 110,
             15
         );
         ctx.fill();
