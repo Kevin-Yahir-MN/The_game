@@ -30,6 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomId = sessionStorage.getItem('roomId');
 
     // Estado del juego
+    let lastNotificationTime = 0;
+    const NOTIFICATION_COOLDOWN = 3000;
     let selectedCard = null;
     let gameState = {
         players: [],
@@ -167,13 +169,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showNotification(message, isError = false) {
+        const now = Date.now();
+        if (now - lastNotificationTime < NOTIFICATION_COOLDOWN) {
+            return; // Ignora si no ha pasado el tiempo mínimo
+        }
+        lastNotificationTime = now;
+
+        // Elimina notificaciones anteriores del mismo tipo
+        document.querySelectorAll('.notification').forEach(el => {
+            if (el.classList.contains(isError ? 'error' : 'success')) {
+                el.remove();
+            }
+        });
+
         const notification = document.createElement('div');
         notification.className = `notification ${isError ? 'error' : ''}`;
         notification.textContent = message;
         document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 3000);
-    }
 
+        // Animación de entrada
+        notification.style.animation = 'fadeIn 0.3s ease-out';
+
+        // Eliminar después de 3 segundos
+        setTimeout(() => {
+            notification.style.animation = 'fadeOut 0.3s ease-out';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
     function showColumnHistory(columnId) {
         const modal = document.getElementById('historyModal');
         const backdrop = document.getElementById('modalBackdrop');

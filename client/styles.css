@@ -558,16 +558,40 @@ body {
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     z-index: 1000;
-    animation: fadeIn 0.3s ease-out;
     max-width: 80%;
     text-align: center;
     font-size: 16px;
     font-weight: bold;
+    pointer-events: none;
 }
 
 .notification.error {
     background-color: var(--danger);
-    animation: shake 0.5s ease-in-out;
+}
+
+/* Añade estas nuevas animaciones */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+
+    to {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+    }
 }
 
 /* ===== ESTILOS UNIFICADOS PARA GAME OVER ===== */
