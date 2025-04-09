@@ -897,3 +897,31 @@ body {
     background-color: rgba(0, 0, 0, 0.7);
     z-index: 1000;
 }
+
+/* Ajustes para la información del juego */
+#gameCanvas {
+    margin-top: 140px;
+    /* Espacio para la información */
+}
+
+@media (max-width: 850px) {
+    #gameCanvas {
+        margin-top: 120px;
+    }
+}
+
+@media (max-width: 600px) {
+    #gameCanvas {
+        margin-top: 100px;
+    }
+
+    .game-controls {
+        top: 80px !important;
+    }
+}
+
+@media (max-width: 400px) {
+    #gameCanvas {
+        margin-top: 80px;
+    }
+}

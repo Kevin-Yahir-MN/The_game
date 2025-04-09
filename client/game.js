@@ -644,27 +644,88 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawGameInfo() {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        const cornerRadius = 12;
+        const padding = 15;
+        const width = 280;
+        const height = 120;
+
+        // Fondo con transparencia y bordes redondeados
+        ctx.fillStyle = 'rgba(42, 52, 65, 0.85)';
         ctx.beginPath();
-        ctx.roundRect(20, 20, 360, 120, 15);
+        ctx.roundRect(
+            padding,
+            padding,
+            width,
+            height,
+            cornerRadius
+        );
         ctx.fill();
 
+        // Borde sutil
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Texto informativo
         ctx.fillStyle = 'white';
-        ctx.font = 'bold 20px Arial';
+        ctx.font = '500 16px "Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
 
         const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
-        ctx.fillText(`Turno actual: ${currentPlayerName}`, 40, 50);
-        ctx.fillText(`Cartas restantes: ${gameState.remainingDeck}`, 40, 80);
+        const lines = [
+            `Turno actual: ${currentPlayerName}`,
+            `Cartas restantes: ${gameState.remainingDeck}`,
+            `Tus cartas: ${gameState.yourCards.length}`
+        ];
 
+        // Posicionamiento del texto con espaciado uniforme
+        const lineHeight = 28;
+        const startY = padding * 2;
+
+        lines.forEach((line, index) => {
+            ctx.fillText(line, padding * 2, startY + (index * lineHeight));
+        });
+
+        // Barra de progreso para cartas jugadas (si es tu turno)
         if (gameState.currentTurn === currentPlayer.id) {
             const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
             const required = gameState.remainingDeck > 0 ? 2 : 1;
-            const color = cardsPlayed >= required ? '#2ecc71' : '#f1c40f';
+            const progressWidth = width - (padding * 4);
 
-            ctx.fillStyle = color;
-            ctx.fillText(`Cartas jugadas: ${cardsPlayed}/${required}`, 40, 110);
+            // Fondo de la barra
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.roundRect(
+                padding * 2,
+                startY + (lines.length * lineHeight) - 10,
+                progressWidth,
+                8,
+                4
+            );
+            ctx.fill();
+
+            // Barra de progreso
+            const progress = Math.min(cardsPlayed / required, 1);
+            ctx.fillStyle = progress >= 1 ? '#2ecc71' : '#f39c12';
+            ctx.beginPath();
+            ctx.roundRect(
+                padding * 2,
+                startY + (lines.length * lineHeight) - 10,
+                progressWidth * progress,
+                8,
+                4
+            );
+            ctx.fill();
+
+            // Texto de progreso
+            ctx.fillStyle = 'white';
+            ctx.font = '500 14px "Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
+            ctx.fillText(
+                `Progreso: ${cardsPlayed}/${required} cartas jugadas`,
+                padding * 2,
+                startY + (lines.length * lineHeight) + 20
+            );
         }
     }
 
