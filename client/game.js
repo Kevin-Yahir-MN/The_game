@@ -738,7 +738,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const iconPaths = [
             '../assets/icons/cards-icon.png', // Ruta relativa desde client/
             '/assets/icons/cards-icon.png',   // Ruta absoluta desde raíz
-            'https://cdn-icons-png.flaticon.com/512/116/116366.png' // Icono de respaldo online
+            'https://cdn-icons-png.flaticon.com/512/8616/8616159.png' // Icono de respaldo online
         ];
 
         let currentTry = 0;
