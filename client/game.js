@@ -405,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const y = HISTORY_ICON_Y;
 
             // Dibujar el icono
-            ctx.drawImage(historyIcon, x, y, 40, 40);
+            ctx.drawImage(historyIcon, x, y, 35, 40);
         });
     }
 
