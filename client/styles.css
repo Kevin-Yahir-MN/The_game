@@ -435,12 +435,22 @@ body {
 .info-panel {
     top: 25px;
     left: 25px;
+    text-align: left;
 }
 
 .info-panel p {
     margin: 14px 0;
-    display: flex;
-    justify-content: space-between;
+    display: block;
+    text-align: left;
+}
+
+
+.info-panel strong {
+    display: inline-block;
+    min-width: 140px;
+    /* Ancho fijo para etiquetas */
+    color: var(--secondary);
+    /* Color destacado */
 }
 
 .progress-container {
