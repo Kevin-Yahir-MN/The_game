@@ -443,12 +443,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const y = HISTORY_ICON_Y;
 
-            // Dibujar fondo circular para mejor visibilidad
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.beginPath();
-            ctx.arc(x + 20, y + 20, 22, 0, Math.PI * 2);
-            ctx.fill();
-
             // Dibujar el icono
             ctx.drawImage(historyIcon, x, y, 40, 40);
         });
