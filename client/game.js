@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const PLAYER_CARDS_Y = canvas.height * 0.6;
     const BUTTONS_Y = canvas.height * 0.85;
-    const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 10;
+    const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
 
     // Icono de historial
     const historyIcon = new Image();
@@ -582,7 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.beginPath();
         ctx.roundRect(
             BOARD_POSITION.x - 25,
-            BOARD_POSITION.y - 40,
+            BOARD_POSITION.y - 30,
             CARD_WIDTH * 4 + COLUMN_SPACING * 3 + 50,
             CARD_HEIGHT + 100,
             15
