@@ -17,17 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const BUTTONS_Y = canvas.height * 0.85;
     const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
 
-    // Variables de estado para drag and drop
-    let isDragging = false;
-    let dragCard = null;
-    let dragStartX = 0;
-    let dragStartY = 0;
-    let dragOffsetX = 0;
-    let dragOffsetY = 0;
-
-    // Icono de historial (SVG en base64 como fallback)
+    // Icono de historial
     const historyIcon = new Image();
-    historyIcon.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE5IDNINWMtMS4xIDAtMiAuOS0yIDJ2MTRjMCAxLjEuOSAyIDIgMmgxNGMxLjEgMCAyLS45IDItMlY1YzAtMS4xLS45LTItMi0yem0wIDE2SDVWNWgxNHYxNHptLTctMmw1LTUtMS40MS0xLjRMMTIgMTMuMTkgOS40MSAxMC42IDggMTJsNCA0eiIvPjwvc3ZnPg==';
+    historyIcon.src = 'cards-icon.png';
 
     // Datos del jugador
     const currentPlayer = {
@@ -41,7 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeNotifications = [];
     const NOTIFICATION_COOLDOWN = 3000;
     let selectedCard = null;
-
     let gameState = {
         players: [],
         yourCards: [],
@@ -72,162 +63,45 @@ document.addEventListener('DOMContentLoaded', () => {
             this.shakeOffset = 0;
             this.hoverOffset = 0;
             this.backgroundColor = isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
-
-            // Drag & Drop
-            this.isBeingDragged = false;
-            this.dragX = 0;
-            this.dragY = 0;
-            this.originalX = x;
-            this.originalY = y;
-
-            // Efectos visuales
             this.shadowColor = 'rgba(0, 0, 0, 0.3)';
-            this.shadowBlur = 8;
-            this.shadowOffsetY = 4;
-            this.rotation = 0;
-            this.scale = 1.0;
-            this.zIndex = 0;
-            this.alpha = 1.0;
         }
 
-        draw(ctx) {
-            const drawX = this.isBeingDragged ? this.dragX : this.x + this.shakeOffset;
-            const drawY = this.isBeingDragged ? this.dragY : this.y;
-
+        draw() {
             ctx.save();
+            ctx.translate(this.shakeOffset, 0);
 
-            // Configuración de sombras y transparencia
-            if (this.isBeingDragged) {
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-                ctx.shadowBlur = 20;
-                ctx.shadowOffsetY = 10;
-                ctx.globalAlpha = 0.9;
-            } else {
-                ctx.shadowColor = this.shadowColor;
-                ctx.shadowBlur = this.shadowBlur;
-                ctx.shadowOffsetY = this.hoverOffset > 0 ? 8 : 4;
-                ctx.globalAlpha = this.alpha;
-            }
+            ctx.shadowColor = this.shadowColor;
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetY = 4;
 
-            // Transformaciones
-            ctx.translate(drawX + this.width / 2, drawY + this.height / 2);
-            ctx.rotate(this.rotation * Math.PI / 180);
-            ctx.scale(this.scale, this.scale);
-            ctx.translate(-this.width / 2, -this.height / 2);
-
-            // Cuerpo de la carta
             ctx.beginPath();
-            ctx.roundRect(0, -this.hoverOffset, this.width, this.height, this.radius);
-
-            // Color basado en estado
-            if (this.isBeingDragged) {
-                ctx.fillStyle = '#FFFFE0';
-            } else if (this.hoverOffset > 0) {
-                ctx.fillStyle = '#FFFF99';
-            } else {
-                ctx.fillStyle = this.backgroundColor;
-            }
-
+            ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
+            ctx.fillStyle = this === selectedCard ? '#FFFF99' : this.backgroundColor;
             ctx.fill();
 
-            // Borde
             ctx.strokeStyle = this.isPlayable ? '#27ae60' : '#34495e';
             ctx.lineWidth = this.isPlayable ? 3 : 2;
             ctx.stroke();
 
-            // Texto
             ctx.fillStyle = '#2c3e50';
             ctx.font = 'bold 28px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.shadowColor = 'transparent';
-            ctx.fillText(this.value.toString(), this.width / 2, this.height / 2 - this.hoverOffset);
+            ctx.fillText(this.value.toString(), this.x + this.width / 2, this.y + this.height / 2 - this.hoverOffset);
 
             ctx.restore();
         }
 
         contains(x, y) {
-            const relX = x - this.x - this.width / 2;
-            const relY = y - this.y - this.height / 2;
-            const angle = -this.rotation * Math.PI / 180;
-
-            const rotatedX = relX * Math.cos(angle) - relY * Math.sin(angle);
-            const rotatedY = relX * Math.sin(angle) + relY * Math.cos(angle);
-
-            return rotatedX >= -this.width / 2 && rotatedX <= this.width / 2 &&
-                rotatedY >= -this.height / 2 && rotatedY <= this.height / 2;
-        }
-
-        startDrag(mouseX, mouseY) {
-            if (!this.isPlayable) return false;
-
-            this.isBeingDragged = true;
-            this.dragX = this.x;
-            this.dragY = this.y;
-            dragOffsetX = mouseX - this.x;
-            dragOffsetY = mouseY - this.y;
-
-            // Efecto visual al agarrar
-            this.scale = 1.1;
-            this.rotation = (Math.random() * 10) - 5; // Pequeña rotación aleatoria
-            this.zIndex = 100;
-
-            return true;
-        }
-
-        updateDrag(mouseX, mouseY) {
-            if (!this.isBeingDragged) return;
-
-            // Movimiento suavizado con interpolación
-            const targetX = mouseX - dragOffsetX;
-            const targetY = mouseY - dragOffsetY - 20; // Elevación al arrastrar
-
-            this.dragX += (targetX - this.dragX) * 0.3;
-            this.dragY += (targetY - this.dragY) * 0.3;
-
-            // Rotación dinámica basada en movimiento
-            const dx = targetX - this.dragX;
-            this.rotation = dx * 0.1;
-        }
-
-        endDrag() {
-            this.isBeingDragged = false;
-            this.scale = 1.0;
-            this.rotation = 0;
-            this.zIndex = 0;
-            this.alpha = 1.0;
-        }
-
-        animateShake() {
-            const shakeAmount = 8;
-            const shakeDuration = 400;
-            const startTime = Date.now();
-
-            const shake = () => {
-                const elapsed = Date.now() - startTime;
-                const progress = elapsed / shakeDuration;
-
-                if (progress >= 1) {
-                    this.shakeOffset = 0;
-                    return;
-                }
-
-                this.shakeOffset = Math.sin(progress * Math.PI * 8) * shakeAmount * (1 - progress);
-                requestAnimationFrame(shake);
-            };
-
-            shake();
-        }
-
-        updateHoverState(mouseX, mouseY) {
-            const isHovered = this.contains(mouseX, mouseY);
-            this.hoverOffset = isHovered && this.isPlayable ? 10 : 0;
-            return isHovered;
+            return x >= this.x && x <= this.x + this.width &&
+                y >= this.y && y <= this.y + this.height;
         }
     }
 
+    let socket;
     function connectWebSocket() {
-        const socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
+        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
 
         socket.onopen = () => {
             console.log('Conexión WebSocket establecida');
@@ -249,16 +123,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 switch (message.type) {
                     case 'game_state':
                         updateGameState(message.state);
-                        updateGameInfo();
+                        updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'game_started':
                         updateGameState(message.state);
                         showNotification('¡El juego ha comenzado!');
-                        updateGameInfo();
+                        updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'your_cards':
                         updatePlayerCards(message.cards);
-                        updateGameInfo();
+                        updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'game_over':
                         handleGameOver(message.message);
@@ -268,20 +142,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     case 'card_played':
                         handleOpponentCardPlayed(message);
-                        updateGameInfo();
+                        updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'invalid_move':
                         if (message.playerId === currentPlayer.id && selectedCard) {
-                            selectedCard.animateShake();
+                            animateInvalidCard(selectedCard);
                         }
                         break;
                     case 'turn_changed':
                         handleTurnChanged(message);
-                        updateGameInfo();
+                        updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'move_undone':
                         handleMoveUndone(message);
-                        updateGameInfo();
+                        updateGameInfo(); // Actualizar panel de información
                         break;
                     case 'room_reset':
                         break;
@@ -307,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return true;
         });
 
-        if (activeNotifications.length > 0) return;
+        if (activeNotifications.length > 0) return; // Evitar superposición
 
         // Crear nueva notificación
         const notification = document.createElement('div');
@@ -382,6 +256,29 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function animateInvalidCard(card) {
+        if (!card) return;
+
+        const shakeAmount = 8;
+        const shakeDuration = 400;
+        const startTime = Date.now();
+
+        function shake() {
+            const elapsed = Date.now() - startTime;
+            const progress = elapsed / shakeDuration;
+
+            if (progress >= 1) {
+                card.shakeOffset = 0;
+                return;
+            }
+
+            card.shakeOffset = Math.sin(progress * Math.PI * 8) * shakeAmount * (1 - progress);
+            requestAnimationFrame(shake);
+        }
+
+        shake();
+    }
+
     function handleTurnChanged(message) {
         gameState.currentTurn = message.newTurn;
         gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
@@ -435,6 +332,11 @@ document.addEventListener('DOMContentLoaded', () => {
         backdrop.appendChild(gameOverDiv);
 
         document.getElementById('returnToRoom').addEventListener('click', () => {
+            socket.send(JSON.stringify({
+                type: 'reset_room',
+                roomId: roomId,
+                playerId: currentPlayer.id
+            }));
             window.location.href = 'sala.html';
         });
     }
@@ -533,6 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function drawHistoryIcons() {
         if (!historyIcon.complete || historyIcon.naturalWidth === 0) {
+            console.log('Icono de historial no cargado todavía');
             return;
         }
 
@@ -540,21 +443,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const y = HISTORY_ICON_Y;
 
+            // Dibujar el icono
             ctx.drawImage(historyIcon, x, y, 40, 40);
         });
     }
 
     function handleCanvasClick(event) {
-        if (isDragging) {
-            isDragging = false;
-            if (dragCard) {
-                dragCard.endDrag();
-                animateCardReturn(dragCard);
-                dragCard = null;
-            }
-            return;
-        }
-
         const rect = canvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
@@ -607,6 +501,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (confirmMove) {
                         playCard(selectedCard.value, clickedColumn);
+                        socket.send(JSON.stringify({
+                            type: 'self_blocked',
+                            playerId: currentPlayer.id,
+                            roomId: roomId
+                        }));
                         return;
                     } else {
                         return;
@@ -623,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedCard = clickedCard.isPlayable ? clickedCard : null;
             if (!clickedCard.isPlayable) {
                 showNotification('No puedes jugar esta carta ahora', true);
-                clickedCard.animateShake();
+                animateInvalidCard(clickedCard);
             }
         }
     }
@@ -647,7 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!isValidMove(cardValue, position)) {
             showNotification('Movimiento inválido', true);
-            selectedCard.animateShake();
+            animateInvalidCard(selectedCard);
             return;
         }
 
@@ -691,8 +590,15 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.board.descending[idx] = cardValue;
         }
 
+        socket.send(JSON.stringify({
+            type: 'play_card',
+            playerId: currentPlayer.id,
+            cardValue,
+            position
+        }));
+
         selectedCard = null;
-        updateGameInfo();
+        updateGameInfo(); // Actualizar panel de información
     }
 
     function endTurn() {
@@ -705,8 +611,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return showNotification(`Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`, true);
         }
 
-        // Enviar mensaje para terminar turno
-        console.log("Terminando turno...");
+        socket.send(JSON.stringify({
+            type: 'end_turn',
+            playerId: currentPlayer.id
+        }));
     }
 
     function drawBoard() {
@@ -745,7 +653,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 false,
                 gameState.cardsPlayedThisTurn.some(c => c.value === value)
             );
-            card.draw(ctx);
+            card.draw();
         });
     }
 
@@ -764,24 +672,24 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         ctx.fill();
 
-        // Ordenar cartas por z-index (excepto la que se está arrastrando)
-        const cardsToDraw = [...gameState.yourCards].sort((a, b) => {
-            if (a.isBeingDragged) return 1;
-            if (b.isBeingDragged) return -1;
-            return a.zIndex - b.zIndex;
-        });
-
-        cardsToDraw.forEach(card => {
-            card.draw(ctx);
+        gameState.yourCards.forEach((card, index) => {
+            if (card) {
+                card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
+                    index * (CARD_WIDTH + CARD_SPACING);
+                card.y = PLAYER_CARDS_Y;
+                card.hoverOffset = card === selectedCard ? 10 : 0;
+                card.draw();
+            }
         });
     }
 
     function updateGameInfo() {
         const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
 
+        // Actualizar elementos HTML
         document.getElementById('currentTurn').textContent = currentPlayerName;
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
-
+        // Actualizar barra de progreso si es tu turno
         if (gameState.currentTurn === currentPlayer.id) {
             const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
             const required = gameState.remainingDeck > 0 ? 2 : 1;
@@ -805,7 +713,7 @@ document.addEventListener('DOMContentLoaded', () => {
             anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * progress;
             anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * progress;
 
-            anim.card.draw(ctx);
+            anim.card.draw();
 
             if (progress === 1) {
                 gameState.animatingCards.splice(i, 1);
@@ -833,7 +741,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Precargar icono de historial
+        // Precargar el icono antes de iniciar
         const loadIcon = new Promise((resolve) => {
             historyIcon.onload = () => {
                 console.log('Icono de historial cargado correctamente');
@@ -852,12 +760,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Configurar eventos
             endTurnButton.addEventListener('click', endTurn);
             canvas.addEventListener('click', handleCanvasClick);
-            canvas.addEventListener('mousedown', handleMouseDown);
-            canvas.addEventListener('mousemove', handleMouseMove);
-            canvas.addEventListener('mouseup', handleMouseUp);
-            canvas.addEventListener('mouseleave', handleMouseUp);
             document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
 
+            // Inicializar panel de información
             updateGameInfo();
 
             // Posicionar controles
@@ -871,6 +776,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Iniciar el juego
     initGame();
 });
