@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Icono de historial
     const historyIcon = new Image();
-    historyIcon.src = 'assets/icons/cards-icon.png';
+    historyIcon.src = '/assets/icons/cards-icon.png';
 
     // Datos del jugador
     const currentPlayer = {
