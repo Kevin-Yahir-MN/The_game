@@ -280,61 +280,569 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ... [Resto de las funciones existentes (connectWebSocket, showNotification, etc.) ...]
+    function connectWebSocket() {
+        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
 
-    function handleMouseDown(event) {
+        socket.onopen = () => {
+            console.log('Conexión WebSocket establecida');
+            socket.send(JSON.stringify({ type: 'get_game_state' }));
+        };
+
+        socket.onclose = () => {
+            console.log('Conexión WebSocket cerrada - Reconectando...');
+            setTimeout(connectWebSocket, 2000);
+        };
+
+        socket.onerror = (error) => {
+            console.error('Error en WebSocket:', error);
+        };
+
+        socket.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                switch (message.type) {
+                    case 'game_state':
+                        updateGameState(message.state);
+                        updateGameInfo();
+                        break;
+                    case 'game_started':
+                        updateGameState(message.state);
+                        showNotification('¡El juego ha comenzado!');
+                        updateGameInfo();
+                        break;
+                    case 'your_cards':
+                        updatePlayerCards(message.cards);
+                        updateGameInfo();
+                        break;
+                    case 'game_over':
+                        handleGameOver(message.message);
+                        break;
+                    case 'notification':
+                        showNotification(message.message, message.isError);
+                        break;
+                    case 'card_played':
+                        handleOpponentCardPlayed(message);
+                        updateGameInfo();
+                        break;
+                    case 'invalid_move':
+                        if (message.playerId === currentPlayer.id && selectedCard) {
+                            animateInvalidCard(selectedCard);
+                        }
+                        break;
+                    case 'turn_changed':
+                        handleTurnChanged(message);
+                        updateGameInfo();
+                        break;
+                    case 'move_undone':
+                        handleMoveUndone(message);
+                        updateGameInfo();
+                        break;
+                    case 'room_reset':
+                        break;
+                    default:
+                        console.log('Mensaje no reconocido:', message);
+                }
+            } catch (error) {
+                console.error('Error procesando mensaje:', error);
+            }
+        };
+    }
+
+    function showNotification(message, isError = false) {
+        const now = Date.now();
+
+        // Limpiar notificaciones antiguas
+        activeNotifications = activeNotifications.filter(notif => {
+            if (now - notif.time > NOTIFICATION_COOLDOWN) {
+                notif.element.classList.add('notification-fade-out');
+                setTimeout(() => notif.element.remove(), 300);
+                return false;
+            }
+            return true;
+        });
+
+        if (activeNotifications.length > 0) return;
+
+        // Crear nueva notificación
+        const notification = document.createElement('div');
+        notification.className = `notification ${isError ? 'error' : ''}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        // Registrar notificación
+        const notificationObj = {
+            element: notification,
+            time: now
+        };
+        activeNotifications.push(notificationObj);
+
+        // Eliminar después de 3 segundos
+        setTimeout(() => {
+            notification.classList.add('notification-fade-out');
+            setTimeout(() => {
+                notification.remove();
+                activeNotifications = activeNotifications.filter(n => n !== notificationObj);
+            }, 300);
+        }, 3000);
+    }
+
+    function showColumnHistory(columnId) {
+        const modal = document.getElementById('historyModal');
+        const backdrop = document.getElementById('modalBackdrop');
+        const title = document.getElementById('historyColumnTitle');
+        const container = document.getElementById('historyCardsContainer');
+
+        const columnNames = {
+            asc1: 'Pila Ascendente 1 (↑)',
+            asc2: 'Pila Ascendente 2 (↑)',
+            desc1: 'Pila Descendente 1 (↓)',
+            desc2: 'Pila Descendente 2 (↓)'
+        };
+
+        title.textContent = columnNames[columnId];
+        container.innerHTML = '';
+
+        gameState.columnHistory[columnId].forEach((card, index) => {
+            const cardElement = document.createElement('div');
+            cardElement.className = `history-card ${index === gameState.columnHistory[columnId].length - 1 ? 'recent' : ''}`;
+            cardElement.textContent = card;
+            container.appendChild(cardElement);
+        });
+
+        modal.style.display = 'block';
+        backdrop.style.display = 'block';
+    }
+
+    function closeHistoryModal() {
+        document.getElementById('historyModal').style.display = 'none';
+        document.getElementById('modalBackdrop').style.display = 'none';
+    }
+
+    function isValidMove(cardValue, position) {
+        const target = position.includes('asc')
+            ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
+            : gameState.board.descending[position === 'desc1' ? 0 : 1];
+
+        return position.includes('asc')
+            ? (cardValue > target || cardValue === target - 10)
+            : (cardValue < target || cardValue === target + 10);
+    }
+
+    function getColumnPosition(position) {
+        const index = ['asc1', 'asc2', 'desc1', 'desc2'].indexOf(position);
+        return {
+            x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * index,
+            y: BOARD_POSITION.y
+        };
+    }
+
+    function animateInvalidCard(card) {
+        if (!card) return;
+
+        const shakeAmount = 8;
+        const shakeDuration = 400;
+        const startTime = Date.now();
+
+        function shake() {
+            const elapsed = Date.now() - startTime;
+            const progress = elapsed / shakeDuration;
+
+            if (progress >= 1) {
+                card.shakeOffset = 0;
+                return;
+            }
+
+            card.shakeOffset = Math.sin(progress * Math.PI * 8) * shakeAmount * (1 - progress);
+            requestAnimationFrame(shake);
+        }
+
+        shake();
+    }
+
+    function handleTurnChanged(message) {
+        gameState.currentTurn = message.newTurn;
+        gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
+            card => card.playerId !== currentPlayer.id
+        );
+
+        const playerName = gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador';
+        showNotification(`Ahora es el turno de ${playerName}`);
+    }
+
+    function handleMoveUndone(message) {
+        if (message.playerId === currentPlayer.id) {
+            const moveIndex = gameState.cardsPlayedThisTurn.findIndex(
+                move => move.value === message.cardValue && move.position === message.position
+            );
+
+            if (moveIndex !== -1) {
+                gameState.cardsPlayedThisTurn.splice(moveIndex, 1);
+            }
+
+            if (message.position.includes('asc')) {
+                const idx = message.position === 'asc1' ? 0 : 1;
+                gameState.board.ascending[idx] = message.previousValue;
+            } else {
+                const idx = message.position === 'desc1' ? 0 : 1;
+                gameState.board.descending[idx] = message.previousValue;
+            }
+
+            const card = new Card(message.cardValue, 0, 0, true, false);
+            gameState.yourCards.push(card);
+            updatePlayerCards(gameState.yourCards.map(c => c.value));
+        }
+    }
+
+    function handleGameOver(message) {
+        canvas.style.pointerEvents = 'none';
+        endTurnButton.disabled = true;
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'game-over-backdrop';
+
+        const gameOverDiv = document.createElement('div');
+        gameOverDiv.className = 'game-over-notification';
+        gameOverDiv.innerHTML = `
+            <h2>¡GAME OVER!</h2>
+            <p>${message}</p>
+            <button id="returnToRoom">Volver a la Sala</button>
+        `;
+
+        document.body.appendChild(backdrop);
+        backdrop.appendChild(gameOverDiv);
+
+        document.getElementById('returnToRoom').addEventListener('click', () => {
+            socket.send(JSON.stringify({
+                type: 'reset_room',
+                roomId: roomId,
+                playerId: currentPlayer.id
+            }));
+            window.location.href = 'sala.html';
+        });
+    }
+
+    function updateGameState(newState) {
+        if (!newState) return;
+
+        gameState.board = newState.board || gameState.board;
+        gameState.currentTurn = newState.currentTurn || gameState.currentTurn;
+        gameState.remainingDeck = newState.remainingDeck || gameState.remainingDeck;
+        gameState.players = newState.players || gameState.players;
+        gameState.initialCards = newState.initialCards || gameState.initialCards;
+        gameState.cardsPlayedThisTurn = newState.cardsPlayedThisTurn || gameState.cardsPlayedThisTurn;
+
+        if (newState.yourCards) {
+            updatePlayerCards(newState.yourCards);
+        }
+
+        if (gameState.currentTurn !== currentPlayer.id) {
+            selectedCard = null;
+        }
+    }
+
+    function handleOpponentCardPlayed(message) {
+        if (message.playerId !== currentPlayer.id) {
+            const position = message.position;
+            const value = message.cardValue;
+
+            if (position.includes('asc')) {
+                const idx = position === 'asc1' ? 0 : 1;
+                gameState.board.ascending[idx] = value;
+            } else {
+                const idx = position === 'desc1' ? 0 : 1;
+                gameState.board.descending[idx] = value;
+            }
+
+            const cardPosition = getColumnPosition(position);
+            const opponentCard = new Card(value, cardPosition.x, cardPosition.y, false, true);
+
+            gameState.animatingCards.push({
+                card: opponentCard,
+                startTime: Date.now(),
+                duration: 400,
+                targetX: cardPosition.x,
+                targetY: cardPosition.y,
+                fromX: cardPosition.x,
+                fromY: -CARD_HEIGHT
+            });
+
+            gameState.cardsPlayedThisTurn.push({
+                value: message.cardValue,
+                position: message.position,
+                playerId: message.playerId,
+                isPlayedThisTurn: true
+            });
+
+            gameState.columnHistory[message.position].push(message.cardValue);
+            showNotification(`${message.playerName} jugó un ${value}`);
+        }
+    }
+
+    function updatePlayerCards(cards) {
+        const isYourTurn = gameState.currentTurn === currentPlayer.id;
+        const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
+        const startY = PLAYER_CARDS_Y;
+
+        gameState.yourCards = cards.map((card, index) => {
+            const value = card instanceof Card ? card.value : card;
+            const playable = isYourTurn && (
+                isValidMove(value, 'asc1') || isValidMove(value, 'asc2') ||
+                isValidMove(value, 'desc1') || isValidMove(value, 'desc2')
+            );
+
+            const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
+                move => move.value === value && move.playerId === currentPlayer.id
+            );
+
+            if (card instanceof Card) {
+                card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
+                card.y = startY;
+                card.isPlayable = playable;
+                card.isPlayedThisTurn = isPlayedThisTurn;
+                card.backgroundColor = isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
+                return card;
+            } else {
+                return new Card(
+                    value,
+                    startX + index * (CARD_WIDTH + CARD_SPACING),
+                    startY,
+                    playable,
+                    isPlayedThisTurn
+                );
+            }
+        });
+    }
+
+    function drawHistoryIcons() {
+        if (!historyIcon.complete || historyIcon.naturalWidth === 0) {
+            console.log('Icono de historial no cargado todavía');
+            return;
+        }
+
+        ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
+            const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
+            const y = HISTORY_ICON_Y;
+
+            ctx.drawImage(historyIcon, x, y, 40, 40);
+        });
+    }
+
+    function handleCanvasClick(event) {
+        if (dragState.active) {
+            dragState.active = false;
+            if (dragState.card) {
+                dragState.card.endDrag(false);
+                dragState.card = null;
+            }
+            return;
+        }
+
         const rect = canvas.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
 
-        for (let i = gameState.yourCards.length - 1; i >= 0; i--) {
-            const card = gameState.yourCards[i];
-            if (card.contains(mouseX, mouseY)) {
-                if (card.isPlayable && card.startDrag(mouseX, mouseY)) {
-                    dragState = { active: true, card };
-                    selectedCard = card;
-                    return;
+        // Verificar clicks en los iconos de historial
+        ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
+            const iconX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
+            const iconY = HISTORY_ICON_Y;
+
+            if (x >= iconX && x <= iconX + 40 && y >= iconY && y <= iconY + 40) {
+                return showColumnHistory(col);
+            }
+        });
+
+        if (gameState.currentTurn !== currentPlayer.id) {
+            return showNotification('No es tu turno', true);
+        }
+
+        const clickedColumn = getClickedColumn(x, y);
+        if (clickedColumn && selectedCard) {
+            if (gameState.remainingDeck > 0 &&
+                gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length === 0) {
+
+                const tempBoard = JSON.parse(JSON.stringify(gameState.board));
+                if (clickedColumn.includes('asc')) {
+                    tempBoard.ascending[clickedColumn === 'asc1' ? 0 : 1] = selectedCard.value;
                 } else {
-                    card.animateShake();
-                    showNotification('No puedes jugar esta carta ahora', true);
-                    return;
+                    tempBoard.descending[clickedColumn === 'desc1' ? 0 : 1] = selectedCard.value;
+                }
+
+                const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
+                const hasOtherMoves = remainingCards.some(card => {
+                    return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+                        const posValue = pos.includes('asc')
+                            ? tempBoard.ascending[pos === 'asc1' ? 0 : 1]
+                            : tempBoard.descending[pos === 'desc1' ? 0 : 1];
+
+                        return pos.includes('asc')
+                            ? (card.value > posValue || card.value === posValue - 10)
+                            : (card.value < posValue || card.value === posValue + 10);
+                    });
+                });
+
+                if (!hasOtherMoves) {
+                    const confirmMove = confirm(
+                        'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\n' +
+                        'Si continúas, el juego terminará con derrota.\n\n' +
+                        '¿Deseas continuar?'
+                    );
+
+                    if (confirmMove) {
+                        playCard(selectedCard.value, clickedColumn);
+                        socket.send(JSON.stringify({
+                            type: 'self_blocked',
+                            playerId: currentPlayer.id,
+                            roomId: roomId
+                        }));
+                        return;
+                    } else {
+                        return;
+                    }
                 }
             }
+
+            playCard(selectedCard.value, clickedColumn);
+            return;
         }
 
-        handleCanvasClick(event);
-    }
-
-    function handleMouseMove(event) {
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
-
-        gameState.yourCards.forEach(card => card.updateHoverState(mouseX, mouseY));
-
-        if (dragState.active && dragState.card) {
-            dragState.card.updateDrag(mouseX, mouseY);
+        const clickedCard = gameState.yourCards.find(card => card.contains(x, y));
+        if (clickedCard) {
+            selectedCard = clickedCard.isPlayable ? clickedCard : null;
+            if (!clickedCard.isPlayable) {
+                showNotification('No puedes jugar esta carta ahora', true);
+                clickedCard.animateShake();
+            }
         }
     }
 
-    function handleMouseUp(event) {
-        if (!dragState.active || !dragState.card) return;
+    function getClickedColumn(x, y) {
+        if (y < BOARD_POSITION.y || y > BOARD_POSITION.y + CARD_HEIGHT) return null;
 
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
+        const columns = [
+            { x: BOARD_POSITION.x, id: 'asc1' },
+            { x: BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, id: 'asc2' },
+            { x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, id: 'desc1' },
+            { x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, id: 'desc2' }
+        ];
 
-        const targetColumn = getClickedColumn(mouseX, mouseY);
-        const isValid = targetColumn && isValidMove(dragState.card.value, targetColumn);
+        const column = columns.find(col => x >= col.x && x <= col.x + CARD_WIDTH);
+        return column ? column.id : null;
+    }
 
-        dragState.card.endDrag(isValid);
+    function playCard(cardValue, position) {
+        if (!selectedCard) return;
 
-        if (isValid) {
-            playCard(dragState.card.value, targetColumn);
+        if (!isValidMove(cardValue, position)) {
+            showNotification('Movimiento inválido', true);
+            selectedCard.animateShake();
+            return;
         }
 
-        dragState = { active: false, card: null };
+        const previousValue = position.includes('asc')
+            ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
+            : gameState.board.descending[position === 'desc1' ? 0 : 1];
+
+        gameState.cardsPlayedThisTurn.push({
+            value: cardValue,
+            position,
+            playerId: currentPlayer.id,
+            previousValue
+        });
+
+        gameState.columnHistory[position].push(cardValue);
+
+        selectedCard.isPlayedThisTurn = true;
+        selectedCard.backgroundColor = '#99CCFF';
+
+        const cardPosition = getColumnPosition(position);
+        gameState.animatingCards.push({
+            card: selectedCard,
+            startTime: Date.now(),
+            duration: 400,
+            targetX: cardPosition.x,
+            targetY: cardPosition.y,
+            fromX: selectedCard.x,
+            fromY: selectedCard.y
+        });
+
+        const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
+        if (cardIndex !== -1) {
+            gameState.yourCards.splice(cardIndex, 1);
+        }
+
+        if (position.includes('asc')) {
+            const idx = position === 'asc1' ? 0 : 1;
+            gameState.board.ascending[idx] = cardValue;
+        } else {
+            const idx = position === 'desc1' ? 0 : 1;
+            gameState.board.descending[idx] = cardValue;
+        }
+
+        socket.send(JSON.stringify({
+            type: 'play_card',
+            playerId: currentPlayer.id,
+            cardValue,
+            position
+        }));
+
         selectedCard = null;
+        updateGameInfo();
+    }
+
+    function endTurn() {
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+            card => card.playerId === currentPlayer.id
+        ).length;
+
+        if (currentPlayerCardsPlayed < minCardsRequired) {
+            return showNotification(`Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`, true);
+        }
+
+        socket.send(JSON.stringify({
+            type: 'end_turn',
+            playerId: currentPlayer.id
+        }));
+    }
+
+    function drawBoard() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.beginPath();
+        ctx.roundRect(
+            BOARD_POSITION.x - 25,
+            BOARD_POSITION.y - 50,
+            CARD_WIDTH * 4 + COLUMN_SPACING * 3 + 50,
+            CARD_HEIGHT + 110,
+            15
+        );
+        ctx.fill();
+
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 36px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetY = 2;
+
+        ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
+            const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2;
+            ctx.fillText(i < 2 ? '↑' : '↓', x, BOARD_POSITION.y - 25);
+        });
+
+        ctx.shadowColor = 'transparent';
+
+        ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
+            const value = i < 2 ? gameState.board.ascending[i % 2] : gameState.board.descending[i % 2];
+            const card = new Card(
+                value,
+                BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i,
+                BOARD_POSITION.y,
+                false,
+                gameState.cardsPlayedThisTurn.some(c => c.value === value)
+            );
+            card.draw(ctx);
+        });
     }
 
     function drawPlayerCards() {
@@ -352,6 +860,7 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         ctx.fill();
 
+        // Ordenar cartas por z-index (excepto la que se está arrastrando)
         const cardsToDraw = [...gameState.yourCards].sort((a, b) => {
             if (a.isDragging) return 1;
             if (b.isDragging) return -1;
@@ -366,10 +875,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateGameInfo() {
         const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
 
-        // Actualizar elementos HTML
         document.getElementById('currentTurn').textContent = currentPlayerName;
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
-        // Actualizar barra de progreso si es tu turno
+
         if (gameState.currentTurn === currentPlayer.id) {
             const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
             const required = gameState.remainingDeck > 0 ? 2 : 1;
@@ -422,8 +930,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const loadIcon = new Promise((resolve) => {
-            historyIcon.onload = () => resolve();
-            historyIcon.onerror = () => resolve();
+            historyIcon.onload = () => {
+                console.log('Icono de historial cargado correctamente');
+                resolve();
+            };
+            historyIcon.onerror = () => {
+                console.error('Error cargando el icono de historial');
+                resolve();
+            };
         });
 
         loadIcon.then(() => {
