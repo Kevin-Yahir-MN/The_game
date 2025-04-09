@@ -453,25 +453,31 @@ body {
     /* Color destacado */
 }
 
+/* Contenedor de progreso */
 .progress-container {
-    order: 1;
-    /* Mueve la barra después del texto */
-    margin-top: 5px;
-    margin-bottom: 15px;
+    margin: 10px 0 15px;
+    /* Mayor margen vertical */
+    padding-top: 8px;
+    /* Espacio adicional arriba */
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    /* Línea sutil de separación */
 }
 
 .progress-bar {
+    margin-top: 5px;
+    /* Espacio extra opcional */
     height: 10px;
     background: var(--primary);
     border-radius: 5px;
-    margin-bottom: 8px;
+    transition: width 0.3s ease;
 }
 
 .progress-text {
-    order: 0;
-    /* Texto primero */
+    display: block;
+    margin-bottom: 8px;
+    /* Espacio entre texto y barra */
     font-size: 1.1rem;
-    margin-bottom: 5px;
+    color: var(--light);
 }
 
 .progress-bar {
