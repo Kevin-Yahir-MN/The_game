@@ -582,7 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.beginPath();
         ctx.roundRect(
             BOARD_POSITION.x - 25,
-            BOARD_POSITION.y - 30,
+            BOARD_POSITION.y - 50,
             CARD_WIDTH * 4 + COLUMN_SPACING * 3 + 50,
             CARD_HEIGHT + 100,
             15
