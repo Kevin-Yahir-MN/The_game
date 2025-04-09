@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomId = sessionStorage.getItem('roomId');
 
     // Estado del juego
-    let lastNotificationTime = 0;
+    let activeNotifications = [];
     const NOTIFICATION_COOLDOWN = 3000;
     let selectedCard = null;
     let gameState = {
@@ -170,32 +170,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showNotification(message, isError = false) {
         const now = Date.now();
-        if (now - lastNotificationTime < NOTIFICATION_COOLDOWN) {
-            return; // Ignora si no ha pasado el tiempo mínimo
-        }
-        lastNotificationTime = now;
 
-        // Elimina notificaciones anteriores del mismo tipo
-        document.querySelectorAll('.notification').forEach(el => {
-            if (el.classList.contains(isError ? 'error' : 'success')) {
-                el.remove();
+        // Limpiar notificaciones antiguas
+        activeNotifications = activeNotifications.filter(notif => {
+            if (now - notif.time > NOTIFICATION_COOLDOWN) {
+                notif.element.classList.add('notification-fade-out');
+                setTimeout(() => notif.element.remove(), 300);
+                return false;
             }
+            return true;
         });
 
+        if (activeNotifications.length > 0) return; // Evitar superposición
+
+        // Crear nueva notificación
         const notification = document.createElement('div');
         notification.className = `notification ${isError ? 'error' : ''}`;
         notification.textContent = message;
         document.body.appendChild(notification);
 
-        // Animación de entrada
-        notification.style.animation = 'fadeIn 0.3s ease-out';
+        // Registrar notificación
+        const notificationObj = {
+            element: notification,
+            time: now
+        };
+        activeNotifications.push(notificationObj);
 
         // Eliminar después de 3 segundos
         setTimeout(() => {
-            notification.style.animation = 'fadeOut 0.3s ease-out';
-            setTimeout(() => notification.remove(), 300);
+            notification.classList.add('notification-fade-out');
+            setTimeout(() => {
+                notification.remove();
+                activeNotifications = activeNotifications.filter(n => n !== notificationObj);
+            }, 300);
         }, 3000);
     }
+
     function showColumnHistory(columnId) {
         const modal = document.getElementById('historyModal');
         const backdrop = document.getElementById('modalBackdrop');

@@ -546,51 +546,58 @@ body {
     z-index: 1000;
 }
 
-/* Notificaciones */
+/* Notificaciones mejoradas */
 .notification {
     position: fixed;
     top: 30px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    width: fit-content;
+    max-width: 80%;
     padding: 15px 30px;
     background-color: var(--success);
     color: white;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     z-index: 1000;
-    max-width: 80%;
     text-align: center;
     font-size: 16px;
     font-weight: bold;
     pointer-events: none;
+    opacity: 0;
+    transform: translateY(-20px);
+    animation: notificationSlideIn 0.4s forwards cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
 
 .notification.error {
     background-color: var(--danger);
 }
 
-/* Añade estas nuevas animaciones */
-@keyframes fadeIn {
-    from {
+@keyframes notificationSlideIn {
+    0% {
         opacity: 0;
-        transform: translate(-50%, -20px);
+        transform: translateY(-20px);
     }
 
-    to {
+    90% {
+        transform: translateY(5px);
+    }
+
+    100% {
         opacity: 1;
-        transform: translate(-50%, 0);
+        transform: translateY(0);
     }
 }
 
-@keyframes fadeOut {
-    from {
-        opacity: 1;
-        transform: translate(-50%, 0);
-    }
+.notification-fade-out {
+    animation: notificationFadeOut 0.3s forwards;
+}
 
-    to {
+@keyframes notificationFadeOut {
+    100% {
         opacity: 0;
-        transform: translate(-50%, -20px);
+        transform: translateY(-20px);
     }
 }
 
