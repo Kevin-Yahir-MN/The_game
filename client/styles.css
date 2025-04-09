@@ -595,6 +595,8 @@ body {
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     border-top: 5px solid var(--accent);
     animation: slideIn 0.4s ease-out;
+    margin: 0 auto;
+    /* Asegura centrado horizontal */
 }
 
 .game-over-notification h2 {

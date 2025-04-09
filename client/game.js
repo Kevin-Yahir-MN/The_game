@@ -297,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         document.body.appendChild(backdrop);
-        document.body.appendChild(gameOverDiv);
+        backdrop.appendChild(gameOverDiv);
 
         document.getElementById('returnToRoom').addEventListener('click', () => {
             socket.send(JSON.stringify({
