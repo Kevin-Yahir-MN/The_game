@@ -19,22 +19,20 @@
             <ul>
                 <li>Haz click en una carta para seleccionarla (amarillo)</li>
                 <li>Haz click en una columna para jugar la carta seleccionada</li>
+                <li>Haz click en el icono de cartas debajo de cada columna para ver el historial de cada una</li>
                 <li>En pilas ascendentes (↑): juega cartas mayores</li>
                 <li>En pilas descendentes (↓): juega cartas menores</li>
-                <li>Puedes jugar exactamente 10 menos/más en cada pila</li>
                 <li>Debes jugar al menos 2 cartas por turno (1 si no quedan cartas)</li>
-                <li>Recibirás cartas nuevas hasta tener 6 (o 5 para 4-5 jugadores)</li>
                 <li>¡Colabora para jugar todas las cartas!</li>
             </ul>
         </div>
+
+        <!-- Contenedor para iconos de historial (alternativa HTML) -->
+        <div id="historyIconsContainer"
+            style="position: absolute; width: 100%; height: 100%; pointer-events: none; top: 0; left: 0;"></div>
     </div>
 
-    <svg style="display: none;">
-        <symbol id="history-icon" viewBox="0 0 24 24">
-            <path d="M12 8v5h5m-5 7a9 9 0 1 1 0-18 9 9 0 0 1 0 18zm1-12h-1v1h1v-1z" />
-        </symbol>
-    </svg>
-
+    <!-- Modal para el historial -->
     <div id="historyModal" class="history-modal" style="display: none;">
         <h3>Historial de Cartas - <span id="historyColumnTitle"></span></h3>
         <div id="historyCardsContainer" class="history-cards"></div>
