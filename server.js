@@ -8,14 +8,13 @@ const app = express();
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3000;
-const LOG_LEVEL = process.env.LOG_LEVEL || 'warn'; // error > warn > info > debug
-const HEARTBEAT_INTERVAL = 300000; // 5 minutos para plan gratuito
+const LOG_LEVEL = process.env.LOG_LEVEL || 'warn';
+const HEARTBEAT_INTERVAL = 300000;
 const allowedOrigins = [
     'https://the-game-2xks.onrender.com',
     'http://localhost:3000'
 ];
 
-// Sistema de logging optimizado
 function log(level, message) {
     const levels = { error: 0, warn: 1, info: 2, debug: 3 };
     if (levels[level] <= levels[LOG_LEVEL]) {
@@ -32,7 +31,6 @@ function log(level, message) {
     }
 }
 
-// Configuración de middleware y CORS (sin cambios)
 app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (allowedOrigins.includes(origin)) {
@@ -44,7 +42,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// Configuración de WebSocket Server (sin cambios)
 const wss = new WebSocket.Server({
     server,
     verifyClient: (info, done) => {
@@ -59,13 +56,11 @@ const wss = new WebSocket.Server({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client')));
 
-// Estructuras de datos para el juego (sin cambios)
 const rooms = new Map();
 const reverseRoomMap = new WeakMap();
 const boardHistory = new Map();
 const connectedPlayers = new Set();
 
-// Funciones del juego (sin cambios en la lógica)
 function initializeDeck() {
     const deck = [];
     for (let i = 2; i < 100; i++) deck.push(i);
@@ -80,7 +75,6 @@ function shuffleArray(array) {
     return array;
 }
 
-// Función de envío seguro optimizada
 function safeSend(ws, message) {
     try {
         if (ws?.readyState === WebSocket.OPEN) {
@@ -115,227 +109,32 @@ function sendGameState(room, player) {
                 cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
             })),
             remainingDeck: room.gameState.deck.length,
-            isYourTurn: room.gameState.currentTurn === player.id
+            isYourTurn: room.gameState.currentTurn === player.id,
+            isSoloGame: room.players.length === 1
         }
     });
 }
 
-function updateBoardHistory(room, position, newValue) {
-    const roomId = reverseRoomMap.get(room);
-    const history = boardHistory.get(roomId);
-    const historyKey = {
-        'asc1': 'ascending1',
-        'asc2': 'ascending2',
-        'desc1': 'descending1',
-        'desc2': 'descending2'
-    }[position];
-
-    if (history[historyKey].slice(-1)[0] !== newValue) {
-        history[historyKey].push(newValue);
-    }
-}
-
-function getNextActivePlayerIndex(currentIndex, players) {
-    for (let offset = 1; offset < players.length; offset++) {
-        const nextIndex = (currentIndex + offset) % players.length;
-        if (players[nextIndex].ws?.readyState === WebSocket.OPEN) {
-            return nextIndex;
-        }
-    }
-    return currentIndex;
-}
-
-function getPlayableCards(playerCards, board) {
-    return playerCards.filter(card => {
-        return (card > board.ascending[0] || card === board.ascending[0] - 10) ||
-            (card > board.ascending[1] || card === board.ascending[1] - 10) ||
-            (card < board.descending[0] || card === board.descending[0] + 10) ||
-            (card < board.descending[1] || card === board.descending[1] + 10);
-    });
-}
-
-function handlePlayCard(room, player, msg) {
-    if (!validPositions.includes(msg.position)) {
-        return safeSend(player.ws, {
-            type: 'notification',
-            message: 'Posición inválida',
-            isError: true
-        });
+function startGame(room, initialCards = 6) {
+    if (room.players.length < 1) {
+        log('warn', 'Intento de iniciar juego sin jugadores');
+        return false;
     }
 
-    if (!player.cards.includes(msg.cardValue)) {
-        return safeSend(player.ws, {
-            type: 'notification',
-            message: 'No tienes esa carta',
-            isError: true
-        });
-    }
+    room.gameState.gameStarted = true;
+    room.gameState.initialCards = initialCards;
+    room.gameState.currentTurn = room.players[0].id;
 
-    const board = room.gameState.board;
-    const targetIdx = msg.position.includes('asc') ?
-        (msg.position === 'asc1' ? 0 : 1) :
-        (msg.position === 'desc1' ? 0 : 1);
-    const targetValue = msg.position.includes('asc') ?
-        board.ascending[targetIdx] :
-        board.descending[targetIdx];
-    const isValid = msg.position.includes('asc') ?
-        (msg.cardValue > targetValue || msg.cardValue === targetValue - 10) :
-        (msg.cardValue < targetValue || msg.cardValue === targetValue + 10);
-
-    if (!isValid) {
-        return safeSend(player.ws, {
-            type: 'notification',
-            message: `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'} que ${targetValue} o igual a ${msg.position.includes('asc') ? targetValue - 10 : targetValue + 10}`,
-            isError: true
-        });
-    }
-
-    // Aplicar el movimiento
-    if (msg.position.includes('asc')) {
-        board.ascending[targetIdx] = msg.cardValue;
-    } else {
-        board.descending[targetIdx] = msg.cardValue;
-    }
-
-    player.cards.splice(player.cards.indexOf(msg.cardValue), 1);
-    player.cardsPlayedThisTurn.push({
-        value: msg.cardValue,
-        position: msg.position,
-        isPlayedThisTurn: true
-    });
-
-    broadcastToRoom(room, {
-        type: 'card_played',
-        cardValue: msg.cardValue,
-        position: msg.position,
-        playerId: player.id,
-        playerName: player.name
-    });
-
-    updateBoardHistory(room, msg.position, msg.cardValue);
-    broadcastGameState(room);
-    checkGameStatus(room);
-}
-
-function handleUndoMove(room, player, msg) {
-    if (player.cardsPlayedThisTurn.length === 0) {
-        return safeSend(player.ws, {
-            type: 'notification',
-            message: 'No hay jugadas para deshacer',
-            isError: true
-        });
-    }
-
-    const lastMoveIndex = player.cardsPlayedThisTurn.findIndex(
-        move => move.value === msg.cardValue &&
-            move.position === msg.position
-    );
-
-    if (lastMoveIndex === -1) {
-        return safeSend(player.ws, {
-            type: 'notification',
-            message: 'No se encontró la jugada para deshacer',
-            isError: true
-        });
-    }
-
-    const lastMove = player.cardsPlayedThisTurn[lastMoveIndex];
-
-    player.cards.push(msg.cardValue);
-
-    if (msg.position.includes('asc')) {
-        const idx = msg.position === 'asc1' ? 0 : 1;
-        room.gameState.board.ascending[idx] = lastMove.previousValue;
-    } else {
-        const idx = msg.position === 'desc1' ? 0 : 1;
-        room.gameState.board.descending[idx] = lastMove.previousValue;
-    }
-
-    player.cardsPlayedThisTurn.splice(lastMoveIndex, 1);
-
-    broadcastToRoom(room, {
-        type: 'move_undone',
-        playerId: player.id,
-        playerName: player.name,
-        cardValue: msg.cardValue,
-        position: msg.position,
-        previousValue: lastMove.previousValue
-    }, { includeGameState: true });
-}
-
-function endTurn(room, player) {
-    const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
-    if (player.cardsPlayedThisTurn.length < minCardsRequired) {
-        return safeSend(player.ws, {
-            type: 'notification',
-            message: `Debes jugar al menos ${minCardsRequired} cartas este turno`,
-            isError: true
-        });
-    }
-
-    const targetCardCount = room.gameState.initialCards;
-    const cardsToDraw = Math.min(
-        targetCardCount - player.cards.length,
-        room.gameState.deck.length
-    );
-
-    for (let i = 0; i < cardsToDraw; i++) {
-        player.cards.push(room.gameState.deck.pop());
-    }
-
-    if (room.gameState.deck.length === 0) {
-        broadcastToRoom(room, {
-            type: 'notification',
-            message: '¡El mazo se ha agotado!',
-            isError: false
-        });
-    }
-
-    const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
-    const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
-    const nextPlayer = room.players[nextIndex];
-    room.gameState.currentTurn = nextPlayer.id;
-
-    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
-
-    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
-        return broadcastToRoom(room, {
-            type: 'game_over',
-            result: 'lose',
-            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
-            reason: 'min_cards_not_met'
-        });
-    }
-
-    player.cardsPlayedThisTurn = [];
-    broadcastGameState(room);
-
-    broadcastToRoom(room, {
-        type: 'turn_changed',
-        newTurn: nextPlayer.id,
-        previousPlayer: player.id,
-        cardsPlayedThisTurn: 0,
-        minCardsRequired: requiredCards
-    });
-}
-
-function broadcastGameState(room) {
     room.players.forEach(player => {
-        sendGameState(room, player);
+        player.cards = [];
+        for (let i = 0; i < initialCards && room.gameState.deck.length > 0; i++) {
+            player.cards.push(room.gameState.deck.pop());
+        }
+        player.cardsPlayedThisTurn = [];
     });
-}
 
-function checkGameStatus(room) {
-    const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
-    if (allPlayersEmpty && room.gameState.deck.length === 0) {
-        broadcastToRoom(room, {
-            type: 'game_over',
-            result: 'win',
-            message: '¡Todos ganan! Todas las cartas jugadas.',
-            reason: 'all_cards_played'
-        });
-    }
+    log('info', `Juego iniciado en sala ${reverseRoomMap.get(room)} con ${room.players.length} jugador(es)`);
+    return true;
 }
 
 app.post('/create-room', (req, res) => {
@@ -424,38 +223,6 @@ app.get('/room-info/:roomId', (req, res) => {
     });
 });
 
-function startGame(room, initialCards = 6) {
-    room.gameState.gameStarted = true;
-    room.gameState.initialCards = initialCards;
-
-    room.players.forEach(player => {
-        player.cards = [];
-        for (let i = 0; i < initialCards && room.gameState.deck.length > 0; i++) {
-            player.cards.push(room.gameState.deck.pop());
-        }
-    });
-
-    broadcastToRoom(room, {
-        type: 'game_started',
-        state: {
-            board: room.gameState.board,
-            currentTurn: room.players[0].id,
-            remainingDeck: room.gameState.deck.length,
-            initialCards: initialCards,
-            players: room.players.map(p => ({
-                id: p.id,
-                name: p.name,
-                cardCount: p.cards.length,
-                cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
-            }))
-        }
-    });
-
-    room.players.forEach(player => {
-        safeSend(player.ws, { type: 'your_cards', cards: player.cards });
-    });
-}
-
 wss.on('connection', (ws, req) => {
     const params = new URLSearchParams(req.url.split('?')[1]);
     const roomId = params.get('roomId');
@@ -489,7 +256,8 @@ wss.on('connection', (ws, req) => {
             currentTurn: room.gameState.currentTurn,
             gameStarted: room.gameState.gameStarted,
             initialCards: room.gameState.initialCards,
-            remainingDeck: room.gameState.deck.length
+            remainingDeck: room.gameState.deck.length,
+            isSoloGame: room.players.length === 1
         },
         isYourTurn: room.gameState.currentTurn === player.id
     };
@@ -512,27 +280,61 @@ wss.on('connection', (ws, req) => {
             switch (msg.type) {
                 case 'start_game':
                     if (player.isHost && !room.gameState.gameStarted) {
-                        startGame(room, msg.initialCards);
+                        const success = startGame(room, msg.initialCards);
+
+                        if (success) {
+                            broadcastToRoom(room, {
+                                type: 'game_started',
+                                state: {
+                                    board: room.gameState.board,
+                                    currentTurn: room.gameState.currentTurn,
+                                    remainingDeck: room.gameState.deck.length,
+                                    initialCards: msg.initialCards,
+                                    players: room.players.map(p => ({
+                                        id: p.id,
+                                        name: p.name,
+                                        cardCount: p.cards.length,
+                                        cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
+                                    })),
+                                    isSoloGame: room.players.length === 1
+                                }
+                            });
+
+                            room.players.forEach(p => {
+                                if (p.ws?.readyState === WebSocket.OPEN) {
+                                    safeSend(p.ws, {
+                                        type: 'your_cards',
+                                        cards: p.cards,
+                                        isSoloGame: room.players.length === 1
+                                    });
+                                }
+                            });
+                        }
                     }
                     break;
+
                 case 'play_card':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                         handlePlayCard(room, player, msg);
                     }
                     break;
+
                 case 'end_turn':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                         endTurn(room, player);
                     }
                     break;
+
                 case 'undo_move':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                         handleUndoMove(room, player, msg);
                     }
                     break;
+
                 case 'get_game_state':
                     if (room.gameState.gameStarted) sendGameState(room, player);
                     break;
+
                 case 'self_blocked':
                     if (rooms.has(msg.roomId)) {
                         const room = rooms.get(msg.roomId);
@@ -548,6 +350,7 @@ wss.on('connection', (ws, req) => {
                         }
                     }
                     break;
+
                 case 'reset_room':
                     if (player.isHost && rooms.has(msg.roomId)) {
                         const room = rooms.get(msg.roomId);
@@ -570,7 +373,7 @@ wss.on('connection', (ws, req) => {
                         });
                     }
                     break;
-                // Reemplaza el caso 'heartbeat' completo:
+
                 case 'heartbeat':
                     if (!msg.playerId || !msg.roomId) {
                         log('warn', 'Heartbeat inválido recibido', msg);
@@ -592,6 +395,7 @@ wss.on('connection', (ws, req) => {
                     player.lastActivity = Date.now();
                     log('debug', `Heartbeat de ${player.name} (${msg.playerId}) en sala ${msg.roomId}`);
                     break;
+
                 default:
                     console.log('Tipo de mensaje no reconocido:', msg.type);
             }

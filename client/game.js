@@ -1,31 +1,26 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Configuración de desarrollo
     const isDevelopment = false;
     const WS_URL = 'wss://the-game-2xks.onrender.com';
-    const HEARTBEAT_INTERVAL = 300000; // 5 minutos
+    const HEARTBEAT_INTERVAL = 300000;
     const MAX_RECONNECT_ATTEMPTS = 3;
     const BASE_RECONNECT_DELAY = 2000;
 
-    // Sistema de logging condicional
     function debugLog(...args) {
         if (isDevelopment) {
             console.log('[DEBUG]', ...args);
         }
     }
 
-    // Verificar datos de sesión
     if (!sessionStorage.getItem('roomId') || !sessionStorage.getItem('playerId')) {
         alert('Datos de sesión faltantes. Serás redirigido al lobby.');
         window.location.href = 'index.html';
         return;
     }
 
-    // Elementos del DOM
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const endTurnButton = document.getElementById('endTurnBtn');
 
-    // Dimensiones y posiciones
     const CARD_WIDTH = 80;
     const CARD_HEIGHT = 120;
     const COLUMN_SPACING = 60;
@@ -37,11 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const PLAYER_CARDS_Y = canvas.height * 0.6;
     const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
 
-    // Icono de historial
     const historyIcon = new Image();
     historyIcon.src = 'cards-icon.png';
 
-    // Datos del jugador
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
         name: sessionStorage.getItem('playerName'),
@@ -49,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const roomId = sessionStorage.getItem('roomId');
 
-    // Estado del juego
     let activeNotifications = [];
     const NOTIFICATION_COOLDOWN = 3000;
     let selectedCard = null;
@@ -67,10 +59,10 @@ document.addEventListener('DOMContentLoaded', () => {
             asc2: [],
             desc1: [],
             desc2: []
-        }
+        },
+        isSoloGame: false
     };
 
-    // Clase Card
     class Card {
         constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
             this.value = value;
@@ -120,7 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Conexión WebSocket
     let socket;
     function connectWebSocket() {
         let reconnectAttempts = 0;
@@ -182,18 +173,28 @@ document.addEventListener('DOMContentLoaded', () => {
                                 window.location.href = 'sala.html';
                                 return;
                             }
+                            gameState.isSoloGame = message.gameState.isSoloGame;
                             updateGameState(message.gameState);
                             if (message.yourCards) updatePlayerCards(message.yourCards);
+                            if (gameState.isSoloGame) {
+                                showNotification('Modo Solitario: Juega contra ti mismo');
+                            }
                             break;
 
                         case 'game_state':
+                            gameState.isSoloGame = message.state.players.length === 1;
                             updateGameState(message.state);
                             updateGameInfo();
                             break;
 
                         case 'game_started':
+                            gameState.isSoloGame = message.state.players.length === 1;
                             updateGameState(message.state);
-                            showNotification('¡El juego ha comenzado!');
+                            if (gameState.isSoloGame) {
+                                showNotification('¡Modo Solitario Activado!');
+                            } else {
+                                showNotification('¡El juego ha comenzado!');
+                            }
                             updateGameInfo();
                             break;
 
@@ -251,7 +252,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('beforeunload', disconnect);
     }
 
-    // Funciones del juego
     function showNotification(message, isError = false) {
         const now = Date.now();
         activeNotifications = activeNotifications.filter(notif => {
@@ -359,8 +359,12 @@ document.addEventListener('DOMContentLoaded', () => {
             card => card.playerId !== currentPlayer.id
         );
 
-        const playerName = gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador';
-        showNotification(`Ahora es el turno de ${playerName}`);
+        if (gameState.isSoloGame) {
+            showNotification('Continúa tu turno (Modo Solitario)');
+        } else {
+            const playerName = gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador';
+            showNotification(`Ahora es el turno de ${playerName}`);
+        }
     }
 
     function handleMoveUndone(message) {
@@ -426,6 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.players = newState.players || gameState.players;
         gameState.initialCards = newState.initialCards || gameState.initialCards;
         gameState.cardsPlayedThisTurn = newState.cardsPlayedThisTurn || gameState.cardsPlayedThisTurn;
+        gameState.isSoloGame = newState.isSoloGame || gameState.isSoloGame;
 
         if (newState.yourCards) {
             updatePlayerCards(newState.yourCards);
@@ -524,7 +529,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
 
-        // Verificar clicks en iconos de historial
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const iconX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const iconY = HISTORY_ICON_Y;
@@ -681,13 +685,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        const minCardsRequired = gameState.isSoloGame ?
+            (gameState.remainingDeck > 0 ? 1 : 1) :
+            (gameState.remainingDeck > 0 ? 2 : 1);
+
         const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
             card => card.playerId === currentPlayer.id
         ).length;
 
         if (currentPlayerCardsPlayed < minCardsRequired) {
-            return showNotification(`Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`, true);
+            return showNotification(
+                gameState.isSoloGame ?
+                    'Juega al menos 1 carta' :
+                    `Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`,
+                true
+            );
         }
 
         socket.send(JSON.stringify({
@@ -763,21 +775,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateGameInfo() {
-        const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
+        if (gameState.isSoloGame) {
+            document.getElementById('currentTurn').textContent = "Tu turno (Solitario)";
+        } else {
+            const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
+            document.getElementById('currentTurn').textContent = currentPlayerName;
+        }
 
-        document.getElementById('currentTurn').textContent = currentPlayerName;
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
 
         if (gameState.currentTurn === currentPlayer.id) {
             const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
-            const required = gameState.remainingDeck > 0 ? 2 : 1;
+            const required = gameState.isSoloGame ?
+                (gameState.remainingDeck > 0 ? 1 : 1) :
+                (gameState.remainingDeck > 0 ? 2 : 1);
             const progress = Math.min(cardsPlayed / required, 1) * 100;
 
             const progressBar = document.getElementById('progressBar');
             progressBar.style.width = `${progress}%`;
             progressBar.style.backgroundColor = progress >= 100 ? 'var(--secondary)' : 'var(--primary)';
 
-            document.getElementById('progressText').textContent = `${cardsPlayed}/${required} cartas jugadas`;
+            document.getElementById('progressText').textContent =
+                gameState.isSoloGame ?
+                    `${cardsPlayed} carta(s) jugada(s)` :
+                    `${cardsPlayed}/${required} cartas jugadas`;
         }
     }
 

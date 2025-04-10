@@ -1,8 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = 'https://the-game-2xks.onrender.com';
     const WS_URL = 'wss://the-game-2xks.onrender.com';
-    const HEARTBEAT_INTERVAL = 300000; // 5 minutos
-    const START_GAME_TIMEOUT = 10000; // 10 segundos
+    const HEARTBEAT_INTERVAL = 300000;
 
     let socket;
     const roomId = sessionStorage.getItem('roomId');
@@ -15,11 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('startGame');
     const gameSettings = document.getElementById('gameSettings');
     const initialCardsSelect = document.getElementById('initialCards');
+    const startText = startBtn.querySelector('span') || startBtn;
 
-    // Mostrar código de sala
     roomIdDisplay.textContent = roomId;
 
-    // Configurar visibilidad para el host
     if (isHost) {
         gameSettings.style.display = 'block';
         startBtn.classList.add('visible');
@@ -28,7 +26,6 @@ document.addEventListener('DOMContentLoaded', () => {
         startBtn.remove();
     }
 
-    // Inicializar WebSocket
     initializeWebSocket();
     updatePlayersList();
     setInterval(updatePlayersList, 3000);
@@ -36,65 +33,32 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleStartGame() {
         const initialCards = parseInt(initialCardsSelect.value);
 
-        // Verificar conexión WebSocket
         if (!socket || socket.readyState !== WebSocket.OPEN) {
-            const result = confirm('No hay conexión con el servidor. ¿Reintentar?');
-            if (result) {
-                initializeWebSocket();
-            }
+            showNotification('No hay conexión con el servidor', true);
             return;
         }
 
         try {
             console.log('Intentando iniciar juego...');
             startBtn.disabled = true;
-            startBtn.textContent = 'Iniciando...';
+            startText.textContent = 'Iniciando...';
 
-            // Enviar mensaje de inicio con timeout
-            const startPromise = new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error('El servidor no respondió a tiempo'));
-                }, START_GAME_TIMEOUT);
+            socket.send(JSON.stringify({
+                type: 'start_game',
+                playerId: playerId,
+                roomId: roomId,
+                initialCards: initialCards
+            }));
 
-                const message = {
-                    type: 'start_game',
-                    playerId: playerId,
-                    roomId: roomId,
-                    initialCards: initialCards
-                };
+            setTimeout(() => {
+                window.location.href = 'game.html';
+            }, 1000);
 
-                console.log('Enviando mensaje start_game:', message);
-                socket.send(JSON.stringify(message));
-
-                // Manejar respuesta del servidor
-                const responseHandler = (event) => {
-                    try {
-                        const message = JSON.parse(event.data);
-                        if (message.type === 'game_started') {
-                            clearTimeout(timeout);
-                            socket.removeEventListener('message', responseHandler);
-                            resolve();
-                        } else if (message.type === 'error' && message.context === 'start_game') {
-                            clearTimeout(timeout);
-                            socket.removeEventListener('message', responseHandler);
-                            reject(new Error(message.message));
-                        }
-                    } catch (error) {
-                        console.error('Error procesando mensaje:', error);
-                    }
-                };
-
-                socket.addEventListener('message', responseHandler);
-            });
-
-            await startPromise;
-            console.log('Juego iniciado, redirigiendo...');
-            window.location.href = 'game.html';
         } catch (error) {
             console.error('Error al iniciar juego:', error);
             startBtn.disabled = false;
-            startBtn.textContent = 'Iniciar Juego';
-            alert(`Error: ${error.message}`);
+            startText.textContent = 'Iniciar Juego';
+            showNotification(`Error: ${error.message}`, true);
         }
     }
 
@@ -119,7 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 reconnectAttempts = 0;
                 console.log('Conexión WebSocket establecida');
 
-                // Configurar heartbeat
                 heartbeatInterval = setInterval(() => {
                     if (socket?.readyState === WebSocket.OPEN) {
                         socket.send(JSON.stringify({
@@ -181,7 +144,6 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
 
-        // Manejar cierre de página
         window.addEventListener('beforeunload', () => {
             isManualClose = true;
             if (socket?.readyState === WebSocket.OPEN) {
@@ -189,7 +151,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Iniciar conexión
         connect();
     }
 
