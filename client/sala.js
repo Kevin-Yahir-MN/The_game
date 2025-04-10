@@ -1,18 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-
-    // Configuración de desarrollo
-    const isDevelopment = false; // Cambiar a true solo durante desarrollo
-    const HEARTBEAT_INTERVAL = 300000; // 5 minutos
-    const MAX_RECONNECT_ATTEMPTS = 3;
-    const BASE_RECONNECT_DELAY = 2000;
-
-    // Sistema de logging condicional
-    function debugLog(...args) {
-        if (isDevelopment) {
-            console.log('[DEBUG]', ...args);
-        }
-    }
-
     const API_URL = 'https://the-game-2xks.onrender.com';
     const WS_URL = 'wss://the-game-2xks.onrender.com';
 
@@ -38,112 +24,59 @@ document.addEventListener('DOMContentLoaded', () => {
         startBtn.remove();
     }
 
-    // Función initializeWebSocket optimizada
+    initializeWebSocket();
+    updatePlayersList();
+    setInterval(updatePlayersList, 3000);
+
     function initializeWebSocket() {
-        let reconnectAttempts = 0;
-        let heartbeatInterval;
-        let isManualClose = false;
-
-        function connect() {
-            isManualClose = false;
-            debugLog(`Intento conexión sala ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}`);
-
-            if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
-                socket.close();
-            }
-
-            socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${playerId}`);
-
-            socket.onopen = () => {
-                reconnectAttempts = 0;
-                debugLog('Conexión WebSocket establecida (sala)');
-
-                heartbeatInterval = setInterval(() => {
-                    if (socket?.readyState === WebSocket.OPEN) {
-                        socket.send(JSON.stringify({ type: 'heartbeat' }));
-                    }
-                }, HEARTBEAT_INTERVAL);
-            };
-
-            socket.onclose = (event) => {
-                clearInterval(heartbeatInterval);
-
-                if (isManualClose) return;
-
-                debugLog(`Conexión cerrada (sala), intento ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}`);
-
-                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                    const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
-                    reconnectAttempts++;
-                    setTimeout(connect, delay);
-                } else {
-                    showNotification('No se pudo reconectar a la sala. Recarga la página.', true);
-                }
-            };
-
-            socket.onerror = (error) => {
-                debugLog('Error en WebSocket (sala):', error);
-            };
-
-            socket.onmessage = (event) => {
-                try {
-                    const message = JSON.parse(event.data);
-                    console.log('Mensaje recibido del servidor:', message.type); // Debug
-
-                    switch (message.type) {
-                        case 'game_started':
-                            debugLog('Juego iniciado, redirigiendo...');
-                            window.location.href = 'game.html';
-                            break;
-                        case 'room_update':
-                            updatePlayersUI(message.players);
-                            break;
-                        case 'notification':
-                            showNotification(message.message, message.isError);
-                            break;
-                        case 'room_reset':
-                            showNotification(message.message);
-                            updatePlayersList();
-                            break;
-                        default:
-                            debugLog('Mensaje no reconocido (sala):', message.type);
-                    }
-                } catch (error) {
-                    debugLog('Error procesando mensaje (sala):', error);
-                }
-            };
+        if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
+            socket.close();
         }
 
-        // Conectar inicialmente
-        connect();
+        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${playerId}`);
 
-        // Manejar cierre de página/ventana
-        window.addEventListener('beforeunload', () => {
-            isManualClose = true;
-            if (socket?.readyState === WebSocket.OPEN) {
-                socket.close();
+        socket.onopen = () => {
+            console.log('Conexión WebSocket establecida');
+        };
+
+        socket.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            console.log('Mensaje recibido:', message);
+
+            if (message.type === 'game_started') {
+                console.log('Juego iniciado, redirigiendo...');
+                window.location.href = 'game.html';
+            } else if (message.type === 'room_update') {
+                updatePlayersUI(message.players);
+            } else if (message.type === 'notification') {
+                showNotification(message.message, message.isError);
+            } else if (message.type === 'room_reset') {
+                showNotification(message.message);
+                updatePlayersList();
             }
-        });
+        };
+
+        socket.onclose = () => {
+            console.log('Conexión cerrada, reconectando...');
+            setTimeout(initializeWebSocket, 2000);
+        };
+
+        socket.onerror = (error) => {
+            console.error('Error en WebSocket:', error);
+        };
     }
 
     function handleStartGame() {
         const initialCards = parseInt(initialCardsSelect.value);
 
         if (!socket || socket.readyState !== WebSocket.OPEN) {
-            console.error('WebSocket no está conectado. Estado:', socket?.readyState);
             alert('Error: No hay conexión con el servidor. Reconectando...');
             initializeWebSocket();
             return;
         }
 
         try {
-            console.log('Enviando comando start_game al servidor...', {
-                type: 'start_game',
-                playerId: playerId,
-                roomId: roomId,
-                initialCards: initialCards
-            });
-
+            console.log('Intentando iniciar juego...');
             startBtn.disabled = true;
             startBtn.textContent = 'Iniciando...';
 
@@ -153,16 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 roomId: roomId,
                 initialCards: initialCards
             }));
-
-            // Agregar timeout para reintentar
-            setTimeout(() => {
-                if (startBtn.textContent === 'Iniciando...') {
-                    startBtn.disabled = false;
-                    startBtn.textContent = 'Reintentar Inicio';
-                    console.warn('Timeout: No se recibió respuesta del servidor');
-                }
-            }, 5000);
-
         } catch (error) {
             console.error('Error al iniciar juego:', error);
             startBtn.disabled = false;
@@ -205,9 +128,4 @@ document.addEventListener('DOMContentLoaded', () => {
                 </li>`;
         }).join('');
     }
-
-    // Inicialización
-    initializeWebSocket();
-    updatePlayersList();
-    setInterval(updatePlayersList, 3000);
 });

@@ -8,31 +8,12 @@ const app = express();
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3000;
-const LOG_LEVEL = process.env.LOG_LEVEL || 'warn'; // error > warn > info > debug
-const HEARTBEAT_INTERVAL = 300000; // 5 minutos para plan gratuito
 const allowedOrigins = [
     'https://the-game-2xks.onrender.com',
     'http://localhost:3000'
 ];
+const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
 
-// Sistema de logging optimizado
-function log(level, message) {
-    const levels = { error: 0, warn: 1, info: 2, debug: 3 };
-    if (levels[level] <= levels[LOG_LEVEL]) {
-        const timestamp = new Date().toISOString();
-        const logMessage = `[${timestamp}] ${level.toUpperCase()}: ${message}`;
-
-        if (level === 'error') {
-            console.error(logMessage);
-        } else if (level === 'warn') {
-            console.warn(logMessage);
-        } else {
-            console.log(logMessage);
-        }
-    }
-}
-
-// Configuración de middleware y CORS (sin cambios)
 app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (allowedOrigins.includes(origin)) {
@@ -44,12 +25,11 @@ app.use((req, res, next) => {
     next();
 });
 
-// Configuración de WebSocket Server (sin cambios)
 const wss = new WebSocket.Server({
     server,
     verifyClient: (info, done) => {
         if (!allowedOrigins.includes(info.origin)) {
-            log('warn', `Origen bloqueado: ${info.origin}`);
+            console.warn(`Origen bloqueado: ${info.origin}`);
             return done(false, 403, 'Origen no permitido');
         }
         done(true);
@@ -59,13 +39,10 @@ const wss = new WebSocket.Server({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client')));
 
-// Estructuras de datos para el juego (sin cambios)
 const rooms = new Map();
 const reverseRoomMap = new WeakMap();
 const boardHistory = new Map();
-const connectedPlayers = new Set();
 
-// Funciones del juego (sin cambios en la lógica)
 function initializeDeck() {
     const deck = [];
     for (let i = 2; i < 100; i++) deck.push(i);
@@ -80,15 +57,13 @@ function shuffleArray(array) {
     return array;
 }
 
-// Función de envío seguro optimizada
 function safeSend(ws, message) {
     try {
         if (ws?.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify(message));
-            log('debug', `Mensaje enviado: ${message.type}`);
         }
     } catch (error) {
-        log('error', `Error enviando mensaje: ${error}`);
+        console.error('Error enviando mensaje:', error);
     }
 }
 
@@ -462,22 +437,15 @@ wss.on('connection', (ws, req) => {
     const playerId = params.get('playerId');
 
     if (!roomId || !playerId || !rooms.has(roomId)) {
-        log('warn', `Intento de conexión con datos inválidos`);
         return ws.close(1008, 'Datos inválidos');
     }
 
     const room = rooms.get(roomId);
     const player = room.players.find(p => p.id === playerId);
-    if (!player) {
-        log('warn', `Jugador no registrado`);
-        return ws.close(1008, 'Jugador no registrado');
-    }
+    if (!player) return ws.close(1008, 'Jugador no registrado');
 
     player.ws = ws;
-    if (!connectedPlayers.has(playerId)) {
-        log('info', `Jugador conectado: ${player.name}`);
-        connectedPlayers.add(playerId);
-    }
+    console.log(`✔ ${player.name} conectado a sala ${roomId}`);
 
     const response = {
         type: 'init_game',
@@ -510,25 +478,9 @@ wss.on('connection', (ws, req) => {
         try {
             const msg = JSON.parse(message);
             switch (msg.type) {
-                // En el caso 'start_game' del servidor:
                 case 'start_game':
                     if (player.isHost && !room.gameState.gameStarted) {
-                        console.log(`Iniciando juego solicitado por ${player.name}`);
-                        try {
-                            startGame(room, msg.initialCards);
-                            // Enviar confirmación explícita
-                            safeSend(player.ws, {
-                                type: 'game_started_confirmation',
-                                success: true
-                            });
-                        } catch (error) {
-                            console.error('Error al iniciar juego:', error);
-                            safeSend(player.ws, {
-                                type: 'notification',
-                                message: 'Error al iniciar el juego',
-                                isError: true
-                            });
-                        }
+                        startGame(room, msg.initialCards);
                     }
                     break;
                 case 'play_card':
@@ -586,28 +538,6 @@ wss.on('connection', (ws, req) => {
                         });
                     }
                     break;
-                // Reemplaza el caso 'heartbeat' completo:
-                case 'heartbeat':
-                    if (!msg.playerId || !msg.roomId) {
-                        log('warn', 'Heartbeat inválido recibido', msg);
-                        break;
-                    }
-
-                    const room = rooms.get(msg.roomId);
-                    if (!room) {
-                        log('warn', `Heartbeat para sala no encontrada: ${msg.roomId}`);
-                        break;
-                    }
-
-                    const player = room.players.find(p => p.id === msg.playerId);
-                    if (!player) {
-                        log('warn', `Heartbeat de jugador no encontrado: ${msg.playerId}`);
-                        break;
-                    }
-
-                    player.lastActivity = Date.now();
-                    log('debug', `Heartbeat de ${player.name} (${msg.playerId}) en sala ${msg.roomId}`);
-                    break;
                 default:
                     console.log('Tipo de mensaje no reconocido:', msg.type);
             }
@@ -635,6 +565,6 @@ wss.on('connection', (ws, req) => {
 });
 
 server.listen(PORT, () => {
-    log('info', `Servidor iniciado en puerto ${PORT}`);
-    log('info', `Nivel de logs: ${LOG_LEVEL}`);
+    console.log(`🚀 Servidor iniciado en puerto ${PORT}`);
+    console.log(`🌍 Orígenes permitidos: ${allowedOrigins.join(', ')}`);
 });
