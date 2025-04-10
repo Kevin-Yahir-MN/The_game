@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomId = sessionStorage.getItem('roomId');
 
     // Estado del juego
+    let socket;
     let activeNotifications = [];
     const NOTIFICATION_COOLDOWN = 3000;
     let selectedCard = null;
@@ -101,7 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Nueva función connectWebSocket mejorada
     function connectWebSocket() {
-        let socket;
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 5;
         const baseReconnectDelay = 1000;
