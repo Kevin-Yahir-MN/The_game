@@ -1,4 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Configuración de desarrollo
+    const isDevelopment = false; // Cambiar a true solo durante desarrollo
+    const HEARTBEAT_INTERVAL = 300000; // 5 minutos
+    const MAX_RECONNECT_ATTEMPTS = 3;
+    const BASE_RECONNECT_DELAY = 2000;
+
+    // Sistema de logging condicional
+    function debugLog(...args) {
+        if (isDevelopment) {
+            console.log('[DEBUG]', ...args);
+        }
+    }
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const WS_URL = 'wss://the-game-2xks.onrender.com';
@@ -103,32 +116,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // Nueva función connectWebSocket mejorada
     function connectWebSocket() {
         let reconnectAttempts = 0;
-        const maxReconnectAttempts = 5;
-        const baseReconnectDelay = 1000;
         let heartbeatInterval;
         let isManualClose = false;
 
         function connect() {
             isManualClose = false;
-            console.log(`Intentando conectar (intento ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
+            debugLog(`Intento conexión ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}`);
 
             socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
 
             socket.onopen = () => {
-                console.log('Conexión WebSocket establecida');
                 reconnectAttempts = 0;
+                debugLog('Conexión WebSocket establecida');
 
-                // Configurar heartbeat cada 2 minutos
                 heartbeatInterval = setInterval(() => {
-                    if (socket.readyState === WebSocket.OPEN) {
+                    if (socket?.readyState === WebSocket.OPEN) {
                         socket.send(JSON.stringify({ type: 'heartbeat' }));
                     }
-                }, 120000);
+                }, HEARTBEAT_INTERVAL);
 
-                // Solicitar estado actual del juego
                 socket.send(JSON.stringify({ type: 'get_game_state' }));
 
-                // Mostrar notificación solo si era una reconexión
                 if (reconnectAttempts > 0) {
                     showNotification('¡Conexión restablecida!');
                 }
@@ -139,91 +147,106 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (isManualClose) return;
 
-                if (!event.wasClean) {
-                    const message = reconnectAttempts < maxReconnectAttempts
-                        ? 'Conexión perdida. Reconectando...'
-                        : 'No se puede conectar al servidor. Recarga la página.';
-                    showNotification(message, reconnectAttempts >= maxReconnectAttempts);
+                const message = reconnectAttempts < MAX_RECONNECT_ATTEMPTS
+                    ? 'Conexión perdida. Reconectando...'
+                    : 'No se puede conectar al servidor. Recarga la página.';
 
-                    if (reconnectAttempts < maxReconnectAttempts) {
-                        const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts);
-                        reconnectAttempts++;
-                        setTimeout(connect, delay);
-                    }
+                showNotification(message, reconnectAttempts >= MAX_RECONNECT_ATTEMPTS);
+
+                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
+                    reconnectAttempts++;
+                    setTimeout(connect, delay);
                 }
             };
 
             socket.onerror = (error) => {
-                console.error('Error en WebSocket:', error);
+                debugLog('Error en WebSocket:', error);
             };
 
             socket.onmessage = (event) => {
                 try {
                     const message = JSON.parse(event.data);
-                    console.log('Mensaje recibido:', message); // Para depuración
+
+                    // Solo loguear mensajes importantes
+                    if (['game_over', 'game_started', 'error'].includes(message.type)) {
+                        debugLog('Mensaje WS:', message.type);
+                    }
 
                     switch (message.type) {
-                        case 'init_game': // Agrega este nuevo caso
-                            console.log('Juego inicializado para el jugador:', message.playerId);
+                        case 'init_game':
+                            debugLog('Juego inicializado');
                             gameState.currentTurn = message.gameState.currentTurn;
-                            gameState.board = message.gameState.board;
-                            gameState.remainingDeck = message.gameState.remainingDeck;
-                            gameState.initialCards = message.gameState.initialCards;
+                            gameState.board = message.gameState.board || { ascending: [1, 1], descending: [100, 100] };
+                            gameState.remainingDeck = message.gameState.remainingDeck || 98;
+                            gameState.initialCards = message.gameState.initialCards || 6;
 
                             if (message.gameState.gameStarted && message.yourCards) {
                                 updatePlayerCards(message.yourCards);
                             }
                             break;
+
                         case 'game_state':
                             updateGameState(message.state);
                             updateGameInfo();
                             break;
+
                         case 'game_started':
                             updateGameState(message.state);
                             showNotification('¡El juego ha comenzado!');
                             updateGameInfo();
                             break;
+
                         case 'your_cards':
                             updatePlayerCards(message.cards);
                             updateGameInfo();
                             break;
+
                         case 'game_over':
                             handleGameOver(message.message);
                             break;
+
                         case 'notification':
                             showNotification(message.message, message.isError);
                             break;
+
                         case 'card_played':
                             handleOpponentCardPlayed(message);
                             updateGameInfo();
                             break;
+
                         case 'invalid_move':
                             if (message.playerId === currentPlayer.id && selectedCard) {
                                 animateInvalidCard(selectedCard);
                             }
                             break;
+
                         case 'turn_changed':
                             handleTurnChanged(message);
                             updateGameInfo();
                             break;
+
                         case 'move_undone':
                             handleMoveUndone(message);
                             updateGameInfo();
                             break;
+
                         case 'room_reset':
+                            showNotification('La sala ha sido reiniciada');
                             break;
+
                         default:
-                            console.log('Mensaje no reconocido:', message);
+                            debugLog('Mensaje no reconocido:', message.type);
                     }
                 } catch (error) {
-                    console.error('Error procesando mensaje:', error);
+                    debugLog('Error procesando mensaje:', error);
                 }
             };
         }
 
         function disconnect() {
             isManualClose = true;
-            if (socket && socket.readyState === WebSocket.OPEN) {
+            if (socket?.readyState === WebSocket.OPEN) {
                 socket.close();
             }
         }
@@ -609,6 +632,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function playCard(cardValue, position) {
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+            showNotification('No hay conexión con el servidor', true);
+            return;
+        }
+
         if (!selectedCard) return;
 
         if (!isValidMove(cardValue, position)) {
@@ -669,6 +697,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function endTurn() {
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+            showNotification('No hay conexión con el servidor', true);
+            return;
+        }
+
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
             card => card.playerId === currentPlayer.id

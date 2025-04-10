@@ -1,4 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
+
+    // Configuración de desarrollo
+    const isDevelopment = false; // Cambiar a true solo durante desarrollo
+    const HEARTBEAT_INTERVAL = 300000; // 5 minutos
+    const MAX_RECONNECT_ATTEMPTS = 3;
+    const BASE_RECONNECT_DELAY = 2000;
+
+    // Sistema de logging condicional
+    function debugLog(...args) {
+        if (isDevelopment) {
+            console.log('[DEBUG]', ...args);
+        }
+    }
+
     const API_URL = 'https://the-game-2xks.onrender.com';
     const WS_URL = 'wss://the-game-2xks.onrender.com';
 
@@ -24,16 +38,15 @@ document.addEventListener('DOMContentLoaded', () => {
         startBtn.remove();
     }
 
-    // Nueva función initializeWebSocket mejorada
+    // Función initializeWebSocket optimizada
     function initializeWebSocket() {
         let reconnectAttempts = 0;
-        const maxReconnectAttempts = 5;
-        const baseReconnectDelay = 1000;
         let heartbeatInterval;
         let isManualClose = false;
 
         function connect() {
             isManualClose = false;
+            debugLog(`Intento conexión sala ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}`);
 
             if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
                 socket.close();
@@ -42,15 +55,14 @@ document.addEventListener('DOMContentLoaded', () => {
             socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${playerId}`);
 
             socket.onopen = () => {
-                console.log('Conexión WebSocket establecida (sala)');
                 reconnectAttempts = 0;
+                debugLog('Conexión WebSocket establecida (sala)');
 
-                // Configurar heartbeat
                 heartbeatInterval = setInterval(() => {
-                    if (socket.readyState === WebSocket.OPEN) {
+                    if (socket?.readyState === WebSocket.OPEN) {
                         socket.send(JSON.stringify({ type: 'heartbeat' }));
                     }
-                }, 120000);
+                }, HEARTBEAT_INTERVAL);
             };
 
             socket.onclose = (event) => {
@@ -58,10 +70,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (isManualClose) return;
 
-                console.log(`Conexión cerrada (sala), reconectando... Intento ${reconnectAttempts + 1}/${maxReconnectAttempts}`);
+                debugLog(`Conexión cerrada (sala), intento ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}`);
 
-                if (reconnectAttempts < maxReconnectAttempts) {
-                    const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts);
+                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
                     reconnectAttempts++;
                     setTimeout(connect, delay);
                 } else {
@@ -70,23 +82,38 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             socket.onerror = (error) => {
-                console.error('Error en WebSocket (sala):', error);
+                debugLog('Error en WebSocket (sala):', error);
             };
 
             socket.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                console.log('Mensaje recibido:', message);
+                try {
+                    const message = JSON.parse(event.data);
 
-                if (message.type === 'game_started') {
-                    console.log('Juego iniciado, redirigiendo...');
-                    window.location.href = 'game.html';
-                } else if (message.type === 'room_update') {
-                    updatePlayersUI(message.players);
-                } else if (message.type === 'notification') {
-                    showNotification(message.message, message.isError);
-                } else if (message.type === 'room_reset') {
-                    showNotification(message.message);
-                    updatePlayersList();
+                    // Solo loguear mensajes importantes
+                    if (['game_started', 'room_update', 'notification'].includes(message.type)) {
+                        debugLog('Mensaje WS (sala):', message.type);
+                    }
+
+                    switch (message.type) {
+                        case 'game_started':
+                            debugLog('Juego iniciado, redirigiendo...');
+                            window.location.href = 'game.html';
+                            break;
+                        case 'room_update':
+                            updatePlayersUI(message.players);
+                            break;
+                        case 'notification':
+                            showNotification(message.message, message.isError);
+                            break;
+                        case 'room_reset':
+                            showNotification(message.message);
+                            updatePlayersList();
+                            break;
+                        default:
+                            debugLog('Mensaje no reconocido (sala):', message.type);
+                    }
+                } catch (error) {
+                    debugLog('Error procesando mensaje (sala):', error);
                 }
             };
         }
@@ -97,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Manejar cierre de página/ventana
         window.addEventListener('beforeunload', () => {
             isManualClose = true;
-            if (socket && socket.readyState === WebSocket.OPEN) {
+            if (socket?.readyState === WebSocket.OPEN) {
                 socket.close();
             }
         });
