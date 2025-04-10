@@ -160,7 +160,20 @@ document.addEventListener('DOMContentLoaded', () => {
             socket.onmessage = (event) => {
                 try {
                     const message = JSON.parse(event.data);
+                    console.log('Mensaje recibido:', message); // Para depuración
+
                     switch (message.type) {
+                        case 'init_game': // Agrega este nuevo caso
+                            console.log('Juego inicializado para el jugador:', message.playerId);
+                            gameState.currentTurn = message.gameState.currentTurn;
+                            gameState.board = message.gameState.board;
+                            gameState.remainingDeck = message.gameState.remainingDeck;
+                            gameState.initialCards = message.gameState.initialCards;
+
+                            if (message.gameState.gameStarted && message.yourCards) {
+                                updatePlayerCards(message.yourCards);
+                            }
+                            break;
                         case 'game_state':
                             updateGameState(message.state);
                             updateGameInfo();
@@ -225,41 +238,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showNotification(message, isError = false) {
-        const now = Date.now();
+        try {
+            const now = Date.now();
+            const NOTIFICATION_COOLDOWN = 3000;
 
-        // Limpiar notificaciones antiguas
-        activeNotifications = activeNotifications.filter(notif => {
-            if (now - notif.time > NOTIFICATION_COOLDOWN) {
-                notif.element.classList.add('notification-fade-out');
-                setTimeout(() => notif.element.remove(), 300);
-                return false;
-            }
-            return true;
-        });
+            // Limpiar notificaciones antiguas
+            const activeNotifications = Array.from(document.querySelectorAll('.notification'));
+            activeNotifications.forEach(notif => {
+                const timestamp = parseInt(notif.dataset.timestamp || '0');
+                if (now - timestamp > NOTIFICATION_COOLDOWN) {
+                    notif.classList.add('notification-fade-out');
+                    setTimeout(() => notif.remove(), 300);
+                }
+            });
 
-        if (activeNotifications.length > 0) return; // Evitar superposición
+            if (document.querySelectorAll('.notification').length > 2) return;
 
-        // Crear nueva notificación
-        const notification = document.createElement('div');
-        notification.className = `notification ${isError ? 'error' : ''}`;
-        notification.textContent = message;
-        document.body.appendChild(notification);
+            // Crear nueva notificación
+            const notification = document.createElement('div');
+            notification.className = `notification ${isError ? 'error' : ''}`;
+            notification.textContent = message;
+            notification.dataset.timestamp = now.toString();
+            document.body.appendChild(notification);
 
-        // Registrar notificación
-        const notificationObj = {
-            element: notification,
-            time: now
-        };
-        activeNotifications.push(notificationObj);
-
-        // Eliminar después de 3 segundos
-        setTimeout(() => {
-            notification.classList.add('notification-fade-out');
+            // Eliminar después del tiempo de cooldown
             setTimeout(() => {
-                notification.remove();
-                activeNotifications = activeNotifications.filter(n => n !== notificationObj);
-            }, 300);
-        }, 3000);
+                notification.classList.add('notification-fade-out');
+                setTimeout(() => notification.remove(), 300);
+            }, NOTIFICATION_COOLDOWN);
+        } catch (error) {
+            console.error('Error mostrando notificación:', error);
+            // Fallback simple si falla el sistema de notificaciones
+            console.log(`[Notificación] ${isError ? 'Error: ' : ''}${message}`);
+        }
     }
 
     function showColumnHistory(columnId) {
