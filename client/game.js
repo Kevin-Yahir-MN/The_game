@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Configuración de desarrollo
-    const isDevelopment = false; // Cambiar a true solo durante desarrollo
+    const isDevelopment = false;
+    const WS_URL = 'wss://the-game-2xks.onrender.com';
     const HEARTBEAT_INTERVAL = 300000; // 5 minutos
     const MAX_RECONNECT_ATTEMPTS = 3;
     const BASE_RECONNECT_DELAY = 2000;
@@ -12,9 +13,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Verificar datos de sesión
+    if (!sessionStorage.getItem('roomId') || !sessionStorage.getItem('playerId')) {
+        alert('Datos de sesión faltantes. Serás redirigido al lobby.');
+        window.location.href = 'index.html';
+        return;
+    }
+
+    // Elementos del DOM
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const WS_URL = 'wss://the-game-2xks.onrender.com';
     const endTurnButton = document.getElementById('endTurnBtn');
 
     // Dimensiones y posiciones
@@ -27,7 +35,6 @@ document.addEventListener('DOMContentLoaded', () => {
         y: canvas.height * 0.3
     };
     const PLAYER_CARDS_Y = canvas.height * 0.6;
-    const BUTTONS_Y = canvas.height * 0.85;
     const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
 
     // Icono de historial
@@ -43,7 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomId = sessionStorage.getItem('roomId');
 
     // Estado del juego
-    let socket;
     let activeNotifications = [];
     const NOTIFICATION_COOLDOWN = 3000;
     let selectedCard = null;
@@ -64,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // Clase Card
     class Card {
         constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
             this.value = value;
@@ -113,7 +120,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Nueva función connectWebSocket mejorada
+    // Conexión WebSocket
+    let socket;
     function connectWebSocket() {
         let reconnectAttempts = 0;
         let heartbeatInterval;
@@ -121,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function connect() {
             isManualClose = false;
-            debugLog(`Intento conexión ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}`);
+            debugLog(`Conectando (intento ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`);
 
             socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
 
@@ -131,32 +139,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 heartbeatInterval = setInterval(() => {
                     if (socket?.readyState === WebSocket.OPEN) {
-                        socket.send(JSON.stringify({ type: 'heartbeat' }));
+                        socket.send(JSON.stringify({
+                            type: 'heartbeat',
+                            playerId: currentPlayer.id,
+                            roomId: roomId,
+                            timestamp: Date.now()
+                        }));
                     }
                 }, HEARTBEAT_INTERVAL);
 
                 socket.send(JSON.stringify({ type: 'get_game_state' }));
-
-                if (reconnectAttempts > 0) {
-                    showNotification('¡Conexión restablecida!');
-                }
             };
 
             socket.onclose = (event) => {
                 clearInterval(heartbeatInterval);
-
                 if (isManualClose) return;
 
-                const message = reconnectAttempts < MAX_RECONNECT_ATTEMPTS
-                    ? 'Conexión perdida. Reconectando...'
-                    : 'No se puede conectar al servidor. Recarga la página.';
-
-                showNotification(message, reconnectAttempts >= MAX_RECONNECT_ATTEMPTS);
+                debugLog(`Conexión cerrada: ${event.code} - ${event.reason}`);
 
                 if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                     const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
                     reconnectAttempts++;
                     setTimeout(connect, delay);
+                } else {
+                    showNotification('No se pudo reconectar. Recarga la página.', true);
                 }
             };
 
@@ -167,23 +173,17 @@ document.addEventListener('DOMContentLoaded', () => {
             socket.onmessage = (event) => {
                 try {
                     const message = JSON.parse(event.data);
-
-                    // Solo loguear mensajes importantes
-                    if (['game_over', 'game_started', 'error'].includes(message.type)) {
-                        debugLog('Mensaje WS:', message.type);
-                    }
+                    debugLog('Mensaje recibido:', message.type);
 
                     switch (message.type) {
                         case 'init_game':
-                            debugLog('Juego inicializado');
-                            gameState.currentTurn = message.gameState.currentTurn;
-                            gameState.board = message.gameState.board || { ascending: [1, 1], descending: [100, 100] };
-                            gameState.remainingDeck = message.gameState.remainingDeck || 98;
-                            gameState.initialCards = message.gameState.initialCards || 6;
-
-                            if (message.gameState.gameStarted && message.yourCards) {
-                                updatePlayerCards(message.yourCards);
+                            if (!message.gameState.gameStarted) {
+                                alert('El juego no ha comenzado. Redirigiendo...');
+                                window.location.href = 'sala.html';
+                                return;
                             }
+                            updateGameState(message.gameState);
+                            if (message.yourCards) updatePlayerCards(message.yourCards);
                             break;
 
                         case 'game_state':
@@ -231,10 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             updateGameInfo();
                             break;
 
-                        case 'room_reset':
-                            showNotification('La sala ha sido reiniciada');
-                            break;
-
                         default:
                             debugLog('Mensaje no reconocido:', message.type);
                     }
@@ -251,49 +247,37 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Conectar inicialmente
         connect();
-
-        // Manejar cierre de página/ventana
         window.addEventListener('beforeunload', disconnect);
-
-        return { disconnect };
     }
 
+    // Funciones del juego
     function showNotification(message, isError = false) {
-        try {
-            const now = Date.now();
-            const NOTIFICATION_COOLDOWN = 3000;
+        const now = Date.now();
+        activeNotifications = activeNotifications.filter(notif => {
+            if (now - notif.time > NOTIFICATION_COOLDOWN) {
+                notif.element.remove();
+                return false;
+            }
+            return true;
+        });
 
-            // Limpiar notificaciones antiguas
-            const activeNotifications = Array.from(document.querySelectorAll('.notification'));
-            activeNotifications.forEach(notif => {
-                const timestamp = parseInt(notif.dataset.timestamp || '0');
-                if (now - timestamp > NOTIFICATION_COOLDOWN) {
-                    notif.classList.add('notification-fade-out');
-                    setTimeout(() => notif.remove(), 300);
-                }
-            });
+        if (activeNotifications.length > 2) return;
 
-            if (document.querySelectorAll('.notification').length > 2) return;
+        const notification = document.createElement('div');
+        notification.className = `notification ${isError ? 'error' : ''}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
 
-            // Crear nueva notificación
-            const notification = document.createElement('div');
-            notification.className = `notification ${isError ? 'error' : ''}`;
-            notification.textContent = message;
-            notification.dataset.timestamp = now.toString();
-            document.body.appendChild(notification);
+        activeNotifications.push({
+            element: notification,
+            time: now
+        });
 
-            // Eliminar después del tiempo de cooldown
-            setTimeout(() => {
-                notification.classList.add('notification-fade-out');
-                setTimeout(() => notification.remove(), 300);
-            }, NOTIFICATION_COOLDOWN);
-        } catch (error) {
-            console.error('Error mostrando notificación:', error);
-            // Fallback simple si falla el sistema de notificaciones
-            console.log(`[Notificación] ${isError ? 'Error: ' : ''}${message}`);
-        }
+        setTimeout(() => {
+            notification.remove();
+            activeNotifications = activeNotifications.filter(n => n.element !== notification);
+        }, NOTIFICATION_COOLDOWN);
     }
 
     function showColumnHistory(columnId) {
@@ -422,11 +406,13 @@ document.addEventListener('DOMContentLoaded', () => {
         backdrop.appendChild(gameOverDiv);
 
         document.getElementById('returnToRoom').addEventListener('click', () => {
-            socket.send(JSON.stringify({
-                type: 'reset_room',
-                roomId: roomId,
-                playerId: currentPlayer.id
-            }));
+            if (socket?.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'reset_room',
+                    roomId: roomId,
+                    playerId: currentPlayer.id
+                }));
+            }
             window.location.href = 'sala.html';
         });
     }
@@ -524,16 +510,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawHistoryIcons() {
-        if (!historyIcon.complete || historyIcon.naturalWidth === 0) {
-            console.log('Icono de historial no cargado todavía');
-            return;
-        }
+        if (!historyIcon.complete || historyIcon.naturalWidth === 0) return;
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const y = HISTORY_ICON_Y;
-
-            // Dibujar el icono
             ctx.drawImage(historyIcon, x, y, 40, 40);
         });
     }
@@ -543,7 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
 
-        // Verificar clicks en los iconos de historial
+        // Verificar clicks en iconos de historial
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const iconX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const iconY = HISTORY_ICON_Y;
@@ -632,12 +613,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function playCard(cardValue, position) {
-        if (!socket || socket.readyState !== WebSocket.OPEN) {
+        if (!selectedCard || !socket || socket.readyState !== WebSocket.OPEN) {
             showNotification('No hay conexión con el servidor', true);
             return;
         }
-
-        if (!selectedCard) return;
 
         if (!isValidMove(cardValue, position)) {
             showNotification('Movimiento inválido', true);
@@ -693,7 +672,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
 
         selectedCard = null;
-        updateGameInfo(); // Actualizar panel de información
+        updateGameInfo();
     }
 
     function endTurn() {
@@ -786,10 +765,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateGameInfo() {
         const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
 
-        // Actualizar elementos HTML
         document.getElementById('currentTurn').textContent = currentPlayerName;
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
-        // Actualizar barra de progreso si es tu turno
+
         if (gameState.currentTurn === currentPlayer.id) {
             const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
             const required = gameState.remainingDeck > 0 ? 2 : 1;
@@ -841,14 +819,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Precargar el icono antes de iniciar
         const loadIcon = new Promise((resolve) => {
             historyIcon.onload = () => {
-                console.log('Icono de historial cargado correctamente');
+                debugLog('Icono de historial cargado');
                 resolve();
             };
             historyIcon.onerror = () => {
-                console.error('Error cargando el icono de historial');
+                debugLog('Error cargando icono de historial');
                 resolve();
             };
         });
@@ -857,18 +834,15 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.width = 800;
             canvas.height = 700;
 
-            // Configurar eventos
             endTurnButton.addEventListener('click', endTurn);
             canvas.addEventListener('click', handleCanvasClick);
             document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
 
-            // Inicializar panel de información
             updateGameInfo();
 
-            // Posicionar controles
             const controlsDiv = document.querySelector('.game-controls');
             if (controlsDiv) {
-                controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
+                controlsDiv.style.bottom = `${canvas.height - PLAYER_CARDS_Y - 50}px`;
             }
 
             connectWebSocket();
