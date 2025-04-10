@@ -1,26 +1,23 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const isDevelopment = false;
-    const WS_URL = 'wss://the-game-2xks.onrender.com';
-    const HEARTBEAT_INTERVAL = 300000;
+    // Configuración de desarrollo
+    const isDevelopment = false; // Cambiar a true solo durante desarrollo
+    const HEARTBEAT_INTERVAL = 300000; // 5 minutos
     const MAX_RECONNECT_ATTEMPTS = 3;
     const BASE_RECONNECT_DELAY = 2000;
 
+    // Sistema de logging condicional
     function debugLog(...args) {
         if (isDevelopment) {
             console.log('[DEBUG]', ...args);
         }
     }
 
-    if (!sessionStorage.getItem('roomId') || !sessionStorage.getItem('playerId')) {
-        alert('Datos de sesión faltantes. Serás redirigido al lobby.');
-        window.location.href = 'index.html';
-        return;
-    }
-
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+    const WS_URL = 'wss://the-game-2xks.onrender.com';
     const endTurnButton = document.getElementById('endTurnBtn');
 
+    // Dimensiones y posiciones
     const CARD_WIDTH = 80;
     const CARD_HEIGHT = 120;
     const COLUMN_SPACING = 60;
@@ -30,11 +27,14 @@ document.addEventListener('DOMContentLoaded', () => {
         y: canvas.height * 0.3
     };
     const PLAYER_CARDS_Y = canvas.height * 0.6;
+    const BUTTONS_Y = canvas.height * 0.85;
     const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
 
+    // Icono de historial
     const historyIcon = new Image();
     historyIcon.src = 'cards-icon.png';
 
+    // Datos del jugador
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
         name: sessionStorage.getItem('playerName'),
@@ -42,6 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const roomId = sessionStorage.getItem('roomId');
 
+    // Estado del juego
+    let socket;
     let activeNotifications = [];
     const NOTIFICATION_COOLDOWN = 3000;
     let selectedCard = null;
@@ -59,8 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
             asc2: [],
             desc1: [],
             desc2: []
-        },
-        isSoloGame: false
+        }
     };
 
     class Card {
@@ -112,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    let socket;
+    // Nueva función connectWebSocket mejorada
     function connectWebSocket() {
         let reconnectAttempts = 0;
         let heartbeatInterval;
@@ -120,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function connect() {
             isManualClose = false;
-            debugLog(`Conectando (intento ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`);
+            debugLog(`Intento conexión ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}`);
 
             socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
 
@@ -130,30 +131,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 heartbeatInterval = setInterval(() => {
                     if (socket?.readyState === WebSocket.OPEN) {
-                        socket.send(JSON.stringify({
-                            type: 'heartbeat',
-                            playerId: currentPlayer.id,
-                            roomId: roomId,
-                            timestamp: Date.now()
-                        }));
+                        socket.send(JSON.stringify({ type: 'heartbeat' }));
                     }
                 }, HEARTBEAT_INTERVAL);
 
                 socket.send(JSON.stringify({ type: 'get_game_state' }));
+
+                if (reconnectAttempts > 0) {
+                    showNotification('¡Conexión restablecida!');
+                }
             };
 
             socket.onclose = (event) => {
                 clearInterval(heartbeatInterval);
+
                 if (isManualClose) return;
 
-                debugLog(`Conexión cerrada: ${event.code} - ${event.reason}`);
+                const message = reconnectAttempts < MAX_RECONNECT_ATTEMPTS
+                    ? 'Conexión perdida. Reconectando...'
+                    : 'No se puede conectar al servidor. Recarga la página.';
+
+                showNotification(message, reconnectAttempts >= MAX_RECONNECT_ATTEMPTS);
 
                 if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                     const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts);
                     reconnectAttempts++;
                     setTimeout(connect, delay);
-                } else {
-                    showNotification('No se pudo reconectar. Recarga la página.', true);
                 }
             };
 
@@ -164,37 +167,33 @@ document.addEventListener('DOMContentLoaded', () => {
             socket.onmessage = (event) => {
                 try {
                     const message = JSON.parse(event.data);
-                    debugLog('Mensaje recibido:', message.type);
+
+                    // Solo loguear mensajes importantes
+                    if (['game_over', 'game_started', 'error'].includes(message.type)) {
+                        debugLog('Mensaje WS:', message.type);
+                    }
 
                     switch (message.type) {
                         case 'init_game':
-                            if (!message.gameState.gameStarted) {
-                                alert('El juego no ha comenzado. Redirigiendo...');
-                                window.location.href = 'sala.html';
-                                return;
-                            }
-                            gameState.isSoloGame = message.gameState.isSoloGame;
-                            updateGameState(message.gameState);
-                            if (message.yourCards) updatePlayerCards(message.yourCards);
-                            if (gameState.isSoloGame) {
-                                showNotification('Modo Solitario: Juega contra ti mismo');
+                            debugLog('Juego inicializado');
+                            gameState.currentTurn = message.gameState.currentTurn;
+                            gameState.board = message.gameState.board || { ascending: [1, 1], descending: [100, 100] };
+                            gameState.remainingDeck = message.gameState.remainingDeck || 98;
+                            gameState.initialCards = message.gameState.initialCards || 6;
+
+                            if (message.gameState.gameStarted && message.yourCards) {
+                                updatePlayerCards(message.yourCards);
                             }
                             break;
 
                         case 'game_state':
-                            gameState.isSoloGame = message.state.players.length === 1;
                             updateGameState(message.state);
                             updateGameInfo();
                             break;
 
                         case 'game_started':
-                            gameState.isSoloGame = message.state.players.length === 1;
                             updateGameState(message.state);
-                            if (gameState.isSoloGame) {
-                                showNotification('¡Modo Solitario Activado!');
-                            } else {
-                                showNotification('¡El juego ha comenzado!');
-                            }
+                            showNotification('¡El juego ha comenzado!');
                             updateGameInfo();
                             break;
 
@@ -232,6 +231,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             updateGameInfo();
                             break;
 
+                        case 'room_reset':
+                            showNotification('La sala ha sido reiniciada');
+                            break;
+
                         default:
                             debugLog('Mensaje no reconocido:', message.type);
                     }
@@ -248,36 +251,49 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // Conectar inicialmente
         connect();
+
+        // Manejar cierre de página/ventana
         window.addEventListener('beforeunload', disconnect);
+
+        return { disconnect };
     }
 
     function showNotification(message, isError = false) {
-        const now = Date.now();
-        activeNotifications = activeNotifications.filter(notif => {
-            if (now - notif.time > NOTIFICATION_COOLDOWN) {
-                notif.element.remove();
-                return false;
-            }
-            return true;
-        });
+        try {
+            const now = Date.now();
+            const NOTIFICATION_COOLDOWN = 3000;
 
-        if (activeNotifications.length > 2) return;
+            // Limpiar notificaciones antiguas
+            const activeNotifications = Array.from(document.querySelectorAll('.notification'));
+            activeNotifications.forEach(notif => {
+                const timestamp = parseInt(notif.dataset.timestamp || '0');
+                if (now - timestamp > NOTIFICATION_COOLDOWN) {
+                    notif.classList.add('notification-fade-out');
+                    setTimeout(() => notif.remove(), 300);
+                }
+            });
 
-        const notification = document.createElement('div');
-        notification.className = `notification ${isError ? 'error' : ''}`;
-        notification.textContent = message;
-        document.body.appendChild(notification);
+            if (document.querySelectorAll('.notification').length > 2) return;
 
-        activeNotifications.push({
-            element: notification,
-            time: now
-        });
+            // Crear nueva notificación
+            const notification = document.createElement('div');
+            notification.className = `notification ${isError ? 'error' : ''}`;
+            notification.textContent = message;
+            notification.dataset.timestamp = now.toString();
+            document.body.appendChild(notification);
 
-        setTimeout(() => {
-            notification.remove();
-            activeNotifications = activeNotifications.filter(n => n.element !== notification);
-        }, NOTIFICATION_COOLDOWN);
+            // Eliminar después del tiempo de cooldown
+            setTimeout(() => {
+                notification.classList.add('notification-fade-out');
+                setTimeout(() => notification.remove(), 300);
+            }, NOTIFICATION_COOLDOWN);
+        } catch (error) {
+            console.error('Error mostrando notificación:', error);
+            // Fallback simple si falla el sistema de notificaciones
+            console.log(`[Notificación] ${isError ? 'Error: ' : ''}${message}`);
+        }
     }
 
     function showColumnHistory(columnId) {
@@ -359,12 +375,8 @@ document.addEventListener('DOMContentLoaded', () => {
             card => card.playerId !== currentPlayer.id
         );
 
-        if (gameState.isSoloGame) {
-            showNotification('Continúa tu turno (Modo Solitario)');
-        } else {
-            const playerName = gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador';
-            showNotification(`Ahora es el turno de ${playerName}`);
-        }
+        const playerName = gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador';
+        showNotification(`Ahora es el turno de ${playerName}`);
     }
 
     function handleMoveUndone(message) {
@@ -410,13 +422,11 @@ document.addEventListener('DOMContentLoaded', () => {
         backdrop.appendChild(gameOverDiv);
 
         document.getElementById('returnToRoom').addEventListener('click', () => {
-            if (socket?.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: 'reset_room',
-                    roomId: roomId,
-                    playerId: currentPlayer.id
-                }));
-            }
+            socket.send(JSON.stringify({
+                type: 'reset_room',
+                roomId: roomId,
+                playerId: currentPlayer.id
+            }));
             window.location.href = 'sala.html';
         });
     }
@@ -430,7 +440,6 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.players = newState.players || gameState.players;
         gameState.initialCards = newState.initialCards || gameState.initialCards;
         gameState.cardsPlayedThisTurn = newState.cardsPlayedThisTurn || gameState.cardsPlayedThisTurn;
-        gameState.isSoloGame = newState.isSoloGame || gameState.isSoloGame;
 
         if (newState.yourCards) {
             updatePlayerCards(newState.yourCards);
@@ -515,11 +524,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawHistoryIcons() {
-        if (!historyIcon.complete || historyIcon.naturalWidth === 0) return;
+        if (!historyIcon.complete || historyIcon.naturalWidth === 0) {
+            console.log('Icono de historial no cargado todavía');
+            return;
+        }
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const y = HISTORY_ICON_Y;
+
+            // Dibujar el icono
             ctx.drawImage(historyIcon, x, y, 40, 40);
         });
     }
@@ -529,6 +543,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
 
+        // Verificar clicks en los iconos de historial
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const iconX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const iconY = HISTORY_ICON_Y;
@@ -617,10 +632,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function playCard(cardValue, position) {
-        if (!selectedCard || !socket || socket.readyState !== WebSocket.OPEN) {
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
             showNotification('No hay conexión con el servidor', true);
             return;
         }
+
+        if (!selectedCard) return;
 
         if (!isValidMove(cardValue, position)) {
             showNotification('Movimiento inválido', true);
@@ -676,7 +693,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
 
         selectedCard = null;
-        updateGameInfo();
+        updateGameInfo(); // Actualizar panel de información
     }
 
     function endTurn() {
@@ -685,21 +702,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const minCardsRequired = gameState.isSoloGame ?
-            (gameState.remainingDeck > 0 ? 1 : 1) :
-            (gameState.remainingDeck > 0 ? 2 : 1);
-
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
             card => card.playerId === currentPlayer.id
         ).length;
 
         if (currentPlayerCardsPlayed < minCardsRequired) {
-            return showNotification(
-                gameState.isSoloGame ?
-                    'Juega al menos 1 carta' :
-                    `Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`,
-                true
-            );
+            return showNotification(`Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`, true);
         }
 
         socket.send(JSON.stringify({
@@ -775,30 +784,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateGameInfo() {
-        if (gameState.isSoloGame) {
-            document.getElementById('currentTurn').textContent = "Tu turno (Solitario)";
-        } else {
-            const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
-            document.getElementById('currentTurn').textContent = currentPlayerName;
-        }
+        const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
 
+        // Actualizar elementos HTML
+        document.getElementById('currentTurn').textContent = currentPlayerName;
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
-
+        // Actualizar barra de progreso si es tu turno
         if (gameState.currentTurn === currentPlayer.id) {
             const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
-            const required = gameState.isSoloGame ?
-                (gameState.remainingDeck > 0 ? 1 : 1) :
-                (gameState.remainingDeck > 0 ? 2 : 1);
+            const required = gameState.remainingDeck > 0 ? 2 : 1;
             const progress = Math.min(cardsPlayed / required, 1) * 100;
 
             const progressBar = document.getElementById('progressBar');
             progressBar.style.width = `${progress}%`;
             progressBar.style.backgroundColor = progress >= 100 ? 'var(--secondary)' : 'var(--primary)';
 
-            document.getElementById('progressText').textContent =
-                gameState.isSoloGame ?
-                    `${cardsPlayed} carta(s) jugada(s)` :
-                    `${cardsPlayed}/${required} cartas jugadas`;
+            document.getElementById('progressText').textContent = `${cardsPlayed}/${required} cartas jugadas`;
         }
     }
 
@@ -840,13 +841,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Precargar el icono antes de iniciar
         const loadIcon = new Promise((resolve) => {
             historyIcon.onload = () => {
-                debugLog('Icono de historial cargado');
+                console.log('Icono de historial cargado correctamente');
                 resolve();
             };
             historyIcon.onerror = () => {
-                debugLog('Error cargando icono de historial');
+                console.error('Error cargando el icono de historial');
                 resolve();
             };
         });
@@ -855,15 +857,18 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.width = 800;
             canvas.height = 700;
 
+            // Configurar eventos
             endTurnButton.addEventListener('click', endTurn);
             canvas.addEventListener('click', handleCanvasClick);
             document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
 
+            // Inicializar panel de información
             updateGameInfo();
 
+            // Posicionar controles
             const controlsDiv = document.querySelector('.game-controls');
             if (controlsDiv) {
-                controlsDiv.style.bottom = `${canvas.height - PLAYER_CARDS_Y - 50}px`;
+                controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
             }
 
             connectWebSocket();
