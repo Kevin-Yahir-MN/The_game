@@ -3,6 +3,7 @@ const WebSocket = require('ws');
 const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const compression = require('compression');
 
 const app = express();
 const server = http.createServer(app);
@@ -13,7 +14,9 @@ const allowedOrigins = [
     'http://localhost:3000'
 ];
 const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
+const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 minutos
 
+app.use(compression());
 app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (allowedOrigins.includes(origin)) {
@@ -29,7 +32,6 @@ const wss = new WebSocket.Server({
     server,
     verifyClient: (info, done) => {
         if (!allowedOrigins.includes(info.origin)) {
-            console.warn(`Origen bloqueado: ${info.origin}`);
             return done(false, 403, 'Origen no permitido');
         }
         done(true);
@@ -40,8 +42,27 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client')));
 
 const rooms = new Map();
-const reverseRoomMap = new WeakMap();
+const reverseRoomMap = new Map();
 const boardHistory = new Map();
+
+// Limpieza periódica de salas inactivas
+setInterval(() => {
+    const now = Date.now();
+    for (const [roomId, room] of rooms.entries()) {
+        let lastActivity = 0;
+        room.players.forEach(player => {
+            if (player.lastActivity > lastActivity) {
+                lastActivity = player.lastActivity;
+            }
+        });
+
+        if (now - lastActivity > 3600000) { // 1 hora inactiva
+            rooms.delete(roomId);
+            reverseRoomMap.delete(room);
+            boardHistory.delete(roomId);
+        }
+    }
+}, ROOM_CLEANUP_INTERVAL);
 
 function initializeDeck() {
     const deck = [];
@@ -68,30 +89,34 @@ function safeSend(ws, message) {
 }
 
 function broadcastToRoom(room, message, options = {}) {
-    const { includeGameState = false } = options;
+    const { includeGameState = false, skipPlayerId = null } = options;
     room.players.forEach(player => {
-        safeSend(player.ws, message);
-        if (includeGameState) sendGameState(room, player);
+        if (player.id !== skipPlayerId && player.ws?.readyState === WebSocket.OPEN) {
+            safeSend(player.ws, message);
+            if (includeGameState) sendGameState(room, player);
+        }
     });
 }
 
 function sendGameState(room, player) {
+    player.lastActivity = Date.now();
+    const state = {
+        b: room.gameState.board,
+        t: room.gameState.currentTurn,
+        y: player.cards,
+        i: room.gameState.initialCards,
+        d: room.gameState.deck.length,
+        p: room.players.map(p => ({
+            i: p.id,
+            n: p.name,
+            c: p.cards.length,
+            s: p.cardsPlayedThisTurn.length
+        }))
+    };
+
     safeSend(player.ws, {
-        type: 'game_state',
-        state: {
-            board: room.gameState.board,
-            currentTurn: room.gameState.currentTurn,
-            yourCards: player.cards,
-            initialCards: room.gameState.initialCards,
-            players: room.players.map(p => ({
-                id: p.id,
-                name: p.name,
-                cardCount: p.cards.length,
-                cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
-            })),
-            remainingDeck: room.gameState.deck.length,
-            isYourTurn: room.gameState.currentTurn === player.id
-        }
+        type: 'gs',
+        s: state
     });
 }
 
@@ -165,7 +190,6 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
-    // Aplicar el movimiento
     if (msg.position.includes('asc')) {
         board.ascending[targetIdx] = msg.cardValue;
     } else {
@@ -328,7 +352,8 @@ app.post('/create-room', (req, res) => {
             isHost: true,
             ws: null,
             cards: [],
-            cardsPlayedThisTurn: []
+            cardsPlayedThisTurn: [],
+            lastActivity: Date.now()
         }],
         gameState: {
             deck: initializeDeck(),
@@ -370,7 +395,8 @@ app.post('/join-room', (req, res) => {
         isHost: false,
         ws: null,
         cards: [],
-        cardsPlayedThisTurn: []
+        cardsPlayedThisTurn: [],
+        lastActivity: Date.now()
     };
 
     room.players.push(newPlayer);
@@ -378,6 +404,7 @@ app.post('/join-room', (req, res) => {
 });
 
 app.get('/room-info/:roomId', (req, res) => {
+    res.set('Cache-Control', 'public, max-age=5');
     const roomId = req.params.roomId;
     if (!rooms.has(roomId)) {
         return res.status(404).json({ success: false, message: 'Sala no encontrada' });
@@ -445,7 +472,7 @@ wss.on('connection', (ws, req) => {
     if (!player) return ws.close(1008, 'Jugador no registrado');
 
     player.ws = ws;
-    console.log(`✔ ${player.name} conectado a sala ${roomId}`);
+    player.lastActivity = Date.now();
 
     const response = {
         type: 'init_game',
@@ -477,6 +504,8 @@ wss.on('connection', (ws, req) => {
     ws.on('message', (message) => {
         try {
             const msg = JSON.parse(message);
+            player.lastActivity = Date.now();
+
             switch (msg.type) {
                 case 'start_game':
                     if (player.isHost && !room.gameState.gameStarted) {
@@ -547,7 +576,6 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('close', () => {
-        console.log(`✖ ${player.name} desconectado`);
         player.ws = null;
 
         if (player.isHost && room.players.length > 1) {

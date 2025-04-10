@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = 'https://the-game-2xks.onrender.com';
     const WS_URL = 'wss://the-game-2xks.onrender.com';
+    const PLAYER_UPDATE_INTERVAL = 5000; // 5 segundos
 
     let socket;
     const roomId = sessionStorage.getItem('roomId');
@@ -13,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('startGame');
     const gameSettings = document.getElementById('gameSettings');
     const initialCardsSelect = document.getElementById('initialCards');
+    let playerUpdateInterval;
 
     roomIdDisplay.textContent = roomId;
 
@@ -26,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initializeWebSocket();
     updatePlayersList();
-    setInterval(updatePlayersList, 3000);
+    playerUpdateInterval = setInterval(updatePlayersList, PLAYER_UPDATE_INTERVAL);
 
     function initializeWebSocket() {
         if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
@@ -41,13 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         socket.onmessage = (event) => {
             const message = JSON.parse(event.data);
-            console.log('Mensaje recibido:', message);
 
             if (message.type === 'game_started') {
-                console.log('Juego iniciado, redirigiendo...');
+                clearInterval(playerUpdateInterval);
                 window.location.href = 'game.html';
-            } else if (message.type === 'room_update') {
-                updatePlayersUI(message.players);
             } else if (message.type === 'notification') {
                 showNotification(message.message, message.isError);
             } else if (message.type === 'room_reset') {
@@ -70,13 +69,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const initialCards = parseInt(initialCardsSelect.value);
 
         if (!socket || socket.readyState !== WebSocket.OPEN) {
-            alert('Error: No hay conexión con el servidor. Reconectando...');
+            showNotification('Error: No hay conexión con el servidor. Reconectando...', true);
             initializeWebSocket();
             return;
         }
 
         try {
-            console.log('Intentando iniciar juego...');
             startBtn.disabled = true;
             startBtn.textContent = 'Iniciando...';
 
@@ -90,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error al iniciar juego:', error);
             startBtn.disabled = false;
             startBtn.textContent = 'Iniciar Juego';
-            alert('Error al iniciar el juego. Intenta nuevamente.');
+            showNotification('Error al iniciar el juego. Intenta nuevamente.', true);
         }
     }
 
@@ -104,8 +102,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function updatePlayersList() {
         try {
-            const response = await fetch(`${API_URL}/room-info/${roomId}`);
-            if (!response.ok) throw new Error('Error en la respuesta');
+            const response = await fetch(`${API_URL}/room-info/${roomId}`, {
+                cache: 'no-store'
+            });
+
+            if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
 
             const data = await response.json();
             if (data.success) {
@@ -128,4 +129,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 </li>`;
         }).join('');
     }
+
+    // Limpieza al salir
+    window.addEventListener('beforeunload', () => {
+        clearInterval(playerUpdateInterval);
+        if (socket) {
+            socket.close();
+        }
+    });
 });
