@@ -1,3 +1,11 @@
+window.addEventListener('error', (event) => {
+    if (event.message.includes('UNSUPPORTED_OS')) {
+        console.warn('Funcionalidad de sistema operativo no disponible en navegador');
+        event.preventDefault(); // Previene que el error se propague
+        return false;
+    }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
