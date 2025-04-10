@@ -538,6 +538,10 @@ wss.on('connection', (ws, req) => {
                         });
                     }
                     break;
+                case 'heartbeat':
+                    // Solo mantener la conexión activa - registrar si se desea
+                    console.log(`Heartbeat recibido de ${msg.playerId}`);
+                    break;
                 default:
                     console.log('Tipo de mensaje no reconocido:', msg.type);
             }
