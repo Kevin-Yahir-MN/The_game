@@ -129,17 +129,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 reconnectAttempts = 0;
                 debugLog('Conexión WebSocket establecida');
 
-                // Reemplaza la sección del heartbeat en connectWebSocket():
                 heartbeatInterval = setInterval(() => {
                     if (socket?.readyState === WebSocket.OPEN) {
-                        const heartbeatMsg = {
-                            type: 'heartbeat',
-                            playerId: currentPlayer.id,
-                            roomId: roomId,
-                            timestamp: Date.now()
-                        };
-                        socket.send(JSON.stringify(heartbeatMsg));
-                        debugLog('Enviando heartbeat', heartbeatMsg);
+                        socket.send(JSON.stringify({ type: 'heartbeat' }));
                     }
                 }, HEARTBEAT_INTERVAL);
 

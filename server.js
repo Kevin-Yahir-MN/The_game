@@ -570,27 +570,9 @@ wss.on('connection', (ws, req) => {
                         });
                     }
                     break;
-                // Reemplaza el caso 'heartbeat' completo:
                 case 'heartbeat':
-                    if (!msg.playerId || !msg.roomId) {
-                        log('warn', 'Heartbeat inválido recibido', msg);
-                        break;
-                    }
-
-                    const room = rooms.get(msg.roomId);
-                    if (!room) {
-                        log('warn', `Heartbeat para sala no encontrada: ${msg.roomId}`);
-                        break;
-                    }
-
-                    const player = room.players.find(p => p.id === msg.playerId);
-                    if (!player) {
-                        log('warn', `Heartbeat de jugador no encontrado: ${msg.playerId}`);
-                        break;
-                    }
-
-                    player.lastActivity = Date.now();
-                    log('debug', `Heartbeat de ${player.name} (${msg.playerId}) en sala ${msg.roomId}`);
+                    // Solo mantener la conexión activa - registrar si se desea
+                    console.log(`Heartbeat recibido de ${msg.playerId}`);
                     break;
                 default:
                     console.log('Tipo de mensaje no reconocido:', msg.type);
