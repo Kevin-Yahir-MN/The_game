@@ -1,10 +1,3 @@
-window.addEventListener('error', (event) => {
-    if (event.message.includes('UNSUPPORTED_OS')) {
-        console.warn('Funcionalidad de sistema operativo no disponible en navegador');
-        event.preventDefault(); // Previene que el error se propague
-        return false;
-    }
-});
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = 'https://the-game-2xks.onrender.com';
     const WS_URL = 'wss://the-game-2xks.onrender.com';
