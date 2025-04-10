@@ -182,6 +182,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     switch (message.type) {
+                        case 'game_started_confirmation':
+                            console.log('Juego iniciado en servidor, redirigiendo...');
+                            window.location.href = 'game.html';
+                            break;
                         case 'init_game':
                             debugLog('Juego inicializado');
                             gameState.currentTurn = message.gameState.currentTurn;

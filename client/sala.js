@@ -88,11 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
             socket.onmessage = (event) => {
                 try {
                     const message = JSON.parse(event.data);
-
-                    // Solo loguear mensajes importantes
-                    if (['game_started', 'room_update', 'notification'].includes(message.type)) {
-                        debugLog('Mensaje WS (sala):', message.type);
-                    }
+                    console.log('Mensaje recibido del servidor:', message.type); // Debug
 
                     switch (message.type) {
                         case 'game_started':
@@ -130,18 +126,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Resto de funciones existentes (sin cambios)
     function handleStartGame() {
         const initialCards = parseInt(initialCardsSelect.value);
 
         if (!socket || socket.readyState !== WebSocket.OPEN) {
+            console.error('WebSocket no está conectado. Estado:', socket?.readyState);
             alert('Error: No hay conexión con el servidor. Reconectando...');
             initializeWebSocket();
             return;
         }
 
         try {
-            console.log('Intentando iniciar juego...');
+            console.log('Enviando comando start_game al servidor...', {
+                type: 'start_game',
+                playerId: playerId,
+                roomId: roomId,
+                initialCards: initialCards
+            });
+
             startBtn.disabled = true;
             startBtn.textContent = 'Iniciando...';
 
@@ -151,6 +153,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 roomId: roomId,
                 initialCards: initialCards
             }));
+
+            // Agregar timeout para reintentar
+            setTimeout(() => {
+                if (startBtn.textContent === 'Iniciando...') {
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Reintentar Inicio';
+                    console.warn('Timeout: No se recibió respuesta del servidor');
+                }
+            }, 5000);
+
         } catch (error) {
             console.error('Error al iniciar juego:', error);
             startBtn.disabled = false;

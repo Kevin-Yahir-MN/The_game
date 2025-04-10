@@ -510,9 +510,25 @@ wss.on('connection', (ws, req) => {
         try {
             const msg = JSON.parse(message);
             switch (msg.type) {
+                // En el caso 'start_game' del servidor:
                 case 'start_game':
                     if (player.isHost && !room.gameState.gameStarted) {
-                        startGame(room, msg.initialCards);
+                        console.log(`Iniciando juego solicitado por ${player.name}`);
+                        try {
+                            startGame(room, msg.initialCards);
+                            // Enviar confirmación explícita
+                            safeSend(player.ws, {
+                                type: 'game_started_confirmation',
+                                success: true
+                            });
+                        } catch (error) {
+                            console.error('Error al iniciar juego:', error);
+                            safeSend(player.ws, {
+                                type: 'notification',
+                                message: 'Error al iniciar el juego',
+                                isError: true
+                            });
+                        }
                     }
                     break;
                 case 'play_card':
