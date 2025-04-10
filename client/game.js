@@ -158,6 +158,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 switch (message.type) {
+                    case 'init_game': // Nuevo manejador añadido
+                        handleInitGame(message);
+                        break;
                     case 'gs': // game_state abreviado
                         lastStateUpdate = now;
                         updateGameState(message.s);
@@ -204,6 +207,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Error procesando mensaje:', error);
             }
         };
+    }
+
+    function handleInitGame(message) {
+        // Actualiza el estado del juego con los datos iniciales
+        gameState.currentTurn = message.gameState.currentTurn;
+        gameState.board = message.gameState.board;
+        gameState.remainingDeck = message.gameState.remainingDeck;
+
+        // Si el juego ya comenzó, actualiza las cartas del jugador
+        if (message.gameState.gameStarted && message.yourCards) {
+            updatePlayerCards(message.yourCards);
+        }
+
+        // Actualiza la información de la interfaz
+        updateGameInfo();
+
+        console.log('Juego inicializado correctamente');
     }
 
     // Notificaciones optimizadas

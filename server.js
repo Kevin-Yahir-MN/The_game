@@ -81,6 +81,7 @@ function shuffleArray(array) {
 function safeSend(ws, message) {
     try {
         if (ws?.readyState === WebSocket.OPEN) {
+            console.debug('Enviando mensaje:', message.type); // Log del tipo de mensaje
             ws.send(JSON.stringify(message));
         }
     } catch (error) {
