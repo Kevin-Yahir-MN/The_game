@@ -24,11 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const playerInfo = document.getElementById('playerInfo') || document.createElement('div');
         playerInfo.id = 'playerInfo';
         playerInfo.className = 'player-info';
-        playerInfo.innerHTML = `
-            <h3>Jugador: <span class="player-name">${playerName || 'Anónimo'}</span></h3>
-            <p>Sala: ${roomId} ${isHost ? '(Host)' : ''}</p>
-            <p class="connection-status" id="connectionStatus">Conectando...</p>
-        `;
 
         const header = document.querySelector('.room-header');
         if (!document.getElementById('playerInfo')) {
