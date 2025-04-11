@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function drawHistoryIcons() {
         const historyIcon = new Image();
-        historyIcon.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyLDJBMTAsMTAgMCAwLDAgMiwxMkEyLDIgMCAwLDAgNCwxMkEyLDIgMCAwLDEgNiwxMkE2LDYgMCAwLDEgMTIsNkE2LDYgMCAwLDEgMTgsMTJBNiw2IDAgMCwxIDEyLDE4QTYsNiAwIDAsMSA2LDEyQTIsMiAwIDAsMCA0LDEyQTEwLDEwIDAgMCwwIDEyLDIyQTEwLDEwIDAgMCwwIDIyLDEyQTEwLDEwIDAgMCwwIDEyLDJNMTEsN0gxM1YxNkgxMVY3WiIgZmlsbD0id2hpdGUiIC8+PC9zdmc+';
+        historyIcon.src = 'cards-icon.png';
 
         if (historyIcon.complete) {
             ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
@@ -211,13 +211,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Funciones de animación
     function handleCardAnimations() {
         const now = Date.now();
         let needsRedraw = false;
 
         for (let i = gameState.animatingCards.length - 1; i >= 0; i--) {
             const anim = gameState.animatingCards[i];
+
+            // Verificar que la animación y la carta sean válidas
+            if (!anim || !anim.card) {
+                gameState.animatingCards.splice(i, 1);
+                continue;
+            }
+
             const elapsed = now - anim.startTime;
             const progress = Math.min(elapsed / anim.duration, 1);
 
@@ -228,7 +234,13 @@ document.addEventListener('DOMContentLoaded', () => {
             anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * easedProgress;
 
             if (progress === 1) {
-                if (anim.onComplete) anim.onComplete();
+                if (typeof anim.onComplete === 'function') {
+                    try {
+                        anim.onComplete();
+                    } catch (e) {
+                        console.error('Error en callback de animación:', e);
+                    }
+                }
                 gameState.animatingCards.splice(i, 1);
                 needsRedraw = true;
             }
@@ -236,6 +248,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function animateCardToColumn(card, column, onComplete) {
+        // Verificar que la carta exista antes de animar
+        if (!card) {
+            console.error('Intento de animar una carta nula');
+            return;
+        }
+
         const targetPos = getColumnPosition(column);
         const finalX = targetPos.x;
         const finalY = targetPos.y;
@@ -248,7 +266,12 @@ document.addEventListener('DOMContentLoaded', () => {
             targetY: finalY,
             fromX: card.x,
             fromY: card.y,
-            onComplete: onComplete,
+            onComplete: () => {
+                // Verificación adicional antes de ejecutar el callback
+                if (card && typeof onComplete === 'function') {
+                    onComplete();
+                }
+            },
             isPlacementAnimation: true
         });
     }
@@ -982,12 +1005,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetColumn = getClickedColumn(x, y);
 
         if (targetColumn && isValidMove(dragCard.value, targetColumn)) {
+            // Guardar el valor de la carta antes de la animación
+            const cardValue = dragCard.value;
+
             animateCardToColumn(dragCard, targetColumn, () => {
-                const index = gameState.yourCards.indexOf(dragCard);
+                // Usamos el valor guardado en lugar de acceder a dragCard que podría ser null
+                const index = gameState.yourCards.findIndex(c => c.value === cardValue);
                 if (index !== -1) {
                     gameState.yourCards.splice(index, 1);
                 }
-                playCard(dragCard.value, targetColumn);
+                playCard(cardValue, targetColumn);
             });
         } else {
             if (targetColumn) {
