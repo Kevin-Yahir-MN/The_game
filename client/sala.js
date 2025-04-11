@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!event.wasClean) {
                 reconnectAttempts++;
                 updateConnectionStatus('🔴 Reconectando...');
-                setTimeout(connectWebSocket, Math.min(RECONNECT_DELAY * Math.pow(2, reconnectAttempts - 1), 30000);
+                setTimeout(connectWebSocket, Math.min(RECONNECT_DELAY * Math.pow(2, reconnectAttempts - 1), 30000));
             } else {
                 updateConnectionStatus('🔴 Desconectado');
             }
