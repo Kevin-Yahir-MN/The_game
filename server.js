@@ -3,8 +3,6 @@ const WebSocket = require('ws');
 const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-const compression = require('compression');
-const zlib = require('zlib');
 
 const app = express();
 const server = http.createServer(app);
@@ -12,9 +10,9 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 const allowedOrigins = ['https://the-game-2xks.onrender.com'];
 const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
-const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000;
+const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 minutos
 
-app.use(compression());
+// Configuración de CORS
 app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (allowedOrigins.includes(origin)) {
@@ -26,36 +24,18 @@ app.use((req, res, next) => {
     next();
 });
 
-const wss = new WebSocket.Server({
-    server,
-    perMessageDeflate: {
-        zlibDeflateOptions: {
-            chunkSize: 1024,
-            memLevel: 7,
-            level: 3
-        },
-        zlibInflateOptions: {
-            chunkSize: 10 * 1024
-        },
-        clientNoContextTakeover: true,
-        serverNoContextTakeover: true,
-        threshold: 1024
-    },
-    verifyClient: (info, done) => {
-        if (!allowedOrigins.includes(info.origin)) {
-            return done(false, 403, 'Origen no permitido');
-        }
-        done(true);
-    }
-});
+// Configuración del WebSocket sin compresión
+const wss = new WebSocket.Server({ server });
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client')));
 
+// Estructuras de datos para el juego
 const rooms = new Map();
 const reverseRoomMap = new Map();
 const boardHistory = new Map();
 
+// Limpieza periódica de salas inactivas
 setInterval(() => {
     const now = Date.now();
     for (const [roomId, room] of rooms.entries()) {
@@ -66,7 +46,7 @@ setInterval(() => {
             }
         });
 
-        if (now - lastActivity > 3600000) {
+        if (now - lastActivity > 3600000) { // 1 hora de inactividad
             rooms.delete(roomId);
             reverseRoomMap.delete(room);
             boardHistory.delete(roomId);
@@ -74,6 +54,7 @@ setInterval(() => {
     }
 }, ROOM_CLEANUP_INTERVAL);
 
+// Funciones del juego
 function initializeDeck() {
     const deck = [];
     for (let i = 2; i < 100; i++) deck.push(i);
@@ -88,13 +69,11 @@ function shuffleArray(array) {
     return array;
 }
 
+// Función simplificada para enviar mensajes sin compresión
 function safeSend(ws, message) {
     try {
         if (ws?.readyState === WebSocket.OPEN) {
-            zlib.deflate(JSON.stringify(message), (err, buffer) => {
-                if (!err) ws.send(buffer);
-                else ws.send(JSON.stringify(message));
-            });
+            ws.send(JSON.stringify(message));
         }
     } catch (error) {
         console.error('Error enviando mensaje:', error);
@@ -352,6 +331,7 @@ function checkGameStatus(room) {
     }
 }
 
+// Endpoints HTTP
 app.post('/create-room', (req, res) => {
     const { playerName } = req.body;
     if (!playerName || playerName.length > 20) {
@@ -479,6 +459,7 @@ function startGame(room, initialCards = 6) {
     });
 }
 
+// WebSocket connection handler
 wss.on('connection', (ws, req) => {
     const params = new URLSearchParams(req.url.split('?')[1]);
     const roomId = params.get('roomId');
@@ -625,6 +606,10 @@ wss.on('connection', (ws, req) => {
                     type: 'notification',
                     message: `${newHost.name} es ahora el host`,
                     isError: false
+                });
+                broadcastToRoom(room, {
+                    type: 'host_changed',
+                    newHostId: newHost.id
                 });
             }
         }
