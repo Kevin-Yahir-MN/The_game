@@ -259,37 +259,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Juego inicializado correctamente');
     }
 
-    function setupPanelMinimization() {
-        document.querySelectorAll('.game-panel').forEach(panel => {
-            const header = panel.querySelector('.panel-header');
-            const btn = panel.querySelector('.minimize-btn');
-
-            // Estado inicial (guardado en localStorage)
-            const panelId = panel.classList.contains('info-panel') ? 'info' :
-                panel.classList.contains('instructions-panel') ? 'instructions' : 'players';
-            const isMinimized = localStorage.getItem(`panel_${panelId}_minimized`) === 'true';
-
-            if (isMinimized) {
-                panel.classList.add('panel-minimized');
-            }
-
-            // Evento para el botón
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                panel.classList.toggle('panel-minimized');
-                localStorage.setItem(`panel_${panelId}_minimized`, panel.classList.contains('panel-minimized'));
-            });
-
-            // Evento para el header (click alternativo)
-            header.addEventListener('click', (e) => {
-                if (e.target === header) {
-                    panel.classList.toggle('panel-minimized');
-                    localStorage.setItem(`panel_${panelId}_minimized`, panel.classList.contains('panel-minimized'));
-                }
-            });
-        });
-    }
-
     // Notificaciones optimizadas
     let notificationTimeout;
 
@@ -1030,8 +999,6 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.addEventListener('click', handleCanvasClick);
             document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
             window.addEventListener('beforeunload', cleanup);
-
-            setupPanelMinimization
 
             // Posicionar controles
             const controlsDiv = document.querySelector('.game-controls');
