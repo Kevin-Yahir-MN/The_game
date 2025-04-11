@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let reconnectAttempts = 0;
     const MAX_RECONNECT_ATTEMPTS = 5;
     let socket;
+    let selectedCard = null;
 
     // Datos del jugador
     const currentPlayer = {
@@ -84,7 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ctx.beginPath();
             ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
-            ctx.fillStyle = this === selectedCard ? '#FFFF99' : this.backgroundColor;
+
+            // Modificación para manejar casos donde selectedCard podría ser undefined
+            ctx.fillStyle = (selectedCard && this === selectedCard) ? '#FFFF99' : this.backgroundColor;
             ctx.fill();
 
             ctx.strokeStyle = this.isPlayable ? '#27ae60' : '#34495e';
