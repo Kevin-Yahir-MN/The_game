@@ -961,69 +961,53 @@ body {
     }
 }
 
-/* Estilos para la información del jugador */
-.player-info {
-    background: rgba(0, 0, 0, 0.2);
-    padding: 10px 15px;
-    border-radius: 8px;
-    margin: 10px 0;
-}
-
-.player-info h3 {
-    margin: 0;
-    color: var(--light);
-}
-
-.player-name {
-    color: var(--secondary);
-    font-weight: bold;
-}
-
-/* Panel de jugadores */
 .players-panel {
     position: fixed;
     top: 20px;
     right: 20px;
-    background: rgba(42, 52, 65, 0.9);
+    background: rgba(42, 52, 65, 0.95);
     padding: 15px;
-    border-radius: 8px;
-    max-width: 200px;
+    border-radius: 12px;
+    width: 250px;
+    max-height: 60vh;
+    overflow-y: auto;
+    z-index: 20;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .players-panel h3 {
     margin-top: 0;
     color: var(--primary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 8px;
+}
+
+.players-panel ul {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0 0;
 }
 
 .players-panel li {
-    margin-bottom: 8px;
-    padding: 5px;
-    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .players-panel .you {
     background: rgba(46, 204, 113, 0.1);
+    border-left: 3px solid var(--secondary);
 }
 
 .players-panel .current-turn {
+    background: rgba(52, 152, 219, 0.1);
     border-left: 3px solid var(--primary);
 }
 
 .card-count {
-    float: right;
+    display: block;
+    font-size: 0.85em;
     color: var(--gray);
-    font-size: 0.8em;
-}
-
-/* Tags especiales */
-.host-tag {
-    color: var(--primary);
-}
-
-.you-tag {
-    color: var(--secondary);
-}
-
-.connection-status {
-    margin-left: 5px;
+    margin-top: 4px;
 }

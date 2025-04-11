@@ -130,21 +130,46 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Cerrar conexión existente si hay una
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.close();
+        }
+
         socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
 
         socket.onopen = () => {
             reconnectAttempts = 0;
-            socket.send(JSON.stringify({ type: 'get_game_state' }));
+            showNotification('Conectado al servidor', false);
+
+            // Solicitar estado actual del juego
+            socket.send(JSON.stringify({
+                type: 'get_game_state',
+                playerId: currentPlayer.id,
+                roomId: roomId
+            }));
         };
 
-        socket.onclose = () => {
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 15000);
-            reconnectAttempts++;
-            setTimeout(connectWebSocket, delay);
+        socket.onclose = (event) => {
+            console.log('Conexión cerrada:', event.code, event.reason);
+
+            if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 15000);
+                reconnectAttempts++;
+
+                showNotification(`Intentando reconectar (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, true);
+
+                setTimeout(() => {
+                    console.log(`Intentando reconexión #${reconnectAttempts}`);
+                    connectWebSocket();
+                }, delay);
+            } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                showNotification('No se pudo reconectar. Recarga la página.', true);
+            }
         };
 
         socket.onerror = (error) => {
             console.error('Error en WebSocket:', error);
+            showNotification('Error de conexión', true);
         };
 
         socket.onmessage = (event) => {
@@ -158,22 +183,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 switch (message.type) {
-                    case 'init_game': // Nuevo manejador añadido
+                    case 'init_game':
                         handleInitGame(message);
                         break;
                     case 'gs': // game_state abreviado
                         lastStateUpdate = now;
                         updateGameState(message.s);
-                        updateGameInfo();
+                        updateGameInfo(); // Actualizar UI
                         break;
                     case 'game_started':
                         updateGameState(message.state);
                         showNotification('¡El juego ha comenzado!');
-                        updateGameInfo();
+                        updateGameInfo(); // Actualizar UI
                         break;
                     case 'your_cards':
                         updatePlayerCards(message.cards);
-                        updateGameInfo();
+                        updateGameInfo(); // Actualizar UI
                         break;
                     case 'game_over':
                         handleGameOver(message.message);
@@ -183,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     case 'card_played':
                         handleOpponentCardPlayed(message);
-                        updateGameInfo();
+                        updateGameInfo(); // Actualizar UI
                         break;
                     case 'invalid_move':
                         if (message.playerId === currentPlayer.id && selectedCard) {
@@ -192,13 +217,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     case 'turn_changed':
                         handleTurnChanged(message);
-                        updateGameInfo();
+                        updateGameInfo(); // Actualizar UI
                         break;
                     case 'move_undone':
                         handleMoveUndone(message);
-                        updateGameInfo();
+                        updateGameInfo(); // Actualizar UI
                         break;
                     case 'room_reset':
+                        // No necesita actualización de UI
+                        break;
+                    case 'player_update':
+                        // Actualización específica de información de jugador
+                        if (message.players) {
+                            gameState.players = message.players;
+                            updateGameInfo(); // Actualizar UI
+                        }
                         break;
                     default:
                         console.log('Mensaje no reconocido:', message);
@@ -741,6 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateGameInfo() {
+        // Actualizar turno actual
         const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
         let currentPlayerName;
 
@@ -754,9 +788,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('currentTurn').textContent = currentPlayerName;
 
-        // Actualiza también el panel de jugadores
-        const playersPanel = document.getElementById('playersPanel') || createPlayersPanel();
-        updatePlayersPanel(playersPanel);
+        // Actualizar cartas restantes en el mazo
+        document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
+
+        // Actualizar progreso de cartas jugadas este turno
+        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+            card => card.playerId === currentPlayer.id
+        ).length;
+
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        const progressText = `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
+        document.getElementById('progressText').textContent = progressText;
+
+        // Actualizar barra de progreso
+        const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
+        document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+
+        // Actualizar panel de jugadores
+        updatePlayersPanel();
     }
 
     function createPlayersPanel() {
@@ -767,16 +816,28 @@ document.addEventListener('DOMContentLoaded', () => {
         return panel;
     }
 
-    function updatePlayersPanel(panel) {
+    function updatePlayersPanel() {
+        const panel = document.getElementById('playersPanel') || createPlayersPanel();
+
         panel.innerHTML = `
-            <h3>Jugadores</h3>
+            <h3>Jugadores (${gameState.players.length})</h3>
             <ul>
-                ${gameState.players.map(player => `
-                    <li class="${player.id === currentPlayer.id ? 'you' : ''} ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
-                        ${player.name} ${player.isHost ? '(Host)' : ''}
-                        <span class="card-count">${player.cardCount} cartas</span>
-                    </li>
-                `).join('')}
+                ${gameState.players.map(player => {
+            const cardsPlayed = gameState.cardsPlayedThisTurn.filter(
+                c => c.playerId === player.id
+            ).length;
+
+            return `
+                        <li class="${player.id === currentPlayer.id ? 'you' : ''} 
+                                   ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
+                            ${player.name} ${player.isHost ? '(Host)' : ''}
+                            <span class="card-count">
+                                ${player.cardCount} cartas | 
+                                Jugadas: ${cardsPlayed}
+                            </span>
+                        </li>
+                    `;
+        }).join('')}
             </ul>
         `;
     }
