@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const WS_URL = 'wss://the-game-2xks.onrender.com';
     const endTurnButton = document.getElementById('endTurnBtn');
     const STATE_UPDATE_THROTTLE = 200; // ms
-    const TARGET_FPS = 30;
+    const TARGET_FPS = 60;
 
     // Dimensiones y posiciones
     const CARD_WIDTH = 80;
@@ -334,7 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!card) return;
 
         const shakeAmount = 8;
-        const shakeDuration = 400;
+        const shakeDuration = 200;
         const startTime = Date.now();
 
         function shake() {
@@ -498,7 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.animatingCards.push({
                 card: opponentCard,
                 startTime: Date.now(),
-                duration: 400,
+                duration: 200,
                 targetX: cardPosition.x,
                 targetY: cardPosition.y,
                 fromX: cardPosition.x,
@@ -687,7 +687,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.animatingCards.push({
             card: selectedCard,
             startTime: Date.now(),
-            duration: 400,
+            duration: 200,
             targetX: cardPosition.x,
             targetY: cardPosition.y,
             fromX: selectedCard.x,
@@ -886,7 +886,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             anim.card.draw();
 
-            if (progress === 1 || now - anim.startTime > 2000) {
+            if (progress === 1 || now - anim.startTime > 1000) {
                 gameState.animatingCards.splice(i, 1);
             }
         }

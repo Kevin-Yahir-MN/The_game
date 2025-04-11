@@ -466,7 +466,7 @@ body {
     border-radius: 6px;
     width: 0%;
     /* Inicialmente en 0% */
-    transition: width 0.5s ease;
+    transition: width 0.2s ease;
     margin-top: 8px;
 }
 
@@ -627,7 +627,7 @@ body {
     pointer-events: none;
     opacity: 0;
     transform: translateY(-20px);
-    animation: notificationSlideIn 0.4s forwards cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    animation: notificationSlideIn 0.2s forwards cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
 
 .notification.error {
@@ -993,6 +993,11 @@ body {
 .players-panel .current-turn {
     background: rgba(52, 152, 219, 0.1);
     border-left: 3px solid var(--primary);
+}
+
+.card {
+    transition: all 0.15s ease-out;
+    /* Reducido de 0.3s */
 }
 
 .card-count {
