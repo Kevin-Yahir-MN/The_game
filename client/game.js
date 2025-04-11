@@ -977,6 +977,22 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(gameLoop);
     }
 
+    function drawGame() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#1a6b1a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        drawBoard();
+        drawHistoryIcons();
+        handleCardAnimations();
+        drawPlayerCards();
+
+        // Dibujar la carta que se está arrastrando encima de todo
+        if (isDragging && dragCard) {
+            dragCard.draw();
+        }
+    }
+
     // Limpieza al salir
     function cleanup() {
         if (socket) {
