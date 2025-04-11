@@ -104,10 +104,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Manejar mensajes del servidor
-    function handleSocketMessage(event) {
+    // Manejar mensajes del servidor (versión corregida)
+    async function handleSocketMessage(event) {
         try {
-            const message = JSON.parse(event.data);
+            let message;
+
+            // Manejar tanto Blob como texto plano
+            if (event.data instanceof Blob) {
+                message = await parseBlobToJson(event.data);
+            } else {
+                message = JSON.parse(event.data);
+            }
 
             if (message.type === 'game_started') {
                 handleGameStart();
@@ -118,6 +125,22 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error procesando mensaje:', error);
         }
+    }
+
+    // Función auxiliar para parsear Blob a JSON
+    function parseBlobToJson(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    resolve(JSON.parse(reader.result));
+                } catch (e) {
+                    reject(e);
+                }
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsText(blob);
+        });
     }
 
     // Actualizar lista de jugadores
