@@ -44,6 +44,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initializeWebSocket() {
+        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${playerId}&playerName=${encodeURIComponent(playerName)}`);
+
+        socket.onopen = () => {
+            console.log('Conexión WebSocket establecida');
+            // Enviar mensaje de actualización de nombre
+            socket.send(JSON.stringify({
+                type: 'update_player',
+                playerId: playerId,
+                name: playerName
+            }));
+        };
         if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
             socket.close();
         }

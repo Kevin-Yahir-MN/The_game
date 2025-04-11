@@ -426,22 +426,31 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateGameState(newState) {
         if (!newState) return;
 
+        // Actualizar información de los jugadores
         if (newState.p) {
             gameState.players = newState.p.map(player => ({
                 id: player.i,
-                name: player.n || `Jugador_${player.i.slice(0, 4)}`,
+                name: player.n || `Jugador_${player.i.slice(0, 4)}`, // Asegurar nombre por defecto
                 cardCount: player.c,
                 isHost: player.h,
-                cardsPlayedThisTurn: player.s
+                cardsPlayedThisTurn: player.s || 0
             }));
+
+            // Actualizar el nombre del jugador actual si no está definido
+            if (!currentPlayer.name && currentPlayer.id) {
+                const player = gameState.players.find(p => p.id === currentPlayer.id);
+                if (player) {
+                    currentPlayer.name = player.name;
+                    sessionStorage.setItem('playerName', player.name);
+                }
+            }
         }
 
+        // Resto de actualizaciones de estado
         gameState.board = newState.b || gameState.board;
         gameState.currentTurn = newState.t || gameState.currentTurn;
         gameState.remainingDeck = newState.d || gameState.remainingDeck;
-        gameState.players = newState.p || gameState.players;
         gameState.initialCards = newState.i || gameState.initialCards;
-        gameState.cardsPlayedThisTurn = newState.cardsPlayedThisTurn || gameState.cardsPlayedThisTurn;
 
         if (newState.y) {
             updatePlayerCards(newState.y);
@@ -827,10 +836,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 c => c.playerId === player.id
             ).length;
 
+            // Asegurar que siempre haya un nombre visible
+            const displayName = player.name || `Jugador_${player.id.slice(0, 4)}`;
+
             return `
                         <li class="${player.id === currentPlayer.id ? 'you' : ''} 
                                    ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
-                            ${player.name} ${player.isHost ? '(Host)' : ''}
+                            <span class="player-name">${displayName}</span>
+                            ${player.isHost ? ' <span class="host-tag">(Host)</span>' : ''}
                             <span class="card-count">
                                 ${player.cardCount} cartas | 
                                 Jugadas: ${cardsPlayed}

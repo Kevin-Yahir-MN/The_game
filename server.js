@@ -107,7 +107,7 @@ function sendGameState(room, player) {
         d: room.gameState.deck.length,
         p: room.players.map(p => ({
             i: p.id,
-            n: p.name,
+            n: p.name, // Asegurar que el nombre se envía
             h: p.isHost,
             c: p.cards.length,
             s: p.cardsPlayedThisTurn.length
@@ -580,6 +580,22 @@ wss.on('connection', (ws, req) => {
                         broadcastToRoom(room, {
                             type: 'room_reset',
                             message: 'La sala ha sido reiniciada para una nueva partida'
+                        });
+                    }
+                    break;
+                case 'update_player':
+                    const playerToUpdate = room.players.find(p => p.id === msg.playerId);
+                    if (playerToUpdate) {
+                        playerToUpdate.name = msg.name;
+                        // Notificar a todos los jugadores sobre el cambio
+                        broadcastToRoom(room, {
+                            type: 'player_update',
+                            players: room.players.map(p => ({
+                                id: p.id,
+                                name: p.name,
+                                isHost: p.isHost,
+                                cardCount: p.cards.length
+                            }))
                         });
                     }
                     break;
