@@ -19,7 +19,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('startGame');
     const gameSettings = document.getElementById('gameSettings');
     const initialCardsSelect = document.getElementById('initialCards');
-    const connectionStatus = document.getElementById('connectionStatus');
 
     // Inicialización de la UI
     function initializeUI() {
