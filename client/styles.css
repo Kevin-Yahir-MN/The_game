@@ -453,38 +453,28 @@ body {
     /* Color destacado */
 }
 
-/* Contenedor de progreso */
 .progress-container {
-    margin: 10px 0 15px;
-    /* Mayor margen vertical */
-    padding-top: 8px;
-    /* Espacio adicional arriba */
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    /* Línea sutil de separación */
-}
-
-.progress-bar {
-    margin-top: 5px;
-    /* Espacio extra opcional */
-    height: 10px;
-    background: var(--primary);
-    border-radius: 5px;
-    transition: width 0.3s ease;
-}
-
-.progress-text {
-    display: block;
-    margin-bottom: 8px;
-    /* Espacio entre texto y barra */
-    font-size: 1.1rem;
-    color: var(--light);
+    margin: 15px 0;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px;
 }
 
 .progress-bar {
     height: 12px;
-    background: var(--primary);
+    background: linear-gradient(90deg, var(--secondary), var(--primary));
     border-radius: 6px;
-    width: 100%;
+    width: 0%;
+    /* Inicialmente en 0% */
+    transition: width 0.5s ease;
+    margin-top: 8px;
+}
+
+.progress-text {
+    font-size: 14px;
+    color: var(--light);
+    margin-bottom: 5px;
+    display: block;
 }
 
 /* Panel de Instrucciones */

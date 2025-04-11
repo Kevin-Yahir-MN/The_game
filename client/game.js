@@ -354,22 +354,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleTurnChanged(message) {
-        const currentPlayer = gameState.players.find(p => p.id === message.newTurn);
-        const previousPlayer = gameState.players.find(p => p.id === message.previousPlayer);
+        const currentPlayerObj = gameState.players.find(p => p.id === message.newTurn);
+        const previousPlayerObj = gameState.players.find(p => p.id === message.previousPlayer);
 
         let playerName;
-        if (currentPlayer) {
-            playerName = currentPlayer.id === currentPlayer.id ?
+        if (currentPlayerObj) {
+            playerName = currentPlayerObj.id === currentPlayer.id ?
                 'Tu turno' :
-                `${currentPlayer.name}'s turn`;
+                `Turno de ${currentPlayerObj.name}`;
         } else {
-            playerName = 'Turno de otro jugador';
+            playerName = 'Esperando jugador...';
         }
 
         showNotification(playerName);
         gameState.currentTurn = message.newTurn;
+
+        // Reiniciar el contador visual de cartas jugadas
+        resetCardsPlayedProgress();
+
         updateGameInfo();
     }
+
+    function resetCardsPlayedProgress() {
+        document.getElementById('progressText').textContent = '0/2 cartas jugadas';
+        document.getElementById('progressBar').style.width = '0%';
+
+        // También reiniciamos visualmente las cartas jugadas este turno
+        gameState.yourCards.forEach(card => {
+            card.isPlayedThisTurn = false;
+            card.backgroundColor = '#FFFFFF';
+        });
+
+        gameState.cardsPlayedThisTurn = [];
+    }
+
 
     function handleMoveUndone(message) {
         if (message.playerId === currentPlayer.id) {
@@ -712,8 +730,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         socket.send(JSON.stringify({
             type: 'end_turn',
-            playerId: currentPlayer.id
+            playerId: currentPlayer.id,
+            roomId: roomId
         }));
+
+        resetCardsPlayedProgress();
     }
 
     function drawBoard() {
@@ -800,18 +821,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Actualizar cartas restantes en el mazo
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
 
-        // Actualizar progreso de cartas jugadas este turno
-        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
-            card => card.playerId === currentPlayer.id
-        ).length;
+        // Actualizar progreso de cartas jugadas este turno (solo para el jugador actual)
+        if (gameState.currentTurn === currentPlayer.id) {
+            const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+                card => card.playerId === currentPlayer.id
+            ).length;
 
-        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        const progressText = `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
-        document.getElementById('progressText').textContent = progressText;
+            const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+            const progressText = `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
+            document.getElementById('progressText').textContent = progressText;
 
-        // Actualizar barra de progreso
-        const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
-        document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+            // Actualizar barra de progreso
+            const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
+            document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+        }
 
         // Actualizar panel de jugadores
         updatePlayersPanel();

@@ -9,10 +9,7 @@ const app = express();
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3000;
-const allowedOrigins = [
-    'https://the-game-2xks.onrender.com',
-    'http://localhost:3000'
-];
+const allowedOrigins = 'https://the-game-2xks.onrender.com';
 const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
 const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000;
 
@@ -533,9 +530,52 @@ wss.on('connection', (ws, req) => {
                         handlePlayCard(room, player, msg);
                     }
                     break;
+                // En el manejador de end_turn
                 case 'end_turn':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        endTurn(room, player);
+                        const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+
+                        // Verificar que haya jugado suficientes cartas
+                        if (player.cardsPlayedThisTurn.length < minCardsRequired) {
+                            return safeSend(player.ws, {
+                                type: 'notification',
+                                message: `Debes jugar al menos ${minCardsRequired} cartas este turno`,
+                                isError: true
+                            });
+                        }
+
+                        // Repartir nuevas cartas si hay en el mazo
+                        const cardsToDraw = Math.min(
+                            room.gameState.initialCards - player.cards.length,
+                            room.gameState.deck.length
+                        );
+
+                        for (let i = 0; i < cardsToDraw; i++) {
+                            player.cards.push(room.gameState.deck.pop());
+                        }
+
+                        // Cambiar turno
+                        const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
+                        const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
+                        const nextPlayer = room.players[nextIndex];
+
+                        // Reiniciar cartas jugadas este turno
+                        player.cardsPlayedThisTurn = [];
+
+                        room.gameState.currentTurn = nextPlayer.id;
+
+                        // Notificar a todos los jugadores del cambio de turno
+                        broadcastToRoom(room, {
+                            type: 'turn_changed',
+                            newTurn: nextPlayer.id,
+                            previousPlayer: player.id,
+                            playerName: nextPlayer.name,
+                            cardsPlayedThisTurn: 0,  // Asegurar que se reinicia el contador
+                            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+                        }, { includeGameState: true });
+
+                        // Verificar estado del juego
+                        checkGameStatus(room);
                     }
                     break;
                 case 'undo_move':
