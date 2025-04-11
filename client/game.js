@@ -261,7 +261,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Notificaciones optimizadas
     let notificationTimeout;
-    const NOTIFICATION_DURATION = 3000;
 
     function showNotification(message, isError = false) {
         const existing = document.querySelector('.notification');
@@ -273,11 +272,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const notification = document.createElement('div');
         notification.className = `notification ${isError ? 'error' : ''}`;
         notification.textContent = message;
+
+        // Estilos especiales para mensajes importantes
+        if (message.includes('GAME OVER') || message.includes('terminará') ||
+            message.includes('derrota') || message.includes('no puede jugar')) {
+            notification.style.zIndex = '1001';
+            notification.style.fontSize = '1.2rem';
+            notification.style.padding = '20px 40px';
+            notification.style.maxWidth = '80%';
+            notification.style.textAlign = 'center';
+        }
+
         document.body.appendChild(notification);
 
+        const duration = (isError || message.includes('GAME OVER')) ? 5000 : 3000;
+
         notificationTimeout = setTimeout(() => {
-            notification.remove();
-        }, NOTIFICATION_DURATION);
+            notification.classList.add('notification-fade-out');
+            setTimeout(() => notification.remove(), 300);
+        }, duration);
     }
 
     function showColumnHistory(columnId) {
@@ -355,24 +368,62 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleTurnChanged(message) {
         const currentPlayerObj = gameState.players.find(p => p.id === message.newTurn);
-        const previousPlayerObj = gameState.players.find(p => p.id === message.previousPlayer);
+        let currentPlayerName;
 
-        let playerName;
         if (currentPlayerObj) {
-            playerName = currentPlayerObj.id === currentPlayer.id ?
+            currentPlayerName = currentPlayerObj.id === currentPlayer.id ?
                 'Tu turno' :
                 `Turno de ${currentPlayerObj.name}`;
         } else {
-            playerName = 'Esperando jugador...';
+            currentPlayerName = 'Esperando jugador...';
         }
 
-        showNotification(playerName);
+        // Verificar si es nuestro turno y si tenemos movimientos posibles
+        if (message.newTurn === currentPlayer.id) {
+            const playableCards = gameState.yourCards.filter(card => {
+                return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
+                    isValidMove(card.value, pos)
+                );
+            });
+
+            const requiredCards = gameState.remainingDeck > 0 ? 2 : 1;
+
+            if (playableCards.length < requiredCards && gameState.yourCards.length > 0) {
+                const confirmMove = confirm(
+                    'ADVERTENCIA: No tienes movimientos suficientes.\n' +
+                    `Necesitas jugar ${requiredCards} carta(s) pero solo tienes ${playableCards.length} movimientos posibles.\n\n` +
+                    'Si continúas, el juego terminará con derrota.\n\n' +
+                    '¿Deseas continuar?'
+                );
+
+                if (confirmMove) {
+                    socket.send(JSON.stringify({
+                        type: 'self_blocked',
+                        playerId: currentPlayer.id,
+                        roomId: roomId
+                    }));
+                    return;
+                }
+            }
+        }
+
+        showNotification(currentPlayerName);
         gameState.currentTurn = message.newTurn;
-
-        // Reiniciar el contador visual de cartas jugadas
         resetCardsPlayedProgress();
-
         updateGameInfo();
+    }
+
+    function canPlayerMeetMinimum() {
+        if (gameState.currentTurn !== currentPlayer.id) return true;
+
+        const playableCards = gameState.yourCards.filter(card => {
+            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
+                isValidMove(card.value, pos)
+            );
+        });
+
+        const requiredCards = gameState.remainingDeck > 0 ? 2 : 1;
+        return playableCards.length >= requiredCards;
     }
 
     function resetCardsPlayedProgress() {

@@ -1039,3 +1039,33 @@ body {
         opacity: 1;
     }
 }
+
+/* Añadir al final del archivo */
+
+.notification.error.important {
+    background-color: #e74c3c;
+    font-size: 1.2rem;
+    padding: 20px 40px;
+    z-index: 1001;
+    max-width: 80%;
+    text-align: center;
+    animation: pulseError 0.5s infinite alternate;
+}
+
+@keyframes pulseError {
+    from {
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4);
+    }
+
+    to {
+        box-shadow: 0 0 0 10px rgba(231, 76, 60, 0);
+    }
+}
+
+.notification.warning {
+    background-color: #f39c12;
+}
+
+.notification.info {
+    background-color: #3498db;
+}

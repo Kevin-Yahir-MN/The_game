@@ -535,7 +535,6 @@ wss.on('connection', (ws, req) => {
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                         const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
 
-                        // Verificar que haya jugado suficientes cartas
                         if (player.cardsPlayedThisTurn.length < minCardsRequired) {
                             return safeSend(player.ws, {
                                 type: 'notification',
@@ -559,22 +558,32 @@ wss.on('connection', (ws, req) => {
                         const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
                         const nextPlayer = room.players[nextIndex];
 
+                        // Verificar si el siguiente jugador puede cumplir con el mínimo
+                        const nextPlayerPlayableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+                        const nextPlayerRequired = room.gameState.deck.length > 0 ? 2 : 1;
+
+                        if (nextPlayerPlayableCards.length < nextPlayerRequired && nextPlayer.cards.length > 0) {
+                            return broadcastToRoom(room, {
+                                type: 'game_over',
+                                result: 'lose',
+                                message: `¡${nextPlayer.name} no puede jugar el mínimo de ${nextPlayerRequired} carta(s) requerida(s)!`,
+                                reason: 'min_cards_not_met'
+                            });
+                        }
+
                         // Reiniciar cartas jugadas este turno
                         player.cardsPlayedThisTurn = [];
-
                         room.gameState.currentTurn = nextPlayer.id;
 
-                        // Notificar a todos los jugadores del cambio de turno
                         broadcastToRoom(room, {
                             type: 'turn_changed',
                             newTurn: nextPlayer.id,
                             previousPlayer: player.id,
                             playerName: nextPlayer.name,
-                            cardsPlayedThisTurn: 0,  // Asegurar que se reinicia el contador
-                            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+                            cardsPlayedThisTurn: 0,
+                            minCardsRequired: nextPlayerRequired
                         }, { includeGameState: true });
 
-                        // Verificar estado del juego
                         checkGameStatus(room);
                     }
                     break;
