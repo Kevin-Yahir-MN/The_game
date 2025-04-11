@@ -23,6 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Inicialización de la UI
     function initializeUI() {
+        if (!roomId || !playerId) {
+            window.location.href = 'index.html';
+            return;
+        }
+
         roomIdDisplay.textContent = roomId;
         displayPlayerInfo();
 
@@ -57,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function connectWebSocket() {
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             updateConnectionStatus('Desconectado', true);
+            showNotification('No se pudo reconectar. Recarga la página.', true);
             return;
         }
 
@@ -72,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
             reconnectAttempts = 0;
             updateConnectionStatus('Conectado');
             sendPlayerUpdate();
+            showNotification('Conectado al servidor');
         };
 
         socket.onclose = (event) => {
@@ -80,40 +87,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1), 30000);
                 setTimeout(connectWebSocket, delay);
                 updateConnectionStatus(`Reconectando (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+                showNotification(`Intentando reconectar (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
             } else {
                 updateConnectionStatus('Desconectado', true);
+                showNotification('Se perdió la conexión con el servidor', true);
             }
         };
 
         socket.onerror = (error) => {
             console.error('WebSocket error:', error);
             updateConnectionStatus('Error de conexión', true);
+            showNotification('Error de conexión con el servidor', true);
         };
 
         socket.onmessage = handleSocketMessage;
     }
 
-    async function decompressMessage(blob) {
-        try {
-            // Primero intentamos descomprimir como gzip
-            const ds = new DecompressionStream('gzip');
-            const decompressedStream = blob.stream().pipeThrough(ds);
-            return await new Response(decompressedStream).text();
-        } catch (e) {
-            console.log('No es gzip, intentando como texto plano');
-            return await blob.text();
-        }
-    }
-
     async function handleSocketMessage(event) {
         try {
             let messageData;
+            let rawData;
 
+            // 1. Obtener los datos crudos
             if (event.data instanceof Blob) {
-                const rawData = await decompressMessage(event.data);
-                messageData = JSON.parse(rawData);
+                rawData = await event.data.text();
             } else {
-                messageData = JSON.parse(event.data);
+                rawData = event.data;
+            }
+
+            // 2. Intentar parsear directamente (si no está comprimido)
+            try {
+                messageData = JSON.parse(rawData);
+            } catch (e) {
+                // 3. Si falla, intentar descomprimir
+                try {
+                    const decompressed = await decompressGzip(rawData);
+                    messageData = JSON.parse(decompressed);
+                } catch (decompressError) {
+                    console.error('Error al descomprimir mensaje:', decompressError);
+                    throw new Error('No se pudo procesar el mensaje');
+                }
+            }
+
+            // Validar estructura básica del mensaje
+            if (!messageData || !messageData.type) {
+                throw new Error('Mensaje inválido recibido');
             }
 
             switch (messageData.type) {
@@ -127,8 +145,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     showNotification(messageData.message, messageData.isError);
                     break;
                 case 'player_update':
-                    // Actualizar lista de jugadores cuando alguien cambia su nombre
                     updatePlayersUI(messageData.players);
+                    break;
+                case 'host_changed':
+                    if (messageData.newHostId === playerId) {
+                        sessionStorage.setItem('isHost', 'true');
+                        showNotification('¡Ahora eres el host!');
+                        window.location.reload();
+                    }
                     break;
                 default:
                     console.log('Mensaje no reconocido:', messageData);
@@ -136,6 +160,23 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error procesando mensaje:', error);
             showNotification('Error al procesar mensaje del servidor', true);
+        }
+    }
+
+    // Función auxiliar para descomprimir gzip
+    async function decompressGzip(compressedData) {
+        try {
+            // Si es un string, convertirlo a Uint8Array primero
+            if (typeof compressedData === 'string') {
+                compressedData = new TextEncoder().encode(compressedData);
+            }
+
+            const ds = new DecompressionStream('gzip');
+            const decompressedStream = new Blob([compressedData]).stream().pipeThrough(ds);
+            return await new Response(decompressedStream).text();
+        } catch (error) {
+            console.error('Error en decompressGzip:', error);
+            throw error;
         }
     }
 
@@ -173,16 +214,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="connection-status">${player.connected ? '🟢 Conectado' : '🔴 Desconectado'}</span>
             </li>
         `).join('');
+
+        // Actualizar visibilidad del botón de inicio si soy host
+        if (isHost) {
+            const canStart = players.length >= 2 && players.filter(p => p.connected).length >= 2;
+            startBtn.disabled = !canStart;
+            if (!canStart) {
+                startBtn.title = 'Se necesitan al menos 2 jugadores conectados';
+            }
+        }
     }
 
     function handleGameStart() {
         clearInterval(playerUpdateInterval);
+        if (socket) socket.close();
         window.location.href = 'game.html';
     }
 
     async function handleStartGame() {
         if (!socket || socket.readyState !== WebSocket.OPEN) {
             updateConnectionStatus('Error: No hay conexión', true);
+            showNotification('No hay conexión con el servidor', true);
             return;
         }
 
@@ -217,6 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Si el host se desconectó y soy el nuevo host
                     if (!isHost && data.players.some(p => p.id === playerId && p.isHost)) {
                         sessionStorage.setItem('isHost', 'true');
+                        showNotification('¡Ahora eres el host de la sala!');
                         window.location.reload();
                     }
                 }
@@ -227,6 +280,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initialize() {
+        if (!roomId || !playerId || !playerName) {
+            window.location.href = 'index.html';
+            return;
+        }
+
         initializeUI();
         connectWebSocket();
         updatePlayersList();
