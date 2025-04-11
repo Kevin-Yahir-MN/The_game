@@ -3,6 +3,7 @@ const WebSocket = require('ws');
 const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const compression = require('compression');
 
 const app = express();
 const server = http.createServer(app);
@@ -10,9 +11,9 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 const allowedOrigins = ['https://the-game-2xks.onrender.com'];
 const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
-const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 minutos
+const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000;
 
-// Configuración de CORS
+app.use(compression());
 app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (allowedOrigins.includes(origin)) {
@@ -24,18 +25,23 @@ app.use((req, res, next) => {
     next();
 });
 
-// Configuración del WebSocket sin compresión
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({
+    server,
+    verifyClient: (info, done) => {
+        if (!allowedOrigins.includes(info.origin)) {
+            return done(false, 403, 'Origen no permitido');
+        }
+        done(true);
+    }
+});
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client')));
 
-// Estructuras de datos para el juego
 const rooms = new Map();
 const reverseRoomMap = new Map();
 const boardHistory = new Map();
 
-// Limpieza periódica de salas inactivas
 setInterval(() => {
     const now = Date.now();
     for (const [roomId, room] of rooms.entries()) {
@@ -46,7 +52,7 @@ setInterval(() => {
             }
         });
 
-        if (now - lastActivity > 3600000) { // 1 hora de inactividad
+        if (now - lastActivity > 3600000) {
             rooms.delete(roomId);
             reverseRoomMap.delete(room);
             boardHistory.delete(roomId);
@@ -54,7 +60,6 @@ setInterval(() => {
     }
 }, ROOM_CLEANUP_INTERVAL);
 
-// Funciones del juego
 function initializeDeck() {
     const deck = [];
     for (let i = 2; i < 100; i++) deck.push(i);
@@ -69,7 +74,6 @@ function shuffleArray(array) {
     return array;
 }
 
-// Función simplificada para enviar mensajes sin compresión
 function safeSend(ws, message) {
     try {
         if (ws?.readyState === WebSocket.OPEN) {
@@ -100,7 +104,7 @@ function sendGameState(room, player) {
         d: room.gameState.deck.length,
         p: room.players.map(p => ({
             i: p.id,
-            n: p.name,
+            n: p.name, // Asegurar que el nombre se envía
             h: p.isHost,
             c: p.cards.length,
             s: p.cardsPlayedThisTurn.length
@@ -193,7 +197,7 @@ function handlePlayCard(room, player, msg) {
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
         position: msg.position,
-        previousValue: targetValue
+        isPlayedThisTurn: true
     });
 
     broadcastToRoom(room, {
@@ -219,7 +223,8 @@ function handleUndoMove(room, player, msg) {
     }
 
     const lastMoveIndex = player.cardsPlayedThisTurn.findIndex(
-        move => move.value === msg.cardValue && move.position === msg.position
+        move => move.value === msg.cardValue &&
+            move.position === msg.position
     );
 
     if (lastMoveIndex === -1) {
@@ -291,13 +296,12 @@ function endTurn(room, player) {
     const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
 
     if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
-        broadcastToRoom(room, {
+        return broadcastToRoom(room, {
             type: 'game_over',
             result: 'lose',
             message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
             reason: 'min_cards_not_met'
         });
-        return;
     }
 
     player.cardsPlayedThisTurn = [];
@@ -331,11 +335,10 @@ function checkGameStatus(room) {
     }
 }
 
-// Endpoints HTTP
 app.post('/create-room', (req, res) => {
     const { playerName } = req.body;
-    if (!playerName || playerName.length > 20) {
-        return res.status(400).json({ success: false, message: 'Nombre de jugador inválido (máx. 20 caracteres)' });
+    if (!playerName) {
+        return res.status(400).json({ success: false, message: 'Se requiere nombre de jugador' });
     }
 
     const roomId = Math.floor(1000 + Math.random() * 9000).toString();
@@ -343,7 +346,7 @@ app.post('/create-room', (req, res) => {
     const room = {
         players: [{
             id: playerId,
-            name: playerName.substring(0, 20),
+            name: playerName,
             isHost: true,
             ws: null,
             cards: [],
@@ -366,15 +369,15 @@ app.post('/create-room', (req, res) => {
         descending1: [100], descending2: [100]
     });
 
-    res.json({ success: true, roomId, playerId, playerName: playerName.substring(0, 20) });
+    res.json({ success: true, roomId, playerId, playerName });
 });
 
 app.post('/join-room', (req, res) => {
     const { playerName, roomId } = req.body;
-    if (!playerName || !roomId || playerName.length > 20) {
+    if (!playerName || !roomId) {
         return res.status(400).json({
             success: false,
-            message: 'Datos inválidos (nombre máx. 20 caracteres)'
+            message: 'Nombre de jugador y código de sala requeridos'
         });
     }
 
@@ -386,7 +389,7 @@ app.post('/join-room', (req, res) => {
     const playerId = uuidv4();
     const newPlayer = {
         id: playerId,
-        name: playerName.substring(0, 20),
+        name: playerName,
         isHost: false,
         ws: null,
         cards: [],
@@ -395,7 +398,7 @@ app.post('/join-room', (req, res) => {
     };
 
     room.players.push(newPlayer);
-    res.json({ success: true, playerId, playerName: playerName.substring(0, 20) });
+    res.json({ success: true, playerId, playerName });
 });
 
 app.get('/room-info/:roomId', (req, res) => {
@@ -459,7 +462,6 @@ function startGame(room, initialCards = 6) {
     });
 }
 
-// WebSocket connection handler
 wss.on('connection', (ws, req) => {
     const params = new URLSearchParams(req.url.split('?')[1]);
     const roomId = params.get('roomId');
@@ -528,9 +530,52 @@ wss.on('connection', (ws, req) => {
                         handlePlayCard(room, player, msg);
                     }
                     break;
+                // En el manejador de end_turn
                 case 'end_turn':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        endTurn(room, player);
+                        const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+
+                        // Verificar que haya jugado suficientes cartas
+                        if (player.cardsPlayedThisTurn.length < minCardsRequired) {
+                            return safeSend(player.ws, {
+                                type: 'notification',
+                                message: `Debes jugar al menos ${minCardsRequired} cartas este turno`,
+                                isError: true
+                            });
+                        }
+
+                        // Repartir nuevas cartas si hay en el mazo
+                        const cardsToDraw = Math.min(
+                            room.gameState.initialCards - player.cards.length,
+                            room.gameState.deck.length
+                        );
+
+                        for (let i = 0; i < cardsToDraw; i++) {
+                            player.cards.push(room.gameState.deck.pop());
+                        }
+
+                        // Cambiar turno
+                        const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
+                        const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
+                        const nextPlayer = room.players[nextIndex];
+
+                        // Reiniciar cartas jugadas este turno
+                        player.cardsPlayedThisTurn = [];
+
+                        room.gameState.currentTurn = nextPlayer.id;
+
+                        // Notificar a todos los jugadores del cambio de turno
+                        broadcastToRoom(room, {
+                            type: 'turn_changed',
+                            newTurn: nextPlayer.id,
+                            previousPlayer: player.id,
+                            playerName: nextPlayer.name,
+                            cardsPlayedThisTurn: 0,  // Asegurar que se reinicia el contador
+                            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+                        }, { includeGameState: true });
+
+                        // Verificar estado del juego
+                        checkGameStatus(room);
                     }
                     break;
                 case 'undo_move':
@@ -542,15 +587,23 @@ wss.on('connection', (ws, req) => {
                     if (room.gameState.gameStarted) sendGameState(room, player);
                     break;
                 case 'self_blocked':
-                    broadcastToRoom(room, {
-                        type: 'game_over',
-                        result: 'lose',
-                        message: `¡${player.name} se quedó sin movimientos posibles!`,
-                        reason: 'self_blocked'
-                    });
+                    if (rooms.has(msg.roomId)) {
+                        const room = rooms.get(msg.roomId);
+                        const player = room.players.find(p => p.id === msg.playerId);
+
+                        if (player) {
+                            broadcastToRoom(room, {
+                                type: 'game_over',
+                                result: 'lose',
+                                message: `¡${player.name} se quedó sin movimientos posibles!`,
+                                reason: 'self_blocked'
+                            });
+                        }
+                    }
                     break;
                 case 'reset_room':
-                    if (player.isHost) {
+                    if (player.isHost && rooms.has(msg.roomId)) {
+                        const room = rooms.get(msg.roomId);
                         room.gameState = {
                             deck: initializeDeck(),
                             board: { ascending: [1, 1], descending: [100, 100] },
@@ -558,14 +611,12 @@ wss.on('connection', (ws, req) => {
                             gameStarted: false,
                             initialCards: room.gameState.initialCards || 6
                         };
-                        room.players.forEach(p => {
-                            p.cards = [];
-                            p.cardsPlayedThisTurn = [];
+
+                        room.players.forEach(player => {
+                            player.cards = [];
+                            player.cardsPlayedThisTurn = [];
                         });
-                        boardHistory.set(roomId, {
-                            ascending1: [1], ascending2: [1],
-                            descending1: [100], descending2: [100]
-                        });
+
                         broadcastToRoom(room, {
                             type: 'room_reset',
                             message: 'La sala ha sido reiniciada para una nueva partida'
@@ -574,8 +625,9 @@ wss.on('connection', (ws, req) => {
                     break;
                 case 'update_player':
                     const playerToUpdate = room.players.find(p => p.id === msg.playerId);
-                    if (playerToUpdate && msg.name && msg.name.length <= 20) {
-                        playerToUpdate.name = msg.name.substring(0, 20);
+                    if (playerToUpdate) {
+                        playerToUpdate.name = msg.name;
+                        // Notificar a todos los jugadores sobre el cambio
                         broadcastToRoom(room, {
                             type: 'player_update',
                             players: room.players.map(p => ({
@@ -606,10 +658,6 @@ wss.on('connection', (ws, req) => {
                     type: 'notification',
                     message: `${newHost.name} es ahora el host`,
                     isError: false
-                });
-                broadcastToRoom(room, {
-                    type: 'host_changed',
-                    newHostId: newHost.id
                 });
             }
         }

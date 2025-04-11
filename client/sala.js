@@ -22,11 +22,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Inicialización de la UI
     function initializeUI() {
-        if (!roomId || !playerId) {
-            window.location.href = 'index.html';
-            return;
-        }
-
         roomIdDisplay.textContent = roomId;
         displayPlayerInfo();
 
@@ -39,33 +34,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Mostrar información del jugador
     function displayPlayerInfo() {
         const playerInfo = document.createElement('div');
         playerInfo.id = 'playerInfo';
         playerInfo.className = 'player-info';
-        playerInfo.innerHTML = `
-            <p>Jugador: <strong>${playerName}</strong></p>
-            <p>${isHost ? '👑 Eres el host' : ''}</p>
-        `;
         document.querySelector('.room-header').appendChild(playerInfo);
     }
 
-    // Conexión WebSocket con manejo de reconexión
+    // Actualizar estado de conexión
+    function updateConnectionStatus(status, isError = false) {
+        const statusElement = document.getElementById('connectionStatusText');
+        if (statusElement) {
+            statusElement.textContent = status;
+            statusElement.className = isError ? 'error' : '';
+        }
+    }
+
+    // Conexión WebSocket mejorada
     function connectWebSocket() {
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            showNotification('No se pudo reconectar. Recarga la página.', true);
+            updateConnectionStatus('Desconectado', true);
             return;
         }
 
+        // Cerrar conexión existente
         if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
             socket.close();
         }
+
+        updateConnectionStatus('Conectando...');
 
         socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${playerId}&playerName=${encodeURIComponent(playerName)}`);
 
         socket.onopen = () => {
             reconnectAttempts = 0;
-            showNotification('Conectado al servidor');
+            updateConnectionStatus('Conectado');
             sendPlayerUpdate();
         };
 
@@ -74,93 +78,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 reconnectAttempts++;
                 const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1), 30000);
                 setTimeout(connectWebSocket, delay);
-                showNotification(`Intentando reconectar (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+                updateConnectionStatus(`Reconectando (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
             } else {
-                showNotification('Se perdió la conexión con el servidor', true);
+                updateConnectionStatus('Desconectado', true);
             }
         };
 
         socket.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            showNotification('Error de conexión con el servidor', true);
+            updateConnectionStatus('Error de conexión', true);
         };
 
         socket.onmessage = handleSocketMessage;
     }
 
-    function handleSocketMessage(event) {
-        try {
-            let messageData;
-
-            // Manejo simple de mensajes JSON sin compresión
-            if (typeof event.data === 'string') {
-                messageData = JSON.parse(event.data);
-            } else {
-                // Si llega un Blob, lo convertimos a texto (aunque no debería ser necesario sin compresión)
-                const reader = new FileReader();
-                reader.onload = () => {
-                    try {
-                        messageData = JSON.parse(reader.result);
-                        processMessage(messageData);
-                    } catch (error) {
-                        console.error('Error parsing message:', error);
-                    }
-                };
-                reader.readAsText(event.data);
-                return;
-            }
-
-            // Validar estructura básica del mensaje
-            if (!messageData || !messageData.type) {
-                throw new Error('Mensaje inválido recibido');
-            }
-
-            processMessage(messageData);
-        } catch (error) {
-            console.error('Error procesando mensaje:', error);
-            showNotification('Error al procesar mensaje del servidor', true);
-        }
-    }
-
-    function processMessage(messageData) {
-        switch (messageData.type) {
-            case 'game_started':
-                handleGameStart();
-                break;
-            case 'room_update':
-                updatePlayersUI(messageData.players);
-                break;
-            case 'notification':
-                showNotification(messageData.message, messageData.isError);
-                break;
-            case 'player_update':
-                updatePlayersUI(messageData.players);
-                break;
-            case 'host_changed':
-                if (messageData.newHostId === playerId) {
-                    sessionStorage.setItem('isHost', 'true');
-                    showNotification('¡Ahora eres el host!');
-                    window.location.reload();
-                }
-                break;
-            default:
-                console.log('Mensaje no reconocido:', messageData);
-        }
-    }
-
-    function showNotification(message, isError = false) {
-        const notification = document.createElement('div');
-        notification.className = `notification ${isError ? 'error' : ''}`;
-        notification.textContent = message;
-        document.body.appendChild(notification);
-
-        setTimeout(() => {
-            notification.remove();
-        }, 3000);
-    }
-
+    // Enviar actualización de jugador
     function sendPlayerUpdate() {
-        if (socket && socket.readyState === WebSocket.OPEN) {
+        if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
                 type: 'player_update',
                 playerId: playerId,
@@ -171,6 +104,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Manejar mensajes del servidor
+    function handleSocketMessage(event) {
+        try {
+            const message = JSON.parse(event.data);
+
+            if (message.type === 'game_started') {
+                handleGameStart();
+            }
+            else if (message.type === 'room_update') {
+                updatePlayersUI(message.players);
+            }
+        } catch (error) {
+            console.error('Error procesando mensaje:', error);
+        }
+    }
+
+    // Actualizar lista de jugadores
     function updatePlayersUI(players) {
         if (!players || !Array.isArray(players)) return;
 
@@ -179,28 +129,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="player-name">${player.name || 'Jugador'}</span>
                 ${player.isHost ? '<span class="host-tag">(Host)</span>' : ''}
                 ${player.id === playerId ? '<span class="you-tag">(Tú)</span>' : ''}
+                <span class="connection-status">${player.connected ? '🟢' : '🔴'}</span>
             </li>
         `).join('');
-
-        // Actualizar visibilidad del botón de inicio si soy host
-        if (isHost) {
-            const canStart = players.length >= 2;
-            startBtn.disabled = !canStart;
-            if (!canStart) {
-                startBtn.title = 'Se necesitan al menos 2 jugadores';
-            }
-        }
     }
 
+    // Manejar inicio del juego
     function handleGameStart() {
         clearInterval(playerUpdateInterval);
-        if (socket) socket.close();
         window.location.href = 'game.html';
     }
 
+    // Iniciar juego (solo host)
     async function handleStartGame() {
         if (!socket || socket.readyState !== WebSocket.OPEN) {
-            showNotification('No hay conexión con el servidor', true);
+            updateConnectionStatus('Error: No hay conexión', true);
             return;
         }
 
@@ -211,56 +154,45 @@ document.addEventListener('DOMContentLoaded', () => {
             socket.send(JSON.stringify({
                 type: 'start_game',
                 playerId: playerId,
+                playerName: playerName,
                 roomId: roomId,
                 initialCards: parseInt(initialCardsSelect.value)
             }));
-
-            showNotification('Iniciando juego...');
         } catch (error) {
             console.error('Error al iniciar juego:', error);
             startBtn.disabled = false;
             startBtn.textContent = 'Iniciar Juego';
-            showNotification('Error al iniciar el juego', true);
+            updateConnectionStatus('Error al iniciar', true);
         }
     }
 
+    // Actualizar lista de jugadores via API
     async function updatePlayersList() {
         try {
             const response = await fetch(`${API_URL}/room-info/${roomId}`);
             if (response.ok) {
                 const data = await response.json();
-                if (data.success) {
-                    updatePlayersUI(data.players);
-
-                    // Si el host se desconectó y soy el nuevo host
-                    if (!isHost && data.players.some(p => p.id === playerId && p.isHost)) {
-                        sessionStorage.setItem('isHost', 'true');
-                        showNotification('¡Ahora eres el host de la sala!');
-                        window.location.reload();
-                    }
-                }
+                if (data.success) updatePlayersUI(data.players);
             }
         } catch (error) {
             console.error('Error actualizando jugadores:', error);
         }
     }
 
+    // Inicializar la aplicación
     function initialize() {
-        if (!roomId || !playerId || !playerName) {
-            window.location.href = 'index.html';
-            return;
-        }
-
         initializeUI();
         connectWebSocket();
         updatePlayersList();
         playerUpdateInterval = setInterval(updatePlayersList, PLAYER_UPDATE_INTERVAL);
     }
 
+    // Limpieza al salir
     window.addEventListener('beforeunload', () => {
         clearInterval(playerUpdateInterval);
         if (socket) socket.close();
     });
 
+    // Iniciar
     initialize();
 });

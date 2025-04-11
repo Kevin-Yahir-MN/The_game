@@ -444,10 +444,13 @@ body {
     text-align: left;
 }
 
+
 .info-panel strong {
     display: inline-block;
     min-width: 140px;
+    /* Ancho fijo para etiquetas */
     color: var(--secondary);
+    /* Color destacado */
 }
 
 .progress-container {
@@ -462,6 +465,7 @@ body {
     background: linear-gradient(90deg, var(--secondary), var(--primary));
     border-radius: 6px;
     width: 0%;
+    /* Inicialmente en 0% */
     transition: width 0.2s ease;
     margin-top: 8px;
 }
@@ -500,6 +504,45 @@ body {
     font-size: 1.8rem;
     margin-right: 12px;
     line-height: 0;
+}
+
+/* Responsive */
+@media (max-width: 1000px) {
+    .game-panel {
+        width: 320px;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .game-panel {
+        width: 280px;
+        padding: 15px;
+    }
+
+    .info-panel {
+        left: 15px;
+        top: 15px;
+    }
+
+    .instructions-panel {
+        right: 15px;
+        bottom: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .game-panel {
+        width: calc(100% - 30px);
+        left: 15px;
+    }
+
+    .instructions-panel {
+        top: auto;
+        bottom: 15px;
+        right: 15px;
+        width: calc(100% - 30px);
+    }
 }
 
 /* Historial de cartas */
@@ -644,6 +687,7 @@ body {
     border-top: 5px solid var(--accent);
     animation: slideIn 0.4s ease-out;
     margin: 0 auto;
+    /* Asegura centrado horizontal */
 }
 
 .game-over-notification h2 {
@@ -671,7 +715,7 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
-    margin: 0.5rem;
+    margin: 0 auto;
 }
 
 .game-over-notification button:hover {
@@ -953,7 +997,7 @@ body {
 
 .card {
     transition: all 0.15s ease-out;
-    will-change: transform, opacity;
+    /* Reducido de 0.3s */
 }
 
 .card-count {
