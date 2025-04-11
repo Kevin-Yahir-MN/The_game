@@ -844,10 +844,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                    ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
                             <span class="player-name">${displayName}</span>
                             ${player.isHost ? ' <span class="host-tag">(Host)</span>' : ''}
-                            <span class="card-count">
-                                ${player.cardCount} cartas | 
-                                Jugadas: ${cardsPlayed}
-                            </span>
                         </li>
                     `;
         }).join('')}
