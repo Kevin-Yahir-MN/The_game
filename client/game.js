@@ -55,6 +55,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    let isDragging = false;
+    let dragCard = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    let originalCardPosition = { x: 0, y: 0 };
+
     // Clase Card optimizada
     class Card {
         constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
@@ -843,8 +849,9 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         ctx.fill();
 
+        // No dibujar la carta que se está arrastrando (ya se dibuja en handleCardAnimations)
         gameState.yourCards.forEach((card, index) => {
-            if (card) {
+            if (card && card !== dragCard) {
                 card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
                     index * (CARD_WIDTH + CARD_SPACING);
                 card.y = PLAYER_CARDS_Y;
@@ -932,15 +939,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const elapsed = now - anim.startTime;
             const progress = Math.min(elapsed / anim.duration, 1);
 
-            anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * progress;
-            anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * progress;
+            // Usar easing para una animación más suave
+            const easedProgress = easeOutQuad(progress);
 
+            anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * easedProgress;
+            anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * easedProgress;
+
+            // Dibujar la carta animada (incluyendo la que se está arrastrando)
             anim.card.draw();
 
-            if (progress === 1 || now - anim.startTime > 1000) {
+            if (progress === 1) {
                 gameState.animatingCards.splice(i, 1);
             }
         }
+
+        // Dibujar la carta que se está arrastrando encima de todo
+        if (isDragging && dragCard) {
+            dragCard.draw();
+        }
+    }
+
+    // Función de easing para animaciones suaves
+    function easeOutQuad(t) {
+        return t * (2 - t);
     }
 
     // Game loop con throttling
@@ -980,6 +1001,112 @@ document.addEventListener('DOMContentLoaded', () => {
         endTurnButton.removeEventListener('click', endTurn);
     }
 
+    function handleMouseDown(event) {
+        if (gameState.currentTurn !== currentPlayer.id) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        // Verificar si se está haciendo clic en una carta del jugador
+        for (const card of gameState.yourCards) {
+            if (card.contains(x, y)) {
+                isDragging = true;
+                dragCard = card;
+                dragOffsetX = x - card.x;
+                dragOffsetY = y - card.y;
+                originalCardPosition = { x: card.x, y: card.y };
+                selectedCard = null; // Deseleccionar cualquier carta seleccionada por click
+                return;
+            }
+        }
+    }
+
+    function handleMouseMove(event) {
+        if (!isDragging || !dragCard) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        // Actualizar posición de la carta mientras se arrastra
+        dragCard.x = x - dragOffsetX;
+        dragCard.y = y - dragOffsetY;
+    }
+
+    function handleMouseUp(event) {
+        if (!isDragging || !dragCard) {
+            // Si no estábamos arrastrando, manejar como click normal
+            handleCanvasClick(event);
+            return;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        // Verificar si se soltó sobre una columna válida
+        const targetColumn = getClickedColumn(x, y);
+
+        if (targetColumn && isValidMove(dragCard.value, targetColumn)) {
+            // Movimiento válido - animar hacia la columna
+            animateCardToColumn(dragCard, targetColumn);
+            playCard(dragCard.value, targetColumn);
+        } else {
+            // Movimiento inválido o no se soltó sobre columna - animar de vuelta a la mano
+            if (targetColumn) {
+                showNotification('Movimiento inválido', true);
+                animateInvalidCard(dragCard);
+            }
+            animateCardBackToHand(dragCard);
+        }
+
+        // Resetear estado de drag
+        isDragging = false;
+        dragCard = null;
+    }
+
+    function handleMouseLeave() {
+        if (isDragging && dragCard) {
+            // Si el mouse sale del canvas mientras se arrastra, devolver la carta
+            animateCardBackToHand(dragCard);
+            isDragging = false;
+            dragCard = null;
+        }
+    }
+
+    function animateCardToColumn(card, column) {
+        const targetPos = getColumnPosition(column);
+        gameState.animatingCards.push({
+            card: card,
+            startTime: Date.now(),
+            duration: 300,
+            targetX: targetPos.x,
+            targetY: targetPos.y,
+            fromX: card.x,
+            fromY: card.y
+        });
+    }
+
+    function animateCardBackToHand(card) {
+        const originalIndex = gameState.yourCards.indexOf(card);
+        if (originalIndex === -1) return;
+
+        const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
+        const targetX = startX + originalIndex * (CARD_WIDTH + CARD_SPACING);
+        const targetY = PLAYER_CARDS_Y;
+
+        gameState.animatingCards.push({
+            card: card,
+            startTime: Date.now(),
+            duration: 300,
+            targetX: targetX,
+            targetY: targetY,
+            fromX: card.x,
+            fromY: card.y
+        });
+    }
+
     // Inicialización optimizada
     function initGame() {
         if (!canvas || !ctx || !currentPlayer.id || !roomId) {
@@ -995,6 +1122,10 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.height = 700;
 
             // Configurar eventos
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('mouseleave', handleMouseLeave);
             endTurnButton.addEventListener('click', endTurn);
             canvas.addEventListener('click', handleCanvasClick);
             document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
