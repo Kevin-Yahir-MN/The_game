@@ -716,18 +716,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function playCard(cardValue, position) {
-        if (!selectedCard) return;
+        // Encontrar la carta en el array (puede ser dragCard)
+        const cardIndex = gameState.yourCards.findIndex(c => c.value === cardValue);
+        if (cardIndex === -1) return;
 
-        if (!isValidMove(cardValue, position)) {
-            showNotification('Movimiento inválido', true);
-            animateInvalidCard(selectedCard);
-            return;
-        }
-
+        const card = gameState.yourCards[cardIndex];
         const previousValue = position.includes('asc')
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
 
+        // Actualizar estado del juego
         gameState.cardsPlayedThisTurn.push({
             value: cardValue,
             position,
@@ -737,25 +735,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         gameState.columnHistory[position].push(cardValue);
 
-        selectedCard.isPlayedThisTurn = true;
-        selectedCard.backgroundColor = '#99CCFF';
+        // Eliminar la carta de la mano del jugador
+        gameState.yourCards.splice(cardIndex, 1);
 
-        const cardPosition = getColumnPosition(position);
-        gameState.animatingCards.push({
-            card: selectedCard,
-            startTime: Date.now(),
-            duration: 200,
-            targetX: cardPosition.x,
-            targetY: cardPosition.y,
-            fromX: selectedCard.x,
-            fromY: selectedCard.y
-        });
-
-        const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
-        if (cardIndex !== -1) {
-            gameState.yourCards.splice(cardIndex, 1);
-        }
-
+        // Actualizar el tablero
         if (position.includes('asc')) {
             const idx = position === 'asc1' ? 0 : 1;
             gameState.board.ascending[idx] = cardValue;
@@ -764,6 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.board.descending[idx] = cardValue;
         }
 
+        // Enviar movimiento al servidor
         socket.send(JSON.stringify({
             type: 'play_card',
             playerId: currentPlayer.id,
@@ -771,7 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
             position
         }));
 
-        selectedCard = null;
+        // Actualizar UI
         updateGameInfo();
     }
 
@@ -931,7 +915,6 @@ document.addEventListener('DOMContentLoaded', () => {
             </ul>
         `;
     }
-
     function handleCardAnimations() {
         const now = Date.now();
         for (let i = gameState.animatingCards.length - 1; i >= 0; i--) {
@@ -939,21 +922,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const elapsed = now - anim.startTime;
             const progress = Math.min(elapsed / anim.duration, 1);
 
-            // Usar easing para una animación más suave
             const easedProgress = easeOutQuad(progress);
 
             anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * easedProgress;
             anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * easedProgress;
 
-            // Dibujar la carta animada (incluyendo la que se está arrastrando)
             anim.card.draw();
 
             if (progress === 1) {
+                // Ejecutar callback si existe
+                if (anim.onComplete) {
+                    anim.onComplete();
+                }
                 gameState.animatingCards.splice(i, 1);
             }
         }
 
-        // Dibujar la carta que se está arrastrando encima de todo
         if (isDragging && dragCard) {
             dragCard.draw();
         }
@@ -1048,16 +1032,21 @@ document.addEventListener('DOMContentLoaded', () => {
         // Verificar si se soltó sobre una columna válida
         const targetColumn = getClickedColumn(x, y);
 
-        if (targetColumn && isValidMove(dragCard.value, targetColumn)) {
-            // Movimiento válido - animar hacia la columna
-            animateCardToColumn(dragCard, targetColumn);
-            playCard(dragCard.value, targetColumn);
-        } else {
-            // Movimiento inválido o no se soltó sobre columna - animar de vuelta a la mano
-            if (targetColumn) {
+        if (targetColumn) {
+            if (isValidMove(dragCard.value, targetColumn)) {
+                // Movimiento válido - animar hacia la columna y colocarla
+                animateCardToColumn(dragCard, targetColumn, () => {
+                    // Callback que se ejecuta cuando termina la animación
+                    playCard(dragCard.value, targetColumn);
+                });
+            } else {
+                // Movimiento inválido - animar de vuelta a la mano y mostrar error
                 showNotification('Movimiento inválido', true);
                 animateInvalidCard(dragCard);
+                animateCardBackToHand(dragCard);
             }
+        } else {
+            // No se soltó sobre una columna - animar de vuelta a la mano
             animateCardBackToHand(dragCard);
         }
 
@@ -1075,19 +1064,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function animateCardToColumn(card, column) {
+    function animateCardToColumn(card, column, onComplete) {
         const targetPos = getColumnPosition(column);
-        gameState.animatingCards.push({
+        const animation = {
             card: card,
             startTime: Date.now(),
             duration: 300,
             targetX: targetPos.x,
             targetY: targetPos.y,
             fromX: card.x,
-            fromY: card.y
-        });
-    }
+            fromY: card.y,
+            onComplete: onComplete
+        };
 
+        gameState.animatingCards.push(animation);
+    }
     function animateCardBackToHand(card) {
         const originalIndex = gameState.yourCards.indexOf(card);
         if (originalIndex === -1) return;
@@ -1103,7 +1094,12 @@ document.addEventListener('DOMContentLoaded', () => {
             targetX: targetX,
             targetY: targetY,
             fromX: card.x,
-            fromY: card.y
+            fromY: card.y,
+            onComplete: () => {
+                // Asegurar que la carta vuelva a su posición correcta
+                card.x = targetX;
+                card.y = targetY;
+            }
         });
     }
 
