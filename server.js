@@ -133,13 +133,19 @@ function updateBoardHistory(room, position, newValue) {
 }
 
 function getNextActivePlayerIndex(currentIndex, players) {
+    // Buscar el siguiente jugador conectado que tenga cartas o pueda recibirlas
     for (let offset = 1; offset < players.length; offset++) {
         const nextIndex = (currentIndex + offset) % players.length;
-        if (players[nextIndex].ws?.readyState === WebSocket.OPEN) {
-            return nextIndex;
+        const nextPlayer = players[nextIndex];
+
+        if (nextPlayer.ws?.readyState === WebSocket.OPEN) {
+            // Si el jugador tiene cartas o aún hay cartas en el mazo para repartir
+            if (nextPlayer.cards.length > 0 || room.gameState.deck.length > 0) {
+                return nextIndex;
+            }
         }
     }
-    return currentIndex;
+    return currentIndex; // Si no se encuentra otro, mantener el turno
 }
 
 function getPlayableCards(playerCards, board) {
@@ -530,12 +536,10 @@ wss.on('connection', (ws, req) => {
                         handlePlayCard(room, player, msg);
                     }
                     break;
-                // En el manejador de end_turn
                 case 'end_turn':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                        // 1. Verificar si el jugador actual cumplió con el mínimo de cartas
                         const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
-
-                        // Verificar que haya jugado suficientes cartas
                         if (player.cardsPlayedThisTurn.length < minCardsRequired) {
                             return safeSend(player.ws, {
                                 type: 'notification',
@@ -544,37 +548,46 @@ wss.on('connection', (ws, req) => {
                             });
                         }
 
-                        // Repartir nuevas cartas si hay en el mazo
-                        const cardsToDraw = Math.min(
-                            room.gameState.initialCards - player.cards.length,
-                            room.gameState.deck.length
-                        );
-
-                        for (let i = 0; i < cardsToDraw; i++) {
-                            player.cards.push(room.gameState.deck.pop());
-                        }
-
-                        // Cambiar turno
+                        // 2. Determinar el siguiente jugador
                         const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
                         const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
                         const nextPlayer = room.players[nextIndex];
 
-                        // Reiniciar cartas jugadas este turno
+                        // 3. Verificar si el siguiente jugador puede cumplir con el mínimo
+                        const nextPlayerPlayableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+                        const nextMinCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+
+                        if (nextPlayerPlayableCards.length < nextMinCardsRequired && nextPlayer.cards.length > 0) {
+                            return broadcastToRoom(room, {
+                                type: 'game_over',
+                                result: 'lose',
+                                message: `¡${nextPlayer.name} no puede jugar el mínimo de ${nextMinCardsRequired} carta(s) requerida(s) al inicio de su turno!`,
+                                reason: 'min_cards_not_met'
+                            });
+                        }
+
+                        // 4. Solo si pasa la validación, proceder con el cambio de turno
+                        room.gameState.currentTurn = nextPlayer.id;
                         player.cardsPlayedThisTurn = [];
 
-                        room.gameState.currentTurn = nextPlayer.id;
+                        // 5. Repartir cartas si es necesario
+                        const cardsToDraw = Math.min(
+                            room.gameState.initialCards - player.cards.length,
+                            room.gameState.deck.length
+                        );
+                        for (let i = 0; i < cardsToDraw; i++) {
+                            player.cards.push(room.gameState.deck.pop());
+                        }
 
-                        // Notificar a todos los jugadores del cambio de turno
                         broadcastToRoom(room, {
                             type: 'turn_changed',
                             newTurn: nextPlayer.id,
                             previousPlayer: player.id,
                             playerName: nextPlayer.name,
-                            cardsPlayedThisTurn: 0,  // Asegurar que se reinicia el contador
-                            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+                            cardsPlayedThisTurn: 0,
+                            minCardsRequired: nextMinCardsRequired
                         }, { includeGameState: true });
 
-                        // Verificar estado del juego
                         checkGameStatus(room);
                     }
                     break;

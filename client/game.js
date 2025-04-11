@@ -216,8 +216,35 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         break;
                     case 'turn_changed':
+                        // Verificar si es nuestro turno y si tenemos movimientos posibles
+                        if (message.newTurn === currentPlayer.id) {
+                            const playableCards = gameState.yourCards.filter(card => {
+                                return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
+                                    isValidMove(card.value, pos)
+                                );
+                            });
+
+                            const minRequired = gameState.remainingDeck > 0 ? 2 : 1;
+
+                            if (playableCards.length < minRequired && gameState.yourCards.length > 0) {
+                                // Mostrar alerta inmediata
+                                showNotification(`¡No tienes ${minRequired} movimientos válidos!`, true);
+
+                                // Opcional: permitir al usuario confirmar que está bloqueado
+                                const confirmBlock = confirm(
+                                    `No tienes ${minRequired} movimientos válidos. ¿Quieres terminar el juego?`
+                                );
+
+                                if (confirmBlock) {
+                                    socket.send(JSON.stringify({
+                                        type: 'self_blocked',
+                                        playerId: currentPlayer.id,
+                                        roomId: roomId
+                                    }));
+                                }
+                            }
+                        }
                         handleTurnChanged(message);
-                        updateGameInfo(); // Actualizar UI
                         break;
                     case 'move_undone':
                         handleMoveUndone(message);
