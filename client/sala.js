@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('startGame');
     const gameSettings = document.getElementById('gameSettings');
     const initialCardsSelect = document.getElementById('initialCards');
+    const connectionStatus = document.getElementById('connectionStatusText');
 
     // Inicialización de la UI
     function initializeUI() {
@@ -34,31 +35,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Mostrar información del jugador
     function displayPlayerInfo() {
         const playerInfo = document.createElement('div');
         playerInfo.id = 'playerInfo';
         playerInfo.className = 'player-info';
+        playerInfo.innerHTML = `
+            <p>Jugador: <strong>${playerName}</strong></p>
+            <p>${isHost ? '👑 Eres el host' : ''}</p>
+        `;
         document.querySelector('.room-header').appendChild(playerInfo);
     }
 
-    // Actualizar estado de conexión
     function updateConnectionStatus(status, isError = false) {
-        const statusElement = document.getElementById('connectionStatusText');
-        if (statusElement) {
-            statusElement.textContent = status;
-            statusElement.className = isError ? 'error' : '';
+        if (connectionStatus) {
+            connectionStatus.textContent = status;
+            connectionStatus.className = isError ? 'error' : '';
         }
     }
 
-    // Conexión WebSocket mejorada
+    // Conexión WebSocket con manejo de reconexión
     function connectWebSocket() {
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             updateConnectionStatus('Desconectado', true);
             return;
         }
 
-        // Cerrar conexión existente
         if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
             socket.close();
         }
@@ -85,15 +86,72 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         socket.onerror = (error) => {
+            console.error('WebSocket error:', error);
             updateConnectionStatus('Error de conexión', true);
         };
 
         socket.onmessage = handleSocketMessage;
     }
 
-    // Enviar actualización de jugador
+    async function decompressMessage(blob) {
+        try {
+            // Primero intentamos descomprimir como gzip
+            const ds = new DecompressionStream('gzip');
+            const decompressedStream = blob.stream().pipeThrough(ds);
+            return await new Response(decompressedStream).text();
+        } catch (e) {
+            console.log('No es gzip, intentando como texto plano');
+            return await blob.text();
+        }
+    }
+
+    async function handleSocketMessage(event) {
+        try {
+            let messageData;
+
+            if (event.data instanceof Blob) {
+                const rawData = await decompressMessage(event.data);
+                messageData = JSON.parse(rawData);
+            } else {
+                messageData = JSON.parse(event.data);
+            }
+
+            switch (messageData.type) {
+                case 'game_started':
+                    handleGameStart();
+                    break;
+                case 'room_update':
+                    updatePlayersUI(messageData.players);
+                    break;
+                case 'notification':
+                    showNotification(messageData.message, messageData.isError);
+                    break;
+                case 'player_update':
+                    // Actualizar lista de jugadores cuando alguien cambia su nombre
+                    updatePlayersUI(messageData.players);
+                    break;
+                default:
+                    console.log('Mensaje no reconocido:', messageData);
+            }
+        } catch (error) {
+            console.error('Error procesando mensaje:', error);
+            showNotification('Error al procesar mensaje del servidor', true);
+        }
+    }
+
+    function showNotification(message, isError = false) {
+        const notification = document.createElement('div');
+        notification.className = `notification ${isError ? 'error' : ''}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
     function sendPlayerUpdate() {
-        if (socket.readyState === WebSocket.OPEN) {
+        if (socket && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
                 type: 'player_update',
                 playerId: playerId,
@@ -104,46 +162,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Manejar mensajes del servidor (versión corregida)
-    async function handleSocketMessage(event) {
-        try {
-            let message;
-
-            // Manejar tanto Blob como texto plano
-            if (event.data instanceof Blob) {
-                message = await parseBlobToJson(event.data);
-            } else {
-                message = JSON.parse(event.data);
-            }
-
-            if (message.type === 'game_started') {
-                handleGameStart();
-            }
-            else if (message.type === 'room_update') {
-                updatePlayersUI(message.players);
-            }
-        } catch (error) {
-            console.error('Error procesando mensaje:', error);
-        }
-    }
-
-    // Función auxiliar para parsear Blob a JSON
-    function parseBlobToJson(blob) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                try {
-                    resolve(JSON.parse(reader.result));
-                } catch (e) {
-                    reject(e);
-                }
-            };
-            reader.onerror = () => reject(reader.error);
-            reader.readAsText(blob);
-        });
-    }
-
-    // Actualizar lista de jugadores
     function updatePlayersUI(players) {
         if (!players || !Array.isArray(players)) return;
 
@@ -152,18 +170,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="player-name">${player.name || 'Jugador'}</span>
                 ${player.isHost ? '<span class="host-tag">(Host)</span>' : ''}
                 ${player.id === playerId ? '<span class="you-tag">(Tú)</span>' : ''}
-                <span class="connection-status">${player.connected ? '🟢' : '🔴'}</span>
+                <span class="connection-status">${player.connected ? '🟢 Conectado' : '🔴 Desconectado'}</span>
             </li>
         `).join('');
     }
 
-    // Manejar inicio del juego
     function handleGameStart() {
         clearInterval(playerUpdateInterval);
         window.location.href = 'game.html';
     }
 
-    // Iniciar juego (solo host)
     async function handleStartGame() {
         if (!socket || socket.readyState !== WebSocket.OPEN) {
             updateConnectionStatus('Error: No hay conexión', true);
@@ -177,32 +193,39 @@ document.addEventListener('DOMContentLoaded', () => {
             socket.send(JSON.stringify({
                 type: 'start_game',
                 playerId: playerId,
-                playerName: playerName,
                 roomId: roomId,
                 initialCards: parseInt(initialCardsSelect.value)
             }));
+
+            showNotification('Iniciando juego...');
         } catch (error) {
             console.error('Error al iniciar juego:', error);
             startBtn.disabled = false;
             startBtn.textContent = 'Iniciar Juego';
-            updateConnectionStatus('Error al iniciar', true);
+            showNotification('Error al iniciar el juego', true);
         }
     }
 
-    // Actualizar lista de jugadores via API
     async function updatePlayersList() {
         try {
             const response = await fetch(`${API_URL}/room-info/${roomId}`);
             if (response.ok) {
                 const data = await response.json();
-                if (data.success) updatePlayersUI(data.players);
+                if (data.success) {
+                    updatePlayersUI(data.players);
+
+                    // Si el host se desconectó y soy el nuevo host
+                    if (!isHost && data.players.some(p => p.id === playerId && p.isHost)) {
+                        sessionStorage.setItem('isHost', 'true');
+                        window.location.reload();
+                    }
+                }
             }
         } catch (error) {
             console.error('Error actualizando jugadores:', error);
         }
     }
 
-    // Inicializar la aplicación
     function initialize() {
         initializeUI();
         connectWebSocket();
@@ -210,12 +233,10 @@ document.addEventListener('DOMContentLoaded', () => {
         playerUpdateInterval = setInterval(updatePlayersList, PLAYER_UPDATE_INTERVAL);
     }
 
-    // Limpieza al salir
     window.addEventListener('beforeunload', () => {
         clearInterval(playerUpdateInterval);
         if (socket) socket.close();
     });
 
-    // Iniciar
     initialize();
 });
