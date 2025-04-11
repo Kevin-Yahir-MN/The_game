@@ -960,3 +960,70 @@ body {
         margin-top: 80px;
     }
 }
+
+/* Estilos para la información del jugador */
+.player-info {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin: 10px 0;
+}
+
+.player-info h3 {
+    margin: 0;
+    color: var(--light);
+}
+
+.player-name {
+    color: var(--secondary);
+    font-weight: bold;
+}
+
+/* Panel de jugadores */
+.players-panel {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(42, 52, 65, 0.9);
+    padding: 15px;
+    border-radius: 8px;
+    max-width: 200px;
+}
+
+.players-panel h3 {
+    margin-top: 0;
+    color: var(--primary);
+}
+
+.players-panel li {
+    margin-bottom: 8px;
+    padding: 5px;
+    border-radius: 4px;
+}
+
+.players-panel .you {
+    background: rgba(46, 204, 113, 0.1);
+}
+
+.players-panel .current-turn {
+    border-left: 3px solid var(--primary);
+}
+
+.card-count {
+    float: right;
+    color: var(--gray);
+    font-size: 0.8em;
+}
+
+/* Tags especiales */
+.host-tag {
+    color: var(--primary);
+}
+
+.you-tag {
+    color: var(--secondary);
+}
+
+.connection-status {
+    margin-left: 5px;
+}

@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = 'https://the-game-2xks.onrender.com';
     const WS_URL = 'wss://the-game-2xks.onrender.com';
-    const PLAYER_UPDATE_INTERVAL = 5000; // 5 segundos
+    const PLAYER_UPDATE_INTERVAL = 5000;
 
     let socket;
     const roomId = sessionStorage.getItem('roomId');
@@ -16,7 +16,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialCardsSelect = document.getElementById('initialCards');
     let playerUpdateInterval;
 
+    // Mostrar información del jugador actual
+    function displayPlayerInfo() {
+        const playerInfo = document.getElementById('playerInfo') || document.createElement('div');
+        playerInfo.id = 'playerInfo';
+        playerInfo.className = 'player-info';
+        playerInfo.innerHTML = `
+            <h3>Jugador: <span class="player-name">${playerName || 'Anónimo'}</span></h3>
+            <p>Sala: ${roomId} ${isHost ? '(Host)' : ''}</p>
+        `;
+
+        const header = document.querySelector('.room-header');
+        if (!document.getElementById('playerInfo')) {
+            header.appendChild(playerInfo);
+        }
+    }
+
     roomIdDisplay.textContent = roomId;
+    displayPlayerInfo();
 
     if (isHost) {
         gameSettings.style.display = 'block';
@@ -26,16 +43,12 @@ document.addEventListener('DOMContentLoaded', () => {
         startBtn.remove();
     }
 
-    initializeWebSocket();
-    updatePlayersList();
-    playerUpdateInterval = setInterval(updatePlayersList, PLAYER_UPDATE_INTERVAL);
-
     function initializeWebSocket() {
         if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
             socket.close();
         }
 
-        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${playerId}`);
+        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${playerId}&playerName=${encodeURIComponent(playerName)}`);
 
         socket.onopen = () => {
             console.log('Conexión WebSocket establecida');
@@ -47,11 +60,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (message.type === 'game_started') {
                 clearInterval(playerUpdateInterval);
                 window.location.href = 'game.html';
+            } else if (message.type === 'room_update') {
+                updatePlayersUI(message.players);
             } else if (message.type === 'notification') {
                 showNotification(message.message, message.isError);
-            } else if (message.type === 'room_reset') {
-                showNotification(message.message);
-                updatePlayersList();
             }
         };
 
@@ -81,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
             socket.send(JSON.stringify({
                 type: 'start_game',
                 playerId: playerId,
+                playerName: playerName, // Envía el nombre al servidor
                 roomId: roomId,
                 initialCards: initialCards
             }));
@@ -102,10 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function updatePlayersList() {
         try {
-            const response = await fetch(`${API_URL}/room-info/${roomId}`, {
-                cache: 'no-store'
-            });
-
+            const response = await fetch(`${API_URL}/room-info/${roomId}`);
             if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
 
             const data = await response.json();
@@ -122,15 +132,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const isCurrentPlayer = player.id === playerId;
             return `
                 <li class="${player.isHost ? 'host' : ''} ${isCurrentPlayer ? 'you' : ''}">
-                    ${player.name}
-                    ${player.isHost ? ' (Host)' : ''}
-                    ${isCurrentPlayer ? ' (Tú)' : ''}
-                    ${player.connected ? '🟢' : '🔴'}
+                    <span class="player-name">${player.name || 'Jugador'}</span>
+                    ${player.isHost ? ' <span class="host-tag">(Host)</span>' : ''}
+                    ${isCurrentPlayer ? ' <span class="you-tag">(Tú)</span>' : ''}
+                    <span class="connection-status">${player.connected ? '🟢' : '🔴'}</span>
                 </li>`;
         }).join('');
     }
 
-    // Limpieza al salir
+    initializeWebSocket();
+    updatePlayersList();
+    playerUpdateInterval = setInterval(updatePlayersList, PLAYER_UPDATE_INTERVAL);
+
     window.addEventListener('beforeunload', () => {
         clearInterval(playerUpdateInterval);
         if (socket) {

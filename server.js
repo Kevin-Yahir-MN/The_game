@@ -14,7 +14,7 @@ const allowedOrigins = [
     'http://localhost:3000'
 ];
 const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
-const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 minutos
+const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000;
 
 app.use(compression());
 app.use((req, res, next) => {
@@ -45,7 +45,6 @@ const rooms = new Map();
 const reverseRoomMap = new Map();
 const boardHistory = new Map();
 
-// Limpieza periódica de salas inactivas
 setInterval(() => {
     const now = Date.now();
     for (const [roomId, room] of rooms.entries()) {
@@ -56,7 +55,7 @@ setInterval(() => {
             }
         });
 
-        if (now - lastActivity > 3600000) { // 1 hora inactiva
+        if (now - lastActivity > 3600000) {
             rooms.delete(roomId);
             reverseRoomMap.delete(room);
             boardHistory.delete(roomId);
@@ -81,7 +80,6 @@ function shuffleArray(array) {
 function safeSend(ws, message) {
     try {
         if (ws?.readyState === WebSocket.OPEN) {
-            console.debug('Enviando mensaje:', message.type); // Log del tipo de mensaje
             ws.send(JSON.stringify(message));
         }
     } catch (error) {
@@ -110,6 +108,7 @@ function sendGameState(room, player) {
         p: room.players.map(p => ({
             i: p.id,
             n: p.name,
+            h: p.isHost,
             c: p.cards.length,
             s: p.cardsPlayedThisTurn.length
         }))
@@ -315,6 +314,7 @@ function endTurn(room, player) {
         type: 'turn_changed',
         newTurn: nextPlayer.id,
         previousPlayer: player.id,
+        playerName: nextPlayer.name,
         cardsPlayedThisTurn: 0,
         minCardsRequired: requiredCards
     });
@@ -448,6 +448,7 @@ function startGame(room, initialCards = 6) {
             players: room.players.map(p => ({
                 id: p.id,
                 name: p.name,
+                isHost: p.isHost,
                 cardCount: p.cards.length,
                 cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
             }))
@@ -455,7 +456,12 @@ function startGame(room, initialCards = 6) {
     });
 
     room.players.forEach(player => {
-        safeSend(player.ws, { type: 'your_cards', cards: player.cards });
+        safeSend(player.ws, {
+            type: 'your_cards',
+            cards: player.cards,
+            playerName: player.name,
+            currentPlayerId: player.id
+        });
     });
 }
 
@@ -463,6 +469,7 @@ wss.on('connection', (ws, req) => {
     const params = new URLSearchParams(req.url.split('?')[1]);
     const roomId = params.get('roomId');
     const playerId = params.get('playerId');
+    const playerName = params.get('playerName');
 
     if (!roomId || !playerId || !rooms.has(roomId)) {
         return ws.close(1008, 'Datos inválidos');
@@ -474,10 +481,12 @@ wss.on('connection', (ws, req) => {
 
     player.ws = ws;
     player.lastActivity = Date.now();
+    if (playerName) player.name = decodeURIComponent(playerName);
 
     const response = {
         type: 'init_game',
         playerId: player.id,
+        playerName: player.name,
         roomId,
         isHost: player.isHost,
         gameState: {
@@ -485,7 +494,13 @@ wss.on('connection', (ws, req) => {
             currentTurn: room.gameState.currentTurn,
             gameStarted: room.gameState.gameStarted,
             initialCards: room.gameState.initialCards,
-            remainingDeck: room.gameState.deck.length
+            remainingDeck: room.gameState.deck.length,
+            players: room.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                isHost: p.isHost,
+                cardCount: p.cards.length
+            }))
         },
         isYourTurn: room.gameState.currentTurn === player.id
     };

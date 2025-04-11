@@ -321,13 +321,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleTurnChanged(message) {
-        gameState.currentTurn = message.newTurn;
-        gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
-            card => card.playerId !== currentPlayer.id
-        );
+        const currentPlayer = gameState.players.find(p => p.id === message.newTurn);
+        const previousPlayer = gameState.players.find(p => p.id === message.previousPlayer);
 
-        const playerName = gameState.players.find(p => p.id === message.newTurn)?.name || 'otro jugador';
-        showNotification(`Ahora es el turno de ${playerName}`);
+        let playerName;
+        if (currentPlayer) {
+            playerName = currentPlayer.id === currentPlayer.id ?
+                'Tu turno' :
+                `${currentPlayer.name}'s turn`;
+        } else {
+            playerName = 'Turno de otro jugador';
+        }
+
+        showNotification(playerName);
+        gameState.currentTurn = message.newTurn;
+        updateGameInfo();
     }
 
     function handleMoveUndone(message) {
@@ -384,6 +392,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateGameState(newState) {
         if (!newState) return;
+
+        if (newState.p) {
+            gameState.players = newState.p.map(player => ({
+                id: player.i,
+                name: player.n || `Jugador_${player.i.slice(0, 4)}`,
+                cardCount: player.c,
+                isHost: player.h,
+                cardsPlayedThisTurn: player.s
+            }));
+        }
 
         gameState.board = newState.b || gameState.board;
         gameState.currentTurn = newState.t || gameState.currentTurn;
@@ -723,22 +741,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateGameInfo() {
-        const currentPlayerName = gameState.players.find(p => p.id === gameState.currentTurn)?.name || 'Esperando...';
+        const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
+        let currentPlayerName;
+
+        if (currentPlayerObj) {
+            currentPlayerName = currentPlayerObj.id === currentPlayer.id ?
+                'Tu turno' :
+                `Turno de ${currentPlayerObj.name}`;
+        } else {
+            currentPlayerName = 'Esperando jugador...';
+        }
 
         document.getElementById('currentTurn').textContent = currentPlayerName;
-        document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
 
-        if (gameState.currentTurn === currentPlayer.id) {
-            const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
-            const required = gameState.remainingDeck > 0 ? 2 : 1;
-            const progress = Math.min(cardsPlayed / required, 1) * 100;
+        // Actualiza también el panel de jugadores
+        const playersPanel = document.getElementById('playersPanel') || createPlayersPanel();
+        updatePlayersPanel(playersPanel);
+    }
 
-            const progressBar = document.getElementById('progressBar');
-            progressBar.style.width = `${progress}%`;
-            progressBar.style.backgroundColor = progress >= 100 ? 'var(--secondary)' : 'var(--primary)';
+    function createPlayersPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'playersPanel';
+        panel.className = 'players-panel';
+        document.body.appendChild(panel);
+        return panel;
+    }
 
-            document.getElementById('progressText').textContent = `${cardsPlayed}/${required} cartas jugadas`;
-        }
+    function updatePlayersPanel(panel) {
+        panel.innerHTML = `
+            <h3>Jugadores</h3>
+            <ul>
+                ${gameState.players.map(player => `
+                    <li class="${player.id === currentPlayer.id ? 'you' : ''} ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
+                        ${player.name} ${player.isHost ? '(Host)' : ''}
+                        <span class="card-count">${player.cardCount} cartas</span>
+                    </li>
+                `).join('')}
+            </ul>
+        `;
     }
 
     function handleCardAnimations() {
