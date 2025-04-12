@@ -930,6 +930,21 @@ document.addEventListener('DOMContentLoaded', () => {
             roomId: roomId
         }));
 
+        // Ordenamiento optimizado para máximo 8 cartas
+        if (gameState.yourCards.length > 1) { // Solo ordenar si hay más de 1 carta
+            gameState.yourCards.sort((a, b) => a.value - b.value);
+
+            // Reposicionamiento optimizado
+            const cardCount = gameState.yourCards.length;
+            const totalWidth = cardCount * CARD_WIDTH + (cardCount - 1) * CARD_SPACING;
+            const startX = (canvas.width - totalWidth) / 2;
+
+            gameState.yourCards.forEach((card, index) => {
+                card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
+                card.y = PLAYER_CARDS_Y;
+            });
+        }
+
         resetCardsPlayedProgress();
     }
 
