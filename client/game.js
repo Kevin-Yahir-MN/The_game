@@ -84,30 +84,24 @@ document.addEventListener('DOMContentLoaded', () => {
         draw() {
             ctx.save();
 
-            // Aplicar transformaciones de arrastre/animación
-            if (this.isDragging) {
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-                ctx.shadowBlur = 15;
-                ctx.shadowOffsetY = 8;
-            } else {
+            // Aplicar transformaciones solo si no se está arrastrando
+            if (!this.isDragging) {
                 ctx.translate(this.shakeOffset, 0);
-                ctx.shadowColor = this.shadowColor;
-                ctx.shadowBlur = 8;
-                ctx.shadowOffsetY = 4;
             }
 
-            // Dibujar cuerpo de la carta
+            ctx.shadowColor = this.shadowColor;
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetY = 4;
+
             ctx.beginPath();
             ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
             ctx.fillStyle = this === selectedCard ? '#FFFF99' : this.backgroundColor;
             ctx.fill();
 
-            // Borde de la carta
             ctx.strokeStyle = this.isPlayable ? '#27ae60' : '#34495e';
             ctx.lineWidth = this.isPlayable ? 3 : 2;
             ctx.stroke();
 
-            // Valor de la carta
             ctx.fillStyle = '#2c3e50';
             ctx.font = 'bold 28px Arial';
             ctx.textAlign = 'center';
@@ -405,7 +399,6 @@ document.addEventListener('DOMContentLoaded', () => {
         shake();
     }
 
-    // 1. Modificar la función que maneja el cambio de turno
     function handleTurnChanged(message) {
         const currentPlayerObj = gameState.players.find(p => p.id === message.newTurn);
         let currentPlayerName;
@@ -418,11 +411,8 @@ document.addEventListener('DOMContentLoaded', () => {
             currentPlayerName = 'Esperando jugador...';
         }
 
-        // Ordenar cartas SI ES NUESTRO TURNO
+        // Verificar si es nuestro turno y si tenemos movimientos posibles
         if (message.newTurn === currentPlayer.id) {
-            sortPlayerCards();
-
-            // Verificar si tenemos movimientos posibles
             const playableCards = gameState.yourCards.filter(card => {
                 return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
                     isValidMove(card.value, pos)
@@ -456,35 +446,17 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGameInfo();
     }
 
-    // 2. Añadir función para ordenar cartas con animación
-    function sortPlayerCards() {
-        if (gameState.yourCards.length < 2) return;
+    function canPlayerMeetMinimum() {
+        if (gameState.currentTurn !== currentPlayer.id) return true;
 
-        // Ordenar las cartas por valor (menor a mayor)
-        gameState.yourCards.sort((a, b) => a.value - b.value);
-
-        // Calcular nuevas posiciones
-        const cardCount = gameState.yourCards.length;
-        const totalWidth = cardCount * CARD_WIDTH + (cardCount - 1) * CARD_SPACING;
-        const startX = (canvas.width - totalWidth) / 2;
-
-        // Crear animaciones para cada carta
-        gameState.yourCards.forEach((card, index) => {
-            const targetX = startX + index * (CARD_WIDTH + CARD_SPACING);
-            const targetY = PLAYER_CARDS_Y;
-
-            // Agregar animación para mover la carta
-            gameState.animatingCards.push({
-                card: card,
-                startTime: Date.now(),
-                duration: 400, // 0.4 segundos para la animación
-                targetX: targetX,
-                targetY: targetY,
-                fromX: card.x,
-                fromY: card.y,
-                easing: function (t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t } // Easing cuadrático
-            });
+        const playableCards = gameState.yourCards.filter(card => {
+            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
+                isValidMove(card.value, pos)
+            );
         });
+
+        const requiredCards = gameState.remainingDeck > 0 ? 2 : 1;
+        return playableCards.length >= requiredCards;
     }
 
     function resetCardsPlayedProgress() {
@@ -958,40 +930,6 @@ document.addEventListener('DOMContentLoaded', () => {
             roomId: roomId
         }));
 
-        // Ordenar cartas con animación
-        if (gameState.yourCards.length > 1) {
-            // 1. Ordenar las cartas por valor (menor a mayor)
-            gameState.yourCards.sort((a, b) => a.value - b.value);
-
-            // 2. Calcular nuevas posiciones
-            const cardCount = gameState.yourCards.length;
-            const totalWidth = cardCount * CARD_WIDTH + (cardCount - 1) * CARD_SPACING;
-            const startX = (canvas.width - totalWidth) / 2;
-
-            // 3. Crear animaciones para cada carta
-            gameState.yourCards.forEach((card, index) => {
-                const targetX = startX + index * (CARD_WIDTH + CARD_SPACING);
-                const targetY = PLAYER_CARDS_Y;
-
-                // Solo animar si la posición cambia significativamente (más de 5px)
-                if (Math.abs(card.x - targetX) > 5 || Math.abs(card.y - targetY) > 5) {
-                    gameState.animatingCards.push({
-                        card: card,
-                        startTime: Date.now(),
-                        duration: 300, // 0.3 segundos
-                        targetX: targetX,
-                        targetY: targetY,
-                        fromX: card.x,
-                        fromY: card.y
-                    });
-                } else {
-                    // Actualizar posición directamente si el movimiento es mínimo
-                    card.x = targetX;
-                    card.y = targetY;
-                }
-            });
-        }
-
         resetCardsPlayedProgress();
     }
 
@@ -1050,11 +988,12 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         ctx.fill();
 
-        // Dibujar cartas ordenadas (excepto la que se está arrastrando)
-        gameState.yourCards.forEach((card) => {
-            if (card !== dragStartCard) {
-                // Aplicar hover effect solo si no está siendo arrastrada
-                card.hoverOffset = (card === selectedCard && !isDragging) ? 10 : 0;
+        gameState.yourCards.forEach((card, index) => {
+            if (card && card !== dragStartCard) { // No dibujar la carta que se está arrastrando
+                card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
+                    index * (CARD_WIDTH + CARD_SPACING);
+                card.y = PLAYER_CARDS_Y;
+                card.hoverOffset = card === selectedCard ? 10 : 0;
                 card.draw();
             }
         });
@@ -1136,18 +1075,14 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = gameState.animatingCards.length - 1; i >= 0; i--) {
             const anim = gameState.animatingCards[i];
             const elapsed = now - anim.startTime;
-            let progress = Math.min(elapsed / anim.duration, 1);
-
-            // Aplicar función de easing si existe
-            if (anim.easing) {
-                progress = anim.easing(progress);
-            }
+            const progress = Math.min(elapsed / anim.duration, 1);
 
             anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * progress;
             anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * progress;
 
-            // Eliminar animación cuando termine
-            if (progress === 1) {
+            anim.card.draw();
+
+            if (progress === 1 || now - anim.startTime > 1000) {
                 gameState.animatingCards.splice(i, 1);
             }
         }
