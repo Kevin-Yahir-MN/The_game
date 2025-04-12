@@ -84,24 +84,30 @@ document.addEventListener('DOMContentLoaded', () => {
         draw() {
             ctx.save();
 
-            // Aplicar transformaciones solo si no se está arrastrando
-            if (!this.isDragging) {
+            // Aplicar transformaciones de arrastre/animación
+            if (this.isDragging) {
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+                ctx.shadowBlur = 15;
+                ctx.shadowOffsetY = 8;
+            } else {
                 ctx.translate(this.shakeOffset, 0);
+                ctx.shadowColor = this.shadowColor;
+                ctx.shadowBlur = 8;
+                ctx.shadowOffsetY = 4;
             }
 
-            ctx.shadowColor = this.shadowColor;
-            ctx.shadowBlur = 8;
-            ctx.shadowOffsetY = 4;
-
+            // Dibujar cuerpo de la carta
             ctx.beginPath();
             ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
             ctx.fillStyle = this === selectedCard ? '#FFFF99' : this.backgroundColor;
             ctx.fill();
 
+            // Borde de la carta
             ctx.strokeStyle = this.isPlayable ? '#27ae60' : '#34495e';
             ctx.lineWidth = this.isPlayable ? 3 : 2;
             ctx.stroke();
 
+            // Valor de la carta
             ctx.fillStyle = '#2c3e50';
             ctx.font = 'bold 28px Arial';
             ctx.textAlign = 'center';
@@ -930,18 +936,37 @@ document.addEventListener('DOMContentLoaded', () => {
             roomId: roomId
         }));
 
-        // Ordenamiento optimizado para máximo 8 cartas
-        if (gameState.yourCards.length > 1) { // Solo ordenar si hay más de 1 carta
+        // Ordenar cartas con animación
+        if (gameState.yourCards.length > 1) {
+            // 1. Ordenar las cartas por valor (menor a mayor)
             gameState.yourCards.sort((a, b) => a.value - b.value);
 
-            // Reposicionamiento optimizado
+            // 2. Calcular nuevas posiciones
             const cardCount = gameState.yourCards.length;
             const totalWidth = cardCount * CARD_WIDTH + (cardCount - 1) * CARD_SPACING;
             const startX = (canvas.width - totalWidth) / 2;
 
+            // 3. Crear animaciones para cada carta
             gameState.yourCards.forEach((card, index) => {
-                card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
-                card.y = PLAYER_CARDS_Y;
+                const targetX = startX + index * (CARD_WIDTH + CARD_SPACING);
+                const targetY = PLAYER_CARDS_Y;
+
+                // Solo animar si la posición cambia significativamente (más de 5px)
+                if (Math.abs(card.x - targetX) > 5 || Math.abs(card.y - targetY) > 5) {
+                    gameState.animatingCards.push({
+                        card: card,
+                        startTime: Date.now(),
+                        duration: 300, // 0.3 segundos
+                        targetX: targetX,
+                        targetY: targetY,
+                        fromX: card.x,
+                        fromY: card.y
+                    });
+                } else {
+                    // Actualizar posición directamente si el movimiento es mínimo
+                    card.x = targetX;
+                    card.y = targetY;
+                }
             });
         }
 
@@ -1003,12 +1028,11 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         ctx.fill();
 
-        gameState.yourCards.forEach((card, index) => {
-            if (card && card !== dragStartCard) { // No dibujar la carta que se está arrastrando
-                card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
-                    index * (CARD_WIDTH + CARD_SPACING);
-                card.y = PLAYER_CARDS_Y;
-                card.hoverOffset = card === selectedCard ? 10 : 0;
+        // Dibujar cartas ordenadas (excepto la que se está arrastrando)
+        gameState.yourCards.forEach((card) => {
+            if (card !== dragStartCard) {
+                // Aplicar hover effect solo si no está siendo arrastrada
+                card.hoverOffset = (card === selectedCard && !isDragging) ? 10 : 0;
                 card.draw();
             }
         });
