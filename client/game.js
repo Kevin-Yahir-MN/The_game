@@ -405,6 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
         shake();
     }
 
+    // 1. Modificar la función que maneja el cambio de turno
     function handleTurnChanged(message) {
         const currentPlayerObj = gameState.players.find(p => p.id === message.newTurn);
         let currentPlayerName;
@@ -417,8 +418,11 @@ document.addEventListener('DOMContentLoaded', () => {
             currentPlayerName = 'Esperando jugador...';
         }
 
-        // Verificar si es nuestro turno y si tenemos movimientos posibles
+        // Ordenar cartas SI ES NUESTRO TURNO
         if (message.newTurn === currentPlayer.id) {
+            sortPlayerCards();
+
+            // Verificar si tenemos movimientos posibles
             const playableCards = gameState.yourCards.filter(card => {
                 return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
                     isValidMove(card.value, pos)
@@ -452,17 +456,35 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGameInfo();
     }
 
-    function canPlayerMeetMinimum() {
-        if (gameState.currentTurn !== currentPlayer.id) return true;
+    // 2. Añadir función para ordenar cartas con animación
+    function sortPlayerCards() {
+        if (gameState.yourCards.length < 2) return;
 
-        const playableCards = gameState.yourCards.filter(card => {
-            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
-                isValidMove(card.value, pos)
-            );
+        // Ordenar las cartas por valor (menor a mayor)
+        gameState.yourCards.sort((a, b) => a.value - b.value);
+
+        // Calcular nuevas posiciones
+        const cardCount = gameState.yourCards.length;
+        const totalWidth = cardCount * CARD_WIDTH + (cardCount - 1) * CARD_SPACING;
+        const startX = (canvas.width - totalWidth) / 2;
+
+        // Crear animaciones para cada carta
+        gameState.yourCards.forEach((card, index) => {
+            const targetX = startX + index * (CARD_WIDTH + CARD_SPACING);
+            const targetY = PLAYER_CARDS_Y;
+
+            // Agregar animación para mover la carta
+            gameState.animatingCards.push({
+                card: card,
+                startTime: Date.now(),
+                duration: 400, // 0.4 segundos para la animación
+                targetX: targetX,
+                targetY: targetY,
+                fromX: card.x,
+                fromY: card.y,
+                easing: function (t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t } // Easing cuadrático
+            });
         });
-
-        const requiredCards = gameState.remainingDeck > 0 ? 2 : 1;
-        return playableCards.length >= requiredCards;
     }
 
     function resetCardsPlayedProgress() {
@@ -1114,14 +1136,18 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = gameState.animatingCards.length - 1; i >= 0; i--) {
             const anim = gameState.animatingCards[i];
             const elapsed = now - anim.startTime;
-            const progress = Math.min(elapsed / anim.duration, 1);
+            let progress = Math.min(elapsed / anim.duration, 1);
+
+            // Aplicar función de easing si existe
+            if (anim.easing) {
+                progress = anim.easing(progress);
+            }
 
             anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * progress;
             anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * progress;
 
-            anim.card.draw();
-
-            if (progress === 1 || now - anim.startTime > 1000) {
+            // Eliminar animación cuando termine
+            if (progress === 1) {
                 gameState.animatingCards.splice(i, 1);
             }
         }
