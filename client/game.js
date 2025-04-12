@@ -418,45 +418,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     isValidMove(card.value, pos)
                 );
             });
-
-            const requiredCards = gameState.remainingDeck > 0 ? 2 : 1;
-
-            if (playableCards.length < requiredCards && gameState.yourCards.length > 0) {
-                const confirmMove = confirm(
-                    'ADVERTENCIA: No tienes movimientos suficientes.\n' +
-                    `Necesitas jugar ${requiredCards} carta(s) pero solo tienes ${playableCards.length} movimientos posibles.\n\n` +
-                    'Si continúas, el juego terminará con derrota.\n\n' +
-                    '¿Deseas continuar?'
-                );
-
-                if (confirmMove) {
-                    socket.send(JSON.stringify({
-                        type: 'self_blocked',
-                        playerId: currentPlayer.id,
-                        roomId: roomId
-                    }));
-                    return;
-                }
-            }
         }
 
         showNotification(currentPlayerName);
         gameState.currentTurn = message.newTurn;
         resetCardsPlayedProgress();
         updateGameInfo();
-    }
-
-    function canPlayerMeetMinimum() {
-        if (gameState.currentTurn !== currentPlayer.id) return true;
-
-        const playableCards = gameState.yourCards.filter(card => {
-            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
-                isValidMove(card.value, pos)
-            );
-        });
-
-        const requiredCards = gameState.remainingDeck > 0 ? 2 : 1;
-        return playableCards.length >= requiredCards;
     }
 
     function resetCardsPlayedProgress() {
