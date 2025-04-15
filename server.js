@@ -166,68 +166,85 @@ app.get('/game-state/:roomId/:playerId', (req, res) => {
 
 // Jugar carta
 app.post('/play-card', (req, res) => {
-    const { roomId, playerId, cardValue, position } = req.body;
+    try {
+        const { roomId, playerId, cardValue, position } = req.body;
 
-    if (!roomId || !playerId || !cardValue || !position) {
-        return res.status(400).json({ error: 'Datos incompletos' });
-    }
+        if (!roomId || !playerId || !cardValue || !position) {
+            return res.status(400).json({
+                error: 'Datos incompletos',
+                received: req.body
+            });
+        }
+        if (!roomId || !playerId || !cardValue || !position) {
+            return res.status(400).json({ error: 'Datos incompletos' });
+        }
 
-    if (!rooms.has(roomId)) {
-        return res.status(404).json({ error: 'Sala no encontrada' });
-    }
+        if (!rooms.has(roomId)) {
+            return res.status(404).json({ error: 'Sala no encontrada' });
+        }
 
-    const room = rooms.get(roomId);
-    const player = room.players.find(p => p.id === playerId);
+        const room = rooms.get(roomId);
+        const player = room.players.find(p => p.id === playerId);
 
-    if (!player) {
-        return res.status(404).json({ error: 'Jugador no encontrado' });
-    }
+        if (!player) {
+            return res.status(404).json({ error: 'Jugador no encontrado' });
+        }
 
-    if (!validPositions.includes(position)) {
-        return res.status(400).json({ error: 'Posición inválida' });
-    }
+        if (!validPositions.includes(position)) {
+            return res.status(400).json({ error: 'Posición inválida' });
+        }
 
-    if (!player.cards.includes(cardValue)) {
-        return res.status(400).json({ error: 'No tienes esa carta' });
-    }
+        if (!player.cards.includes(cardValue)) {
+            return res.status(400).json({ error: 'No tienes esa carta' });
+        }
 
-    const board = room.gameState.board;
-    const targetIdx = position.includes('asc') ?
-        (position === 'asc1' ? 0 : 1) :
-        (position === 'desc1' ? 0 : 1);
-    const targetValue = position.includes('asc') ?
-        board.ascending[targetIdx] :
-        board.descending[targetIdx];
-    const isValid = position.includes('asc') ?
-        (cardValue > targetValue || cardValue === targetValue - 10) :
-        (cardValue < targetValue || cardValue === targetValue + 10);
+        const board = room.gameState.board;
+        const targetIdx = position.includes('asc') ?
+            (position === 'asc1' ? 0 : 1) :
+            (position === 'desc1' ? 0 : 1);
+        const targetValue = position.includes('asc') ?
+            board.ascending[targetIdx] :
+            board.descending[targetIdx];
+        const isValid = position.includes('asc') ?
+            (cardValue > targetValue || cardValue === targetValue - 10) :
+            (cardValue < targetValue || cardValue === targetValue + 10);
 
-    if (!isValid) {
-        return res.status(400).json({
-            error: `Movimiento inválido. La carta debe ${position.includes('asc') ? 'ser mayor' : 'ser menor'} que ${targetValue} o igual a ${position.includes('asc') ? targetValue - 10 : targetValue + 10}`
+        if (!isValid) {
+            return res.status(400).json({
+                error: `Movimiento inválido. La carta debe ${position.includes('asc') ? 'ser mayor' : 'ser menor'} que ${targetValue} o igual a ${position.includes('asc') ? targetValue - 10 : targetValue + 10}`,
+                cardValue,
+                targetValue,
+                position
+            });
+        }
+
+        // Actualizar tablero
+        if (position.includes('asc')) {
+            board.ascending[targetIdx] = cardValue;
+        } else {
+            board.descending[targetIdx] = cardValue;
+        }
+
+        // Actualizar jugador
+        player.cards.splice(player.cards.indexOf(cardValue), 1);
+        player.cardsPlayedThisTurn.push({
+            value: cardValue,
+            position,
+            isPlayedThisTurn: true
+        });
+
+        // Actualizar historial
+        updateBoardHistory(room, position, cardValue);
+
+        player.lastActivity = Date.now();
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error en /play-card:', error);
+        res.status(500).json({
+            error: 'Error interno del servidor',
+            details: error.message
         });
     }
-
-    // Actualizar tablero
-    if (position.includes('asc')) {
-        board.ascending[targetIdx] = cardValue;
-    } else {
-        board.descending[targetIdx] = cardValue;
-    }
-
-    // Actualizar jugador
-    player.cards.splice(player.cards.indexOf(cardValue), 1);
-    player.cardsPlayedThisTurn.push({
-        value: cardValue,
-        position,
-        isPlayedThisTurn: true
-    });
-
-    // Actualizar historial
-    updateBoardHistory(room, position, cardValue);
-
-    player.lastActivity = Date.now();
-    res.json({ success: true });
 });
 
 // Terminar turno

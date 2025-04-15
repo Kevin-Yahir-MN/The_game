@@ -735,59 +735,83 @@ document.addEventListener('DOMContentLoaded', () => {
         return column ? column.id : null;
     }
 
-    function playCard(cardValue, position) {
-        if (!selectedCard) return;
+    async function playCard(cardValue, position) {
+        try {
+            const response = await fetch(`${API_URL}/play-card`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    roomId: roomId,
+                    playerId: currentPlayer.id,
+                    cardValue: cardValue,
+                    position: position
+                })
+            });
 
-        if (!isValidMove(cardValue, position)) {
-            showNotification('Movimiento inválido', true);
-            animateInvalidCard(selectedCard);
-            return;
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Error al jugar carta');
+            }
+
+            if (!selectedCard) return;
+
+            if (!isValidMove(cardValue, position)) {
+                showNotification('Movimiento inválido', true);
+                animateInvalidCard(selectedCard);
+                return;
+            }
+
+            gameState.cardsPlayedThisTurn.push({
+                value: cardValue,
+                position,
+                playerId: currentPlayer.id
+            });
+
+            gameState.columnHistory[position].push(cardValue);
+
+            selectedCard.isPlayedThisTurn = true;
+            selectedCard.backgroundColor = '#99CCFF';
+
+            const cardPosition = getColumnPosition(position);
+            gameState.animatingCards.push({
+                card: selectedCard,
+                startTime: Date.now(),
+                duration: 200,
+                targetX: cardPosition.x,
+                targetY: cardPosition.y,
+                fromX: selectedCard.x,
+                fromY: selectedCard.y
+            });
+
+            const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
+            if (cardIndex !== -1) {
+                gameState.yourCards.splice(cardIndex, 1);
+            }
+
+            if (position.includes('asc')) {
+                const idx = position === 'asc1' ? 0 : 1;
+                gameState.board.ascending[idx] = cardValue;
+            } else {
+                const idx = position === 'desc1' ? 0 : 1;
+                gameState.board.descending[idx] = cardValue;
+            }
+
+            window.gameConnection.send(JSON.stringify({
+                type: 'play_card',
+                playerId: currentPlayer.id,
+                cardValue,
+                position,
+                roomId: roomId
+            }));
+
+            selectedCard = null;
+            updateGameInfo();
+        } catch (error) {
+            console.error('Error al jugar carta:', error);
+            showNotification(error.message, true);
+            // Revertir cambios visuales si es necesario
         }
-
-        gameState.cardsPlayedThisTurn.push({
-            value: cardValue,
-            position,
-            playerId: currentPlayer.id
-        });
-
-        gameState.columnHistory[position].push(cardValue);
-
-        selectedCard.isPlayedThisTurn = true;
-        selectedCard.backgroundColor = '#99CCFF';
-
-        const cardPosition = getColumnPosition(position);
-        gameState.animatingCards.push({
-            card: selectedCard,
-            startTime: Date.now(),
-            duration: 200,
-            targetX: cardPosition.x,
-            targetY: cardPosition.y,
-            fromX: selectedCard.x,
-            fromY: selectedCard.y
-        });
-
-        const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
-        if (cardIndex !== -1) {
-            gameState.yourCards.splice(cardIndex, 1);
-        }
-
-        if (position.includes('asc')) {
-            const idx = position === 'asc1' ? 0 : 1;
-            gameState.board.ascending[idx] = cardValue;
-        } else {
-            const idx = position === 'desc1' ? 0 : 1;
-            gameState.board.descending[idx] = cardValue;
-        }
-
-        window.gameConnection.send(JSON.stringify({
-            type: 'play_card',
-            playerId: currentPlayer.id,
-            cardValue,
-            position
-        }));
-
-        selectedCard = null;
-        updateGameInfo();
     }
 
     function endTurn() {
