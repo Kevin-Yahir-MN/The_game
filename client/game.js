@@ -1,12 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const API_URL = 'https://the-game-2xks.onrender.com';
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const WS_URL = 'wss://the-game-2xks.onrender.com';
     const endTurnButton = document.getElementById('endTurnBtn');
-    const STATE_UPDATE_THROTTLE = 200; // ms
+    const STATE_UPDATE_INTERVAL = 2000; // 2 segundos para polling
     const TARGET_FPS = 60;
 
-    // Dimensiones y posiciones
+    // Dimensiones y posiciones (igual que antes)
     const CARD_WIDTH = 80;
     const CARD_HEIGHT = 120;
     const COLUMN_SPACING = 60;
@@ -22,18 +22,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Cache de assets
     const assetCache = new Map();
     let historyIcon = new Image();
-    let lastStateUpdate = 0;
     let lastRenderTime = 0;
-    let reconnectAttempts = 0;
-    const MAX_RECONNECT_ATTEMPTS = 5;
+    let pollingInterval;
+    let lastUpdateTime = 0;
 
-    // Variables para drag and drop
+    // Variables para drag and drop (igual que antes)
     let dragStartCard = null;
     let dragStartX = 0;
     let dragStartY = 0;
     let isDragging = false;
 
-    // Datos del jugador
+    // Datos del jugador (igual que antes)
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
         name: sessionStorage.getItem('playerName'),
@@ -41,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const roomId = sessionStorage.getItem('roomId');
 
-    // Estado del juego optimizado
+    // Estado del juego (igual que antes)
     let activeNotifications = [];
     let selectedCard = null;
     let gameState = {
@@ -61,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Clase Card optimizada con soporte para drag and drop
+    // Clase Card (igual que antes)
     class Card {
         constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
             this.value = value;
@@ -83,32 +82,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         draw() {
             ctx.save();
-
-            // Aplicar transformaciones solo si no se está arrastrando
             if (!this.isDragging) {
                 ctx.translate(this.shakeOffset, 0);
             }
-
             ctx.shadowColor = this.shadowColor;
             ctx.shadowBlur = 8;
             ctx.shadowOffsetY = 4;
-
             ctx.beginPath();
             ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
             ctx.fillStyle = this === selectedCard ? '#FFFF99' : this.backgroundColor;
             ctx.fill();
-
             ctx.strokeStyle = this.isPlayable ? '#27ae60' : '#34495e';
             ctx.lineWidth = this.isPlayable ? 3 : 2;
             ctx.stroke();
-
             ctx.fillStyle = '#2c3e50';
             ctx.font = 'bold 28px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.shadowColor = 'transparent';
             ctx.fillText(this.value.toString(), this.x + this.width / 2, this.y + this.height / 2 - this.hoverOffset);
-
             ctx.restore();
         }
 
@@ -139,12 +131,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Función para cargar assets con cache
+    // Función para cargar assets (igual que antes)
     function loadAsset(url) {
         if (assetCache.has(url)) {
             return Promise.resolve(assetCache.get(url));
         }
-
         return new Promise((resolve) => {
             const img = new Image();
             img.onload = () => {
@@ -156,144 +147,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // WebSocket optimizado con reconexión inteligente
-    let socket;
-    function connectWebSocket() {
-        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            showNotification('No se puede conectar al servidor. Recarga la página.', true);
-            return;
-        }
-
-        // Cerrar conexión existente si hay una
-        if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.close();
-        }
-
-        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
-
-        socket.onopen = () => {
-            reconnectAttempts = 0;
-            showNotification('Conectado al servidor', false);
-
-            // Solicitar estado actual del juego
-            socket.send(JSON.stringify({
-                type: 'get_game_state',
-                playerId: currentPlayer.id,
-                roomId: roomId
-            }));
-        };
-
-        socket.onclose = (event) => {
-            console.log('Conexión cerrada:', event.code, event.reason);
-
-            if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 15000);
-                reconnectAttempts++;
-
-                showNotification(`Intentando reconectar (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, true);
-
-                setTimeout(() => {
-                    console.log(`Intentando reconexión #${reconnectAttempts}`);
-                    connectWebSocket();
-                }, delay);
-            } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-                showNotification('No se pudo reconectar. Recarga la página.', true);
-            }
-        };
-
-        socket.onerror = (error) => {
-            console.error('Error en WebSocket:', error);
-            showNotification('Error de conexión', true);
-        };
-
-        socket.onmessage = (event) => {
+    // Polling para actualizaciones del juego
+    function startGamePolling() {
+        const poll = async () => {
             try {
-                const now = Date.now();
-                const message = JSON.parse(event.data);
+                const response = await fetch(`${API_URL}/game-state/${roomId}?playerId=${currentPlayer.id}&lastUpdate=${lastUpdateTime}`);
+                if (!response.ok) throw new Error('Error en la respuesta');
 
-                // Throttle para game_state
-                if (message.type === 'gs' && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
-                    return;
-                }
+                const data = await response.json();
+                if (data.success) {
+                    lastUpdateTime = Date.now();
+                    updateGameState(data.state);
 
-                switch (message.type) {
-                    case 'init_game':
-                        handleInitGame(message);
-                        break;
-                    case 'gs': // game_state abreviado
-                        lastStateUpdate = now;
-                        updateGameState(message.s);
-                        updateGameInfo(); // Actualizar UI
-                        break;
-                    case 'game_started':
-                        updateGameState(message.state);
-                        showNotification('¡El juego ha comenzado!');
-                        updateGameInfo(); // Actualizar UI
-                        break;
-                    case 'your_cards':
-                        updatePlayerCards(message.cards);
-                        updateGameInfo(); // Actualizar UI
-                        break;
-                    case 'game_over':
-                        handleGameOver(message.message);
-                        break;
-                    case 'notification':
-                        showNotification(message.message, message.isError);
-                        break;
-                    case 'card_played':
-                        handleOpponentCardPlayed(message);
-                        updateGameInfo(); // Actualizar UI
-                        break;
-                    case 'invalid_move':
-                        if (message.playerId === currentPlayer.id && selectedCard) {
-                            animateInvalidCard(selectedCard);
-                        }
-                        break;
-                    case 'turn_changed':
-                        handleTurnChanged(message);
-                        updateGameInfo(); // Actualizar UI
-                        break;
-                    case 'move_undone':
-                        handleMoveUndone(message);
-                        updateGameInfo(); // Actualizar UI
-                        break;
-                    case 'room_reset':
-                        // No necesita actualización de UI
-                        break;
-                    case 'player_update':
-                        // Actualización específica de información de jugador
-                        if (message.players) {
-                            gameState.players = message.players;
-                            updateGameInfo(); // Actualizar UI
-                        }
-                        break;
-                    default:
-                        console.log('Mensaje no reconocido:', message);
+                    // Manejar notificaciones especiales
+                    if (data.notification) {
+                        showNotification(data.notification.message, data.notification.isError);
+                    }
+
+                    if (data.gameOver) {
+                        handleGameOver(data.gameOver.message);
+                    }
                 }
             } catch (error) {
-                console.error('Error procesando mensaje:', error);
+                console.error('Error en polling del juego:', error);
+                // Reintentar automáticamente en el próximo intervalo
             }
         };
+
+        poll(); // Primera llamada inmediata
+        pollingInterval = setInterval(poll, STATE_UPDATE_INTERVAL);
     }
 
-    function handleInitGame(message) {
-        // Actualiza el estado del juego con los datos iniciales
-        gameState.currentTurn = message.gameState.currentTurn;
-        gameState.board = message.gameState.board;
-        gameState.remainingDeck = message.gameState.remainingDeck;
-
-        // Si el juego ya comenzó, actualiza las cartas del jugador
-        if (message.gameState.gameStarted && message.yourCards) {
-            updatePlayerCards(message.yourCards);
-        }
-
-        // Actualiza la información de la interfaz
-        updateGameInfo();
-
-        console.log('Juego inicializado correctamente');
-    }
-
-    // Notificaciones optimizadas
+    // Notificaciones (igual que antes)
     let notificationTimeout;
     function showNotification(message, isError = false) {
         const existing = document.querySelector('.notification');
@@ -306,7 +191,6 @@ document.addEventListener('DOMContentLoaded', () => {
         notification.className = `notification ${isError ? 'error' : ''}`;
         notification.textContent = message;
 
-        // Estilos especiales para mensajes importantes
         if (message.includes('GAME OVER') || message.includes('terminará') ||
             message.includes('derrota') || message.includes('no puede jugar')) {
             notification.style.zIndex = '1001';
@@ -317,14 +201,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         document.body.appendChild(notification);
-
         const duration = (isError || message.includes('GAME OVER')) ? 5000 : 3000;
-
         notificationTimeout = setTimeout(() => {
             notification.classList.add('notification-fade-out');
             setTimeout(() => notification.remove(), 300);
         }, duration);
     }
+
 
     function showColumnHistory(columnId) {
         const modal = document.getElementById('historyModal');
@@ -842,7 +725,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         gameState.columnHistory[position].push(cardValue);
-
         selectedCard.isPlayedThisTurn = true;
         selectedCard.backgroundColor = '#99CCFF';
 
@@ -870,17 +752,28 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.board.descending[idx] = cardValue;
         }
 
-        socket.send(JSON.stringify({
-            type: 'play_card',
-            playerId: currentPlayer.id,
-            cardValue,
-            position
-        }));
+        // Enviar movimiento al servidor via fetch
+        fetch(`${API_URL}/play-card`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                playerId: currentPlayer.id,
+                roomId: roomId,
+                cardValue: cardValue,
+                position: position
+            })
+        }).catch(error => {
+            console.error('Error al enviar movimiento:', error);
+            showNotification('Error al enviar movimiento', true);
+        });
 
         selectedCard = null;
         updateGameInfo();
     }
 
+    // Función para terminar turno (modificada para usar fetch)
     function endTurn() {
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
@@ -891,13 +784,22 @@ document.addEventListener('DOMContentLoaded', () => {
             return showNotification(`Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`, true);
         }
 
-        socket.send(JSON.stringify({
-            type: 'end_turn',
-            playerId: currentPlayer.id,
-            roomId: roomId
-        }));
-
-        resetCardsPlayedProgress();
+        fetch(`${API_URL}/end-turn`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                playerId: currentPlayer.id,
+                roomId: roomId
+            })
+        }).then(response => {
+            if (!response.ok) throw new Error('Error al terminar turno');
+            resetCardsPlayedProgress();
+        }).catch(error => {
+            console.error('Error al terminar turno:', error);
+            showNotification('Error al terminar turno', true);
+        });
     }
 
     function drawBoard() {
@@ -1083,16 +985,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Limpieza al salir
     function cleanup() {
-        if (socket) {
-            socket.onopen = null;
-            socket.onmessage = null;
-            socket.onclose = null;
-            socket.onerror = null;
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.close();
-            }
-        }
-
+        clearInterval(pollingInterval);
         canvas.removeEventListener('click', handleCanvasClick);
         canvas.removeEventListener('mousedown', handleMouseDown);
         canvas.removeEventListener('mousemove', handleMouseMove);
@@ -1103,7 +996,6 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.removeEventListener('touchend', handleTouchEnd);
         endTurnButton.removeEventListener('click', endTurn);
     }
-
     // Inicialización optimizada
     function initGame() {
         if (!canvas || !ctx || !currentPlayer.id || !roomId) {
@@ -1118,7 +1010,7 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.width = 800;
             canvas.height = 700;
 
-            // Configurar eventos
+            // Configurar eventos (igual que antes)
             endTurnButton.addEventListener('click', endTurn);
             canvas.addEventListener('click', handleCanvasClick);
             canvas.addEventListener('mousedown', handleMouseDown);
@@ -1137,7 +1029,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
             }
 
-            connectWebSocket();
+            startGamePolling();
             gameLoop();
         });
     }

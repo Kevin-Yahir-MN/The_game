@@ -401,6 +401,193 @@ app.post('/join-room', (req, res) => {
     res.json({ success: true, playerId, playerName });
 });
 
+// Nueva ruta para obtener estado del juego
+app.get('/game-state/:roomId', (req, res) => {
+    const roomId = req.params.roomId;
+    const playerId = req.query.playerId;
+
+    if (!rooms.has(roomId)) {
+        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+    }
+
+    const room = rooms.get(roomId);
+    const player = room.players.find(p => p.id === playerId);
+
+    if (!player) {
+        return res.status(404).json({ success: false, message: 'Jugador no encontrado' });
+    }
+
+    res.json({
+        success: true,
+        state: {
+            board: room.gameState.board,
+            currentTurn: room.gameState.currentTurn,
+            players: room.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                cardCount: p.cards.length,
+                isHost: p.isHost,
+                cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
+            })),
+            yourCards: player.cards,
+            remainingDeck: room.gameState.deck.length,
+            initialCards: room.gameState.initialCards,
+            gameStarted: room.gameState.gameStarted
+        }
+    });
+});
+
+// Nueva ruta para jugar una carta
+app.post('/play-card', (req, res) => {
+    const { playerId, roomId, cardValue, position } = req.body;
+
+    if (!rooms.has(roomId)) {
+        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+    }
+
+    const room = rooms.get(roomId);
+    const player = room.players.find(p => p.id === playerId);
+
+    if (!player) {
+        return res.status(404).json({ success: false, message: 'Jugador no encontrado' });
+    }
+
+    if (player.id !== room.gameState.currentTurn) {
+        return res.status(400).json({
+            success: false,
+            message: 'No es tu turno'
+        });
+    }
+
+    // Validar movimiento (igual que en handlePlayCard original)
+    if (!['asc1', 'asc2', 'desc1', 'desc2'].includes(position)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Posición inválida'
+        });
+    }
+
+    if (!player.cards.includes(cardValue)) {
+        return res.status(400).json({
+            success: false,
+            message: 'No tienes esa carta'
+        });
+    }
+
+    const board = room.gameState.board;
+    const targetIdx = position.includes('asc') ?
+        (position === 'asc1' ? 0 : 1) :
+        (position === 'desc1' ? 0 : 1);
+    const targetValue = position.includes('asc') ?
+        board.ascending[targetIdx] :
+        board.descending[targetIdx];
+    const isValid = position.includes('asc') ?
+        (cardValue > targetValue || cardValue === targetValue - 10) :
+        (cardValue < targetValue || cardValue === targetValue + 10);
+
+    if (!isValid) {
+        return res.status(400).json({
+            success: false,
+            message: `Movimiento inválido. La carta debe ${position.includes('asc') ? 'ser mayor' : 'ser menor'} que ${targetValue} o igual a ${position.includes('asc') ? targetValue - 10 : targetValue + 10}`
+        });
+    }
+
+    // Aplicar movimiento
+    if (position.includes('asc')) {
+        board.ascending[targetIdx] = cardValue;
+    } else {
+        board.descending[targetIdx] = cardValue;
+    }
+
+    player.cards.splice(player.cards.indexOf(cardValue), 1);
+    player.cardsPlayedThisTurn.push({
+        value: cardValue,
+        position: position,
+        isPlayedThisTurn: true
+    });
+
+    updateBoardHistory(room, position, cardValue);
+    checkGameStatus(room);
+
+    res.json({ success: true });
+});
+
+// Nueva ruta para terminar turno
+app.post('/end-turn', (req, res) => {
+    const { playerId, roomId } = req.body;
+
+    if (!rooms.has(roomId)) {
+        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+    }
+
+    const room = rooms.get(roomId);
+    const player = room.players.find(p => p.id === playerId);
+
+    if (!player) {
+        return res.status(404).json({ success: false, message: 'Jugador no encontrado' });
+    }
+
+    if (player.id !== room.gameState.currentTurn) {
+        return res.status(400).json({
+            success: false,
+            message: 'No es tu turno'
+        });
+    }
+
+    const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+    if (player.cardsPlayedThisTurn.length < minCardsRequired) {
+        return res.status(400).json({
+            success: false,
+            message: `Debes jugar al menos ${minCardsRequired} cartas este turno`
+        });
+    }
+
+    // Repartir nuevas cartas
+    const cardsToDraw = Math.min(
+        room.gameState.initialCards - player.cards.length,
+        room.gameState.deck.length
+    );
+
+    for (let i = 0; i < cardsToDraw; i++) {
+        player.cards.push(room.gameState.deck.pop());
+    }
+
+    // Cambiar turno
+    const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
+    const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
+    const nextPlayer = room.players[nextIndex];
+    room.gameState.currentTurn = nextPlayer.id;
+
+    // Verificar si el siguiente jugador puede cumplir con el mínimo
+    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
+
+    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
+        return res.json({
+            success: true,
+            notification: {
+                message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
+                isError: true
+            },
+            gameOver: {
+                message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
+                result: 'lose'
+            }
+        });
+    }
+
+    player.cardsPlayedThisTurn = [];
+    checkGameStatus(room);
+
+    res.json({
+        success: true,
+        notification: {
+            message: `Ahora es el turno de ${nextPlayer.name}`,
+            isError: false
+        }
+    });
+});
+
 app.get('/room-info/:roomId', (req, res) => {
     res.set('Cache-Control', 'public, max-age=5');
     const roomId = req.params.roomId;
