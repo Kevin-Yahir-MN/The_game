@@ -8,30 +8,69 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
-const allowedOrigins = ['https://the-game-2xks.onrender.com'];
-const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
-const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000;
+app.disable('x-powered-by');
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-app.use(compression());
 app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=()');
+
+    const allowedOrigins = ['https://the-game-2xks.onrender.com'];
     const origin = req.headers.origin;
+
     if (allowedOrigins.includes(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
     }
-    if (req.method === 'OPTIONS') return res.status(200).end();
+
+    if (req.method === 'OPTIONS') {
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        return res.status(200).end();
+    }
+
+    if (!req.path.startsWith('/client')) {
+        res.setHeader('Cache-Control', 'no-store, max-age=0');
+    }
+
     next();
 });
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'client')));
+app.use(compression({
+    level: 6,
+    threshold: 10000,
+    filter: (req, res) => {
+        if (req.headers['x-no-compression']) return false;
+        return compression.filter(req, res);
+    }
+}));
+
+app.use(express.static(path.join(__dirname, 'client'), {
+    setHeaders: (res, filePath) => {
+        const fileType = path.extname(filePath);
+        let cacheControl = 'public, max-age=31536000, immutable';
+
+        if (fileType === '.html') {
+            cacheControl = 'no-store, max-age=0';
+        } else if (fileType === '.css' || fileType === '.js') {
+            cacheControl = 'public, max-age=604800';
+        }
+
+        res.setHeader('Cache-Control', cacheControl);
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
+}));
 
 const rooms = new Map();
 const reverseRoomMap = new Map();
 const boardHistory = new Map();
 const sseConnections = new Map();
 
+const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000;
 setInterval(() => {
     const now = Date.now();
     for (const [roomId, room] of rooms.entries()) {
@@ -350,6 +389,7 @@ app.get('/sse', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
 
     if (!sseConnections.has(roomId)) {
         sseConnections.set(roomId, new Map());
@@ -366,7 +406,17 @@ app.get('/sse', (req, res) => {
     });
 });
 
-app.post('/create-room', (req, res) => {
+const validateContentType = (req, res, next) => {
+    if (req.headers['content-type'] !== 'application/json') {
+        return res.status(415).json({
+            success: false,
+            message: 'Unsupported Media Type'
+        });
+    }
+    next();
+};
+
+app.post('/create-room', validateContentType, (req, res) => {
     const { playerName } = req.body;
     if (!playerName) {
         return res.status(400).json({ success: false, message: 'Se requiere nombre de jugador' });
@@ -399,10 +449,11 @@ app.post('/create-room', (req, res) => {
         descending1: [100], descending2: [100]
     });
 
+    res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains');
     res.json({ success: true, roomId, playerId, playerName });
 });
 
-app.post('/join-room', (req, res) => {
+app.post('/join-room', validateContentType, (req, res) => {
     const { playerName, roomId } = req.body;
     if (!playerName || !roomId) {
         return res.status(400).json({
@@ -453,7 +504,7 @@ app.get('/room-info/:roomId', (req, res) => {
     });
 });
 
-app.post('/start-game', (req, res) => {
+app.post('/start-game', validateContentType, (req, res) => {
     const { roomId, playerId, initialCards } = req.body;
     if (!rooms.has(roomId)) {
         return res.status(404).json({ success: false, message: 'Sala no encontrada' });
@@ -510,7 +561,7 @@ function startGame(room, initialCards = 6) {
     });
 }
 
-app.post('/play-card', (req, res) => {
+app.post('/play-card', validateContentType, (req, res) => {
     const { roomId, playerId, cardValue, position } = req.body;
     if (!rooms.has(roomId)) {
         return res.status(404).json({ success: false, message: 'Sala no encontrada' });
@@ -526,7 +577,7 @@ app.post('/play-card', (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/end-turn', (req, res) => {
+app.post('/end-turn', validateContentType, (req, res) => {
     const { roomId, playerId } = req.body;
     if (!rooms.has(roomId)) {
         return res.status(404).json({ success: false, message: 'Sala no encontrada' });
@@ -542,7 +593,7 @@ app.post('/end-turn', (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/undo-move', (req, res) => {
+app.post('/undo-move', validateContentType, (req, res) => {
     const { roomId, playerId, cardValue, position } = req.body;
     if (!rooms.has(roomId)) {
         return res.status(404).json({ success: false, message: 'Sala no encontrada' });
@@ -558,7 +609,7 @@ app.post('/undo-move', (req, res) => {
     res.json({ success: true });
 });
 
-app.post('/update-player', (req, res) => {
+app.post('/update-player', validateContentType, (req, res) => {
     const { roomId, playerId, name } = req.body;
     if (!rooms.has(roomId)) {
         return res.status(404).json({ success: false, message: 'Sala no encontrada' });
@@ -584,6 +635,15 @@ app.post('/update-player', (req, res) => {
     res.json({ success: true });
 });
 
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor',
+        error: process.env.NODE_ENV === 'production' ? {} : err
+    });
+});
+
 server.listen(PORT, () => {
-    console.log(`🚀 Servidor SSE iniciado en puerto ${PORT}`);
+    console.log(`🚀 Servidor iniciado en puerto ${PORT}`);
 });
