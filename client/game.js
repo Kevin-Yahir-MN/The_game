@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const API_URL = window.location.origin; // Usa la misma URL del servidor actual
+    window.API_URL = API_URL;
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const endTurnButton = document.getElementById('endTurnBtn');
