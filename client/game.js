@@ -218,6 +218,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 5000);
     }
 
+    function showNotification(message, isError = false) {
+        const notification = document.createElement('div');
+        notification.className = `notification ${isError ? 'error' : ''}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.classList.add('notification-fade-out');
+            setTimeout(() => notification.remove(), 300);
+        }, isError ? 5000 : 3000);
+    }
+
+    function isValidMove(cardValue, position) {
+        const target = position.includes('asc')
+            ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
+            : gameState.board.descending[position === 'desc1' ? 0 : 1];
+
+        return position.includes('asc')
+            ? (cardValue > target || cardValue === target - 10)
+            : (cardValue < target || cardValue === target + 10);
+    }
+
+    function updatePlayerCards(cards) {
+        const isYourTurn = gameState.currentTurn === currentPlayer.id;
+        const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
+
+        gameState.yourCards = cards.map((cardValue, index) => {
+            const playable = isYourTurn && (
+                isValidMove(cardValue, 'asc1') ||
+                isValidMove(cardValue, 'asc2') ||
+                isValidMove(cardValue, 'desc1') ||
+                isValidMove(cardValue, 'desc2')
+            );
+
+            return new Card(
+                cardValue,
+                startX + index * (CARD_WIDTH + CARD_SPACING),
+                PLAYER_CARDS_Y,
+                playable,
+                false
+            );
+        });
+    }
     function updateGameState(newState) {
         if (!newState) return;
 
