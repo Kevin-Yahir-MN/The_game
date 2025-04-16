@@ -175,64 +175,6 @@ app.get('/room-info/:roomId', (req, res) => {
     });
 });
 
-app.post('/start-game', (req, res) => {
-    const { playerId, roomId, initialCards } = req.body;
-
-    if (!rooms.has(roomId)) {
-        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
-    }
-
-    const room = rooms.get(roomId);
-    const player = room.players.find(p => p.id === playerId);
-
-    if (!player) {
-        return res.status(404).json({ success: false, message: 'Jugador no encontrado' });
-    }
-
-    if (!player.isHost) {
-        return res.status(403).json({ success: false, message: 'Solo el host puede iniciar el juego' });
-    }
-
-    if (room.gameState.gameStarted) {
-        return res.status(400).json({ success: false, message: 'El juego ya ha comenzado' });
-    }
-
-    // Inicialización completa del juego
-    room.gameState = {
-        deck: initializeDeck(),
-        board: { ascending: [1, 1], descending: [100, 100] },
-        currentTurn: room.players[0].id,
-        gameStarted: true,
-        initialCards: parseInt(initialCards) || 6,
-        gameOver: null
-    };
-
-    // Repartir cartas a TODOS los jugadores
-    room.players.forEach(p => {
-        p.cards = [];
-        p.cardsPlayedThisTurn = [];
-        for (let i = 0; i < room.gameState.initialCards; i++) {
-            if (room.gameState.deck.length > 0) {
-                p.cards.push(room.gameState.deck.pop());
-            }
-        }
-    });
-
-    // Inicializar historial del tablero
-    boardHistory.set(roomId, {
-        ascending1: [1], ascending2: [1],
-        descending1: [100], descending2: [100]
-    });
-
-    res.json({
-        success: true,
-        message: 'Juego iniciado correctamente',
-        initialCards: room.gameState.initialCards,
-        // Devuelve las cartas iniciales del jugador que inició
-        initialHand: player.cards
-    });
-});
-
 app.get('/game-state/:roomId', (req, res) => {
     const roomId = req.params.roomId;
     const playerId = req.query.playerId;
@@ -270,6 +212,74 @@ app.get('/game-state/:roomId', (req, res) => {
             initialCards: room.gameState.initialCards,
             gameOver: room.gameState.gameOver
         }
+    });
+});
+
+app.get('/check-game-started/:roomId', (req, res) => {
+    const roomId = req.params.roomId;
+
+    if (!rooms.has(roomId)) {
+        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+    }
+
+    const room = rooms.get(roomId);
+
+    res.json({
+        success: true,
+        gameStarted: room.gameState.gameStarted,
+        currentPlayerId: room.gameState.currentTurn
+    });
+});
+
+app.post('/start-game', (req, res) => {
+    const { playerId, roomId, initialCards } = req.body;
+
+    if (!rooms.has(roomId)) {
+        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+    }
+
+    const room = rooms.get(roomId);
+    const player = room.players.find(p => p.id === playerId);
+
+    if (!player) {
+        return res.status(404).json({ success: false, message: 'Jugador no encontrado' });
+    }
+
+    if (!player.isHost) {
+        return res.status(403).json({ success: false, message: 'Solo el host puede iniciar el juego' });
+    }
+
+    // Iniciar el juego
+    room.gameState = {
+        deck: initializeDeck(),
+        board: { ascending: [1, 1], descending: [100, 100] },
+        currentTurn: room.players[0].id,
+        gameStarted: true,
+        initialCards: parseInt(initialCards) || 6,
+        gameOver: null
+    };
+
+    // Repartir cartas a todos los jugadores
+    room.players.forEach(player => {
+        player.cards = [];
+        for (let i = 0; i < room.gameState.initialCards && room.gameState.deck.length > 0; i++) {
+            player.cards.push(room.gameState.deck.pop());
+        }
+    });
+
+    // Inicializar historial del tablero
+    boardHistory.set(roomId, {
+        ascending1: [1], ascending2: [1],
+        descending1: [100], descending2: [100]
+    });
+
+    // Guardar en sessionStorage del servidor
+    room.lastActivity = Date.now();
+
+    res.json({
+        success: true,
+        message: 'Juego iniciado correctamente',
+        gameStarted: true
     });
 });
 

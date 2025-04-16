@@ -997,6 +997,7 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.removeEventListener('touchend', handleTouchEnd);
         endTurnButton.removeEventListener('click', endTurn);
     }
+
     // Inicialización optimizada
     function initGame() {
         if (!canvas || !ctx || !currentPlayer.id || !roomId) {
@@ -1004,20 +1005,33 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Verificar estado del juego y obtener cartas iniciales
-        fetch(`${API_URL}/game-state/${roomId}?playerId=${currentPlayer.id}`)
+        // Primero verificar si el juego ya comenzó
+        fetch(`${API_URL}/check-game-started/${roomId}`)
             .then(response => response.json())
             .then(data => {
-                if (!data.success || !data.state.gameStarted) {
-                    alert('El juego no ha comenzado. Vuelve a la sala.');
-                    window.location.href = 'sala.html';
+                if (!data.success || !data.gameStarted) {
+                    showNotification('El juego no ha comenzado. Vuelve a la sala.', true);
+                    setTimeout(() => {
+                        window.location.href = 'sala.html';
+                    }, 2000);
                     return;
+                }
+
+                // Si el juego ha comenzado, obtener el estado completo
+                return fetch(`${API_URL}/game-state/${roomId}?playerId=${currentPlayer.id}`);
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data || !data.success) {
+                    throw new Error('No se pudo obtener el estado del juego');
                 }
 
                 // Inicializar el estado del juego
                 gameState = {
                     players: data.state.players,
-                    yourCards: data.state.yourCards.map(value => new Card(value, 0, 0, false, false)),
+                    yourCards: data.state.yourCards.map(value =>
+                        new Card(value, 0, 0, false, false)
+                    ),
                     board: data.state.board,
                     currentTurn: data.state.currentTurn,
                     remainingDeck: data.state.remainingDeck,
@@ -1036,30 +1050,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 updatePlayerCards(data.state.yourCards);
 
                 // Cargar assets y comenzar el juego
-                Promise.all([
-                    loadAsset('cards-icon.png').then(img => { if (img) historyIcon = img; })
-                ]).then(() => {
-                    // Configurar eventos
-                    endTurnButton.addEventListener('click', endTurn);
-                    canvas.addEventListener('click', handleCanvasClick);
-                    canvas.addEventListener('mousedown', handleMouseDown);
-                    canvas.addEventListener('mousemove', handleMouseMove);
-                    canvas.addEventListener('mouseup', handleMouseUp);
-                    canvas.addEventListener('mouseleave', handleMouseUp);
-                    canvas.addEventListener('touchstart', handleTouchStart);
-                    canvas.addEventListener('touchmove', handleTouchMove);
-                    canvas.addEventListener('touchend', handleTouchEnd);
-                    document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
-                    window.addEventListener('beforeunload', cleanup);
+                return loadAsset('cards-icon.png');
+            })
+            .then(img => {
+                if (img) historyIcon = img;
 
-                    // Iniciar polling del juego
-                    startGamePolling();
-                    gameLoop();
-                });
+                // Configurar eventos
+                endTurnButton.addEventListener('click', endTurn);
+                canvas.addEventListener('click', handleCanvasClick);
+                canvas.addEventListener('mousedown', handleMouseDown);
+                canvas.addEventListener('mousemove', handleMouseMove);
+                canvas.addEventListener('mouseup', handleMouseUp);
+                canvas.addEventListener('mouseleave', handleMouseUp);
+                canvas.addEventListener('touchstart', handleTouchStart);
+                canvas.addEventListener('touchmove', handleTouchMove);
+                canvas.addEventListener('touchend', handleTouchEnd);
+                document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
+                window.addEventListener('beforeunload', cleanup);
+
+                // Iniciar polling del juego
+                startGamePolling();
+                gameLoop();
             })
             .catch(error => {
-                console.error('Error al obtener estado inicial:', error);
-                alert('Error al conectar con el servidor. Recarga la página.');
+                console.error('Error al inicializar el juego:', error);
+                showNotification('Error al cargar el juego. Recarga la página.', true);
             });
     }
 

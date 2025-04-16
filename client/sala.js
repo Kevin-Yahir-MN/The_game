@@ -102,11 +102,17 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'game.html';
     }
 
-    // Iniciar juego (solo host)
     async function handleStartGame() {
+        if (!roomId || !playerId) {
+            showNotification('Error: No se encontraron datos de la sala', true);
+            return;
+        }
+
+        startBtn.disabled = true;
+        startBtn.textContent = 'Iniciando...';
+
         try {
-            startBtn.disabled = true;
-            startBtn.textContent = 'Iniciando...';
+            const initialCards = parseInt(initialCardsSelect.value) || 6;
 
             const response = await fetch(`${API_URL}/start-game`, {
                 method: 'POST',
@@ -115,25 +121,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     playerId: playerId,
-                    playerName: playerName,
                     roomId: roomId,
-                    initialCards: parseInt(initialCardsSelect.value)
+                    initialCards: initialCards
                 })
             });
 
             if (!response.ok) {
-                throw new Error('Error al iniciar juego');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || 'Error al iniciar juego');
             }
 
             const data = await response.json();
+
             if (!data.success) {
                 throw new Error(data.message || 'Error al iniciar juego');
             }
+
+            // Guardar en sessionStorage que el juego ha comenzado
+            sessionStorage.setItem('gameStarted', 'true');
+
+            // Redirigir a la pantalla de juego
+            window.location.href = 'game.html';
+
         } catch (error) {
             console.error('Error al iniciar juego:', error);
+            showNotification(error.message || 'Error al iniciar el juego', true);
+        } finally {
             startBtn.disabled = false;
             startBtn.textContent = 'Iniciar Juego';
-            updateConnectionStatus('Error al iniciar', true);
         }
     }
 

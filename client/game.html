@@ -55,6 +55,19 @@
     <div id="modalBackdrop" class="modal-backdrop" style="display: none;"></div>
 
     <script src="game.js"></script>
+    <script>
+        // Verificación inicial antes de cargar el juego
+        if (!sessionStorage.getItem('playerId') || !sessionStorage.getItem('roomId')) {
+            alert('No se encontraron datos del jugador. Vuelve a la sala.');
+            window.location.href = 'sala.html';
+        }
+
+        // Verificar si el juego fue iniciado
+        if (sessionStorage.getItem('gameStarted') !== 'true') {
+            alert('El juego no ha comenzado. Serás redirigido a la sala.');
+            window.location.href = 'sala.html';
+        }
+    </script>
 </body>
 
 </html>
