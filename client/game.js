@@ -1021,70 +1021,141 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initGame() {
-        if (!canvas || !ctx || !currentPlayer.id || !roomId) {
-            alert('Error: No se pudo inicializar el juego. Vuelve a la sala.');
+        // 1. Validación inicial de requisitos
+        if (!canvas || !ctx) {
+            console.error('Canvas or context not available');
+            alert('Error: No se pudo inicializar el juego. Recarga la página.');
             return;
         }
 
-        // Obtener datos iniciales de sessionStorage
-        const initialPlayers = JSON.parse(sessionStorage.getItem('initialPlayers') || []);
-        const initialTurn = sessionStorage.getItem('currentTurn');
-        const initialCards = parseInt(sessionStorage.getItem('initialCards')) || 6;
-        const lastModified = parseInt(sessionStorage.getItem('lastModified')) || Date.now();
+        if (!currentPlayer.id || !roomId) {
+            console.error('Missing player ID or room ID');
+            alert('Error: Datos de jugador o sala no encontrados. Vuelve a la sala.');
+            window.location.href = 'sala.html';
+            return;
+        }
 
-        // Establecer estado inicial
-        gameState.players = initialPlayers;
-        gameState.currentTurn = initialTurn;
-        gameState.initialCards = initialCards;
-        lastUpdateTime = lastModified;
+        // 2. Función helper para leer sessionStorage de forma segura
+        const getSafeStorage = (key, defaultValue) => {
+            try {
+                const item = sessionStorage.getItem(key);
+                if (item === null) return defaultValue;
+                return JSON.parse(item);
+            } catch (e) {
+                console.error(`Error parsing ${key}:`, e);
+                return defaultValue;
+            }
+        };
 
-        // Limpiar sessionStorage
-        sessionStorage.removeItem('initialPlayers');
-        sessionStorage.removeItem('currentTurn');
-        sessionStorage.removeItem('initialCards');
-        sessionStorage.removeItem('lastModified');
+        // 3. Cargar datos iniciales con validación
+        const initialData = {
+            players: getSafeStorage('initialPlayers', []),
+            currentTurn: sessionStorage.getItem('currentTurn') || '',
+            initialCards: Math.max(1, parseInt(sessionStorage.getItem('initialCards')) || 6),
+            lastModified: Math.max(0, parseInt(sessionStorage.getItem('lastModified'))) || Date.now()
+        };
 
-        fetch(`${API_URL}/check-game-started/${roomId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (!data.success || !data.gameStarted) {
-                    showNotification('El juego no ha comenzado. Vuelve a la sala.', true);
-                    setTimeout(() => {
-                        window.location.href = 'sala.html';
-                    }, 2000);
-                    return;
+        // 4. Limpiar sessionStorage después de leer
+        const cleanSessionStorage = () => {
+            try {
+                ['initialPlayers', 'currentTurn', 'initialCards', 'lastModified', 'gameStarted'].forEach(key => {
+                    sessionStorage.removeItem(key);
+                });
+            } catch (e) {
+                console.error('Error cleaning sessionStorage:', e);
+            }
+        };
+
+        // 5. Verificar datos mínimos requeridos
+        if (!Array.isArray(initialData.players) || initialData.players.length === 0) {
+            console.error('Invalid players data:', initialData.players);
+            showNotification('Datos de jugadores inválidos. Vuelve a la sala.', true);
+            cleanSessionStorage();
+            setTimeout(() => window.location.href = 'sala.html', 2000);
+            return;
+        }
+
+        // 6. Inicializar estado del juego
+        gameState = {
+            ...gameState,
+            players: initialData.players,
+            currentTurn: initialData.currentTurn,
+            initialCards: initialData.initialCards,
+            yourCards: [],
+            board: { ascending: [1, 1], descending: [100, 100] },
+            remainingDeck: 98,
+            animatingCards: [],
+            columnHistory: {
+                asc1: [1],
+                asc2: [1],
+                desc1: [100],
+                desc2: [100]
+            }
+        };
+
+        lastUpdateTime = initialData.lastModified;
+        cleanSessionStorage();
+
+        // 7. Verificar estado del juego con el servidor
+        const verifyGameState = async () => {
+            try {
+                // Primero verificar si el juego ha comenzado
+                const checkResponse = await fetch(`${API_URL}/check-game-started/${roomId}`);
+                const checkData = await checkResponse.json();
+
+                if (!checkData.success || !checkData.gameStarted) {
+                    throw new Error(checkData.message || 'El juego no ha comenzado');
                 }
 
-                return fetch(`${API_URL}/game-state/${roomId}?playerId=${currentPlayer.id}`);
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (!data || !data.success) {
-                    throw new Error('No se pudo obtener el estado del juego');
+                // Obtener estado actual del juego
+                const stateResponse = await fetch(
+                    `${API_URL}/game-state/${roomId}?playerId=${currentPlayer.id}&_=${Date.now()}`
+                );
+                const stateData = await stateResponse.json();
+
+                if (!stateData.success) {
+                    throw new Error(stateData.message || 'Estado del juego inválido');
                 }
 
-                updateGameState(data.state);
+                return stateData.state;
+            } catch (error) {
+                console.error('Error verifying game state:', error);
+                throw error;
+            }
+        };
+
+        // 8. Iniciar el juego después de verificar
+        verifyGameState()
+            .then(state => {
+                updateGameState(state);
                 startGamePolling();
                 gameLoop();
+                setupEventListeners();
             })
             .catch(error => {
-                console.error('Error al inicializar el juego:', error);
-                showNotification('Error al cargar el juego. Recarga la página.', true);
+                console.error('Initialization failed:', error);
+                showNotification(`Error: ${error.message}. Vuelve a la sala.`, true);
+                setTimeout(() => window.location.href = 'sala.html', 3000);
             });
 
-        // Configurar eventos
-        endTurnButton.addEventListener('click', endTurn);
-        canvas.addEventListener('click', handleCanvasClick);
-        canvas.addEventListener('mousedown', handleMouseDown);
-        canvas.addEventListener('mousemove', handleMouseMove);
-        canvas.addEventListener('mouseup', handleMouseUp);
-        canvas.addEventListener('mouseleave', handleMouseUp);
-        canvas.addEventListener('touchstart', handleTouchStart);
-        canvas.addEventListener('touchmove', handleTouchMove);
-        canvas.addEventListener('touchend', handleTouchEnd);
-        document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
-        window.addEventListener('beforeunload', cleanup);
+        // 9. Configurar event listeners (separado para claridad)
+        const setupEventListeners = () => {
+            try {
+                endTurnButton.addEventListener('click', endTurn);
+                canvas.addEventListener('click', handleCanvasClick);
+                canvas.addEventListener('mousedown', handleMouseDown);
+                canvas.addEventListener('mousemove', handleMouseMove);
+                canvas.addEventListener('mouseup', handleMouseUp);
+                canvas.addEventListener('mouseleave', handleMouseUp);
+                canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+                canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+                canvas.addEventListener('touchend', handleTouchEnd);
+                document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
+                window.addEventListener('beforeunload', cleanup);
+            } catch (e) {
+                console.error('Error setting up event listeners:', e);
+            }
+        };
     }
-
     initGame();
 });

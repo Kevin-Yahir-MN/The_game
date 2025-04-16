@@ -214,9 +214,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.message || 'Error al iniciar juego');
             }
 
-            // Esperar breve momento para asegurar propagación del estado
-            await new Promise(resolve => setTimeout(resolve, 300));
-            handleGameStart();
+            // Guardar datos en sessionStorage de forma segura
+            sessionStorage.setItem('initialPlayers', JSON.stringify(data.players || []));
+            sessionStorage.setItem('currentTurn', data.currentTurn || '');
+            sessionStorage.setItem('initialCards', data.initialCards?.toString() || '6');
+            sessionStorage.setItem('lastModified', data.lastModified?.toString() || Date.now().toString());
+            sessionStorage.setItem('gameStarted', 'true');
+
+            // Redirigir después de asegurar que los datos están guardados
+            setTimeout(() => {
+                window.location.href = 'game.html';
+            }, 300);
         } catch (error) {
             console.error('Start game error:', error);
             updateConnectionStatus('Error al iniciar: ' + error.message, true);
@@ -225,7 +233,6 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.startBtn.textContent = 'Iniciar Juego';
         }
     }
-
     function handleGameStart() {
         stopPolling();
         sessionStorage.setItem('gameStarted', 'true');
