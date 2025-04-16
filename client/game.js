@@ -392,26 +392,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateGameState(newState) {
-        if (!newState) return;
-
-        gameState.players = newState.players.map(player => ({
-            id: player.id,
-            name: player.name,
-            cardCount: player.cardCount,
-            isHost: player.isHost,
-            connected: player.connected
-        }));
-
-        gameState.board = newState.board || gameState.board;
-        gameState.currentTurn = newState.currentTurn || gameState.currentTurn;
-        gameState.remainingDeck = newState.remainingDeck || gameState.remainingDeck;
-        gameState.initialCards = newState.initialCards || gameState.initialCards;
-
-        if (newState.yourCards) {
-            updatePlayerCards(newState.yourCards);
+        if (!newState || !newState.players || !Array.isArray(newState.players)) {
+            console.error('Estado del juego inválido:', newState);
+            return;
         }
 
-        updateGameInfo();
+        try {
+            gameState.players = newState.players.map(player => ({
+                id: player.id,
+                name: player.name || `Jugador_${player.id.slice(0, 4)}`,
+                cardCount: player.cardCount || 0,
+                isHost: Boolean(player.isHost),
+                connected: Boolean(player.connected)
+            }));
+
+            gameState.board = newState.board || gameState.board;
+            gameState.currentTurn = newState.currentTurn || gameState.currentTurn;
+            gameState.remainingDeck = newState.remainingDeck || gameState.remainingDeck;
+            gameState.initialCards = newState.initialCards || gameState.initialCards;
+
+            if (newState.yourCards && Array.isArray(newState.yourCards)) {
+                updatePlayerCards(newState.yourCards);
+            }
+
+            updateGameInfo();
+        } catch (error) {
+            console.error('Error al actualizar el estado del juego:', error);
+        }
     }
 
     function handleOpponentCardPlayed(message) {
@@ -976,6 +983,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         requestAnimationFrame(gameLoop);
+    }
+
+    function cleanup() {
+        clearTimeout(pollingTimeout);
+        canvas.removeEventListener('click', handleCanvasClick);
+        canvas.removeEventListener('mousedown', handleMouseDown);
+        canvas.removeEventListener('mousemove', handleMouseMove);
+        canvas.removeEventListener('mouseup', handleMouseUp);
+        canvas.removeEventListener('mouseleave', handleMouseUp);
+        canvas.removeEventListener('touchstart', handleTouchStart);
+        canvas.removeEventListener('touchmove', handleTouchMove);
+        canvas.removeEventListener('touchend', handleTouchEnd);
+        endTurnButton.removeEventListener('click', endTurn);
     }
 
     function initGame() {
