@@ -85,6 +85,13 @@ function getFilteredGameState(room, playerId) {
         yourCards: player?.cards || [],
         remainingDeck: room.gameState.deck.length,
         initialCards: room.gameState.initialCards,
+        players: room.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            cardCount: p.cards.length,
+            isHost: p.isHost,
+            connected: p.connected
+        })),
         gameOver: room.gameState.gameOver
     };
 }
@@ -306,7 +313,7 @@ app.post('/start-game', (req, res) => {
         return res.status(403).json({ success: false, message: 'Solo el host puede iniciar el juego' });
     }
 
-    // Iniciar el juego
+    // Inicializar el mazo y repartir cartas
     room.gameState = {
         deck: initializeDeck(),
         board: { ascending: [1, 1], descending: [100, 100] },
@@ -322,6 +329,8 @@ app.post('/start-game', (req, res) => {
         for (let i = 0; i < room.gameState.initialCards && room.gameState.deck.length > 0; i++) {
             player.cards.push(room.gameState.deck.pop());
         }
+        player.cardsPlayedThisTurn = []; // Asegurar que esté inicializado
+        player.lastActivity = Date.now(); // Actualizar actividad
     });
 
     // Inicializar historial del tablero
@@ -332,10 +341,20 @@ app.post('/start-game', (req, res) => {
 
     room.lastModified = Date.now();
 
+    // Respuesta con todos los datos necesarios
     res.json({
         success: true,
-        message: 'Juego iniciado correctamente',
-        gameStarted: true
+        players: room.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            cardCount: p.cards.length,
+            isHost: p.isHost,
+            connected: true
+        })),
+        currentTurn: room.gameState.currentTurn,
+        initialCards: room.gameState.initialCards,
+        gameStarted: true,
+        lastModified: room.lastModified
     });
 });
 

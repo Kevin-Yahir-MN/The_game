@@ -151,18 +151,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || 'Error al iniciar juego');
-            }
-
             const data = await response.json();
 
             if (!data.success) {
                 throw new Error(data.message || 'Error al iniciar juego');
             }
 
-            handleGameStart();
+            // Guardar datos iniciales antes de redirigir
+            sessionStorage.setItem('initialPlayers', JSON.stringify(data.players));
+            sessionStorage.setItem('currentTurn', data.currentTurn);
+            sessionStorage.setItem('initialCards', data.initialCards);
+            sessionStorage.setItem('lastModified', data.lastModified);
+
+            // Pequeña espera para asegurar propagación del estado
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // Redirigir al juego
+            window.location.href = 'game.html';
 
         } catch (error) {
             console.error('Error al iniciar juego:', error);

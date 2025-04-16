@@ -392,23 +392,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateGameState(newState) {
-        if (!newState || !newState.players || !Array.isArray(newState.players)) {
-            console.error('Estado del juego inválido:', newState);
-            return;
-        }
-
         try {
-            gameState.players = newState.players.map(player => ({
-                id: player.id,
-                name: player.name || `Jugador_${player.id.slice(0, 4)}`,
-                cardCount: player.cardCount || 0,
-                isHost: Boolean(player.isHost),
-                connected: Boolean(player.connected)
-            }));
+            if (!newState) {
+                throw new Error('Estado nulo recibido');
+            }
 
+            // Validación mínima del estado
+            if (!newState.board || !newState.currentTurn) {
+                throw new Error('Estado del juego incompleto');
+            }
+
+            // Actualizar jugadores (mantener existentes si no vienen nuevos)
+            if (newState.players && Array.isArray(newState.players)) {
+                gameState.players = newState.players.map(player => ({
+                    id: player.id,
+                    name: player.name || `Jugador_${player.id.slice(0, 4)}`,
+                    cardCount: player.cardCount || 0,
+                    isHost: Boolean(player.isHost),
+                    connected: Boolean(player.connected)
+                }));
+            } else if (!gameState.players) {
+                gameState.players = [];
+            }
+
+            // Actualizar resto del estado
             gameState.board = newState.board || gameState.board;
             gameState.currentTurn = newState.currentTurn || gameState.currentTurn;
-            gameState.remainingDeck = newState.remainingDeck || gameState.remainingDeck;
+            gameState.remainingDeck = newState.remainingDeck ?? gameState.remainingDeck;
             gameState.initialCards = newState.initialCards || gameState.initialCards;
 
             if (newState.yourCards && Array.isArray(newState.yourCards)) {
@@ -418,6 +428,18 @@ document.addEventListener('DOMContentLoaded', () => {
             updateGameInfo();
         } catch (error) {
             console.error('Error al actualizar el estado del juego:', error);
+            console.debug('Estado recibido:', newState);
+
+            // Recuperación mínima - mantener al menos al jugador actual
+            if (!gameState.players.length && currentPlayer.id) {
+                gameState.players = [{
+                    id: currentPlayer.id,
+                    name: currentPlayer.name,
+                    cardCount: gameState.yourCards?.length || 0,
+                    isHost: currentPlayer.isHost,
+                    connected: true
+                }];
+            }
         }
     }
 
@@ -1004,6 +1026,24 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Obtener datos iniciales de sessionStorage
+        const initialPlayers = JSON.parse(sessionStorage.getItem('initialPlayers') || []);
+        const initialTurn = sessionStorage.getItem('currentTurn');
+        const initialCards = parseInt(sessionStorage.getItem('initialCards')) || 6;
+        const lastModified = parseInt(sessionStorage.getItem('lastModified')) || Date.now();
+
+        // Establecer estado inicial
+        gameState.players = initialPlayers;
+        gameState.currentTurn = initialTurn;
+        gameState.initialCards = initialCards;
+        lastUpdateTime = lastModified;
+
+        // Limpiar sessionStorage
+        sessionStorage.removeItem('initialPlayers');
+        sessionStorage.removeItem('currentTurn');
+        sessionStorage.removeItem('initialCards');
+        sessionStorage.removeItem('lastModified');
+
         fetch(`${API_URL}/check-game-started/${roomId}`)
             .then(response => response.json())
             .then(data => {
@@ -1023,26 +1063,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error('No se pudo obtener el estado del juego');
                 }
 
-                gameState = {
-                    players: data.state.players,
-                    yourCards: data.state.yourCards.map(value =>
-                        new Card(value, 0, 0, false, false)
-                    ),
-                    board: data.state.board,
-                    currentTurn: data.state.currentTurn,
-                    remainingDeck: data.state.remainingDeck,
-                    initialCards: data.state.initialCards,
-                    cardsPlayedThisTurn: [],
-                    animatingCards: [],
-                    columnHistory: {
-                        asc1: data.state.board.ascending[0] === 1 ? [1] : [1, data.state.board.ascending[0]],
-                        asc2: data.state.board.ascending[1] === 1 ? [1] : [1, data.state.board.ascending[1]],
-                        desc1: data.state.board.descending[0] === 100 ? [100] : [100, data.state.board.descending[0]],
-                        desc2: data.state.board.descending[1] === 100 ? [100] : [100, data.state.board.descending[1]]
-                    }
-                };
-
-                updatePlayerCards(data.state.yourCards);
+                updateGameState(data.state);
                 startGamePolling();
                 gameLoop();
             })
