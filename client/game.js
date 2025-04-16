@@ -3,10 +3,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const endTurnButton = document.getElementById('endTurnBtn');
-    const STATE_UPDATE_INTERVAL = 2000; // 2 segundos para polling
     const TARGET_FPS = 60;
 
-    // Dimensiones y posiciones (igual que antes)
+    // Dimensiones y posiciones
     const CARD_WIDTH = 80;
     const CARD_HEIGHT = 120;
     const COLUMN_SPACING = 60;
@@ -23,16 +22,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const assetCache = new Map();
     let historyIcon = new Image();
     let lastRenderTime = 0;
-    let pollingInterval;
     let lastUpdateTime = 0;
+    let stopPolling = null;
 
-    // Variables para drag and drop (igual que antes)
+    // Variables para drag and drop
     let dragStartCard = null;
     let dragStartX = 0;
     let dragStartY = 0;
     let isDragging = false;
 
-    // Datos del jugador (igual que antes)
+    // Datos del jugador
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
         name: sessionStorage.getItem('playerName'),
@@ -40,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const roomId = sessionStorage.getItem('roomId');
 
-    // Estado del juego (igual que antes)
+    // Estado del juego
     let activeNotifications = [];
     let selectedCard = null;
     let gameState = {
@@ -60,7 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Clase Card (igual que antes)
     class Card {
         constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
             this.value = value;
@@ -131,7 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Función para cargar assets (igual que antes)
     function loadAsset(url) {
         if (assetCache.has(url)) {
             return Promise.resolve(assetCache.get(url));
@@ -147,39 +144,52 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Polling para actualizaciones del juego
-    function startGamePolling() {
+    function startLongPolling() {
+        let isRequestPending = false;
+        let shouldContinue = true;
+
         const poll = async () => {
+            if (!shouldContinue || isRequestPending) return;
+
+            isRequestPending = true;
             try {
-                const response = await fetch(`${API_URL}/game-state/${roomId}?playerId=${currentPlayer.id}&lastUpdate=${lastUpdateTime}`);
-                if (!response.ok) throw new Error('Error en la respuesta');
+                const response = await fetch(`${API_URL}/game-state-longpoll/${roomId}?playerId=${currentPlayer.id}&lastUpdate=${lastUpdateTime}`);
 
-                const data = await response.json();
-                if (data.success) {
-                    lastUpdateTime = Date.now();
-                    updateGameState(data.state);
+                if (response.status === 204) {
+                    console.log('Long polling timeout, reiniciando...');
+                } else if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        lastUpdateTime = Date.now();
+                        updateGameState(data.state);
 
-                    // Manejar notificaciones especiales
-                    if (data.notification) {
-                        showNotification(data.notification.message, data.notification.isError);
-                    }
+                        if (data.notification) {
+                            showNotification(data.notification.message, data.notification.isError);
+                        }
 
-                    if (data.gameOver) {
-                        handleGameOver(data.gameOver.message);
+                        if (data.gameOver) {
+                            handleGameOver(data.gameOver.message);
+                        }
                     }
                 }
             } catch (error) {
-                console.error('Error en polling del juego:', error);
-                // Reintentar automáticamente en el próximo intervalo
+                console.error('Error en long polling:', error);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            } finally {
+                isRequestPending = false;
+                if (shouldContinue) {
+                    poll();
+                }
             }
         };
 
-        poll(); // Primera llamada inmediata
-        pollingInterval = setInterval(poll, STATE_UPDATE_INTERVAL);
+        poll();
+
+        return () => {
+            shouldContinue = false;
+        };
     }
 
-    // Notificaciones (igual que antes)
-    let notificationTimeout;
     function showNotification(message, isError = false) {
         const existing = document.querySelector('.notification');
         if (existing) {
@@ -207,7 +217,6 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => notification.remove(), 300);
         }, duration);
     }
-
 
     function showColumnHistory(columnId) {
         const modal = document.getElementById('historyModal');
@@ -291,7 +300,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? 'Tu turno'
                 : `Turno de ${currentPlayerObj.name}`;
 
-            // Actualizar cartas jugables si es nuestro turno
             if (gameState.currentTurn === currentPlayer.id) {
                 gameState.yourCards.forEach(card => {
                     card.isPlayable = ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
@@ -311,37 +319,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('progressText').textContent = '0/2 cartas jugadas';
         document.getElementById('progressBar').style.width = '0%';
 
-        // También reiniciamos visualmente las cartas jugadas este turno
         gameState.yourCards.forEach(card => {
             card.isPlayedThisTurn = false;
             card.backgroundColor = '#FFFFFF';
         });
 
         gameState.cardsPlayedThisTurn = [];
-    }
-
-    function handleMoveUndone(message) {
-        if (message.playerId === currentPlayer.id) {
-            const moveIndex = gameState.cardsPlayedThisTurn.findIndex(
-                move => move.value === message.cardValue && move.position === message.position
-            );
-
-            if (moveIndex !== -1) {
-                gameState.cardsPlayedThisTurn.splice(moveIndex, 1);
-            }
-
-            if (message.position.includes('asc')) {
-                const idx = message.position === 'asc1' ? 0 : 1;
-                gameState.board.ascending[idx] = message.previousValue;
-            } else {
-                const idx = message.position === 'desc1' ? 0 : 1;
-                gameState.board.descending[idx] = message.previousValue;
-            }
-
-            const card = new Card(message.cardValue, 0, 0, true, false);
-            gameState.yourCards.push(card);
-            updatePlayerCards(gameState.yourCards.map(c => c.value));
-        }
     }
 
     function handleGameOver(message) {
@@ -363,11 +346,6 @@ document.addEventListener('DOMContentLoaded', () => {
         backdrop.appendChild(gameOverDiv);
 
         document.getElementById('returnToRoom').addEventListener('click', () => {
-            socket.send(JSON.stringify({
-                type: 'reset_room',
-                roomId: roomId,
-                playerId: currentPlayer.id
-            }));
             window.location.href = 'sala.html';
         });
     }
@@ -375,7 +353,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateGameState(newState) {
         if (!newState) return;
 
-        // Actualizar información de los jugadores
         gameState.players = newState.players.map(player => ({
             id: player.id,
             name: player.name,
@@ -384,57 +361,16 @@ document.addEventListener('DOMContentLoaded', () => {
             connected: player.connected
         }));
 
-        // Actualizar estado del juego
         gameState.board = newState.board || gameState.board;
         gameState.currentTurn = newState.currentTurn || gameState.currentTurn;
         gameState.remainingDeck = newState.remainingDeck || gameState.remainingDeck;
         gameState.initialCards = newState.initialCards || gameState.initialCards;
 
-        // Actualizar cartas del jugador si están presentes
         if (newState.yourCards) {
             updatePlayerCards(newState.yourCards);
         }
 
-        // Actualizar UI
         updateGameInfo();
-    }
-
-    function handleOpponentCardPlayed(message) {
-        if (message.playerId !== currentPlayer.id) {
-            const position = message.position;
-            const value = message.cardValue;
-
-            if (position.includes('asc')) {
-                const idx = position === 'asc1' ? 0 : 1;
-                gameState.board.ascending[idx] = value;
-            } else {
-                const idx = position === 'desc1' ? 0 : 1;
-                gameState.board.descending[idx] = value;
-            }
-
-            const cardPosition = getColumnPosition(position);
-            const opponentCard = new Card(value, cardPosition.x, cardPosition.y, false, true);
-
-            gameState.animatingCards.push({
-                card: opponentCard,
-                startTime: Date.now(),
-                duration: 200,
-                targetX: cardPosition.x,
-                targetY: cardPosition.y,
-                fromX: cardPosition.x,
-                fromY: -CARD_HEIGHT
-            });
-
-            gameState.cardsPlayedThisTurn.push({
-                value: message.cardValue,
-                position: message.position,
-                playerId: message.playerId,
-                isPlayedThisTurn: true
-            });
-
-            gameState.columnHistory[message.position].push(message.cardValue);
-            showNotification(`${message.playerName} jugó un ${value}`);
-        }
     }
 
     function updatePlayerCards(cards) {
@@ -472,7 +408,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Manejadores de eventos para drag and drop
     function handleMouseDown(e) {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -490,7 +425,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startDrag(x, y) {
-        // Verificar si estamos arrastrando una carta del jugador
         const clickedCard = gameState.yourCards.find(card => card.contains(x, y));
         if (clickedCard && clickedCard.isPlayable && gameState.currentTurn === currentPlayer.id) {
             dragStartCard = clickedCard;
@@ -498,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dragStartY = y;
             isDragging = true;
             dragStartCard.startDrag(x - dragStartCard.x, y - dragStartCard.y);
-            selectedCard = dragStartCard; // Mantener consistencia con la selección por clic
+            selectedCard = dragStartCard;
         }
     }
 
@@ -551,7 +485,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 clientX = e.changedTouches[0].clientX;
                 clientY = e.changedTouches[0].clientY;
             } else {
-                // Caso por defecto si no hay coordenadas disponibles
                 dragStartCard.endDrag();
                 dragStartCard = null;
                 isDragging = false;
@@ -561,12 +494,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const x = clientX - rect.left;
             const y = clientY - rect.top;
 
-            // Verificar si soltamos la carta sobre una columna válida
             const targetColumn = getClickedColumn(x, y);
             if (targetColumn) {
                 playCard(dragStartCard.value, targetColumn);
             } else {
-                // Si no es una columna válida, devolver la carta a su posición original
                 const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
                 if (cardIndex !== -1) {
                     const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
@@ -583,14 +514,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleCanvasClick(e) {
-        // Si estamos en medio de un drag and drop, ignorar el clic
         if (isDragging) return;
 
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        // Verificar clicks en los iconos de historial
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const iconX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const iconY = HISTORY_ICON_Y;
@@ -638,11 +567,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (confirmMove) {
                         playCard(selectedCard.value, clickedColumn);
-                        socket.send(JSON.stringify({
-                            type: 'self_blocked',
-                            playerId: currentPlayer.id,
-                            roomId: roomId
-                        }));
                         return;
                     } else {
                         return;
@@ -726,7 +650,6 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.board.descending[idx] = cardValue;
         }
 
-        // Enviar movimiento al servidor via fetch
         fetch(`${API_URL}/play-card`, {
             method: 'POST',
             headers: {
@@ -747,7 +670,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGameInfo();
     }
 
-    // Función para terminar turno (modificada para usar fetch)
     function endTurn() {
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
@@ -774,10 +696,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error(data.message || 'Error al terminar turno');
                 }
 
-                // Actualizar el estado local con la respuesta del servidor
                 gameState.currentTurn = data.nextPlayer.id;
 
-                // Mostrar notificación del cambio de turno
                 const isMyTurn = data.nextPlayer.id === currentPlayer.id;
                 const turnMessage = isMyTurn
                     ? '¡Es tu turno!'
@@ -785,7 +705,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 showNotification(turnMessage);
 
-                // Actualizar cartas jugables si es nuestro turno
                 if (isMyTurn) {
                     gameState.yourCards.forEach(card => {
                         card.isPlayable = ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
@@ -859,7 +778,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fill();
 
         gameState.yourCards.forEach((card, index) => {
-            if (card && card !== dragStartCard) { // No dibujar la carta que se está arrastrando
+            if (card && card !== dragStartCard) {
                 card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
                     index * (CARD_WIDTH + CARD_SPACING);
                 card.y = PLAYER_CARDS_Y;
@@ -870,7 +789,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateGameInfo() {
-        // Actualizar turno actual
         const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
         let currentPlayerName;
 
@@ -883,11 +801,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         document.getElementById('currentTurn').textContent = currentPlayerName;
-
-        // Actualizar cartas restantes en el mazo
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
 
-        // Actualizar progreso de cartas jugadas este turno (solo para el jugador actual)
         if (gameState.currentTurn === currentPlayer.id) {
             const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
                 card => card.playerId === currentPlayer.id
@@ -897,12 +812,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const progressText = `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
             document.getElementById('progressText').textContent = progressText;
 
-            // Actualizar barra de progreso
             const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
             document.getElementById('progressBar').style.width = `${progressPercentage}%`;
         }
 
-        // Actualizar panel de jugadores
         updatePlayersPanel();
     }
 
@@ -925,7 +838,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 c => c.playerId === player.id
             ).length;
 
-            // Asegurar que siempre haya un nombre visible
             const displayName = player.name || `Jugador_${player.id.slice(0, 4)}`;
 
             return `
@@ -958,7 +870,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Game loop con throttling
     function gameLoop(timestamp) {
         if (timestamp - lastRenderTime < 1000 / TARGET_FPS) {
             requestAnimationFrame(gameLoop);
@@ -976,7 +887,6 @@ document.addEventListener('DOMContentLoaded', () => {
         handleCardAnimations();
         drawPlayerCards();
 
-        // Dibujar la carta que se está arrastrando encima de todo
         if (isDragging && dragStartCard) {
             dragStartCard.draw();
         }
@@ -984,9 +894,8 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(gameLoop);
     }
 
-    // Limpieza al salir
     function cleanup() {
-        clearInterval(pollingInterval);
+        if (stopPolling) stopPolling();
         canvas.removeEventListener('click', handleCanvasClick);
         canvas.removeEventListener('mousedown', handleMouseDown);
         canvas.removeEventListener('mousemove', handleMouseMove);
@@ -998,14 +907,12 @@ document.addEventListener('DOMContentLoaded', () => {
         endTurnButton.removeEventListener('click', endTurn);
     }
 
-    // Inicialización optimizada
     function initGame() {
         if (!canvas || !ctx || !currentPlayer.id || !roomId) {
             alert('Error: No se pudo inicializar el juego. Vuelve a la sala.');
             return;
         }
 
-        // Primero verificar si el juego ya comenzó
         fetch(`${API_URL}/check-game-started/${roomId}`)
             .then(response => response.json())
             .then(data => {
@@ -1017,7 +924,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // Si el juego ha comenzado, obtener el estado completo
                 return fetch(`${API_URL}/game-state/${roomId}?playerId=${currentPlayer.id}`);
             })
             .then(response => response.json())
@@ -1026,7 +932,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error('No se pudo obtener el estado del juego');
                 }
 
-                // Inicializar el estado del juego
                 gameState = {
                     players: data.state.players,
                     yourCards: data.state.yourCards.map(value =>
@@ -1046,16 +951,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 };
 
-                // Posicionar cartas del jugador
                 updatePlayerCards(data.state.yourCards);
 
-                // Cargar assets y comenzar el juego
                 return loadAsset('cards-icon.png');
             })
             .then(img => {
                 if (img) historyIcon = img;
 
-                // Configurar eventos
                 endTurnButton.addEventListener('click', endTurn);
                 canvas.addEventListener('click', handleCanvasClick);
                 canvas.addEventListener('mousedown', handleMouseDown);
@@ -1068,8 +970,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
                 window.addEventListener('beforeunload', cleanup);
 
-                // Iniciar polling del juego
-                startGamePolling();
+                stopPolling = startLongPolling();
                 gameLoop();
             })
             .catch(error => {
