@@ -197,7 +197,7 @@ app.post('/start-game', (req, res) => {
         return res.status(400).json({ success: false, message: 'El juego ya ha comenzado' });
     }
 
-    // Iniciar el juego
+    // Inicialización completa del juego
     room.gameState = {
         deck: initializeDeck(),
         board: { ascending: [1, 1], descending: [100, 100] },
@@ -207,16 +207,18 @@ app.post('/start-game', (req, res) => {
         gameOver: null
     };
 
-    // Repartir cartas
-    room.players.forEach(player => {
-        player.cards = [];
-        player.cardsPlayedThisTurn = [];
-        for (let i = 0; i < room.gameState.initialCards && room.gameState.deck.length > 0; i++) {
-            player.cards.push(room.gameState.deck.pop());
+    // Repartir cartas a TODOS los jugadores
+    room.players.forEach(p => {
+        p.cards = [];
+        p.cardsPlayedThisTurn = [];
+        for (let i = 0; i < room.gameState.initialCards; i++) {
+            if (room.gameState.deck.length > 0) {
+                p.cards.push(room.gameState.deck.pop());
+            }
         }
     });
 
-    // Inicializar historial
+    // Inicializar historial del tablero
     boardHistory.set(roomId, {
         ascending1: [1], ascending2: [1],
         descending1: [100], descending2: [100]
@@ -225,7 +227,9 @@ app.post('/start-game', (req, res) => {
     res.json({
         success: true,
         message: 'Juego iniciado correctamente',
-        initialCards: room.gameState.initialCards
+        initialCards: room.gameState.initialCards,
+        // Devuelve las cartas iniciales del jugador que inició
+        initialHand: player.cards
     });
 });
 
@@ -378,7 +382,7 @@ app.post('/end-turn', (req, res) => {
         });
     }
 
-    // Repartir nuevas cartas
+    // Repartir nuevas cartas si hay en el mazo
     const cardsToDraw = Math.min(
         room.gameState.initialCards - player.cards.length,
         room.gameState.deck.length
@@ -395,25 +399,27 @@ app.post('/end-turn', (req, res) => {
     room.gameState.currentTurn = nextPlayer.id;
 
     // Verificar si el siguiente jugador puede jugar
-    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
+    const nextPlayerPlayableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+    const nextPlayerRequired = room.gameState.deck.length > 0 ? 2 : 1;
 
-    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
+    if (nextPlayerPlayableCards.length < nextPlayerRequired && nextPlayer.cards.length > 0) {
         room.gameState.gameOver = {
             result: 'lose',
-            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`
+            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${nextPlayerRequired} carta(s) requerida(s)!`
         };
     }
 
+    // Reiniciar cartas jugadas este turno
     player.cardsPlayedThisTurn = [];
     checkGameStatus(room);
 
     res.json({
         success: true,
-        notification: {
-            message: `Turno cambiado a ${nextPlayer.name}`,
-            isError: false
+        nextPlayer: {
+            id: nextPlayer.id,
+            name: nextPlayer.name
         },
+        minCardsRequired: nextPlayerRequired,
         gameOver: room.gameState.gameOver
     });
 });
