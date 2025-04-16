@@ -1,10 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = 'https://the-game-2xks.onrender.com';
-    const PLAYER_UPDATE_INTERVAL = 3000; // 3 segundos para polling
+    const BASE_POLL_INTERVAL = 3000;
+    const MIN_POLL_INTERVAL = 1000;
+    const MAX_POLL_INTERVAL = 5000;
     const MAX_RECONNECT_ATTEMPTS = 5;
     const RECONNECT_BASE_DELAY = 2000;
 
-    let pollingInterval;
+    let currentPollInterval = BASE_POLL_INTERVAL;
+    let pollingTimeout;
+    let lastActivityTime = Date.now();
     const roomId = sessionStorage.getItem('roomId');
     const playerId = sessionStorage.getItem('playerId');
     const playerName = sessionStorage.getItem('playerName');
@@ -39,28 +43,24 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.room-header').appendChild(playerInfo);
     }
 
-    // Actualizar estado de conexión
-    function updateConnectionStatus(status, isError = false) {
-        const statusElement = document.getElementById('connectionStatusText');
-        if (statusElement) {
-            statusElement.textContent = status;
-            statusElement.className = isError ? 'error' : '';
-        }
-    }
-
-    // Polling para actualizaciones de sala
+    // Polling adaptativo
     function startPolling() {
         let retryCount = 0;
 
         const poll = async () => {
             try {
-                const response = await fetch(`${API_URL}/room-info/${roomId}`);
+                const response = await fetch(`${API_URL}/room-info/${roomId}?_=${Date.now()}`);
                 if (!response.ok) throw new Error('Error en la respuesta');
 
                 const data = await response.json();
                 if (data.success) {
                     retryCount = 0;
                     updatePlayersUI(data.players);
+
+                    // Ajustar intervalo basado en actividad
+                    const hasActivity = checkRoomActivity(data);
+                    adjustPollingInterval(hasActivity);
+
                     if (data.gameStarted) {
                         handleGameStart();
                     }
@@ -75,11 +75,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, retryCount - 1), 30000);
                 setTimeout(poll, delay);
                 updateConnectionStatus(`Reconectando (${retryCount}/${MAX_RECONNECT_ATTEMPTS})...`);
+            } finally {
+                if (!retryCount || retryCount < MAX_RECONNECT_ATTEMPTS) {
+                    pollingTimeout = setTimeout(poll, currentPollInterval);
+                }
             }
         };
 
         poll(); // Primera llamada inmediata
-        pollingInterval = setInterval(poll, PLAYER_UPDATE_INTERVAL);
+    }
+
+    function checkRoomActivity(data) {
+        // Verificar cambios significativos en el estado de la sala
+        const previousPlayerCount = playersList.children.length;
+        const currentPlayerCount = data.players?.length || 0;
+
+        return (previousPlayerCount !== currentPlayerCount) ||
+            data.gameStarted ||
+            (Date.now() - lastActivityTime < 5000);
+    }
+
+    function adjustPollingInterval(hasActivity) {
+        if (hasActivity) {
+            // Reducir intervalo si hay actividad
+            currentPollInterval = Math.max(MIN_POLL_INTERVAL, currentPollInterval - 500);
+            lastActivityTime = Date.now();
+        } else {
+            // Aumentar intervalo gradualmente
+            currentPollInterval = Math.min(MAX_POLL_INTERVAL, currentPollInterval + 500);
+        }
     }
 
     // Actualizar lista de jugadores
@@ -98,7 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Manejar inicio del juego
     function handleGameStart() {
-        clearInterval(pollingInterval);
+        clearTimeout(pollingTimeout);
+        sessionStorage.setItem('gameStarted', 'true');
         window.location.href = 'game.html';
     }
 
@@ -137,11 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.message || 'Error al iniciar juego');
             }
 
-            // Guardar en sessionStorage que el juego ha comenzado
-            sessionStorage.setItem('gameStarted', 'true');
-
-            // Redirigir a la pantalla de juego
-            window.location.href = 'game.html';
+            handleGameStart();
 
         } catch (error) {
             console.error('Error al iniciar juego:', error);
@@ -154,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Limpieza al salir
     window.addEventListener('beforeunload', () => {
-        clearInterval(pollingInterval);
+        clearTimeout(pollingTimeout);
     });
 
     // Iniciar

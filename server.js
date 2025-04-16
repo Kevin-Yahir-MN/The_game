@@ -77,7 +77,19 @@ function checkGameStatus(room) {
     }
 }
 
-// Rutas HTTP
+function getFilteredGameState(room, playerId) {
+    const player = room.players.find(p => p.id === playerId);
+    return {
+        board: room.gameState.board,
+        currentTurn: room.gameState.currentTurn,
+        yourCards: player?.cards || [],
+        remainingDeck: room.gameState.deck.length,
+        initialCards: room.gameState.initialCards,
+        gameOver: room.gameState.gameOver
+    };
+}
+
+// Rutas del API
 app.post('/create-room', (req, res) => {
     const { playerName } = req.body;
     if (!playerName) {
@@ -103,7 +115,8 @@ app.post('/create-room', (req, res) => {
             gameStarted: false,
             initialCards: 6,
             gameOver: null
-        }
+        },
+        lastModified: Date.now()
     };
 
     rooms.set(roomId, room);
@@ -142,6 +155,7 @@ app.post('/join-room', (req, res) => {
     };
 
     room.players.push(newPlayer);
+    room.lastModified = Date.now();
     res.json({ success: true, playerId, playerName });
 });
 
@@ -152,9 +166,9 @@ app.get('/room-info/:roomId', (req, res) => {
     }
 
     const room = rooms.get(roomId);
-
-    // Marcar jugadores inactivos (última actividad > 30 segundos)
     const now = Date.now();
+
+    // Marcar jugadores inactivos
     room.players.forEach(player => {
         player.connected = (now - player.lastActivity) < 30000;
     });
@@ -173,6 +187,49 @@ app.get('/room-info/:roomId', (req, res) => {
         initialCards: room.gameState.initialCards,
         gameOver: room.gameState.gameOver
     });
+});
+
+app.get('/game-state-updates/:roomId', (req, res) => {
+    const roomId = req.params.roomId;
+    const playerId = req.query.playerId;
+    const lastUpdate = parseInt(req.query.lastUpdate) || 0;
+
+    if (!rooms.has(roomId)) {
+        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+    }
+
+    const room = rooms.get(roomId);
+    const player = room.players.find(p => p.id === playerId);
+
+    if (!player) {
+        return res.status(404).json({ success: false, message: 'Jugador no encontrado' });
+    }
+
+    // Actualizar actividad del jugador
+    player.lastActivity = Date.now();
+    player.connected = true;
+
+    // Responder inmediatamente si hay cambios
+    if (room.lastModified > lastUpdate) {
+        return res.json({
+            success: true,
+            state: getFilteredGameState(room, playerId),
+            lastModified: room.lastModified
+        });
+    }
+
+    // Esperar hasta 2 segundos por cambios
+    const startTime = Date.now();
+    const checkInterval = setInterval(() => {
+        if (room.lastModified > lastUpdate || Date.now() - startTime > 2000) {
+            clearInterval(checkInterval);
+            res.json({
+                success: true,
+                state: room.lastModified > lastUpdate ? getFilteredGameState(room, playerId) : null,
+                lastModified: room.lastModified
+            });
+        }
+    }, 300);
 });
 
 app.get('/game-state/:roomId', (req, res) => {
@@ -273,8 +330,7 @@ app.post('/start-game', (req, res) => {
         descending1: [100], descending2: [100]
     });
 
-    // Guardar en sessionStorage del servidor
-    room.lastActivity = Date.now();
+    room.lastModified = Date.now();
 
     res.json({
         success: true,
@@ -353,6 +409,7 @@ app.post('/play-card', (req, res) => {
 
     updateBoardHistory(room, position, numericCardValue);
     checkGameStatus(room);
+    room.lastModified = Date.now();
 
     res.json({
         success: true,
@@ -422,6 +479,7 @@ app.post('/end-turn', (req, res) => {
     // Reiniciar cartas jugadas este turno
     player.cardsPlayedThisTurn = [];
     checkGameStatus(room);
+    room.lastModified = Date.now();
 
     res.json({
         success: true,
@@ -432,6 +490,29 @@ app.post('/end-turn', (req, res) => {
         minCardsRequired: nextPlayerRequired,
         gameOver: room.gameState.gameOver
     });
+});
+
+app.post('/self-blocked', (req, res) => {
+    const { playerId, roomId } = req.body;
+
+    if (!rooms.has(roomId)) {
+        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+    }
+
+    const room = rooms.get(roomId);
+    const player = room.players.find(p => p.id === playerId);
+
+    if (!player) {
+        return res.status(404).json({ success: false, message: 'Jugador no encontrado' });
+    }
+
+    room.gameState.gameOver = {
+        result: 'lose',
+        message: `¡${player.name} se bloqueó a sí mismo!`
+    };
+
+    room.lastModified = Date.now();
+    res.json({ success: true });
 });
 
 // Limpieza de salas inactivas
@@ -453,7 +534,7 @@ setInterval(() => {
     }
 }, ROOM_CLEANUP_INTERVAL);
 
-// Iniciar servidor HTTP
+// Iniciar servidor
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor HTTP (Polling) iniciado en puerto ${PORT}`);
+    console.log(`🚀 Servidor HTTP (Polling Optimizado) iniciado en puerto ${PORT}`);
 });
