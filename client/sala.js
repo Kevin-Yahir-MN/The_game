@@ -20,11 +20,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('startGame');
     const gameSettings = document.getElementById('gameSettings');
     const initialCardsSelect = document.getElementById('initialCards');
+    const connectionStatus = document.createElement('div');
+    connectionStatus.className = 'connection-status';
+    document.querySelector('.room-header').appendChild(connectionStatus);
+
+    // Función para actualizar el estado de conexión
+    function updateConnectionStatus(message, isError = false) {
+        connectionStatus.textContent = message;
+        connectionStatus.className = `connection-status ${isError ? 'error' : ''}`;
+    }
 
     // Inicialización de la UI
     function initializeUI() {
         roomIdDisplay.textContent = roomId;
-        displayPlayerInfo();
 
         if (isHost) {
             gameSettings.style.display = 'block';
@@ -35,26 +43,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Mostrar información del jugador
-    function displayPlayerInfo() {
-        const playerInfo = document.createElement('div');
-        playerInfo.id = 'playerInfo';
-        playerInfo.className = 'player-info';
-        document.querySelector('.room-header').appendChild(playerInfo);
-    }
-
-    // Polling adaptativo
+    // Polling adaptativo mejorado
     function startPolling() {
         let retryCount = 0;
 
         const poll = async () => {
             try {
-                const response = await fetch(`${API_URL}/room-info/${roomId}?_=${Date.now()}`);
-                if (!response.ok) throw new Error('Error en la respuesta');
+                const response = await fetch(`${API_URL}/room/${roomId}/info?playerId=${playerId}&_=${Date.now()}`);
+
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
 
                 const data = await response.json();
+
                 if (data.success) {
                     retryCount = 0;
+                    updateConnectionStatus('Conectado');
                     updatePlayersUI(data.players);
 
                     // Ajustar intervalo basado en actividad
@@ -64,49 +69,47 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (data.gameStarted) {
                         handleGameStart();
                     }
+                } else {
+                    throw new Error(data.message || 'Error en la respuesta del servidor');
                 }
             } catch (error) {
                 retryCount++;
                 console.error('Error en polling:', error);
+                updateConnectionStatus(`Error de conexión (${retryCount}/${MAX_RECONNECT_ATTEMPTS})`, true);
+
                 if (retryCount >= MAX_RECONNECT_ATTEMPTS) {
-                    updateConnectionStatus('Error de conexión', true);
+                    updateConnectionStatus('No se puede conectar al servidor', true);
                     return;
                 }
+
                 const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, retryCount - 1), 30000);
-                setTimeout(poll, delay);
-                updateConnectionStatus(`Reconectando (${retryCount}/${MAX_RECONNECT_ATTEMPTS})...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                poll(); // Reintentar
             } finally {
-                if (!retryCount || retryCount < MAX_RECONNECT_ATTEMPTS) {
+                if (retryCount < MAX_RECONNECT_ATTEMPTS) {
                     pollingTimeout = setTimeout(poll, currentPollInterval);
                 }
             }
         };
 
-        poll(); // Primera llamada inmediata
+        poll();
     }
 
     function checkRoomActivity(data) {
-        // Verificar cambios significativos en el estado de la sala
         const previousPlayerCount = playersList.children.length;
         const currentPlayerCount = data.players?.length || 0;
-
-        return (previousPlayerCount !== currentPlayerCount) ||
-            data.gameStarted ||
-            (Date.now() - lastActivityTime < 5000);
+        return (previousPlayerCount !== currentPlayerCount) || data.gameStarted;
     }
 
     function adjustPollingInterval(hasActivity) {
         if (hasActivity) {
-            // Reducir intervalo si hay actividad
             currentPollInterval = Math.max(MIN_POLL_INTERVAL, currentPollInterval - 500);
             lastActivityTime = Date.now();
         } else {
-            // Aumentar intervalo gradualmente
             currentPollInterval = Math.min(MAX_POLL_INTERVAL, currentPollInterval + 500);
         }
     }
 
-    // Actualizar lista de jugadores
     function updatePlayersUI(players) {
         if (!players || !Array.isArray(players)) return;
 
@@ -120,12 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
     }
 
-    // Manejar inicio del juego
-    function handleGameStart() {
-        clearTimeout(pollingTimeout);
-        sessionStorage.setItem('gameStarted', 'true');
-        window.location.href = 'game.html';
-    }
 
     async function handleStartGame() {
         if (!roomId || !playerId) {
