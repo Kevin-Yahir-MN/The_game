@@ -1,149 +1,209 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_URL = 'https://the-game-2xks.onrender.com';
-    const BASE_POLL_INTERVAL = 3000;
-    const MIN_POLL_INTERVAL = 1000;
-    const MAX_POLL_INTERVAL = 5000;
-    const MAX_RECONNECT_ATTEMPTS = 5;
-    const RECONNECT_BASE_DELAY = 2000;
+    const POLL_INTERVALS = {
+        normal: 3000,
+        fast: 1000,
+        slow: 5000,
+        reconnect: 2000
+    };
+    const MAX_RETRIES = 5;
 
-    let currentPollInterval = BASE_POLL_INTERVAL;
-    let pollingTimeout;
-    let lastActivityTime = Date.now();
-    const roomId = sessionStorage.getItem('roomId');
-    const playerId = sessionStorage.getItem('playerId');
-    const playerName = sessionStorage.getItem('playerName');
-    const isHost = sessionStorage.getItem('isHost') === 'true';
+    // Estado de la aplicación
+    const appState = {
+        polling: {
+            active: false,
+            interval: POLL_INTERVALS.normal,
+            timeout: null,
+            retries: 0
+        },
+        room: {
+            id: sessionStorage.getItem('roomId'),
+            players: []
+        },
+        player: {
+            id: sessionStorage.getItem('playerId'),
+            name: sessionStorage.getItem('playerName'),
+            isHost: sessionStorage.getItem('isHost') === 'true'
+        }
+    };
 
     // Elementos UI
-    const roomIdDisplay = document.getElementById('roomIdDisplay');
-    const playersList = document.getElementById('playersList');
-    const startBtn = document.getElementById('startGame');
-    const gameSettings = document.getElementById('gameSettings');
-    const initialCardsSelect = document.getElementById('initialCards');
-    const connectionStatus = document.createElement('div');
-    connectionStatus.className = 'connection-status';
-    document.querySelector('.room-header').appendChild(connectionStatus);
+    const elements = {
+        roomCode: document.getElementById('roomIdDisplay'),
+        playersList: document.getElementById('playersList'),
+        startBtn: document.getElementById('startGame'),
+        gameSettings: document.getElementById('gameSettings'),
+        initialCards: document.getElementById('initialCards'),
+        statusIndicator: createStatusIndicator()
+    };
 
-    // Función para actualizar el estado de conexión
-    function updateConnectionStatus(message, isError = false) {
-        connectionStatus.textContent = message;
-        connectionStatus.className = `connection-status ${isError ? 'error' : ''}`;
+    // Inicialización
+    function initialize() {
+        if (!appState.room.id || !appState.player.id) {
+            return redirectToLobby('Datos de sala inválidos');
+        }
+
+        setupUI();
+        startPolling();
+        setupEventListeners();
     }
 
-    // Inicialización de la UI
-    function initializeUI() {
-        roomIdDisplay.textContent = roomId;
+    function setupUI() {
+        elements.roomCode.textContent = appState.room.id;
+        document.querySelector('.room-header').appendChild(elements.statusIndicator);
 
-        if (isHost) {
-            gameSettings.style.display = 'block';
-            startBtn.classList.add('visible');
-            startBtn.addEventListener('click', handleStartGame);
+        if (appState.player.isHost) {
+            elements.gameSettings.style.display = 'block';
+            elements.startBtn.classList.add('visible');
         } else {
-            startBtn.remove();
+            elements.startBtn.remove();
+            elements.gameSettings.remove();
         }
     }
 
-    // Polling adaptativo mejorado
+    function createStatusIndicator() {
+        const indicator = document.createElement('div');
+        indicator.className = 'connection-status';
+        return indicator;
+    }
+
+    // Sistema de Polling
     function startPolling() {
-        let retryCount = 0;
+        if (appState.polling.active) return;
 
-        const poll = async () => {
-            try {
-                const response = await fetch(`${API_URL}/room/${roomId}/info?playerId=${playerId}&_=${Date.now()}`);
+        appState.polling.active = true;
+        appState.polling.retries = 0;
+        pollRoomInfo();
+    }
 
-                if (!response.ok) {
-                    throw new Error(`Error HTTP: ${response.status}`);
-                }
+    function stopPolling() {
+        appState.polling.active = false;
+        clearTimeout(appState.polling.timeout);
+    }
 
-                const data = await response.json();
+    async function pollRoomInfo() {
+        if (!appState.polling.active) return;
 
-                if (data.success) {
-                    retryCount = 0;
-                    updateConnectionStatus('Conectado');
-                    updatePlayersUI(data.players);
+        try {
+            const url = `${API_URL}/room/${appState.room.id}/info?playerId=${appState.player.id}&_=${Date.now()}`;
+            const response = await fetch(url);
 
-                    // Ajustar intervalo basado en actividad
-                    const hasActivity = checkRoomActivity(data);
-                    adjustPollingInterval(hasActivity);
-
-                    if (data.gameStarted) {
-                        handleGameStart();
-                    }
-                } else {
-                    throw new Error(data.message || 'Error en la respuesta del servidor');
-                }
-            } catch (error) {
-                retryCount++;
-                console.error('Error en polling:', error);
-                updateConnectionStatus(`Error de conexión (${retryCount}/${MAX_RECONNECT_ATTEMPTS})`, true);
-
-                if (retryCount >= MAX_RECONNECT_ATTEMPTS) {
-                    updateConnectionStatus('No se puede conectar al servidor', true);
-                    return;
-                }
-
-                const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, retryCount - 1), 30000);
-                await new Promise(resolve => setTimeout(resolve, delay));
-                poll(); // Reintentar
-            } finally {
-                if (retryCount < MAX_RECONNECT_ATTEMPTS) {
-                    pollingTimeout = setTimeout(poll, currentPollInterval);
-                }
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
             }
-        };
 
-        poll();
-    }
+            const data = await response.json();
 
-    function checkRoomActivity(data) {
-        const previousPlayerCount = playersList.children.length;
-        const currentPlayerCount = data.players?.length || 0;
-        return (previousPlayerCount !== currentPlayerCount) || data.gameStarted;
-    }
+            if (!data.success) {
+                throw new Error(data.message || 'Invalid response');
+            }
 
-    function adjustPollingInterval(hasActivity) {
-        if (hasActivity) {
-            currentPollInterval = Math.max(MIN_POLL_INTERVAL, currentPollInterval - 500);
-            lastActivityTime = Date.now();
-        } else {
-            currentPollInterval = Math.min(MAX_POLL_INTERVAL, currentPollInterval + 500);
+            handleSuccessfulPoll(data);
+        } catch (error) {
+            handlePollError(error);
+        } finally {
+            if (appState.polling.active) {
+                scheduleNextPoll();
+            }
         }
     }
 
-    function updatePlayersUI(players) {
-        if (!players || !Array.isArray(players)) return;
+    function handleSuccessfulPoll(data) {
+        appState.polling.retries = 0;
+        updateConnectionStatus('Conectado', false);
 
-        playersList.innerHTML = players.map(player => `
-            <li class="${player.isHost ? 'host' : ''} ${player.id === playerId ? 'you' : ''}">
-                <span class="player-name">${player.name || 'Jugador'}</span>
-                ${player.isHost ? '<span class="host-tag">(Host)</span>' : ''}
-                ${player.id === playerId ? '<span class="you-tag">(Tú)</span>' : ''}
-                <span class="connection-status">${player.connected ? '🟢' : '🔴'}</span>
-            </li>
-        `).join('');
+        // Actualizar lista de jugadores
+        if (data.players && Array.isArray(data.players)) {
+            appState.room.players = data.players;
+            updatePlayersList();
+        }
+
+        // Manejar inicio del juego
+        if (data.gameStarted) {
+            handleGameStart();
+        }
+
+        // Ajustar velocidad de polling
+        adjustPollingSpeed(data);
     }
 
+    function handlePollError(error) {
+        console.error('Polling error:', error);
+        appState.polling.retries++;
 
-    async function handleStartGame() {
-        if (!roomId || !playerId) {
-            showNotification('Error: No se encontraron datos de la sala', true);
+        if (appState.polling.retries >= MAX_RETRIES) {
+            updateConnectionStatus('Error de conexión', true);
+            stopPolling();
             return;
         }
 
-        startBtn.disabled = true;
-        startBtn.textContent = 'Iniciando...';
+        updateConnectionStatus(`Reconectando (${appState.polling.retries}/${MAX_RETRIES})`, true);
+        appState.polling.interval = POLL_INTERVALS.reconnect * Math.pow(2, appState.polling.retries - 1);
+    }
+
+    function scheduleNextPoll() {
+        appState.polling.timeout = setTimeout(() => {
+            pollRoomInfo();
+        }, appState.polling.interval);
+    }
+
+    function adjustPollingSpeed(data) {
+        const hasActivity = checkRoomActivity(data);
+        appState.polling.interval = hasActivity
+            ? POLL_INTERVALS.fast
+            : POLL_INTERVALS.normal;
+    }
+
+    function checkRoomActivity(data) {
+        const previousCount = appState.room.players.length;
+        const currentCount = data.players?.length || 0;
+        return previousCount !== currentCount || data.gameStarted;
+    }
+
+    // Actualización de UI
+    function updatePlayersList() {
+        elements.playersList.innerHTML = appState.room.players
+            .map(player => createPlayerElement(player))
+            .join('');
+    }
+
+    function createPlayerElement(player) {
+        return `
+            <li class="${player.isHost ? 'host' : ''} ${player.id === appState.player.id ? 'you' : ''}">
+                <span class="player-name">${player.name || 'Jugador'}</span>
+                ${player.isHost ? '<span class="host-tag">(Host)</span>' : ''}
+                ${player.id === appState.player.id ? '<span class="you-tag">(Tú)</span>' : ''}
+                <span class="connection-icon">${player.connected ? '🟢' : '🔴'}</span>
+            </li>
+        `;
+    }
+
+    function updateConnectionStatus(message, isError) {
+        elements.statusIndicator.textContent = message;
+        elements.statusIndicator.className = `connection-status ${isError ? 'error' : ''}`;
+    }
+
+    // Manejadores de eventos
+    function setupEventListeners() {
+        if (appState.player.isHost) {
+            elements.startBtn.addEventListener('click', handleStartGame);
+        }
+
+        window.addEventListener('beforeunload', stopPolling);
+    }
+
+    async function handleStartGame() {
+        elements.startBtn.disabled = true;
+        elements.startBtn.textContent = 'Iniciando...';
 
         try {
-            const initialCards = parseInt(initialCardsSelect.value) || 6;
-
+            const initialCards = parseInt(elements.initialCards.value) || 6;
             const response = await fetch(`${API_URL}/start-game`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    playerId: playerId,
-                    roomId: roomId,
+                    playerId: appState.player.id,
+                    roomId: appState.room.id,
                     initialCards: initialCards
                 })
             });
@@ -154,33 +214,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.message || 'Error al iniciar juego');
             }
 
-            // Guardar datos iniciales antes de redirigir
-            sessionStorage.setItem('initialPlayers', JSON.stringify(data.players));
-            sessionStorage.setItem('currentTurn', data.currentTurn);
-            sessionStorage.setItem('initialCards', data.initialCards);
-            sessionStorage.setItem('lastModified', data.lastModified);
-
-            // Pequeña espera para asegurar propagación del estado
+            // Esperar breve momento para asegurar propagación del estado
             await new Promise(resolve => setTimeout(resolve, 300));
-
-            // Redirigir al juego
-            window.location.href = 'game.html';
-
+            handleGameStart();
         } catch (error) {
-            console.error('Error al iniciar juego:', error);
-            showNotification(error.message || 'Error al iniciar el juego', true);
+            console.error('Start game error:', error);
+            updateConnectionStatus('Error al iniciar: ' + error.message, true);
         } finally {
-            startBtn.disabled = false;
-            startBtn.textContent = 'Iniciar Juego';
+            elements.startBtn.disabled = false;
+            elements.startBtn.textContent = 'Iniciar Juego';
         }
     }
 
-    // Limpieza al salir
-    window.addEventListener('beforeunload', () => {
-        clearTimeout(pollingTimeout);
-    });
+    function handleGameStart() {
+        stopPolling();
+        sessionStorage.setItem('gameStarted', 'true');
+        window.location.href = 'game.html';
+    }
 
-    // Iniciar
-    initializeUI();
-    startPolling();
+    function redirectToLobby(message) {
+        console.error(message);
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+    }
+
+    // Iniciar la aplicación
+    initialize();
 });

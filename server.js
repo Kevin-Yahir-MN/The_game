@@ -295,6 +295,45 @@ app.get('/check-game-started/:roomId', (req, res) => {
     });
 });
 
+// En server.js, añade este nuevo endpoint antes de app.listen()
+app.get('/room/:roomId/info', (req, res) => {
+    const { roomId } = req.params;
+    const { playerId } = req.query;
+
+    if (!rooms.has(roomId)) {
+        return res.status(404).json({
+            success: false,
+            message: 'Sala no encontrada'
+        });
+    }
+
+    const room = rooms.get(roomId);
+    const now = Date.now();
+
+    // Actualizar estado de conexión del jugador
+    room.players.forEach(player => {
+        if (player.id === playerId) {
+            player.lastActivity = now;
+            player.connected = true;
+        }
+    });
+
+    res.json({
+        success: true,
+        players: room.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            isHost: p.isHost,
+            cardCount: p.cards?.length || 0,
+            connected: (now - p.lastActivity) < 30000 // 30 segundos de inactividad
+        })),
+        gameStarted: room.gameState?.gameStarted || false,
+        currentTurn: room.gameState?.currentTurn,
+        initialCards: room.gameState?.initialCards,
+        lastModified: room.lastModified
+    });
+});
+
 app.post('/start-game', (req, res) => {
     const { playerId, roomId, initialCards } = req.body;
 
