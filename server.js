@@ -94,6 +94,7 @@ function notifyRoomPlayers(roomId) {
 }
 
 // Endpoint de long polling
+// server.js - Solo el endpoint modificado
 app.get('/game-state-longpoll/:roomId', async (req, res) => {
     const { roomId } = req.params;
     const { playerId } = req.query;
@@ -116,6 +117,11 @@ app.get('/game-state-longpoll/:roomId', async (req, res) => {
 
     // Función para enviar respuesta
     const sendResponse = () => {
+        const history = boardHistory.get(roomId) || {
+            ascending1: [1], ascending2: [1],
+            descending1: [100], descending2: [100]
+        };
+
         const data = {
             success: true,
             state: {
@@ -132,7 +138,8 @@ app.get('/game-state-longpoll/:roomId', async (req, res) => {
                 yourCards: player.cards,
                 remainingDeck: room.gameState.deck.length,
                 initialCards: room.gameState.initialCards,
-                gameOver: room.gameState.gameOver
+                gameOver: room.gameState.gameOver,
+                history: history
             }
         };
 
@@ -148,10 +155,10 @@ app.get('/game-state-longpoll/:roomId', async (req, res) => {
     // Almacenar la solicitud pendiente
     pendingRequests.set(playerId, { res, sendResponse });
 
-    // Timeout después de 25 segundos (Render tiene timeout a 30s)
+    // Timeout después de 25 segundos
     setTimeout(() => {
         if (pendingRequests.has(playerId)) {
-            pendingRequests.get(playerId).res.status(204).end(); // No Content
+            pendingRequests.get(playerId).res.status(204).end();
             pendingRequests.delete(playerId);
         }
     }, 25000);

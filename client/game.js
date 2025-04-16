@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const ctx = canvas.getContext('2d');
     const endTurnButton = document.getElementById('endTurnBtn');
     const TARGET_FPS = 60;
+    const MAX_RETRIES = 5;
+    let retryCount = 0;
 
     // Dimensiones y posiciones
     const CARD_WIDTH = 80;
@@ -22,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const assetCache = new Map();
     let historyIcon = new Image();
     let lastRenderTime = 0;
-    let lastUpdateTime = 0;
+    let lastUpdateTime = Date.now();
     let stopPolling = null;
 
     // Variables para drag and drop
@@ -52,10 +54,10 @@ document.addEventListener('DOMContentLoaded', () => {
         cardsPlayedThisTurn: [],
         animatingCards: [],
         columnHistory: {
-            asc1: [],
-            asc2: [],
-            desc1: [],
-            desc2: []
+            asc1: [1],
+            asc2: [1],
+            desc1: [100],
+            desc2: [100]
         }
     };
 
@@ -129,21 +131,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function loadAsset(url) {
-        if (assetCache.has(url)) {
-            return Promise.resolve(assetCache.get(url));
-        }
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-                assetCache.set(url, img);
-                resolve(img);
-            };
-            img.onerror = () => resolve(null);
-            img.src = url;
-        });
-    }
-
     function startLongPolling() {
         let isRequestPending = false;
         let shouldContinue = true;
@@ -160,6 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (response.ok) {
                     const data = await response.json();
                     if (data.success) {
+                        retryCount = 0;
                         lastUpdateTime = Date.now();
                         updateGameState(data.state);
 
@@ -169,12 +157,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         if (data.gameOver) {
                             handleGameOver(data.gameOver.message);
+                            shouldContinue = false;
                         }
                     }
                 }
             } catch (error) {
                 console.error('Error en long polling:', error);
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                retryCount++;
+
+                if (retryCount >= MAX_RETRIES) {
+                    showNotification('Error de conexión. Recargando la página...', true);
+                    setTimeout(() => window.location.reload(), 2000);
+                    return;
+                }
+
+                const delay = Math.min(2000 * Math.pow(2, retryCount - 1), 30000);
+                showNotification(`Reconectando (${retryCount}/${MAX_RETRIES})...`, false);
+                await new Promise(resolve => setTimeout(resolve, delay));
             } finally {
                 isRequestPending = false;
                 if (shouldContinue) {
@@ -190,168 +189,56 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    function showNotification(message, isError = false) {
-        const existing = document.querySelector('.notification');
-        if (existing) {
-            clearTimeout(notificationTimeout);
-            existing.remove();
-        }
+    function checkConnectionStatus() {
+        const connectionStatus = document.createElement('div');
+        connectionStatus.id = 'connectionStatus';
+        connectionStatus.style.position = 'fixed';
+        connectionStatus.style.bottom = '10px';
+        connectionStatus.style.right = '10px';
+        connectionStatus.style.padding = '8px 16px';
+        connectionStatus.style.backgroundColor = 'rgba(46, 204, 113, 0.7)';
+        connectionStatus.style.color = 'white';
+        connectionStatus.style.borderRadius = '4px';
+        connectionStatus.style.zIndex = '1000';
+        connectionStatus.textContent = 'Conectado';
 
-        const notification = document.createElement('div');
-        notification.className = `notification ${isError ? 'error' : ''}`;
-        notification.textContent = message;
+        document.body.appendChild(connectionStatus);
 
-        if (message.includes('GAME OVER') || message.includes('terminará') ||
-            message.includes('derrota') || message.includes('no puede jugar')) {
-            notification.style.zIndex = '1001';
-            notification.style.fontSize = '1.2rem';
-            notification.style.padding = '20px 40px';
-            notification.style.maxWidth = '80%';
-            notification.style.textAlign = 'center';
-        }
+        setInterval(() => {
+            const now = Date.now();
+            const lastUpdateDiff = now - lastUpdateTime;
 
-        document.body.appendChild(notification);
-        const duration = (isError || message.includes('GAME OVER')) ? 5000 : 3000;
-        notificationTimeout = setTimeout(() => {
-            notification.classList.add('notification-fade-out');
-            setTimeout(() => notification.remove(), 300);
-        }, duration);
-    }
-
-    function showColumnHistory(columnId) {
-        const modal = document.getElementById('historyModal');
-        const backdrop = document.getElementById('modalBackdrop');
-        const title = document.getElementById('historyColumnTitle');
-        const container = document.getElementById('historyCardsContainer');
-
-        const columnNames = {
-            asc1: 'Pila Ascendente 1 (↑)',
-            asc2: 'Pila Ascendente 2 (↑)',
-            desc1: 'Pila Descendente 1 (↓)',
-            desc2: 'Pila Descendente 2 (↓)'
-        };
-
-        title.textContent = columnNames[columnId];
-        container.innerHTML = '';
-
-        gameState.columnHistory[columnId].forEach((card, index) => {
-            const cardElement = document.createElement('div');
-            cardElement.className = `history-card ${index === gameState.columnHistory[columnId].length - 1 ? 'recent' : ''}`;
-            cardElement.textContent = card;
-            container.appendChild(cardElement);
-        });
-
-        modal.style.display = 'block';
-        backdrop.style.display = 'block';
-    }
-
-    function closeHistoryModal() {
-        document.getElementById('historyModal').style.display = 'none';
-        document.getElementById('modalBackdrop').style.display = 'none';
-    }
-
-    function isValidMove(cardValue, position) {
-        const target = position.includes('asc')
-            ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
-            : gameState.board.descending[position === 'desc1' ? 0 : 1];
-
-        return position.includes('asc')
-            ? (cardValue > target || cardValue === target - 10)
-            : (cardValue < target || cardValue === target + 10);
-    }
-
-    function getColumnPosition(position) {
-        const index = ['asc1', 'asc2', 'desc1', 'desc2'].indexOf(position);
-        return {
-            x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * index,
-            y: BOARD_POSITION.y
-        };
-    }
-
-    function animateInvalidCard(card) {
-        if (!card) return;
-
-        const shakeAmount = 8;
-        const shakeDuration = 200;
-        const startTime = Date.now();
-
-        function shake() {
-            const elapsed = Date.now() - startTime;
-            const progress = elapsed / shakeDuration;
-
-            if (progress >= 1) {
-                card.shakeOffset = 0;
-                return;
+            if (lastUpdateDiff > 30000) {
+                connectionStatus.textContent = 'Intentando reconectar...';
+                connectionStatus.style.backgroundColor = 'rgba(231, 76, 60, 0.7)';
+            } else {
+                connectionStatus.textContent = 'Conectado';
+                connectionStatus.style.backgroundColor = 'rgba(46, 204, 113, 0.7)';
             }
-
-            card.shakeOffset = Math.sin(progress * Math.PI * 8) * shakeAmount * (1 - progress);
-            requestAnimationFrame(shake);
-        }
-
-        shake();
-    }
-
-    function handleTurnChanged() {
-        const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
-        let currentPlayerName;
-
-        if (currentPlayerObj) {
-            currentPlayerName = currentPlayerObj.id === currentPlayer.id
-                ? 'Tu turno'
-                : `Turno de ${currentPlayerObj.name}`;
-
-            if (gameState.currentTurn === currentPlayer.id) {
-                gameState.yourCards.forEach(card => {
-                    card.isPlayable = ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
-                        isValidMove(card.value, pos)
-                    );
-                });
-            }
-        } else {
-            currentPlayerName = 'Esperando jugador...';
-        }
-
-        document.getElementById('currentTurn').textContent = currentPlayerName;
-        resetCardsPlayedProgress();
-    }
-
-    function resetCardsPlayedProgress() {
-        document.getElementById('progressText').textContent = '0/2 cartas jugadas';
-        document.getElementById('progressBar').style.width = '0%';
-
-        gameState.yourCards.forEach(card => {
-            card.isPlayedThisTurn = false;
-            card.backgroundColor = '#FFFFFF';
-        });
-
-        gameState.cardsPlayedThisTurn = [];
-    }
-
-    function handleGameOver(message) {
-        canvas.style.pointerEvents = 'none';
-        endTurnButton.disabled = true;
-
-        const backdrop = document.createElement('div');
-        backdrop.className = 'game-over-backdrop';
-
-        const gameOverDiv = document.createElement('div');
-        gameOverDiv.className = 'game-over-notification';
-        gameOverDiv.innerHTML = `
-            <h2>¡GAME OVER!</h2>
-            <p>${message}</p>
-            <button id="returnToRoom">Volver a la Sala</button>
-        `;
-
-        document.body.appendChild(backdrop);
-        backdrop.appendChild(gameOverDiv);
-
-        document.getElementById('returnToRoom').addEventListener('click', () => {
-            window.location.href = 'sala.html';
-        });
+        }, 5000);
     }
 
     function updateGameState(newState) {
         if (!newState) return;
+
+        // Actualizar el historial de columnas desde el servidor
+        if (newState.board) {
+            ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
+                const value = i < 2 ? newState.board.ascending[i % 2] : newState.board.descending[i % 2];
+                const historyKey = {
+                    'asc1': 'ascending1',
+                    'asc2': 'ascending2',
+                    'desc1': 'descending1',
+                    'desc2': 'descending2'
+                }[col];
+
+                if (newState.history && newState.history[historyKey]) {
+                    gameState.columnHistory[col] = newState.history[historyKey];
+                } else if (!gameState.columnHistory[col].includes(value)) {
+                    gameState.columnHistory[col].push(value);
+                }
+            });
+        }
 
         gameState.players = newState.players.map(player => ({
             id: player.id,
@@ -924,7 +811,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                return fetch(`${API_URL}/game-state/${roomId}?playerId=${currentPlayer.id}`);
+                return fetch(`${API_URL}/game-state-longpoll/${roomId}?playerId=${currentPlayer.id}`);
             })
             .then(response => response.json())
             .then(data => {
@@ -943,16 +830,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     initialCards: data.state.initialCards,
                     cardsPlayedThisTurn: [],
                     animatingCards: [],
-                    columnHistory: {
-                        asc1: data.state.board.ascending[0] === 1 ? [1] : [1, data.state.board.ascending[0]],
-                        asc2: data.state.board.ascending[1] === 1 ? [1] : [1, data.state.board.ascending[1]],
-                        desc1: data.state.board.descending[0] === 100 ? [100] : [100, data.state.board.descending[0]],
-                        desc2: data.state.board.descending[1] === 100 ? [100] : [100, data.state.board.descending[1]]
+                    columnHistory: data.state.history || {
+                        asc1: [1, data.state.board.ascending[0]],
+                        asc2: [1, data.state.board.ascending[1]],
+                        desc1: [100, data.state.board.descending[0]],
+                        desc2: [100, data.state.board.descending[1]]
                     }
                 };
 
                 updatePlayerCards(data.state.yourCards);
-
                 return loadAsset('cards-icon.png');
             })
             .then(img => {
@@ -971,6 +857,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.addEventListener('beforeunload', cleanup);
 
                 stopPolling = startLongPolling();
+                checkConnectionStatus();
                 gameLoop();
             })
             .catch(error => {
