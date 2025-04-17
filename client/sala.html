@@ -28,16 +28,29 @@
             <div class="form-group">
                 <label for="initialCards">Cartas iniciales por jugador:</label>
                 <select id="initialCards" class="form-control">
-                    <option value="8">8 cartas</option>
-                    <option value="7">7 cartas</option>
                     <option value="6">6 cartas</option>
-                    <option value="5">5 cartas</option>
+                    <option value="7">7 cartas</option>
+                    <option value="8">8 cartas</option>
                 </select>
             </div>
         </div>
 
         <button id="startGame">Iniciar Juego</button>
     </div>
+
+    <script>
+        // Manejo de recargas forzadas
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('reload')) {
+            // Limpiar solo el estado de juego sin perder identificación
+            ['gameStarted', 'initialPlayers', 'currentTurn', 'initialCards', 'lastModified'].forEach(key => {
+                sessionStorage.removeItem(key);
+            });
+            // Limpiar parámetro de URL
+            history.replaceState(null, '', 'sala.html');
+        }
+    </script>
+
     <script src="sala.js"></script>
 </body>
 
