@@ -394,13 +394,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function updatePlayerCards(cards) {
+    function updatePlayerCards(cardValues) {
         const isYourTurn = gameState.currentTurn === currentPlayer.id;
-        const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
+        const startX = (canvas.width - (cardValues.length * (CARD_WIDTH + CARD_SPACING))) / 2;
         const startY = PLAYER_CARDS_Y;
 
-        gameState.yourCards = cards.map((card, index) => {
-            const value = card instanceof Card ? card.value : card;
+        gameState.yourCards = cardValues.map((value, index) => {
             const playable = isYourTurn && (
                 isValidMove(value, 'asc1') || isValidMove(value, 'asc2') ||
                 isValidMove(value, 'desc1') || isValidMove(value, 'desc2')
@@ -410,22 +409,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 move => move.value === value && move.playerId === currentPlayer.id
             );
 
-            if (card instanceof Card) {
-                card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
-                card.y = startY;
-                card.isPlayable = playable;
-                card.isPlayedThisTurn = isPlayedThisTurn;
-                card.backgroundColor = isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
-                return card;
-            } else {
-                return new Card(
-                    value,
-                    startX + index * (CARD_WIDTH + CARD_SPACING),
-                    startY,
-                    playable,
-                    isPlayedThisTurn
-                );
-            }
+            return new Card(
+                value,
+                startX + index * (CARD_WIDTH + CARD_SPACING),
+                startY,
+                playable,
+                isPlayedThisTurn
+            );
         });
     }
 
@@ -662,9 +652,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         gameState.columnHistory[position].push(cardValue);
 
-        selectedCard.isPlayedThisTurn = true;
-        selectedCard.backgroundColor = '#99CCFF';
-
         const cardPosition = getColumnPosition(position);
         gameState.animatingCards.push({
             card: selectedCard,
@@ -676,7 +663,8 @@ document.addEventListener('DOMContentLoaded', () => {
             fromY: selectedCard.y
         });
 
-        const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
+        // Eliminar la carta por su valor (no por referencia al objeto)
+        const cardIndex = gameState.yourCards.findIndex(c => c.value === cardValue);
         if (cardIndex !== -1) {
             gameState.yourCards.splice(cardIndex, 1);
         }
@@ -711,7 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            // 1. Primero obtener las nuevas cartas del servidor
+            // 1. Obtener nuevas cartas del servidor
             const response = await fetch(`${API_URL}/draw-cards`, {
                 method: 'POST',
                 headers: {
@@ -731,12 +719,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json();
 
-            // 2. Actualizar el estado local con las nuevas cartas
+            // 2. Actualizar estado local
             if (data.success && data.newCards) {
-                gameState.yourCards = [...gameState.yourCards, ...data.newCards];
+                // Crear nuevas instancias de Card
+                const newCards = data.newCards.map(value => {
+                    const playable = ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
+                        isValidMove(value, pos)
+                    );
+
+                    return new Card(
+                        value,
+                        0, // Posición temporal
+                        PLAYER_CARDS_Y,
+                        playable,
+                        false
+                    );
+                });
+
+                gameState.yourCards = [...gameState.yourCards, ...newCards];
                 gameState.remainingDeck = data.remainingDeck;
 
-                // 3. Notificar al servidor que terminó el turno (con cartas ya robadas)
+                // 3. Reorganizar todas las cartas
+                updatePlayerCards(gameState.yourCards.map(card => card.value));
+
+                // 4. Notificar al servidor
                 socket.send(JSON.stringify({
                     type: 'end_turn',
                     playerId: currentPlayer.id,
@@ -747,7 +753,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showNotification(`Has robado ${data.newCards.length} carta(s)`);
             }
 
-            // 4. Resetear estado del turno
+            // 5. Resetear estado
             resetCardsPlayedProgress();
             updateGameInfo();
 
@@ -796,7 +802,6 @@ document.addEventListener('DOMContentLoaded', () => {
             card.draw();
         });
     }
-
     function drawPlayerCards() {
         const backgroundHeight = CARD_HEIGHT + 30;
         const backgroundWidth = gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 40;
@@ -813,7 +818,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fill();
 
         gameState.yourCards.forEach((card, index) => {
-            if (card && card !== dragStartCard) {
+            if (!card || typeof card.draw !== 'function') return;
+
+            if (card !== dragStartCard) {
                 card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
                     index * (CARD_WIDTH + CARD_SPACING);
                 card.y = PLAYER_CARDS_Y;
@@ -822,7 +829,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-
     function updateGameInfo() {
         const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
         let currentPlayerName;
