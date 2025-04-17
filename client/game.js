@@ -764,6 +764,16 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGameInfo();
     }
 
+    function getColumnPosition(position) {
+        const columnIndex = ['asc1', 'asc2', 'desc1', 'desc2'].indexOf(position);
+        if (columnIndex === -1) return { x: 0, y: 0 };
+
+        return {
+            x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * columnIndex,
+            y: BOARD_POSITION.y
+        };
+    }
+
     function isValidMove(cardValue, position) {
         if (!gameState.board) return false;
 
