@@ -108,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // En la función que maneja las actualizaciones de la sala
     function handleSuccessfulPoll(data) {
         appState.polling.retries = 0;
         updateConnectionStatus('Conectado', false);
@@ -118,12 +119,24 @@ document.addEventListener('DOMContentLoaded', () => {
             updatePlayersList();
         }
 
-        // Manejar inicio del juego
+        // Guardar datos del juego iniciado (para todos los jugadores)
         if (data.gameStarted) {
+            sessionStorage.setItem('roomId', appState.room.id);
+            sessionStorage.setItem('playerId', appState.player.id);
+            sessionStorage.setItem('playerName', appState.player.name);
+            sessionStorage.setItem('isHost', appState.player.isHost.toString());
+
+            // Solo guardar estos datos si eres el host
+            if (appState.player.isHost) {
+                sessionStorage.setItem('initialPlayers', JSON.stringify(data.players));
+                sessionStorage.setItem('currentTurn', data.currentTurn);
+                sessionStorage.setItem('initialCards', data.initialCards.toString());
+                sessionStorage.setItem('lastModified', data.lastModified.toString());
+            }
+
             handleGameStart();
         }
 
-        // Ajustar velocidad de polling
         adjustPollingSpeed(data);
     }
 

@@ -982,108 +982,168 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
+    let animationFrameId = null;
 
     function gameLoop(timestamp) {
+        // 1. Controlar FPS
         if (timestamp - lastRenderTime < 1000 / TARGET_FPS) {
-            requestAnimationFrame(gameLoop);
+            animationFrameId = requestAnimationFrame(gameLoop);
             return;
         }
 
         lastRenderTime = timestamp;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        try {
+            // 2. Limpiar canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 3. Dibujar elementos del juego
+            drawGameBackground();
+            drawBoard();
+            drawHistoryIcons();
+            handleCardAnimations();
+            drawPlayerCards();
+
+            // 4. Dibujar carta arrastrada si existe
+            if (isDragging && dragStartCard) {
+                dragStartCard.draw();
+            }
+        } catch (error) {
+            console.error('Error en gameLoop:', error);
+            handleCriticalError('Error en el motor gráfico');
+            return;
+        }
+
+        // 5. Solicitar siguiente frame
+        animationFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    function drawGameBackground() {
         ctx.fillStyle = '#1a6b1a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        drawBoard();
-        drawHistoryIcons();
-        handleCardAnimations();
-        drawPlayerCards();
-
-        if (isDragging && dragStartCard) {
-            dragStartCard.draw();
-        }
-
-        requestAnimationFrame(gameLoop);
     }
 
+    /**
+     * Limpia todos los recursos y event listeners del juego
+     * Se ejecuta al salir de la partida o cuando ocurre un error crítico
+     */
     function cleanup() {
+        // 1. Detener todos los intervalos y timeouts
         clearTimeout(pollingTimeout);
-        canvas.removeEventListener('click', handleCanvasClick);
-        canvas.removeEventListener('mousedown', handleMouseDown);
-        canvas.removeEventListener('mousemove', handleMouseMove);
-        canvas.removeEventListener('mouseup', handleMouseUp);
-        canvas.removeEventListener('mouseleave', handleMouseUp);
-        canvas.removeEventListener('touchstart', handleTouchStart);
-        canvas.removeEventListener('touchmove', handleTouchMove);
-        canvas.removeEventListener('touchend', handleTouchEnd);
-        endTurnButton.removeEventListener('click', endTurn);
+        cancelAnimationFrame(animationFrameId);
+
+        // 2. Eliminar todos los event listeners del canvas
+        const canvasEvents = [
+            'click', 'mousedown', 'mousemove', 'mouseup', 'mouseleave',
+            'touchstart', 'touchmove', 'touchend'
+        ];
+
+        canvasEvents.forEach(event => {
+            canvas.removeEventListener(event, handleCanvasEvent);
+        });
+
+        // 3. Eliminar listener del botón de terminar turno
+        if (endTurnButton) {
+            endTurnButton.removeEventListener('click', endTurn);
+        }
+
+        // 4. Eliminar listeners de ventana
+        window.removeEventListener('beforeunload', cleanup);
+        window.removeEventListener('pagehide', cleanup);
+        window.removeEventListener('unload', cleanup);
+
+        // 5. Limpiar sessionStorage (excepto datos esenciales)
+        const keysToRemove = [
+            'gameStarted', 'initialPlayers', 'currentTurn',
+            'initialCards', 'lastModified', 'cardsPlayed'
+        ];
+
+        keysToRemove.forEach(key => {
+            sessionStorage.removeItem(key);
+        });
+
+        console.log('[Cleanup] Todos los recursos han sido liberados');
     }
 
+    // Manejador unificado para eventos del canvas
+    function handleCanvasEvent(e) {
+        switch (e.type) {
+            case 'click': handleCanvasClick(e); break;
+            case 'mousedown': handleMouseDown(e); break;
+            case 'mousemove': handleMouseMove(e); break;
+            case 'mouseup':
+            case 'mouseleave':
+                handleMouseUp(e);
+                break;
+            case 'touchstart': handleTouchStart(e); break;
+            case 'touchmove': handleTouchMove(e); break;
+            case 'touchend': handleTouchEnd(e); break;
+        }
+    }
+
+    function handleCriticalError(message, redirectUrl = 'sala.html', delay = 3000) {
+        console.error('Critical Error:', message);
+        showNotification(`Error: ${message}`, true);
+
+        // Limpiar solo datos específicos, mantener identificación del jugador
+        ['initialPlayers', 'currentTurn', 'initialCards', 'lastModified', 'gameStarted'].forEach(key => {
+            sessionStorage.removeItem(key);
+        });
+
+        setTimeout(() => {
+            // Forzar recarga completa de la sala
+            window.location.href = redirectUrl + '?reload=' + Date.now();
+        }, delay);
+    }
+
+    /**
+   * Inicializa el juego con validaciones robustas
+   */
     function initGame() {
-        // 1. Validación inicial de requisitos
+        // 1. Validación de requisitos mínimos
+        if (!validateRequirements()) {
+            return;
+        }
+
+        // 2. Configurar estado inicial
+        setupInitialState();
+
+        // 3. Cargar estado del juego desde el servidor
+        loadGameState()
+            .then(state => {
+                initializeGameComponents(state);
+                startGameSystems();
+            })
+            .catch(error => {
+                handleCriticalError(error.message || 'Error al cargar el juego');
+            });
+    }
+
+    // Funciones auxiliares para initGame()
+
+    function validateRequirements() {
         if (!canvas || !ctx) {
-            console.error('Canvas or context not available');
-            alert('Error: No se pudo inicializar el juego. Recarga la página.');
-            return;
+            handleCriticalError('Error de renderización', 'sala.html');
+            return false;
         }
 
-        if (!currentPlayer.id || !roomId) {
-            console.error('Missing player ID or room ID');
-            alert('Error: Datos de jugador o sala no encontrados. Vuelve a la sala.');
-            window.location.href = 'sala.html';
-            return;
+        if (!sessionStorage.getItem('playerId') || !sessionStorage.getItem('roomId')) {
+            handleCriticalError('Datos de sesión incompletos', 'sala.html');
+            return false;
         }
 
-        // 2. Función helper para leer sessionStorage de forma segura
-        const getSafeStorage = (key, defaultValue) => {
-            try {
-                const item = sessionStorage.getItem(key);
-                if (item === null) return defaultValue;
-                return JSON.parse(item);
-            } catch (e) {
-                console.error(`Error parsing ${key}:`, e);
-                return defaultValue;
-            }
-        };
+        return true;
+    }
 
-        // 3. Cargar datos iniciales con validación
-        const initialData = {
-            players: getSafeStorage('initialPlayers', []),
-            currentTurn: sessionStorage.getItem('currentTurn') || '',
-            initialCards: Math.max(1, parseInt(sessionStorage.getItem('initialCards')) || 6),
-            lastModified: Math.max(0, parseInt(sessionStorage.getItem('lastModified'))) || Date.now()
-        };
-
-        // 4. Limpiar sessionStorage después de leer
-        const cleanSessionStorage = () => {
-            try {
-                ['initialPlayers', 'currentTurn', 'initialCards', 'lastModified', 'gameStarted'].forEach(key => {
-                    sessionStorage.removeItem(key);
-                });
-            } catch (e) {
-                console.error('Error cleaning sessionStorage:', e);
-            }
-        };
-
-        // 5. Verificar datos mínimos requeridos
-        if (!Array.isArray(initialData.players) || initialData.players.length === 0) {
-            console.error('Invalid players data:', initialData.players);
-            showNotification('Datos de jugadores inválidos. Vuelve a la sala.', true);
-            cleanSessionStorage();
-            setTimeout(() => window.location.href = 'sala.html', 2000);
-            return;
-        }
-
-        // 6. Inicializar estado del juego
+    function setupInitialState() {
         gameState = {
-            ...gameState,
-            players: initialData.players,
-            currentTurn: initialData.currentTurn,
-            initialCards: initialData.initialCards,
+            players: [],
             yourCards: [],
             board: { ascending: [1, 1], descending: [100, 100] },
-            remainingDeck: 98,
+            currentTurn: '',
+            remainingDeck: 0,
+            initialCards: 6,
+            gameOver: null,
             animatingCards: [],
             columnHistory: {
                 asc1: [1],
@@ -1092,70 +1152,106 @@ document.addEventListener('DOMContentLoaded', () => {
                 desc2: [100]
             }
         };
+    }
 
-        lastUpdateTime = initialData.lastModified;
-        cleanSessionStorage();
+    async function loadGameState() {
+        const roomId = sessionStorage.getItem('roomId');
+        const playerId = sessionStorage.getItem('playerId');
 
-        // 7. Verificar estado del juego con el servidor
-        const verifyGameState = async () => {
-            try {
-                // Primero verificar si el juego ha comenzado
-                const checkResponse = await fetch(`${API_URL}/check-game-started/${roomId}`);
-                const checkData = await checkResponse.json();
+        // Verificar si el juego está iniciado
+        const checkResponse = await fetch(`${API_URL}/check-game-started/${roomId}`);
+        const checkData = await checkResponse.json();
 
-                if (!checkData.success || !checkData.gameStarted) {
-                    throw new Error(checkData.message || 'El juego no ha comenzado');
-                }
+        if (!checkData.success || !checkData.gameStarted) {
+            throw new Error(checkData.message || 'El juego no ha comenzado');
+        }
 
-                // Obtener estado actual del juego
-                const stateResponse = await fetch(
-                    `${API_URL}/game-state/${roomId}?playerId=${currentPlayer.id}&_=${Date.now()}`
-                );
-                const stateData = await stateResponse.json();
+        // Obtener estado completo
+        const stateResponse = await fetch(
+            `${API_URL}/game-state/${roomId}?playerId=${playerId}&_=${Date.now()}`
+        );
+        const stateData = await stateResponse.json();
 
-                if (!stateData.success) {
-                    throw new Error(stateData.message || 'Estado del juego inválido');
-                }
+        if (!stateData.success || !stateData.state) {
+            throw new Error(stateData.message || 'Estado del juego inválido');
+        }
 
-                return stateData.state;
-            } catch (error) {
-                console.error('Error verifying game state:', error);
-                throw error;
-            }
-        };
+        return stateData.state;
+    }
 
-        // 8. Iniciar el juego después de verificar
-        verifyGameState()
-            .then(state => {
-                updateGameState(state);
-                startGamePolling();
-                gameLoop();
-                setupEventListeners();
-            })
-            .catch(error => {
-                console.error('Initialization failed:', error);
-                showNotification(`Error: ${error.message}. Vuelve a la sala.`, true);
-                setTimeout(() => window.location.href = 'sala.html', 3000);
+    function initializeGameComponents(state) {
+        // Actualizar gameState con datos del servidor
+        gameState.players = state.players || [];
+        gameState.yourCards = state.yourCards || [];
+        gameState.board = state.board || { ascending: [1, 1], descending: [100, 100] };
+        gameState.currentTurn = state.currentTurn || '';
+        gameState.remainingDeck = state.remainingDeck || 0;
+        gameState.initialCards = state.initialCards || 6;
+        gameState.gameOver = state.gameOver || null;
+
+        // Configurar UI inicial
+        updateGameInfo();
+    }
+
+    function startGameSystems() {
+        // Iniciar sistemas del juego
+        startGamePolling();
+        gameLoop();
+        setupEventListeners();
+
+        // Mostrar notificación adecuada
+        const isHost = sessionStorage.getItem('isHost') === 'true';
+        showNotification(isHost ? '¡Has iniciado el juego!' : '¡El juego ha comenzado!');
+    }
+
+    function setupEventListeners() {
+        try {
+            // Configurar listeners del canvas
+            const canvasEvents = [
+                'click', 'mousedown', 'mousemove',
+                'mouseup', 'mouseleave', 'touchstart',
+                'touchmove', 'touchend'
+            ];
+
+            canvasEvents.forEach(event => {
+                canvas.addEventListener(event, handleCanvasEvent);
             });
 
-        // 9. Configurar event listeners (separado para claridad)
-        const setupEventListeners = () => {
-            try {
-                endTurnButton.addEventListener('click', endTurn);
-                canvas.addEventListener('click', handleCanvasClick);
-                canvas.addEventListener('mousedown', handleMouseDown);
-                canvas.addEventListener('mousemove', handleMouseMove);
-                canvas.addEventListener('mouseup', handleMouseUp);
-                canvas.addEventListener('mouseleave', handleMouseUp);
-                canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-                canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-                canvas.addEventListener('touchend', handleTouchEnd);
-                document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
-                window.addEventListener('beforeunload', cleanup);
-            } catch (e) {
-                console.error('Error setting up event listeners:', e);
-            }
-        };
+            // Botón de terminar turno
+            endTurnButton.addEventListener('click', endTurn);
+
+            // Modal de historial
+            document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
+
+            // Configurar cleanup para varios escenarios de salida
+            window.addEventListener('beforeunload', cleanup);
+            window.addEventListener('pagehide', cleanup);
+            window.addEventListener('unload', cleanup);
+        } catch (e) {
+            console.error('Error configurando event listeners:', e);
+            handleCriticalError('Error interno al configurar controles');
+        }
+    }
+
+    function handleCriticalError(message, redirectUrl = 'sala.html', delay = 3000) {
+        console.error('[Critical Error]', message);
+
+        // 1. Ejecutar limpieza completa
+        cleanup();
+
+        // 2. Mostrar notificación
+        const notification = document.createElement('div');
+        notification.className = 'notification error important';
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        // 3. Redirigir con parámetro de recarga forzada
+        setTimeout(() => {
+            const url = new URL(redirectUrl, window.location.origin);
+            url.searchParams.append('reload', Date.now());
+            window.location.href = url.toString();
+        }, delay);
     }
     initGame();
+
 });

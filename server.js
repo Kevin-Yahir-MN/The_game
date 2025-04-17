@@ -244,38 +244,54 @@ app.get('/game-state/:roomId', (req, res) => {
     const playerId = req.query.playerId;
 
     if (!rooms.has(roomId)) {
-        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+        return res.status(404).json({
+            success: false,
+            message: 'Sala no encontrada'
+        });
     }
 
     const room = rooms.get(roomId);
-    const player = room.players.find(p => p.id === playerId);
-
-    if (!player) {
-        return res.status(404).json({ success: false, message: 'Jugador no encontrado' });
-    }
+    const now = Date.now();
 
     // Actualizar actividad del jugador
-    player.lastActivity = Date.now();
-    player.connected = true;
+    room.players.forEach(player => {
+        if (player.id === playerId) {
+            player.lastActivity = now;
+            player.connected = true;
+        }
+    });
+
+    // Preparar datos del estado del juego
+    const player = room.players.find(p => p.id === playerId);
+    if (!player) {
+        return res.status(404).json({
+            success: false,
+            message: 'Jugador no encontrado en la sala'
+        });
+    }
+
+    // Filtrar datos sensibles para el cliente
+    const gameState = {
+        players: room.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            isHost: p.isHost,
+            cardCount: p.cards.length,
+            connected: (now - p.lastActivity) < 30000
+        })),
+        board: room.gameState.board,
+        currentTurn: room.gameState.currentTurn,
+        yourCards: player.cards,
+        remainingDeck: room.gameState.deck.length,
+        initialCards: room.gameState.initialCards,
+        gameOver: room.gameState.gameOver,
+        gameStarted: room.gameState.gameStarted,
+        lastModified: room.lastModified
+    };
 
     res.json({
         success: true,
-        state: {
-            board: room.gameState.board,
-            currentTurn: room.gameState.currentTurn,
-            players: room.players.map(p => ({
-                id: p.id,
-                name: p.name,
-                isHost: p.isHost,
-                cardCount: p.cards.length,
-                connected: p.connected,
-                cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
-            })),
-            yourCards: player.cards,
-            remainingDeck: room.gameState.deck.length,
-            initialCards: room.gameState.initialCards,
-            gameOver: room.gameState.gameOver
-        }
+        state: gameState
     });
 });
 
