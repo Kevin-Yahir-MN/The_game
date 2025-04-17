@@ -708,25 +708,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({
                     roomId: roomId,
                     playerId: currentPlayer.id,
-                    cardsToDraw: Math.min(
-                        gameState.initialCards - gameState.yourCards.length,
-                        gameState.remainingDeck
-                    )
+                    cardsNeeded: gameState.initialCards - gameState.yourCards.length,
+                    remainingDeck: gameState.remainingDeck
                 })
             });
 
             if (!response.ok) throw new Error('Error al robar cartas');
-
             const data = await response.json();
 
-            // 2. Actualizar estado local
+            // 2. Actualizar estado local con las nuevas cartas
             if (data.success && data.newCards) {
-                // Crear nuevas instancias de Card
-                const newCards = data.newCards.map(value => {
+                // Convertir los valores de cartas a objetos Card
+                const newCardObjects = data.newCards.map(value => {
                     const playable = ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
                         isValidMove(value, pos)
                     );
-
                     return new Card(
                         value,
                         0, // Posición temporal
@@ -736,24 +732,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     );
                 });
 
-                gameState.yourCards = [...gameState.yourCards, ...newCards];
+                // Agregar las nuevas cartas
+                gameState.yourCards = [...gameState.yourCards, ...newCardObjects];
                 gameState.remainingDeck = data.remainingDeck;
 
-                // 3. Reorganizar todas las cartas
-                updatePlayerCards(gameState.yourCards.map(card => card.value));
+                // Reorganizar visualmente todas las cartas
+                reorganizePlayerCards();
 
-                // 4. Notificar al servidor
+                // Notificar al servidor que terminó el turno
                 socket.send(JSON.stringify({
-                    type: 'end_turn',
+                    type: 'turn_completed',
                     playerId: currentPlayer.id,
                     roomId: roomId,
-                    cardsDrawn: data.newCards.length
+                    cardsDrawn: data.newCards.length,
+                    cardsInHand: gameState.yourCards.map(c => c.value) // Enviar todas las cartas
                 }));
 
                 showNotification(`Has robado ${data.newCards.length} carta(s)`);
             }
 
-            // 5. Resetear estado
+            // 3. Resetear estado del turno
             resetCardsPlayedProgress();
             updateGameInfo();
 
@@ -761,6 +759,14 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error al terminar turno:', error);
             showNotification('Error al terminar turno', true);
         }
+    }
+
+    function reorganizePlayerCards() {
+        const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
+        gameState.yourCards.forEach((card, index) => {
+            card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
+            card.y = PLAYER_CARDS_Y;
+        });
     }
 
     function drawBoard() {
@@ -1073,12 +1079,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleTurnChanged(message) {
+        // Actualizar el turno
         gameState.currentTurn = message.newTurn;
         selectedCard = null;
 
-        if (message.newTurn === currentPlayer.id) {
+        // Si soy el jugador actual, actualizar mis cartas
+        if (message.newTurn === currentPlayer.id && message.cardsInHand) {
+            updatePlayerCards(message.cardsInHand);
             showNotification(`¡Es tu turno! Juega al menos ${message.minCardsRequired} carta(s)`);
         }
+
+        updateGameInfo();
     }
 
     function handleMoveUndone(message) {

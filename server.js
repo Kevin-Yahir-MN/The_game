@@ -499,8 +499,9 @@ function startGame(room, initialCards = 6) {
     });
 }
 
-app.post('/draw-cards', async (req, res) => {
-    const { roomId, playerId, cardsToDraw } = req.body;
+// Endpoint para robar cartas
+app.post('/draw-cards', (req, res) => {
+    const { roomId, playerId, cardsNeeded, remainingDeck } = req.body;
 
     if (!rooms.has(roomId)) {
         return res.status(404).json({ success: false, message: 'Sala no encontrada' });
@@ -513,12 +514,24 @@ app.post('/draw-cards', async (req, res) => {
         return res.status(404).json({ success: false, message: 'Jugador no encontrado' });
     }
 
-    const cardsDrawn = [];
-    const cardsToDrawActual = Math.min(cardsToDraw, room.gameState.deck.length);
+    // Verificar que el mazo coincida
+    if (room.gameState.deck.length !== remainingDeck) {
+        return res.status(409).json({
+            success: false,
+            message: 'El mazo no coincide',
+            serverDeckCount: room.gameState.deck.length
+        });
+    }
 
-    for (let i = 0; i < cardsToDrawActual; i++) {
+    const cardsDrawn = [];
+    const cardsToDraw = Math.min(cardsNeeded, room.gameState.deck.length);
+
+    for (let i = 0; i < cardsToDraw; i++) {
         cardsDrawn.push(room.gameState.deck.pop());
     }
+
+    // Actualizar las cartas del jugador en el servidor
+    player.cards = [...player.cards, ...cardsDrawn];
 
     res.json({
         success: true,
@@ -619,6 +632,40 @@ wss.on('connection', (ws, req) => {
                             playerName: nextPlayer.name,
                             cardsPlayedThisTurn: 0,
                             minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+                        }, { includeGameState: true });
+
+                        checkGameStatus(room);
+                    }
+                    break;
+                case 'turn_completed':
+                    if (player.id === room.gameState.currentTurn) {
+                        // Verificar que las cartas coincidan
+                        const serverCards = player.cards;
+                        const clientCards = msg.cardsInHand;
+
+                        if (serverCards.length !== clientCards.length ||
+                            !serverCards.every(c => clientCards.includes(c))) {
+                            // Resincronizar si hay discrepancia
+                            player.cards = clientCards;
+                        }
+
+                        // Cambiar de turno
+                        const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
+                        const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
+                        const nextPlayer = room.players[nextIndex];
+
+                        room.gameState.currentTurn = nextPlayer.id;
+                        player.cardsPlayedThisTurn = [];
+
+                        // Enviar estado actualizado a todos
+                        broadcastToRoom(room, {
+                            type: 'turn_changed',
+                            newTurn: nextPlayer.id,
+                            previousPlayer: player.id,
+                            playerName: nextPlayer.name,
+                            cardsPlayedThisTurn: 0,
+                            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
+                            cardsInHand: player.cards // Enviar cartas actualizadas
                         }, { includeGameState: true });
 
                         checkGameStatus(room);
