@@ -1,44 +1,87 @@
 <!DOCTYPE html>
+
 <html lang="es">
 
+
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Sala de Juego - The Game</title>
+
     <link rel="stylesheet" href="styles.css">
+
 </head>
 
+
+
 <body>
+
     <div class="room-container">
+
         <div class="room-header">
+
             <h1>Sala de Juego</h1>
+
             <div class="room-code">
+
                 <h2>Código de Sala: <span id="roomIdDisplay"></span></h2>
+
                 <p>Comparte este código con otros jugadores</p>
+
             </div>
+
         </div>
+
+
 
         <div class="players-section">
+
             <h3>Jugadores Conectados:</h3>
+
             <ul id="playersList"></ul>
+
         </div>
+
+
 
         <div class="game-settings" id="gameSettings" style="display: none;">
+
             <h3>Configuración del Juego</h3>
+
             <div class="form-group">
+
                 <label for="initialCards">Cartas iniciales por jugador:</label>
+
                 <select id="initialCards" class="form-control">
+
                     <option value="8">8 cartas</option>
+
                     <option value="7">7 cartas</option>
+
                     <option value="6">6 cartas</option>
+
                     <option value="5">5 cartas</option>
+
                 </select>
+
             </div>
+
         </div>
 
+
+
         <button id="startGame">Iniciar Juego</button>
+
     </div>
+
     <script src="sala.js"></script>
+
 </body>
+
+
 
 </html>
