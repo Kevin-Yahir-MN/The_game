@@ -332,14 +332,45 @@ function broadcastGameState(room) {
 }
 
 function checkGameStatus(room) {
+    // 1. Verificar si todos ganaron (cartas jugadas)
     const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
     if (allPlayersEmpty && room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
             type: 'game_over',
             result: 'win',
-            message: '¡Todos ganan! Todas las cartas jugadas.',
-            reason: 'all_cards_played'
+            message: '¡Victoria! Todos ganaron - Todas las cartas jugadas correctamente.'
         });
+        return;
+    }
+
+    // 2. Verificar si alguien no puede jugar
+    const currentPlayer = room.players.find(p => p.id === room.gameState.currentTurn);
+    if (currentPlayer) {
+        const playableCards = getPlayableCards(currentPlayer.cards, room.gameState.board);
+        const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
+
+        if (playableCards.length < requiredCards && currentPlayer.cards.length > 0) {
+            broadcastToRoom(room, {
+                type: 'game_over',
+                result: 'lose',
+                message: `¡Derrota! ${currentPlayer.name} no puede jugar el mínimo requerido.`
+            });
+            return;
+        }
+    }
+
+    // 3. Verificar si alguien se bloqueó a sí mismo
+    if (room.selfBlockedPlayer) {
+        const player = room.players.find(p => p.id === room.selfBlockedPlayer);
+        if (player) {
+            broadcastToRoom(room, {
+                type: 'game_over',
+                result: 'lose',
+                message: `¡Derrota! ${player.name} se bloqueó a sí mismo sin movimientos posibles.`
+            });
+            room.selfBlockedPlayer = null;
+            return;
+        }
     }
 }
 

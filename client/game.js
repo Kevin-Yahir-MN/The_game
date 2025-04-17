@@ -221,6 +221,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         handleMoveUndone(message);
                         updateGameInfo();
                         break;
+                    // En el switch de mensajes WebSocket
+                    case 'game_over':
+                        handleGameOver(message.message, message.result);
+                        break;
                     case 'room_reset':
                         break;
                     case 'player_update':
@@ -1112,14 +1116,56 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function handleGameOver(message) {
-        showNotification(message, true);
-        endTurnButton.disabled = true;
-        canvas.style.pointerEvents = 'none';
+    function handleGameOver(message, result) {
+        // Crear elemento de Game Over si no existe
+        let gameOverElement = document.getElementById('gameOverModal');
 
-        setTimeout(() => {
-            alert(`JUEGO TERMINADO\n${message}`);
-        }, 1000);
+        if (!gameOverElement) {
+            gameOverElement = document.createElement('div');
+            gameOverElement.id = 'gameOverModal';
+            gameOverElement.className = 'game-over-modal';
+            gameOverElement.innerHTML = `
+                <div class="game-over-content">
+                    <h2>GAME OVER</h2>
+                    <p id="gameOverMessage">${message}</p>
+                    <div class="game-over-buttons">
+                        <button id="returnToLobby">Volver al Lobby</button>
+                        ${currentPlayer.isHost ? '<button id="rematchButton">Revancha</button>' : ''}
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(gameOverElement);
+
+            // Configurar event listeners
+            document.getElementById('returnToLobby').addEventListener('click', () => {
+                window.location.href = 'index.html';
+            });
+
+            if (currentPlayer.isHost) {
+                document.getElementById('rematchButton').addEventListener('click', () => {
+                    socket.send(JSON.stringify({
+                        type: 'request_rematch',
+                        roomId: roomId,
+                        playerId: currentPlayer.id
+                    }));
+                });
+            }
+        } else {
+            // Actualizar mensaje si ya existe
+            document.getElementById('gameOverMessage').textContent = message;
+        }
+
+        // Estilos dinámicos según resultado
+        gameOverElement.style.backgroundColor = result === 'win' ? 'rgba(46, 204, 113, 0.9)' :
+            result === 'lose' ? 'rgba(231, 76, 60, 0.9)' :
+                'rgba(52, 152, 219, 0.9)';
+
+        // Deshabilitar interacción con el juego
+        canvas.style.pointerEvents = 'none';
+        endTurnButton.disabled = true;
+
+        // Mostrar el modal
+        gameOverElement.style.display = 'flex';
     }
 
     initGame();
