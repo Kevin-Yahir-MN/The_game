@@ -499,6 +499,34 @@ function startGame(room, initialCards = 6) {
     });
 }
 
+app.post('/draw-cards', async (req, res) => {
+    const { roomId, playerId, cardsToDraw } = req.body;
+
+    if (!rooms.has(roomId)) {
+        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+    }
+
+    const room = rooms.get(roomId);
+    const player = room.players.find(p => p.id === playerId);
+
+    if (!player) {
+        return res.status(404).json({ success: false, message: 'Jugador no encontrado' });
+    }
+
+    const cardsDrawn = [];
+    const cardsToDrawActual = Math.min(cardsToDraw, room.gameState.deck.length);
+
+    for (let i = 0; i < cardsToDrawActual; i++) {
+        cardsDrawn.push(room.gameState.deck.pop());
+    }
+
+    res.json({
+        success: true,
+        newCards: cardsDrawn,
+        remainingDeck: room.gameState.deck.length
+    });
+});
+
 // Configuración WebSocket
 wss.on('connection', (ws, req) => {
     const params = new URLSearchParams(req.url.split('?')[1]);
@@ -576,23 +604,13 @@ wss.on('connection', (ws, req) => {
                 // En el manejador de mensajes WebSocket
                 case 'end_turn':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        // El cliente ya calculó cuántas cartas necesita
-                        const cardsToDraw = msg.cardsToDraw || 0;
-
-                        // Robar cartas reales del mazo
-                        for (let i = 0; i < cardsToDraw; i++) {
-                            if (room.gameState.deck.length > 0) {
-                                player.cards.push(room.gameState.deck.pop());
-                            }
-                        }
-
-                        // Cambiar de turno
+                        // Las cartas ya fueron robadas via HTTP, solo cambiar turno
                         const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
                         const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
                         const nextPlayer = room.players[nextIndex];
 
                         room.gameState.currentTurn = nextPlayer.id;
-                        player.cardsPlayedThisTurn = []; // Resetear cartas jugadas este turno
+                        player.cardsPlayedThisTurn = [];
 
                         broadcastToRoom(room, {
                             type: 'turn_changed',
@@ -600,8 +618,7 @@ wss.on('connection', (ws, req) => {
                             previousPlayer: player.id,
                             playerName: nextPlayer.name,
                             cardsPlayedThisTurn: 0,
-                            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
-                            cardsDrawn: cardsToDraw
+                            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
                         }, { includeGameState: true });
 
                         checkGameStatus(room);

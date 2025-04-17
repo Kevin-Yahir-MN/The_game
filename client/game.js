@@ -700,7 +700,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGameInfo();
     }
 
-    function endTurn() {
+    async function endTurn() {
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
             card => card.playerId === currentPlayer.id
@@ -710,44 +710,51 @@ document.addEventListener('DOMContentLoaded', () => {
             return showNotification(`Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`, true);
         }
 
-        // Obtener el jugador actual
-        const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
-        if (!currentPlayerObj) return;
+        try {
+            // 1. Primero obtener las nuevas cartas del servidor
+            const response = await fetch(`${API_URL}/draw-cards`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    roomId: roomId,
+                    playerId: currentPlayer.id,
+                    cardsToDraw: Math.min(
+                        gameState.initialCards - gameState.yourCards.length,
+                        gameState.remainingDeck
+                    )
+                })
+            });
 
-        // Calcular cartas a robar (usando remainingDeck en lugar de gameState.deck)
-        const cardsToDraw = Math.min(
-            gameState.initialCards - currentPlayerObj.cardCount,
-            gameState.remainingDeck
-        );
+            if (!response.ok) throw new Error('Error al robar cartas');
 
-        // Actualizar el estado localmente
-        if (cardsToDraw > 0) {
-            // Simular que tomamos cartas (el servidor enviará las cartas reales)
-            currentPlayerObj.cardCount += cardsToDraw;
-            gameState.remainingDeck -= cardsToDraw;
+            const data = await response.json();
 
-            // Notificar al servidor
-            socket.send(JSON.stringify({
-                type: 'end_turn',
-                playerId: currentPlayer.id,
-                roomId: roomId,
-                cardsToDraw: cardsToDraw
-            }));
+            // 2. Actualizar el estado local con las nuevas cartas
+            if (data.success && data.newCards) {
+                gameState.yourCards = [...gameState.yourCards, ...data.newCards];
+                gameState.remainingDeck = data.remainingDeck;
 
-            // Mostrar notificación
-            showNotification(`Has robado ${cardsToDraw} carta(s)`);
-        } else {
-            // No hay cartas para robar, solo terminar turno
-            socket.send(JSON.stringify({
-                type: 'end_turn',
-                playerId: currentPlayer.id,
-                roomId: roomId,
-                cardsToDraw: 0
-            }));
+                // 3. Notificar al servidor que terminó el turno (con cartas ya robadas)
+                socket.send(JSON.stringify({
+                    type: 'end_turn',
+                    playerId: currentPlayer.id,
+                    roomId: roomId,
+                    cardsDrawn: data.newCards.length
+                }));
+
+                showNotification(`Has robado ${data.newCards.length} carta(s)`);
+            }
+
+            // 4. Resetear estado del turno
+            resetCardsPlayedProgress();
+            updateGameInfo();
+
+        } catch (error) {
+            console.error('Error al terminar turno:', error);
+            showNotification('Error al terminar turno', true);
         }
-
-        resetCardsPlayedProgress();
-        updateGameInfo();
     }
 
     function drawBoard() {
