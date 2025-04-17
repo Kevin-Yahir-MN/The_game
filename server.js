@@ -573,44 +573,14 @@ wss.on('connection', (ws, req) => {
                         handlePlayCard(room, player, msg);
                     }
                     break;
+                // En el manejador de mensajes WebSocket
                 case 'end_turn':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
-
-                        if (player.cardsPlayedThisTurn.length < minCardsRequired) {
-                            return safeSend(player.ws, {
-                                type: 'notification',
-                                message: `Debes jugar al menos ${minCardsRequired} cartas este turno`,
-                                isError: true
-                            });
-                        }
-
-                        const cardsToDraw = Math.min(
-                            room.gameState.initialCards - player.cards.length,
-                            room.gameState.deck.length
-                        );
-
-                        for (let i = 0; i < cardsToDraw; i++) {
-                            player.cards.push(room.gameState.deck.pop());
-                        }
-
+                        // El cliente ya tomó sus cartas, solo cambiar el turno
                         const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
                         const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
                         const nextPlayer = room.players[nextIndex];
 
-                        const nextPlayerPlayableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-                        const nextPlayerRequired = room.gameState.deck.length > 0 ? 2 : 1;
-
-                        if (nextPlayerPlayableCards.length < nextPlayerRequired && nextPlayer.cards.length > 0) {
-                            return broadcastToRoom(room, {
-                                type: 'game_over',
-                                result: 'lose',
-                                message: `¡${nextPlayer.name} no puede jugar el mínimo de ${nextPlayerRequired} carta(s) requerida(s)!`,
-                                reason: 'min_cards_not_met'
-                            });
-                        }
-
-                        player.cardsPlayedThisTurn = [];
                         room.gameState.currentTurn = nextPlayer.id;
 
                         broadcastToRoom(room, {
@@ -619,7 +589,7 @@ wss.on('connection', (ws, req) => {
                             previousPlayer: player.id,
                             playerName: nextPlayer.name,
                             cardsPlayedThisTurn: 0,
-                            minCardsRequired: nextPlayerRequired
+                            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
                         }, { includeGameState: true });
 
                         checkGameStatus(room);

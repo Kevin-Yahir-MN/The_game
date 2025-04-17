@@ -710,13 +710,31 @@ document.addEventListener('DOMContentLoaded', () => {
             return showNotification(`Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`, true);
         }
 
+        // Primero: Reponer cartas al jugador actual inmediatamente
+        const player = gameState.players.find(p => p.id === currentPlayer.id);
+        if (player) {
+            const cardsToDraw = Math.min(
+                gameState.initialCards - player.cards.length,
+                gameState.remainingDeck
+            );
+
+            for (let i = 0; i < cardsToDraw; i++) {
+                player.cards.push(gameState.deck.pop());
+            }
+            gameState.remainingDeck = gameState.deck.length;
+        }
+
+        // Segundo: Enviar mensaje al servidor para cambiar de turno
         socket.send(JSON.stringify({
             type: 'end_turn',
             playerId: currentPlayer.id,
-            roomId: roomId
+            roomId: roomId,
+            cardsDrawn: cardsToDraw || 0  // Informar cuántas cartas se tomaron
         }));
 
+        // Tercero: Actualizar la interfaz
         resetCardsPlayedProgress();
+        updateGameInfo();
     }
 
     function drawBoard() {
