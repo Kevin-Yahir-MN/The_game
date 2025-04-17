@@ -445,6 +445,46 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Mostrar historial de una columna
+    function showColumnHistory(column) {
+        const modal = document.getElementById('historyModal');
+        const backdrop = document.getElementById('modalBackdrop');
+        const title = document.getElementById('historyColumnTitle');
+        const container = document.getElementById('historyCardsContainer');
+
+        // Configurar título según la columna
+        const columnNames = {
+            'asc1': 'Ascendente 1',
+            'asc2': 'Ascendente 2',
+            'desc1': 'Descendente 1',
+            'desc2': 'Descendente 2'
+        };
+
+        title.textContent = columnNames[column] || column;
+
+        // Limpiar contenedor
+        container.innerHTML = '';
+
+        // Agregar cartas al historial (ejemplo)
+        const history = gameState.columnHistory[column] || [];
+        history.forEach((cardValue, index) => {
+            const cardElement = document.createElement('div');
+            cardElement.className = 'history-card' + (index === history.length - 1 ? ' recent' : '');
+            cardElement.textContent = cardValue;
+            container.appendChild(cardElement);
+        });
+
+        // Mostrar modal
+        modal.style.display = 'block';
+        backdrop.style.display = 'block';
+    }
+
+    // Cerrar el modal de historial
+    function closeHistoryModal() {
+        document.getElementById('historyModal').style.display = 'none';
+        document.getElementById('modalBackdrop').style.display = 'none';
+    }
+
     function drawHistoryIcons() {
         if (!historyIcon.complete || historyIcon.naturalWidth === 0) {
             return;
