@@ -93,7 +93,10 @@
     </div>
 
     -->
-
+    <div id="waitingOverlay"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; color: white; display: flex; justify-content: center; align-items: center; font-size: 24px;">
+        Esperando a que el host inicie el juego...
+    </div>
 
 
     <!-- Modal para el historial -->
@@ -119,18 +122,6 @@
         if (!sessionStorage.getItem('playerId') || !sessionStorage.getItem('roomId')) {
 
             alert('No se encontraron datos del jugador. Vuelve a la sala.');
-
-            window.location.href = 'sala.html';
-
-        }
-
-
-
-        // Verificar si el juego fue iniciado
-
-        if (sessionStorage.getItem('gameStarted') !== 'true') {
-
-            alert('El juego no ha comenzado. Serás redirigido a la sala.');
 
             window.location.href = 'sala.html';
 

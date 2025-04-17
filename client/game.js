@@ -2001,6 +2001,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inicialización optimizada
 
     function initGame() {
+        document.getElementById('waitingOverlay').style.display = 'flex';
 
         if (!canvas || !ctx || !currentPlayer.id || !roomId) {
 
@@ -2022,14 +2023,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (!data.success || !data.gameStarted) {
 
-                    showNotification('El juego no ha comenzado. Vuelve a la sala.', true);
-
-                    setTimeout(() => {
-
-                        window.location.href = 'sala.html';
-
-                    }, 2000);
-
+                    console.log('El juego aún no ha comenzado, esperando...');
+                    setTimeout(initGame, 2000);
                     return;
 
                 }
@@ -2052,6 +2047,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 }
 
+                document.getElementById('waitingOverlay').style.display = 'none';
 
 
                 // Inicializar el estado del juego
