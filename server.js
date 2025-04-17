@@ -77,26 +77,7 @@ function checkGameStatus(room) {
     }
 }
 
-function getFilteredGameState(room, playerId) {
-    const player = room.players.find(p => p.id === playerId);
-    return {
-        board: room.gameState.board,
-        currentTurn: room.gameState.currentTurn,
-        yourCards: player?.cards || [],
-        remainingDeck: room.gameState.deck.length,
-        initialCards: room.gameState.initialCards,
-        players: room.players.map(p => ({
-            id: p.id,
-            name: p.name,
-            cardCount: p.cards.length,
-            isHost: p.isHost,
-            connected: p.connected
-        })),
-        gameOver: room.gameState.gameOver
-    };
-}
-
-// Rutas del API
+// Rutas HTTP
 app.post('/create-room', (req, res) => {
     const { playerName } = req.body;
     if (!playerName) {
@@ -122,8 +103,7 @@ app.post('/create-room', (req, res) => {
             gameStarted: false,
             initialCards: 6,
             gameOver: null
-        },
-        lastModified: Date.now()
+        }
     };
 
     rooms.set(roomId, room);
@@ -162,7 +142,6 @@ app.post('/join-room', (req, res) => {
     };
 
     room.players.push(newPlayer);
-    room.lastModified = Date.now();
     res.json({ success: true, playerId, playerName });
 });
 
@@ -173,9 +152,9 @@ app.get('/room-info/:roomId', (req, res) => {
     }
 
     const room = rooms.get(roomId);
-    const now = Date.now();
 
-    // Marcar jugadores inactivos
+    // Marcar jugadores inactivos (última actividad > 30 segundos)
+    const now = Date.now();
     room.players.forEach(player => {
         player.connected = (now - player.lastActivity) < 30000;
     });
@@ -196,10 +175,9 @@ app.get('/room-info/:roomId', (req, res) => {
     });
 });
 
-app.get('/game-state-updates/:roomId', (req, res) => {
+app.get('/game-state/:roomId', (req, res) => {
     const roomId = req.params.roomId;
     const playerId = req.query.playerId;
-    const lastUpdate = parseInt(req.query.lastUpdate) || 0;
 
     if (!rooms.has(roomId)) {
         return res.status(404).json({ success: false, message: 'Sala no encontrada' });
@@ -216,82 +194,24 @@ app.get('/game-state-updates/:roomId', (req, res) => {
     player.lastActivity = Date.now();
     player.connected = true;
 
-    // Responder inmediatamente si hay cambios
-    if (room.lastModified > lastUpdate) {
-        return res.json({
-            success: true,
-            state: getFilteredGameState(room, playerId),
-            lastModified: room.lastModified
-        });
-    }
-
-    // Esperar hasta 2 segundos por cambios
-    const startTime = Date.now();
-    const checkInterval = setInterval(() => {
-        if (room.lastModified > lastUpdate || Date.now() - startTime > 2000) {
-            clearInterval(checkInterval);
-            res.json({
-                success: true,
-                state: room.lastModified > lastUpdate ? getFilteredGameState(room, playerId) : null,
-                lastModified: room.lastModified
-            });
-        }
-    }, 300);
-});
-
-app.get('/game-state/:roomId', (req, res) => {
-    const roomId = req.params.roomId;
-    const playerId = req.query.playerId;
-
-    if (!rooms.has(roomId)) {
-        return res.status(404).json({
-            success: false,
-            message: 'Sala no encontrada'
-        });
-    }
-
-    const room = rooms.get(roomId);
-    const now = Date.now();
-
-    // Actualizar actividad del jugador
-    room.players.forEach(player => {
-        if (player.id === playerId) {
-            player.lastActivity = now;
-            player.connected = true;
-        }
-    });
-
-    // Preparar datos del estado del juego
-    const player = room.players.find(p => p.id === playerId);
-    if (!player) {
-        return res.status(404).json({
-            success: false,
-            message: 'Jugador no encontrado en la sala'
-        });
-    }
-
-    // Filtrar datos sensibles para el cliente
-    const gameState = {
-        players: room.players.map(p => ({
-            id: p.id,
-            name: p.name,
-            isHost: p.isHost,
-            cardCount: p.cards.length,
-            connected: (now - p.lastActivity) < 30000
-        })),
-        board: room.gameState.board,
-        currentTurn: room.gameState.currentTurn,
-        yourCards: player.cards,
-        remainingDeck: room.gameState.deck.length,
-        initialCards: room.gameState.initialCards,
-        gameOver: room.gameState.gameOver,
-        gameStarted: room.gameState.gameStarted,
-        lastModified: room.lastModified
-    };
-
     res.json({
         success: true,
-        state: gameState
+        state: {
+            board: room.gameState.board,
+            currentTurn: room.gameState.currentTurn,
+            players: room.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                isHost: p.isHost,
+                cardCount: p.cards.length,
+                connected: p.connected,
+                cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
+            })),
+            yourCards: player.cards,
+            remainingDeck: room.gameState.deck.length,
+            initialCards: room.gameState.initialCards,
+            gameOver: room.gameState.gameOver
+        }
     });
 });
 
@@ -308,45 +228,6 @@ app.get('/check-game-started/:roomId', (req, res) => {
         success: true,
         gameStarted: room.gameState.gameStarted,
         currentPlayerId: room.gameState.currentTurn
-    });
-});
-
-// En server.js, añade este nuevo endpoint antes de app.listen()
-app.get('/room/:roomId/info', (req, res) => {
-    const { roomId } = req.params;
-    const { playerId } = req.query;
-
-    if (!rooms.has(roomId)) {
-        return res.status(404).json({
-            success: false,
-            message: 'Sala no encontrada'
-        });
-    }
-
-    const room = rooms.get(roomId);
-    const now = Date.now();
-
-    // Actualizar estado de conexión del jugador
-    room.players.forEach(player => {
-        if (player.id === playerId) {
-            player.lastActivity = now;
-            player.connected = true;
-        }
-    });
-
-    res.json({
-        success: true,
-        players: room.players.map(p => ({
-            id: p.id,
-            name: p.name,
-            isHost: p.isHost,
-            cardCount: p.cards?.length || 0,
-            connected: (now - p.lastActivity) < 30000 // 30 segundos de inactividad
-        })),
-        gameStarted: room.gameState?.gameStarted || false,
-        currentTurn: room.gameState?.currentTurn,
-        initialCards: room.gameState?.initialCards,
-        lastModified: room.lastModified
     });
 });
 
@@ -368,7 +249,7 @@ app.post('/start-game', (req, res) => {
         return res.status(403).json({ success: false, message: 'Solo el host puede iniciar el juego' });
     }
 
-    // Inicializar el mazo y repartir cartas
+    // Iniciar el juego
     room.gameState = {
         deck: initializeDeck(),
         board: { ascending: [1, 1], descending: [100, 100] },
@@ -384,8 +265,6 @@ app.post('/start-game', (req, res) => {
         for (let i = 0; i < room.gameState.initialCards && room.gameState.deck.length > 0; i++) {
             player.cards.push(room.gameState.deck.pop());
         }
-        player.cardsPlayedThisTurn = []; // Asegurar que esté inicializado
-        player.lastActivity = Date.now(); // Actualizar actividad
     });
 
     // Inicializar historial del tablero
@@ -394,22 +273,13 @@ app.post('/start-game', (req, res) => {
         descending1: [100], descending2: [100]
     });
 
-    room.lastModified = Date.now();
+    // Guardar en sessionStorage del servidor
+    room.lastActivity = Date.now();
 
-    // Respuesta con todos los datos necesarios
     res.json({
         success: true,
-        players: room.players.map(p => ({
-            id: p.id,
-            name: p.name,
-            cardCount: p.cards.length,
-            isHost: p.isHost,
-            connected: true
-        })),
-        currentTurn: room.gameState.currentTurn,
-        initialCards: room.gameState.initialCards,
-        gameStarted: true,
-        lastModified: room.lastModified
+        message: 'Juego iniciado correctamente',
+        gameStarted: true
     });
 });
 
@@ -483,7 +353,6 @@ app.post('/play-card', (req, res) => {
 
     updateBoardHistory(room, position, numericCardValue);
     checkGameStatus(room);
-    room.lastModified = Date.now();
 
     res.json({
         success: true,
@@ -553,7 +422,6 @@ app.post('/end-turn', (req, res) => {
     // Reiniciar cartas jugadas este turno
     player.cardsPlayedThisTurn = [];
     checkGameStatus(room);
-    room.lastModified = Date.now();
 
     res.json({
         success: true,
@@ -564,29 +432,6 @@ app.post('/end-turn', (req, res) => {
         minCardsRequired: nextPlayerRequired,
         gameOver: room.gameState.gameOver
     });
-});
-
-app.post('/self-blocked', (req, res) => {
-    const { playerId, roomId } = req.body;
-
-    if (!rooms.has(roomId)) {
-        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
-    }
-
-    const room = rooms.get(roomId);
-    const player = room.players.find(p => p.id === playerId);
-
-    if (!player) {
-        return res.status(404).json({ success: false, message: 'Jugador no encontrado' });
-    }
-
-    room.gameState.gameOver = {
-        result: 'lose',
-        message: `¡${player.name} se bloqueó a sí mismo!`
-    };
-
-    room.lastModified = Date.now();
-    res.json({ success: true });
 });
 
 // Limpieza de salas inactivas
@@ -608,7 +453,7 @@ setInterval(() => {
     }
 }, ROOM_CLEANUP_INTERVAL);
 
-// Iniciar servidor
+// Iniciar servidor HTTP
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor HTTP (Polling Optimizado) iniciado en puerto ${PORT}`);
+    console.log(`🚀 Servidor HTTP (Polling) iniciado en puerto ${PORT}`);
 });
