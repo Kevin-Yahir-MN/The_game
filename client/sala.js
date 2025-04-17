@@ -1,13 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Configuración
     const API_URL = 'https://the-game-2xks.onrender.com';
     const WS_URL = 'wss://the-game-2xks.onrender.com';
     const PLAYER_UPDATE_INTERVAL = 5000;
-    const MAX_RECONNECT_ATTEMPTS = 5;
+    const MAX_RECONNECT_ATTEMPTS = 10;
     const RECONNECT_BASE_DELAY = 2000;
+    const CONNECTION_CHECK_INTERVAL = 30000;
 
+    // Variables de estado
     let socket;
     let reconnectAttempts = 0;
     let playerUpdateInterval;
+    let connectionCheckInterval;
+    let isConnected = false;
     const roomId = sessionStorage.getItem('roomId');
     const playerId = sessionStorage.getItem('playerId');
     const playerName = sessionStorage.getItem('playerName');
@@ -20,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameSettings = document.getElementById('gameSettings');
     const initialCardsSelect = document.getElementById('initialCards');
 
-    // Inicialización de la UI
+    // Inicialización UI
     function initializeUI() {
         roomIdDisplay.textContent = roomId;
         displayPlayerInfo();
@@ -34,15 +39,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Mostrar información del jugador
     function displayPlayerInfo() {
         const playerInfo = document.createElement('div');
         playerInfo.id = 'playerInfo';
         playerInfo.className = 'player-info';
+        playerInfo.innerHTML = `
+            <p>Jugador: <strong>${playerName}</strong></p>
+            <p>${isHost ? '🏠 Host' : '👤 Jugador'}</p>
+            <p id="connectionStatusText">Conectando...</p>
+        `;
         document.querySelector('.room-header').appendChild(playerInfo);
     }
 
-    // Actualizar estado de conexión
     function updateConnectionStatus(status, isError = false) {
         const statusElement = document.getElementById('connectionStatusText');
         if (statusElement) {
@@ -54,11 +62,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Conexión WebSocket mejorada
     function connectWebSocket() {
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            updateConnectionStatus('Desconectado', true);
+            updateConnectionStatus('Desconectado - Recarga la página', true);
             return;
         }
 
-        // Cerrar conexión existente
         if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
             socket.close();
         }
@@ -69,11 +76,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         socket.onopen = () => {
             reconnectAttempts = 0;
+            isConnected = true;
             updateConnectionStatus('Conectado');
             sendPlayerUpdate();
         };
 
         socket.onclose = (event) => {
+            isConnected = false;
             if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                 reconnectAttempts++;
                 const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1), 30000);
@@ -95,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function sendPlayerUpdate() {
         if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
-                type: 'player_update',
+                type: 'update_player',
                 playerId: playerId,
                 name: playerName,
                 isHost: isHost,
@@ -114,6 +123,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             else if (message.type === 'room_update') {
                 updatePlayersUI(message.players);
+            }
+            else if (message.type === 'notification') {
+                showNotification(message.message, message.isError);
             }
         } catch (error) {
             console.error('Error procesando mensaje:', error);
@@ -137,6 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Manejar inicio del juego
     function handleGameStart() {
         clearInterval(playerUpdateInterval);
+        clearInterval(connectionCheckInterval);
         window.location.href = 'game.html';
     }
 
@@ -172,24 +185,53 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${API_URL}/room-info/${roomId}`);
             if (response.ok) {
                 const data = await response.json();
-                if (data.success) updatePlayersUI(data.players);
+                if (data.success) {
+                    updatePlayersUI(data.players.map(p => ({
+                        ...p,
+                        connected: p.connected || false
+                    })));
+                }
             }
         } catch (error) {
             console.error('Error actualizando jugadores:', error);
         }
     }
 
-    // Inicializar la aplicación
+    // Verificar conexión periódicamente
+    function startConnectionChecker() {
+        connectionCheckInterval = setInterval(() => {
+            if (!isConnected) {
+                updatePlayersList();
+            }
+        }, CONNECTION_CHECK_INTERVAL);
+    }
+
+    // Mostrar notificación
+    function showNotification(message, isError = false) {
+        const notification = document.createElement('div');
+        notification.className = `notification ${isError ? 'error' : ''}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.classList.add('notification-fade-out');
+            setTimeout(() => notification.remove(), 300);
+        }, isError ? 5000 : 3000);
+    }
+
+    // Inicialización
     function initialize() {
         initializeUI();
         connectWebSocket();
         updatePlayersList();
         playerUpdateInterval = setInterval(updatePlayersList, PLAYER_UPDATE_INTERVAL);
+        startConnectionChecker();
     }
 
-    // Limpieza al salir
+    // Limpieza
     window.addEventListener('beforeunload', () => {
         clearInterval(playerUpdateInterval);
+        clearInterval(connectionCheckInterval);
         if (socket) socket.close();
     });
 

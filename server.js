@@ -4,15 +4,18 @@ const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const compression = require('compression');
+const zlib = require('zlib');
 
+// Configuración inicial
 const app = express();
 const server = http.createServer(app);
-
 const PORT = process.env.PORT || 3000;
 const allowedOrigins = ['https://the-game-2xks.onrender.com'];
 const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
-const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000;
+const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 minutos
+const STATE_BACKUP_INTERVAL = 30 * 1000; // 30 segundos
 
+// Middlewares
 app.use(compression());
 app.use((req, res, next) => {
     const origin = req.headers.origin;
@@ -25,6 +28,7 @@ app.use((req, res, next) => {
     next();
 });
 
+// Configuración WebSocket con compresión
 const wss = new WebSocket.Server({
     server,
     verifyClient: (info, done) => {
@@ -32,34 +36,30 @@ const wss = new WebSocket.Server({
             return done(false, 403, 'Origen no permitido');
         }
         done(true);
+    },
+    perMessageDeflate: {
+        zlibDeflateOptions: {
+            chunkSize: 1024,
+            memLevel: 7,
+            level: 3
+        },
+        zlibInflateOptions: {
+            chunkSize: 10 * 1024
+        },
+        threshold: 1024
     }
 });
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client')));
 
-const rooms = new Map();
-const reverseRoomMap = new Map();
-const boardHistory = new Map();
+// Estructuras de datos para el juego
+const rooms = new Map(); // {roomId: roomData}
+const reverseRoomMap = new Map(); // {roomData: roomId}
+const boardHistory = new Map(); // {roomId: historyData}
+const gameStateBackups = new Map(); // {roomId: backupString}
 
-setInterval(() => {
-    const now = Date.now();
-    for (const [roomId, room] of rooms.entries()) {
-        let lastActivity = 0;
-        room.players.forEach(player => {
-            if (player.lastActivity > lastActivity) {
-                lastActivity = player.lastActivity;
-            }
-        });
-
-        if (now - lastActivity > 3600000) {
-            rooms.delete(roomId);
-            reverseRoomMap.delete(room);
-            boardHistory.delete(roomId);
-        }
-    }
-}, ROOM_CLEANUP_INTERVAL);
-
+// Funciones auxiliares del juego
 function initializeDeck() {
     const deck = [];
     for (let i = 2; i < 100; i++) deck.push(i);
@@ -77,7 +77,10 @@ function shuffleArray(array) {
 function safeSend(ws, message) {
     try {
         if (ws?.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify(message));
+            if (typeof message === 'object') {
+                message = JSON.stringify(message);
+            }
+            ws.send(message);
         }
     } catch (error) {
         console.error('Error enviando mensaje:', error);
@@ -96,24 +99,28 @@ function broadcastToRoom(room, message, options = {}) {
 
 function sendGameState(room, player) {
     player.lastActivity = Date.now();
-    const state = {
+
+    const minimalState = {
         b: room.gameState.board,
         t: room.gameState.currentTurn,
-        y: player.cards,
-        i: room.gameState.initialCards,
         d: room.gameState.deck.length,
+        i: room.gameState.initialCards,
         p: room.players.map(p => ({
             i: p.id,
-            n: p.name, // Asegurar que el nombre se envía
+            n: p.name.substring(0, 12),
             h: p.isHost,
             c: p.cards.length,
             s: p.cardsPlayedThisTurn.length
         }))
     };
 
+    if (player.id === room.gameState.currentTurn || room.gameState.currentTurn === null) {
+        minimalState.y = player.cards;
+    }
+
     safeSend(player.ws, {
         type: 'gs',
-        s: state
+        s: minimalState
     });
 }
 
@@ -151,6 +158,7 @@ function getPlayableCards(playerCards, board) {
     });
 }
 
+// Handlers de acciones del juego
 function handlePlayCard(room, player, msg) {
     if (!validPositions.includes(msg.position)) {
         return safeSend(player.ws, {
@@ -335,6 +343,7 @@ function checkGameStatus(room) {
     }
 }
 
+// Endpoints HTTP
 app.post('/create-room', (req, res) => {
     const { playerName } = req.body;
     if (!playerName) {
@@ -424,6 +433,34 @@ app.get('/room-info/:roomId', (req, res) => {
     });
 });
 
+app.get('/game-state/:roomId', (req, res) => {
+    const roomId = req.params.roomId;
+    if (rooms.has(roomId)) {
+        const room = rooms.get(roomId);
+        res.json({
+            success: true,
+            state: {
+                gameState: room.gameState,
+                players: room.players.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    cards: p.cards,
+                    cardsPlayedThisTurn: p.cardsPlayedThisTurn,
+                    isHost: p.isHost
+                })),
+                history: boardHistory.get(roomId)
+            }
+        });
+    } else if (gameStateBackups.has(roomId)) {
+        res.json({
+            success: true,
+            state: JSON.parse(gameStateBackups.get(roomId))
+        });
+    } else {
+        res.status(404).json({ success: false, message: 'Sala no encontrada' });
+    }
+});
+
 function startGame(room, initialCards = 6) {
     room.gameState.gameStarted = true;
     room.gameState.initialCards = initialCards;
@@ -462,6 +499,7 @@ function startGame(room, initialCards = 6) {
     });
 }
 
+// Configuración WebSocket
 wss.on('connection', (ws, req) => {
     const params = new URLSearchParams(req.url.split('?')[1]);
     const roomId = params.get('roomId');
@@ -479,6 +517,11 @@ wss.on('connection', (ws, req) => {
     player.ws = ws;
     player.lastActivity = Date.now();
     if (playerName) player.name = decodeURIComponent(playerName);
+
+    // Configurar compresión por socket
+    ws._socket.on('drain', () => {
+        ws._socket.setNoDelay(false);
+    });
 
     const response = {
         type: 'init_game',
@@ -530,7 +573,6 @@ wss.on('connection', (ws, req) => {
                         handlePlayCard(room, player, msg);
                     }
                     break;
-                // En el manejador de end_turn
                 case 'end_turn':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                         const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
@@ -543,7 +585,6 @@ wss.on('connection', (ws, req) => {
                             });
                         }
 
-                        // Repartir nuevas cartas si hay en el mazo
                         const cardsToDraw = Math.min(
                             room.gameState.initialCards - player.cards.length,
                             room.gameState.deck.length
@@ -553,12 +594,10 @@ wss.on('connection', (ws, req) => {
                             player.cards.push(room.gameState.deck.pop());
                         }
 
-                        // Cambiar turno
                         const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
                         const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
                         const nextPlayer = room.players[nextIndex];
 
-                        // Verificar si el siguiente jugador puede cumplir con el mínimo
                         const nextPlayerPlayableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
                         const nextPlayerRequired = room.gameState.deck.length > 0 ? 2 : 1;
 
@@ -571,7 +610,6 @@ wss.on('connection', (ws, req) => {
                             });
                         }
 
-                        // Reiniciar cartas jugadas este turno
                         player.cardsPlayedThisTurn = [];
                         room.gameState.currentTurn = nextPlayer.id;
 
@@ -594,6 +632,9 @@ wss.on('connection', (ws, req) => {
                     break;
                 case 'get_game_state':
                     if (room.gameState.gameStarted) sendGameState(room, player);
+                    break;
+                case 'sync_game_state':
+                    sendGameState(room, player);
                     break;
                 case 'self_blocked':
                     if (rooms.has(msg.roomId)) {
@@ -636,7 +677,6 @@ wss.on('connection', (ws, req) => {
                     const playerToUpdate = room.players.find(p => p.id === msg.playerId);
                     if (playerToUpdate) {
                         playerToUpdate.name = msg.name;
-                        // Notificar a todos los jugadores sobre el cambio
                         broadcastToRoom(room, {
                             type: 'player_update',
                             players: room.players.map(p => ({
@@ -673,7 +713,25 @@ wss.on('connection', (ws, req) => {
     });
 });
 
+// Iniciar servidor
 server.listen(PORT, () => {
     console.log(`🚀 Servidor iniciado en puerto ${PORT}`);
     console.log(`🌍 Orígenes permitidos: ${allowedOrigins.join(', ')}`);
 });
+
+// Backup periódico del estado del juego
+setInterval(() => {
+    for (const [roomId, room] of rooms.entries()) {
+        gameStateBackups.set(roomId, JSON.stringify({
+            gameState: room.gameState,
+            players: room.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                cards: p.cards,
+                cardsPlayedThisTurn: p.cardsPlayedThisTurn,
+                isHost: p.isHost
+            })),
+            history: boardHistory.get(roomId)
+        }));
+    }
+}, STATE_BACKUP_INTERVAL);
