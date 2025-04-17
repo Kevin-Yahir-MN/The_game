@@ -764,6 +764,26 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGameInfo();
     }
 
+    function isValidMove(cardValue, position) {
+        if (!gameState.board) return false;
+
+        // Obtener el valor actual de la posición objetivo
+        let targetValue;
+        if (position.includes('asc')) {
+            const idx = position === 'asc1' ? 0 : 1;
+            targetValue = gameState.board.ascending[idx];
+
+            // Para pilas ascendentes: la carta debe ser mayor o igual a targetValue - 10
+            return cardValue > targetValue || cardValue === targetValue - 10;
+        } else {
+            const idx = position === 'desc1' ? 0 : 1;
+            targetValue = gameState.board.descending[idx];
+
+            // Para pilas descendentes: la carta debe ser menor o igual a targetValue + 10
+            return cardValue < targetValue || cardValue === targetValue + 10;
+        }
+    }
+
     function endTurn() {
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
