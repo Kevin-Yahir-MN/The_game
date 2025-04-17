@@ -710,29 +710,42 @@ document.addEventListener('DOMContentLoaded', () => {
             return showNotification(`Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`, true);
         }
 
-        // Primero: Reponer cartas al jugador actual inmediatamente
-        const player = gameState.players.find(p => p.id === currentPlayer.id);
-        if (player) {
-            const cardsToDraw = Math.min(
-                gameState.initialCards - player.cards.length,
-                gameState.remainingDeck
-            );
+        // Obtener el jugador actual
+        const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
+        if (!currentPlayerObj) return;
 
-            for (let i = 0; i < cardsToDraw; i++) {
-                player.cards.push(gameState.deck.pop());
-            }
-            gameState.remainingDeck = gameState.deck.length;
+        // Calcular cartas a robar (usando remainingDeck en lugar de gameState.deck)
+        const cardsToDraw = Math.min(
+            gameState.initialCards - currentPlayerObj.cardCount,
+            gameState.remainingDeck
+        );
+
+        // Actualizar el estado localmente
+        if (cardsToDraw > 0) {
+            // Simular que tomamos cartas (el servidor enviará las cartas reales)
+            currentPlayerObj.cardCount += cardsToDraw;
+            gameState.remainingDeck -= cardsToDraw;
+
+            // Notificar al servidor
+            socket.send(JSON.stringify({
+                type: 'end_turn',
+                playerId: currentPlayer.id,
+                roomId: roomId,
+                cardsToDraw: cardsToDraw
+            }));
+
+            // Mostrar notificación
+            showNotification(`Has robado ${cardsToDraw} carta(s)`);
+        } else {
+            // No hay cartas para robar, solo terminar turno
+            socket.send(JSON.stringify({
+                type: 'end_turn',
+                playerId: currentPlayer.id,
+                roomId: roomId,
+                cardsToDraw: 0
+            }));
         }
 
-        // Segundo: Enviar mensaje al servidor para cambiar de turno
-        socket.send(JSON.stringify({
-            type: 'end_turn',
-            playerId: currentPlayer.id,
-            roomId: roomId,
-            cardsDrawn: cardsToDraw || 0  // Informar cuántas cartas se tomaron
-        }));
-
-        // Tercero: Actualizar la interfaz
         resetCardsPlayedProgress();
         updateGameInfo();
     }

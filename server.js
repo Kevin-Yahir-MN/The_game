@@ -576,12 +576,23 @@ wss.on('connection', (ws, req) => {
                 // En el manejador de mensajes WebSocket
                 case 'end_turn':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        // El cliente ya tomó sus cartas, solo cambiar el turno
+                        // El cliente ya calculó cuántas cartas necesita
+                        const cardsToDraw = msg.cardsToDraw || 0;
+
+                        // Robar cartas reales del mazo
+                        for (let i = 0; i < cardsToDraw; i++) {
+                            if (room.gameState.deck.length > 0) {
+                                player.cards.push(room.gameState.deck.pop());
+                            }
+                        }
+
+                        // Cambiar de turno
                         const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
                         const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
                         const nextPlayer = room.players[nextIndex];
 
                         room.gameState.currentTurn = nextPlayer.id;
+                        player.cardsPlayedThisTurn = []; // Resetear cartas jugadas este turno
 
                         broadcastToRoom(room, {
                             type: 'turn_changed',
@@ -589,7 +600,8 @@ wss.on('connection', (ws, req) => {
                             previousPlayer: player.id,
                             playerName: nextPlayer.name,
                             cardsPlayedThisTurn: 0,
-                            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+                            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
+                            cardsDrawn: cardsToDraw
                         }, { includeGameState: true });
 
                         checkGameStatus(room);
