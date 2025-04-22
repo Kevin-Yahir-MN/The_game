@@ -27,15 +27,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedCard = null;
     let historyIcon = new Image();
     let notificationTimeout;
+    let socket;
+    const messageQueue = [];
+    let isProcessingQueue = false;
+
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
         name: sessionStorage.getItem('playerName'),
         isHost: sessionStorage.getItem('isHost') === 'true'
     };
     const roomId = sessionStorage.getItem('roomId');
-    let socket;
-    const messageQueue = [];
-    let isProcessingQueue = false;
 
     let gameState = {
         players: [],
@@ -48,21 +49,6 @@ document.addEventListener('DOMContentLoaded', () => {
         animatingCards: [],
         columnHistory: { asc1: [], asc2: [], desc1: [], desc2: [] }
     };
-
-    const reloadState = sessionStorage.getItem('reloadState');
-    if (reloadState) {
-        try {
-            const parsed = JSON.parse(reloadState);
-            if (parsed.roomId === roomId && parsed.playerId === currentPlayer.id) {
-                gameState.yourCards = parsed.cards.map(value => new Card(value, 0, 0, false, false));
-                gameState.board = parsed.board;
-            }
-        } catch (e) {
-            console.error('Error parsing reload state:', e);
-        } finally {
-            sessionStorage.removeItem('reloadState');
-        }
-    }
 
     class Card {
         constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
@@ -129,6 +115,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.y = y - this.dragOffsetY;
             }
         }
+    }
+
+    function showNotification(message, isError = false) {
+        const existing = document.querySelector('.notification');
+        if (existing) {
+            clearTimeout(notificationTimeout);
+            existing.remove();
+        }
+        const notification = document.createElement('div');
+        notification.className = `notification ${isError ? 'error' : ''}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        const duration = isError ? 5000 : 3000;
+        notificationTimeout = setTimeout(() => {
+            notification.remove();
+        }, duration);
     }
 
     function connectWebSocket() {
@@ -214,22 +216,6 @@ document.addEventListener('DOMContentLoaded', () => {
             safeSend(message);
         }
         isProcessingQueue = false;
-    }
-
-    function showNotification(message, isError = false) {
-        const existing = document.querySelector('.notification');
-        if (existing) {
-            clearTimeout(notificationTimeout);
-            existing.remove();
-        }
-        const notification = document.createElement('div');
-        notification.className = `notification ${isError ? 'error' : ''}`;
-        notification.textContent = message;
-        document.body.appendChild(notification);
-        const duration = isError ? 5000 : 3000;
-        notificationTimeout = setTimeout(() => {
-            notification.remove();
-        }, duration);
     }
 
     function showColumnHistory(columnId) {
@@ -558,6 +544,111 @@ document.addEventListener('DOMContentLoaded', () => {
         return column ? column.id : null;
     }
 
+    function playCard(cardValue, position) {
+        if (!selectedCard) return;
+        if (!isValidMove(cardValue, position)) {
+            showNotification('Movimiento inválido', true);
+            animateInvalidCard(selectedCard);
+            return;
+        }
+        const previousValue = position.includes('asc')
+            ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
+            : gameState.board.descending[position === 'desc1' ? 0 : 1];
+        gameState.cardsPlayedThisTurn.push({
+            value: cardValue,
+            position,
+            playerId: currentPlayer.id,
+            previousValue
+        });
+        gameState.columnHistory[position].push(cardValue);
+        selectedCard.isPlayedThisTurn = true;
+        selectedCard.backgroundColor = '#99CCFF';
+        const cardPosition = getColumnPosition(position);
+        gameState.animatingCards.push({
+            card: selectedCard,
+            startTime: Date.now(),
+            duration: 200,
+            targetX: cardPosition.x,
+            targetY: cardPosition.y,
+            fromX: selectedCard.x,
+            fromY: selectedCard.y
+        });
+        const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
+        if (cardIndex !== -1) gameState.yourCards.splice(cardIndex, 1);
+        if (position.includes('asc')) {
+            const idx = position === 'asc1' ? 0 : 1;
+            gameState.board.ascending[idx] = cardValue;
+        } else {
+            const idx = position === 'desc1' ? 0 : 1;
+            gameState.board.descending[idx] = cardValue;
+        }
+        safeSend({
+            type: 'play_card',
+            playerId: currentPlayer.id,
+            cardValue,
+            position
+        });
+        selectedCard = null;
+        updateGameInfo();
+    }
+
+    function endTurn() {
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+            card => card.playerId === currentPlayer.id
+        ).length;
+        if (currentPlayerCardsPlayed < minCardsRequired) {
+            return showNotification(`Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`, true);
+        }
+        safeSend({
+            type: 'end_turn',
+            playerId: currentPlayer.id,
+            roomId: roomId
+        });
+        resetCardsPlayedProgress();
+    }
+
+    function updateGameInfo() {
+        const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
+        let currentPlayerName = currentPlayerObj ?
+            (currentPlayerObj.id === currentPlayer.id ? 'Tu turno' : `Turno de ${currentPlayerObj.name}`) :
+            'Esperando jugador...';
+        document.getElementById('currentTurn').textContent = currentPlayerName;
+        document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
+        if (gameState.currentTurn === currentPlayer.id) {
+            const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+                card => card.playerId === currentPlayer.id
+            ).length;
+            const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+            document.getElementById('progressText').textContent = `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
+            document.getElementById('progressBar').style.width = `${Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100)}%`;
+        }
+        updatePlayersPanel();
+    }
+
+    function updatePlayersPanel() {
+        const panel = document.getElementById('playersPanel') || createPlayersPanel();
+        panel.innerHTML = `
+            <h3>Jugadores (${gameState.players.length})</h3>
+            <ul>
+                ${gameState.players.map(player => `
+                    <li class="${player.id === currentPlayer.id ? 'you' : ''} ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
+                        <span class="player-name">${player.name}</span>
+                        ${player.isHost ? ' <span class="host-tag">(Host)</span>' : ''}
+                    </li>
+                `).join('')}
+            </ul>
+        `;
+    }
+
+    function createPlayersPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'playersPanel';
+        panel.className = 'players-panel';
+        document.body.appendChild(panel);
+        return panel;
+    }
+
     function drawBoard() {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
         ctx.beginPath();
@@ -697,6 +788,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initGame() {
+        const reloadState = sessionStorage.getItem('gameState');
+        if (reloadState) {
+            try {
+                const parsed = JSON.parse(reloadState);
+                if (parsed.roomId === roomId && parsed.playerId === currentPlayer.id) {
+                    gameState.yourCards = parsed.cards.map(value => new Card(value, 0, 0, false, false));
+                    gameState.board = parsed.board;
+                }
+            } catch (e) {
+                console.error('Error parsing reload state:', e);
+            }
+        }
+
         canvas.width = 800;
         canvas.height = 700;
         endTurnButton.addEventListener('click', endTurn);
