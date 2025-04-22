@@ -1,49 +1,3 @@
-window.addEventListener('error', (event) => {
-
-    console.error('Error global capturado:', event.error);
-
-    showNotification('Error crítico en el juego. Recargando...', true);
-
-    setTimeout(() => window.location.reload(), 3000);
-
-});
-
-
-
-window.addEventListener('unhandledrejection', (event) => {
-
-    console.error('Promesa rechazada no capturada:', event.reason);
-
-    showNotification('Error en operación asíncrona. Recargando...', true);
-
-    setTimeout(() => window.location.reload(), 3000);
-
-});
-
-
-
-window.addEventListener('beforeunload', (e) => {
-
-    if (socket && socket.readyState === WebSocket.OPEN) {
-
-        sessionStorage.setItem('reloadState', JSON.stringify({
-
-            roomId,
-
-            playerId: currentPlayer.id,
-
-            cards: gameState.yourCards.map(c => c.value),
-
-            board: gameState.board
-
-        }));
-
-    }
-
-});
-
-
-
 document.addEventListener('DOMContentLoaded', () => {
 
     const canvas = document.getElementById('gameCanvas');
@@ -91,8 +45,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastRenderTime = 0;
 
     let reconnectAttempts = 0;
-
-    const RECONNECT_BASE_DELAY = 2000;
 
     const MAX_RECONNECT_ATTEMPTS = 5;
 
@@ -162,38 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    const reloadState = sessionStorage.getItem('reloadState');
-
-    if (reloadState) {
-
-        try {
-
-            const parsed = JSON.parse(reloadState);
-
-            if (parsed.roomId === roomId && parsed.playerId === currentPlayer.id) {
-
-                gameState.yourCards = parsed.cards.map(value =>
-
-                    new Card(value, 0, 0, false, false)
-
-                );
-
-                gameState.board = parsed.board;
-
-            }
-
-        } catch (e) {
-
-            console.error('Error parsing reload state:', e);
-
-        } finally {
-
-            sessionStorage.removeItem('reloadState');
-
-        }
-
-    }
-
     class Card {
 
         constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
@@ -227,22 +147,6 @@ document.addEventListener('DOMContentLoaded', () => {
             this.dragOffsetX = 0;
 
             this.dragOffsetY = 0;
-
-        }
-
-
-
-
-
-        contains(x, y) {
-
-            return x >= this.x &&
-
-                x <= this.x + this.width &&
-
-                y >= this.y &&
-
-                y <= this.y + this.height;
 
         }
 
@@ -382,161 +286,73 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function connectWebSocket() {
 
-        const heartbeatInterval = setInterval(() => {
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
 
-            if (socket.readyState === WebSocket.OPEN) {
-
-                socket.send(JSON.stringify({ type: 'heartbeat' }));
-
-            }
-
-        }, 15000);
-
-        const isReconnect = sessionStorage.getItem('attemptingReconnect') === 'true';
-
-        let savedState = null;
-
-
-
-        try {
-
-            const savedStateStr = sessionStorage.getItem('gameState');
-
-            if (savedStateStr) {
-
-                savedState = JSON.parse(savedStateStr);
-
-                // Validación del estado guardado
-
-                if (!savedState || typeof savedState !== 'object') {
-
-                    savedState = null;
-
-                    sessionStorage.removeItem('gameState');
-
-                }
-
-            }
-
-        } catch (e) {
-
-            console.error('Error parsing saved state:', e);
-
-            sessionStorage.removeItem('gameState');
-
-        }
-
-
-
-        // Validación de variables esenciales
-
-        if (!roomId || !currentPlayer?.id) {
-
-            console.error('Faltan datos esenciales para la conexión');
-
-            showNotification('Error: Faltan datos de conexión', true);
+            showNotification('No se puede conectar al servidor. Recarga la página.', true);
 
             return;
 
         }
 
+        if (socket) {
 
+            socket.onopen = null;
 
-        const wsUrl = `${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}&reconnect=${isReconnect}`;
+            socket.onclose = null;
 
-        socket = new WebSocket(wsUrl);
+            socket.onerror = null;
 
+            socket.onmessage = null;
 
+            if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+
+                socket.close();
+
+            }
+
+        }
+
+        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
 
         socket.onopen = () => {
 
             reconnectAttempts = 0;
 
-            sessionStorage.removeItem('attemptingReconnect');
+            showNotification('Conectado al servidor', false);
 
+            startPingInterval();
 
+            processQueue();
 
-            if (isReconnect && savedState) {
-
-                safeSend({
-
-                    type: 'reconnect_request',
-
-                    playerId: currentPlayer.id,
-
-                    roomId: roomId,
-
-                    lastKnownState: savedState
-
-                });
-
-            } else {
-
-                requestGameState();
-
-            }
+            requestGameState();
 
         };
-
-
 
         socket.onclose = (event) => {
 
-            clearInterval(heartbeatInterval);
+            clearInterval(pingInterval);
 
             if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
 
-                // Guardar estado actual de forma segura
-
-                const stateToSave = {
-
-                    yourCards: Array.isArray(gameState.yourCards)
-
-                        ? gameState.yourCards.map(c => c?.value).filter(v => v !== undefined)
-
-                        : [],
-
-                    board: gameState.board || { ascending: [1, 1], descending: [100, 100] },
-
-                    currentTurn: gameState.currentTurn
-
-                };
-
-
-
-                sessionStorage.setItem('attemptingReconnect', 'true');
-
-                sessionStorage.setItem('gameState', JSON.stringify(stateToSave));
-
-
-
-                const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts), 30000);
+                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 15000);
 
                 reconnectAttempts++;
 
-
-
-                showNotification(`Reconectando (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, true);
+                showNotification(`Intentando reconectar (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, true);
 
                 setTimeout(connectWebSocket, delay);
-
-            } else {
-
-                showNotification('Conexión perdida. Recarga la página para intentar nuevamente.', true);
 
             }
 
         };
 
-
-
         socket.onerror = (error) => {
 
-            console.error('WebSocket error:', error);
+            console.error('Error en WebSocket:', error);
+
+            showNotification('Error de conexión', true);
 
         };
-
-
 
         socket.onmessage = handleSocketMessage;
 
@@ -544,95 +360,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    async function requestFullState() {
+    function startPingInterval() {
 
-        try {
+        clearInterval(pingInterval);
 
-            if (!roomId) {
-
-                throw new Error('roomId no definido');
-
-            }
-
-
-
-            const response = await fetch(`${API_URL}/room-state/${roomId}`);
-
-
-
-            if (!response.ok) {
-
-                throw new Error(`HTTP error! status: ${response.status}`);
-
-            }
-
-
-
-            const data = await response.json();
-
-
-
-            if (!data || typeof data !== 'object') {
-
-                throw new Error('Respuesta inválida del servidor');
-
-            }
-
-
-
-            if (data.success && data.state) {
-
-                // Validación del estado recibido
-
-                if (typeof data.state === 'string') {
-
-                    updateGameState(JSON.parse(data.state));
-
-                } else if (typeof data.state === 'object') {
-
-                    updateGameState(data.state);
-
-                } else {
-
-                    throw new Error('Formato de estado inválido');
-
-                }
-
-            } else {
-
-                throw new Error(data.message || 'Error en la respuesta del servidor');
-
-            }
-
-        } catch (error) {
-
-            console.error('Error fetching game state:', error);
-
-            showNotification('Error al cargar el estado del juego', true);
-
-
-
-            // Intento de recuperación
+        pingInterval = setInterval(() => {
 
             if (socket && socket.readyState === WebSocket.OPEN) {
 
-                safeSend({
-
-                    type: 'get_game_state',
-
-                    playerId: currentPlayer.id,
-
-                    roomId: roomId
-
-                });
-
-            } else {
-
-                setTimeout(connectWebSocket, 2000);
+                safeSend({ type: 'ping' });
 
             }
 
-        }
+        }, PING_INTERVAL);
 
     }
 
@@ -1024,133 +764,57 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateGameState(newState) {
 
-        if (!newState || typeof newState !== 'object') {
+        if (!newState) return;
 
-            console.error('Estado nuevo inválido:', newState);
+        if (newState.p) {
 
-            return;
+            gameState.players = newState.p.map(player => ({
 
-        }
+                id: player.i,
 
+                name: player.n || `Jugador_${player.i.slice(0, 4)}`,
 
+                cardCount: player.c,
 
-        // Inicialización segura del estado
+                isHost: player.h,
 
-        gameState.yourCards = [];
-
-        gameState.board = newState.b || { ascending: [1, 1], descending: [100, 100] };
-
-        gameState.currentTurn = newState.t || null;
-
-        gameState.remainingDeck = typeof newState.d === 'number' ? newState.d : 98;
-
-        gameState.initialCards = typeof newState.i === 'number' ? newState.i : 6;
-
-
-
-        // Manejo seguro de las cartas del jugador
-
-        if (Array.isArray(newState.y)) {
-
-            const validCards = newState.y
-
-                .filter(card => typeof card === 'number' && !isNaN(card))
-
-                .slice(0, 10); // Limitar a un máximo razonable
-
-
-
-            updatePlayerCards(validCards);
-
-        } else {
-
-            console.error('Formato de cartas inválido:', newState.y);
-
-            gameState.yourCards = [];
-
-        }
-
-
-
-        // Manejo seguro de los jugadores
-
-        if (Array.isArray(newState.p)) {
-
-            gameState.players = newState.p
-
-                .filter(p => p && typeof p.i === 'string' && typeof p.n === 'string')
-
-                .map(p => ({
-
-                    id: p.i,
-
-                    name: p.n,
-
-                    cardCount: typeof p.c === 'number' ? p.c : 0,
-
-                    isHost: !!p.h,
-
-                    cardsPlayedThisTurn: typeof p.s === 'number' ? p.s : 0
-
-                }));
-
-        } else {
-
-            gameState.players = [];
-
-        }
-
-    }
-
-
-
-    window.addEventListener('beforeunload', (e) => {
-
-        if (socket && socket.readyState === WebSocket.OPEN) {
-
-            sessionStorage.setItem('reloadState', JSON.stringify({
-
-                roomId,
-
-                playerId: currentPlayer.id,
-
-                cards: gameState.yourCards.map(c => c.value),
-
-                board: gameState.board
+                cardsPlayedThisTurn: player.s || 0
 
             }));
 
-        }
+            if (!currentPlayer.name && currentPlayer.id) {
 
-    });
+                const player = gameState.players.find(p => p.id === currentPlayer.id);
 
+                if (player) {
 
+                    currentPlayer.name = player.name;
 
-    if (reloadState) {
+                    sessionStorage.setItem('playerName', player.name);
 
-        try {
-
-            const parsed = JSON.parse(reloadState);
-
-            if (parsed.roomId === roomId && parsed.playerId === currentPlayer.id) {
-
-                gameState.yourCards = parsed.cards.map(value =>
-
-                    new Card(value, 0, 0, false, false)
-
-                );
-
-                gameState.board = parsed.board;
+                }
 
             }
 
-        } catch (e) {
+        }
 
-            console.error('Error parsing reload state:', e);
+        gameState.board = newState.b || gameState.board;
 
-        } finally {
+        gameState.currentTurn = newState.t || gameState.currentTurn;
 
-            sessionStorage.removeItem('reloadState');
+        gameState.remainingDeck = newState.d || gameState.remainingDeck;
+
+        gameState.initialCards = newState.i || gameState.initialCards;
+
+        if (newState.y) {
+
+            updatePlayerCards(newState.y);
+
+        }
+
+        if (gameState.currentTurn !== currentPlayer.id) {
+
+            selectedCard = null;
 
         }
 
@@ -1232,55 +896,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const startY = PLAYER_CARDS_Y;
 
+        gameState.yourCards = cards.map((card, index) => {
 
-
-        gameState.yourCards = cards.map((cardValue, index) => {
-
-            // Si ya existe una carta válida, reutilízala
-
-            const existingCard = gameState.yourCards.find(c => c.value === cardValue);
-
-            if (existingCard && typeof existingCard.draw === 'function') {
-
-                existingCard.x = startX + index * (CARD_WIDTH + CARD_SPACING);
-
-                existingCard.y = startY;
-
-                return existingCard;
-
-            }
-
-
-
-            // Crea una nueva carta si no existe
+            const value = card instanceof Card ? card.value : card;
 
             const playable = isYourTurn && (
 
-                isValidMove(cardValue, 'asc1') ||
+                isValidMove(value, 'asc1') || isValidMove(value, 'asc2') ||
 
-                isValidMove(cardValue, 'asc2') ||
-
-                isValidMove(cardValue, 'desc1') ||
-
-                isValidMove(cardValue, 'desc2')
+                isValidMove(value, 'desc1') || isValidMove(value, 'desc2')
 
             );
 
+            const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
 
-
-            return new Card(
-
-                cardValue,
-
-                startX + index * (CARD_WIDTH + CARD_SPACING),
-
-                startY,
-
-                playable,
-
-                gameState.cardsPlayedThisTurn.some(move => move.value === cardValue)
+                move => move.value === value && move.playerId === currentPlayer.id
 
             );
+
+            if (card instanceof Card) {
+
+                card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
+
+                card.y = startY;
+
+                card.isPlayable = playable;
+
+                card.isPlayedThisTurn = isPlayedThisTurn;
+
+                card.backgroundColor = isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
+
+                return card;
+
+            } else {
+
+                return new Card(
+
+                    value,
+
+                    startX + index * (CARD_WIDTH + CARD_SPACING),
+
+                    startY,
+
+                    playable,
+
+                    isPlayedThisTurn
+
+                );
+
+            }
 
         });
 
@@ -1882,8 +1546,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const backgroundWidth = gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 40;
 
-
-
         ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
 
         ctx.beginPath();
@@ -1904,29 +1566,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ctx.fill();
 
-
-
         gameState.yourCards.forEach((card, index) => {
 
-            if (!card || typeof card.draw !== 'function') {
+            if (card && card !== dragStartCard) {
 
-                console.error('Carta inválida en posición', index, card);
+                card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
 
-                return;
+                    index * (CARD_WIDTH + CARD_SPACING);
+
+                card.y = PLAYER_CARDS_Y;
+
+                card.hoverOffset = card === selectedCard ? 10 : 0;
+
+                card.draw();
 
             }
-
-
-
-            card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
-
-                index * (CARD_WIDTH + CARD_SPACING);
-
-            card.y = PLAYER_CARDS_Y;
-
-            card.hoverOffset = card === selectedCard ? 10 : 0;
-
-            card.draw();
 
         });
 
@@ -2076,75 +1730,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function gameLoop(timestamp) {
 
-        try {
-
-            if (timestamp - lastRenderTime < 1000 / TARGET_FPS) {
-
-                requestAnimationFrame(gameLoop);
-
-                return;
-
-            }
-
-
-
-            lastRenderTime = timestamp;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            ctx.fillStyle = '#1a6b1a';
-
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-
-
-            drawBoard();
-
-            drawHistoryIcons();
-
-            handleCardAnimations();
-
-
-
-            try {
-
-                drawPlayerCards();
-
-            } catch (err) {
-
-                console.error('Error dibujando cartas:', err);
-
-                // Intenta recuperar el estado
-
-                if (socket && socket.readyState === WebSocket.OPEN) {
-
-                    requestGameState();
-
-                }
-
-            }
-
-
-
-            if (isDragging && dragStartCard && typeof dragStartCard.draw === 'function') {
-
-                dragStartCard.draw();
-
-            }
-
-
+        if (timestamp - lastRenderTime < 1000 / TARGET_FPS) {
 
             requestAnimationFrame(gameLoop);
 
-        } catch (error) {
-
-            console.error('Error en gameLoop:', error);
-
-            // Reiniciar el bucle después de 1 segundo
-
-            setTimeout(() => requestAnimationFrame(gameLoop), 1000);
+            return;
 
         }
+
+        lastRenderTime = timestamp;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = '#1a6b1a';
+
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        drawBoard();
+
+        drawHistoryIcons();
+
+        handleCardAnimations();
+
+        drawPlayerCards();
+
+        if (isDragging && dragStartCard) {
+
+            dragStartCard.draw();
+
+        }
+
+        requestAnimationFrame(gameLoop);
 
     }
 
@@ -2274,47 +1890,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
 
-            let message;
+            const now = Date.now();
 
-            if (typeof event.data === 'string') {
+            const message = JSON.parse(event.data);
 
-                message = JSON.parse(event.data);
-
-            } else if (typeof event.data === 'object') {
-
-                message = event.data;
-
-            } else {
-
-                throw new Error('Formato de mensaje no soportado');
-
-            }
-
-
-
-            if (message.type === 'reconnect_response') {
-
-                if (message.success && message.state) {
-
-                    // Validación profunda del estado recibido
-
-                    if (message.state.y && Array.isArray(message.state.y)) {
-
-                        updateGameState(message.state);
-
-                        showNotification('Reconexión exitosa. Estado del juego recuperado.');
-
-                    } else {
-
-                        throw new Error('Estructura de estado inválida en reconexión');
-
-                    }
-
-                } else {
-
-                    requestFullState();
-
-                }
+            if (message.type === 'gs' && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
 
                 return;
 
@@ -2431,12 +2011,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
 
             console.error('Error procesando mensaje:', error);
-
-            if (error instanceof SyntaxError) {
-
-                setTimeout(() => connectWebSocket(), 2000);
-
-            }
 
         }
 

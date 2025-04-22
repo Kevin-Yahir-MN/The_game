@@ -32,50 +32,6 @@ const PING_INTERVAL = 30000;
 
 
 
-// Después de los otros requires
-
-const { Pool } = require('pg');
-
-
-
-// Configuración de la base de datos
-
-const pool = new Pool({
-
-    connectionString: process.env.DATABASE_URL,
-
-    ssl: {
-
-        rejectUnauthorized: false // Necesario para Render
-
-    }
-
-});
-
-
-
-// Verifica la conexión a la base de datos
-
-async function testConnection() {
-
-    try {
-
-        await pool.query('SELECT NOW()');
-
-        console.log('✅ Conexión a PostgreSQL establecida');
-
-    } catch (err) {
-
-        console.error('❌ Error conectando a PostgreSQL:', err);
-
-    }
-
-}
-
-testConnection();
-
-
-
 app.use(compression());
 
 app.use((req, res, next) => {
@@ -150,27 +106,25 @@ const boardHistory = new Map();
 
 
 
-// Guardar estado cada 5 minutos y limpiar salas inactivas
-
-setInterval(async () => {
+setInterval(() => {
 
     const now = Date.now();
 
-
-
     for (const [roomId, room] of rooms.entries()) {
 
-        // Guardar salas activas
+        let lastActivity = 0;
 
-        if (now - room.lastActivity < 3600000) { // 1 hora
+        room.players.forEach(player => {
 
-            await saveGameState(roomId);
+            if (player.lastActivity > lastActivity) {
 
-        }
+                lastActivity = player.lastActivity;
 
-        // Limpiar salas inactivas
+            }
 
-        else {
+        });
+
+        if (now - lastActivity > 3600000) {
 
             rooms.delete(roomId);
 
@@ -178,127 +132,11 @@ setInterval(async () => {
 
             boardHistory.delete(roomId);
 
-            await pool.query('DELETE FROM game_states WHERE room_id = $1', [roomId]);
-
         }
 
     }
 
-}, 300000); // 5 minutos
-
-
-
-async function saveGameState(roomId) {
-
-    const room = rooms.get(roomId);
-
-    if (!room) return;
-
-
-
-    try {
-
-        const stateData = {
-
-            players: room.players.map(p => ({
-
-                id: p.id,
-
-                name: p.name,
-
-                isHost: p.isHost,
-
-                cards: p.cards,
-
-                lastActivity: p.lastActivity
-
-            })),
-
-            gameState: room.gameState,
-
-            history: boardHistory.get(roomId)
-
-        };
-
-
-
-        // Asegurarse de guardar como string JSON
-
-        await pool.query(
-
-            `INSERT INTO game_states (room_id, state_data, last_activity)
-
-             VALUES ($1, $2, NOW())
-
-             ON CONFLICT (room_id) 
-
-             DO UPDATE SET state_data = $2, last_activity = NOW()`,
-
-            [roomId, JSON.stringify(stateData)]
-
-        );
-
-    } catch (err) {
-
-        console.error(`Error guardando estado para sala ${roomId}:`, err);
-
-    }
-
-}
-
-
-
-// Función para cargar el estado del juego
-
-async function loadGameState(roomId) {
-
-    try {
-
-        const { rows } = await pool.query(
-
-            'SELECT state_data FROM game_states WHERE room_id = $1',
-
-            [roomId]
-
-        );
-
-
-
-        if (rows.length === 0) return null;
-
-
-
-        let stateData = rows[0].state_data;
-
-
-
-        // Si es un objeto, convertirlo a string y volver a parsear
-
-        if (typeof stateData === 'object') {
-
-            stateData = JSON.stringify(stateData);
-
-        }
-
-
-
-        const data = JSON.parse(stateData);
-
-
-
-        // Resto de la lógica de carga...
-
-        return data;
-
-    } catch (err) {
-
-        console.error(`Error cargando estado para sala ${roomId}:`, err);
-
-        return null;
-
-    }
-
-}
+}, ROOM_CLEANUP_INTERVAL);
 
 
 
@@ -804,33 +642,19 @@ function checkGameStatus(room) {
 
 
 
-// Endpoint para crear sala (modificado)
-
-app.post('/create-room', async (req, res) => {
+app.post('/create-room', (req, res) => {
 
     const { playerName } = req.body;
 
-
-
     if (!playerName) {
 
-        return res.status(400).json({
-
-            success: false,
-
-            message: 'Se requiere nombre de jugador'
-
-        });
+        return res.status(400).json({ success: false, message: 'Se requiere nombre de jugador' });
 
     }
-
-
 
     const roomId = Math.floor(1000 + Math.random() * 9000).toString();
 
     const playerId = uuidv4();
-
-
 
     const room = {
 
@@ -864,13 +688,9 @@ app.post('/create-room', async (req, res) => {
 
             initialCards: 6
 
-        },
-
-        lastActivity: Date.now()
+        }
 
     };
-
-
 
     rooms.set(roomId, room);
 
@@ -884,37 +704,15 @@ app.post('/create-room', async (req, res) => {
 
     });
 
-
-
-    // Persistir la nueva sala
-
-    await saveGameState(roomId);
-
-
-
-    res.json({
-
-        success: true,
-
-        roomId,
-
-        playerId,
-
-        playerName
-
-    });
+    res.json({ success: true, roomId, playerId, playerName });
 
 });
 
 
 
-// Endpoint para unirse a sala (modificado)
-
-app.post('/join-room', async (req, res) => {
+app.post('/join-room', (req, res) => {
 
     const { playerName, roomId } = req.body;
-
-
 
     if (!playerName || !roomId) {
 
@@ -928,35 +726,15 @@ app.post('/join-room', async (req, res) => {
 
     }
 
-
-
     if (!rooms.has(roomId)) {
 
-        // Intentar cargar desde DB si no está en memoria
-
-        const loadedRoom = await loadGameState(roomId);
-
-        if (!loadedRoom) {
-
-            return res.status(404).json({
-
-                success: false,
-
-                message: 'Sala no encontrada'
-
-            });
-
-        }
+        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
 
     }
-
-
 
     const room = rooms.get(roomId);
 
     const playerId = uuidv4();
-
-
 
     const newPlayer = {
 
@@ -976,95 +754,9 @@ app.post('/join-room', async (req, res) => {
 
     };
 
-
-
     room.players.push(newPlayer);
 
-    room.lastActivity = Date.now();
-
-
-
-    // Actualizar estado en DB
-
-    await saveGameState(roomId);
-
-
-
-    res.json({
-
-        success: true,
-
-        playerId,
-
-        playerName
-
-    });
-
-});
-
-
-
-// Nuevo endpoint para recuperar estado completo
-
-app.get('/room-state/:roomId', async (req, res) => {
-
-    try {
-
-        const { rows } = await pool.query(
-
-            'SELECT state_data FROM game_states WHERE room_id = $1',
-
-            [req.params.roomId]
-
-        );
-
-
-
-        if (rows.length === 0) {
-
-            return res.status(404).json({
-
-                success: false,
-
-                message: 'Sala no encontrada'
-
-            });
-
-        }
-
-
-
-        // Asegúrate que state_data es un string JSON válido
-
-        const stateData = typeof rows[0].state_data === 'object'
-
-            ? JSON.stringify(rows[0].state_data)
-
-            : rows[0].state_data;
-
-
-
-        res.json({
-
-            success: true,
-
-            state: JSON.parse(stateData) // Parseamos para validar
-
-        });
-
-    } catch (err) {
-
-        console.error('Error recuperando estado:', err);
-
-        res.status(500).json({
-
-            success: false,
-
-            message: 'Error interno del servidor'
-
-        });
-
-    }
+    res.json({ success: true, playerId, playerName });
 
 });
 
@@ -1184,7 +876,7 @@ function startGame(room, initialCards = 6) {
 
 
 
-wss.on('connection', async (ws, req) => {
+wss.on('connection', (ws, req) => {
 
     const params = new URLSearchParams(req.url.split('?')[1]);
 
@@ -1194,10 +886,6 @@ wss.on('connection', async (ws, req) => {
 
     const playerName = params.get('playerName');
 
-    const isReconnect = params.get('reconnect') === 'true';
-
-
-
     const connectionTimeout = setTimeout(() => {
 
         if (ws.readyState === WebSocket.CONNECTING) {
@@ -1206,77 +894,7 @@ wss.on('connection', async (ws, req) => {
 
         }
 
-    }, 10000);
-
-
-
-    if (isReconnect) {
-
-        try {
-
-            let room = rooms.get(roomId);
-
-            if (!room) {
-
-                room = await loadGameState(roomId);
-
-                if (!room) {
-
-                    clearTimeout(connectionTimeout);
-
-                    return ws.close(1008, 'Sala no encontrada');
-
-                }
-
-            }
-
-
-
-            const player = room.players.find(p => p.id === playerId);
-
-            if (!player) {
-
-                clearTimeout(connectionTimeout);
-
-                return ws.close(1008, 'Jugador no registrado');
-
-            }
-
-
-
-            if (player.ws && [WebSocket.OPEN, WebSocket.CONNECTING].includes(player.ws.readyState)) {
-
-                player.ws.close(1000, 'Nueva conexión establecida');
-
-            }
-
-
-
-            player.ws = ws;
-
-            player.lastActivity = Date.now();
-
-            room.lastActivity = Date.now();
-
-
-
-            clearTimeout(connectionTimeout);
-
-            sendGameState(room, player);
-
-            return;
-
-        } catch (err) {
-
-            console.error('Error en reconexión:', err);
-
-            ws.close(1011, 'Error interno del servidor');
-
-        }
-
-    }
-
-
+    }, CONNECTION_TIMEOUT);
 
     if (!roomId || !playerId || !rooms.has(roomId)) {
 
@@ -1286,13 +904,9 @@ wss.on('connection', async (ws, req) => {
 
     }
 
-
-
     const room = rooms.get(roomId);
 
     const player = room.players.find(p => p.id === playerId);
-
-
 
     if (!player) {
 
@@ -1302,23 +916,15 @@ wss.on('connection', async (ws, req) => {
 
     }
 
-
-
     if (player.ws && [WebSocket.OPEN, WebSocket.CONNECTING].includes(player.ws.readyState)) {
 
         player.ws.close(1000, 'Nueva conexión establecida');
 
     }
 
-
-
     player.ws = ws;
 
     player.lastActivity = Date.now();
-
-    room.lastActivity = Date.now();
-
-
 
     const pingInterval = setInterval(() => {
 
@@ -1328,11 +934,9 @@ wss.on('connection', async (ws, req) => {
 
         }
 
-    }, 30000);
+    }, PING_INTERVAL);
 
-
-
-    ws.on('message', async (message) => {
+    ws.on('message', (message) => {
 
         try {
 
@@ -1340,211 +944,239 @@ wss.on('connection', async (ws, req) => {
 
             player.lastActivity = Date.now();
 
-            room.lastActivity = Date.now();
-
-
-
             if (msg.type === 'ping') {
 
-                return safeSend(ws, { type: 'pong', timestamp: Date.now() });
+                return ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
 
             }
 
+            switch (msg.type) {
 
+                case 'start_game':
 
-            if (msg.type === 'reconnect_request') {
+                    if (player.isHost && !room.gameState.gameStarted) {
 
-                const response = {
-
-                    type: 'reconnect_response',
-
-                    success: true,
-
-                    state: {
-
-                        b: room.gameState.board,
-
-                        t: room.gameState.currentTurn,
-
-                        y: player.cards,
-
-                        i: room.gameState.initialCards,
-
-                        d: room.gameState.deck.length,
-
-                        p: room.players.map(p => ({
-
-                            i: p.id,
-
-                            n: p.name,
-
-                            h: p.isHost,
-
-                            c: p.cards.length,
-
-                            s: p.cardsPlayedThisTurn.length
-
-                        }))
+                        startGame(room, msg.initialCards);
 
                     }
 
-                };
+                    break;
 
-                return safeSend(ws, response);
+                case 'play_card':
+
+                    if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+
+                        handlePlayCard(room, player, msg);
+
+                    }
+
+                    break;
+
+                case 'end_turn':
+
+                    if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+
+                        const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+
+                        if (player.cardsPlayedThisTurn.length < minCardsRequired) {
+
+                            return safeSend(player.ws, {
+
+                                type: 'notification',
+
+                                message: `Debes jugar al menos ${minCardsRequired} cartas este turno`,
+
+                                isError: true
+
+                            });
+
+                        }
+
+                        const cardsToDraw = Math.min(
+
+                            room.gameState.initialCards - player.cards.length,
+
+                            room.gameState.deck.length
+
+                        );
+
+                        for (let i = 0; i < cardsToDraw; i++) {
+
+                            player.cards.push(room.gameState.deck.pop());
+
+                        }
+
+                        const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
+
+                        const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
+
+                        const nextPlayer = room.players[nextIndex];
+
+                        const nextPlayerPlayableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+
+                        const nextPlayerRequired = room.gameState.deck.length > 0 ? 2 : 1;
+
+                        if (nextPlayerPlayableCards.length < nextPlayerRequired && nextPlayer.cards.length > 0) {
+
+                            return broadcastToRoom(room, {
+
+                                type: 'game_over',
+
+                                result: 'lose',
+
+                                message: `¡${nextPlayer.name} no puede jugar el mínimo de ${nextPlayerRequired} carta(s) requerida(s)!`,
+
+                                reason: 'min_cards_not_met'
+
+                            });
+
+                        }
+
+                        player.cardsPlayedThisTurn = [];
+
+                        room.gameState.currentTurn = nextPlayer.id;
+
+                        broadcastToRoom(room, {
+
+                            type: 'turn_changed',
+
+                            newTurn: nextPlayer.id,
+
+                            previousPlayer: player.id,
+
+                            playerName: nextPlayer.name,
+
+                            cardsPlayedThisTurn: 0,
+
+                            minCardsRequired: nextPlayerRequired
+
+                        }, { includeGameState: true });
+
+                        checkGameStatus(room);
+
+                    }
+
+                    break;
+
+                case 'undo_move':
+
+                    if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+
+                        handleUndoMove(room, player, msg);
+
+                    }
+
+                    break;
+
+                case 'get_game_state':
+
+                    if (room.gameState.gameStarted) sendGameState(room, player);
+
+                    break;
+
+                case 'self_blocked':
+
+                    if (rooms.has(msg.roomId)) {
+
+                        const room = rooms.get(msg.roomId);
+
+                        const player = room.players.find(p => p.id === msg.playerId);
+
+                        if (player) {
+
+                            broadcastToRoom(room, {
+
+                                type: 'game_over',
+
+                                result: 'lose',
+
+                                message: `¡${player.name} se quedó sin movimientos posibles!`,
+
+                                reason: 'self_blocked'
+
+                            });
+
+                        }
+
+                    }
+
+                    break;
+
+                case 'reset_room':
+
+                    if (player.isHost && rooms.has(msg.roomId)) {
+
+                        const room = rooms.get(msg.roomId);
+
+                        room.gameState = {
+
+                            deck: initializeDeck(),
+
+                            board: { ascending: [1, 1], descending: [100, 100] },
+
+                            currentTurn: room.players[0].id,
+
+                            gameStarted: false,
+
+                            initialCards: room.gameState.initialCards || 6
+
+                        };
+
+                        room.players.forEach(player => {
+
+                            player.cards = [];
+
+                            player.cardsPlayedThisTurn = [];
+
+                        });
+
+                        broadcastToRoom(room, {
+
+                            type: 'room_reset',
+
+                            message: 'La sala ha sido reiniciada para una nueva partida'
+
+                        });
+
+                    }
+
+                    break;
+
+                case 'update_player':
+
+                    const playerToUpdate = room.players.find(p => p.id === msg.playerId);
+
+                    if (playerToUpdate) {
+
+                        playerToUpdate.name = msg.name;
+
+                        broadcastToRoom(room, {
+
+                            type: 'player_update',
+
+                            players: room.players.map(p => ({
+
+                                id: p.id,
+
+                                name: p.name,
+
+                                isHost: p.isHost,
+
+                                cardCount: p.cards.length
+
+                            }))
+
+                        });
+
+                    }
+
+                    break;
+
+                default:
+
+                    console.log('Tipo de mensaje no reconocido:', msg.type);
 
             }
-
-
-
-            if (msg.type === 'start_game' && player.isHost && !room.gameState.gameStarted) {
-
-                startGame(room, msg.initialCards);
-
-                await saveGameState(roomId);
-
-            }
-
-
-
-            if (msg.type === 'play_card' && player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-
-                handlePlayCard(room, player, msg);
-
-                await saveGameState(roomId);
-
-            }
-
-
-
-            if (msg.type === 'end_turn' && player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-
-                endTurn(room, player);
-
-                await saveGameState(roomId);
-
-            }
-
-
-
-            if (msg.type === 'undo_move' && player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-
-                handleUndoMove(room, player, msg);
-
-                await saveGameState(roomId);
-
-            }
-
-
-
-            if (msg.type === 'get_game_state' && room.gameState.gameStarted) {
-
-                sendGameState(room, player);
-
-            }
-
-
-
-            if (msg.type === 'self_blocked' && rooms.has(msg.roomId)) {
-
-                const room = rooms.get(msg.roomId);
-
-                const player = room.players.find(p => p.id === msg.playerId);
-
-                if (player) {
-
-                    broadcastToRoom(room, {
-
-                        type: 'game_over',
-
-                        result: 'lose',
-
-                        message: `¡${player.name} se quedó sin movimientos posibles!`,
-
-                        reason: 'self_blocked'
-
-                    });
-
-                    await saveGameState(roomId);
-
-                }
-
-            }
-
-
-
-            if (msg.type === 'reset_room' && player.isHost && rooms.has(msg.roomId)) {
-
-                const room = rooms.get(msg.roomId);
-
-                room.gameState = {
-
-                    deck: initializeDeck(),
-
-                    board: { ascending: [1, 1], descending: [100, 100] },
-
-                    currentTurn: room.players[0].id,
-
-                    gameStarted: false,
-
-                    initialCards: room.gameState.initialCards || 6
-
-                };
-
-                room.players.forEach(player => {
-
-                    player.cards = [];
-
-                    player.cardsPlayedThisTurn = [];
-
-                });
-
-                broadcastToRoom(room, {
-
-                    type: 'room_reset',
-
-                    message: 'La sala ha sido reiniciada para una nueva partida'
-
-                });
-
-                await saveGameState(roomId);
-
-            }
-
-
-
-            if (msg.type === 'update_player') {
-
-                const playerToUpdate = room.players.find(p => p.id === msg.playerId);
-
-                if (playerToUpdate) {
-
-                    playerToUpdate.name = msg.name;
-
-                    broadcastToRoom(room, {
-
-                        type: 'player_update',
-
-                        players: room.players.map(p => ({
-
-                            id: p.id,
-
-                            name: p.name,
-
-                            isHost: p.isHost,
-
-                            cardCount: p.cards.length
-
-                        }))
-
-                    });
-
-                    await saveGameState(roomId);
-
-                }
-
-            }
-
-
 
         } catch (error) {
 
@@ -1554,17 +1186,11 @@ wss.on('connection', async (ws, req) => {
 
     });
 
-
-
-    ws.on('close', async () => {
+    ws.on('close', () => {
 
         clearInterval(pingInterval);
 
         player.ws = null;
-
-        await saveGameState(roomId);
-
-
 
         if (player.isHost && room.players.length > 1) {
 
@@ -1584,15 +1210,11 @@ wss.on('connection', async (ws, req) => {
 
                 });
 
-                await saveGameState(roomId);
-
             }
 
         }
 
     });
-
-
 
     ws.on('error', (error) => {
 
@@ -1603,8 +1225,6 @@ wss.on('connection', async (ws, req) => {
         clearInterval(pingInterval);
 
     });
-
-
 
     clearTimeout(connectionTimeout);
 
@@ -1649,8 +1269,6 @@ wss.on('connection', async (ws, req) => {
         isYourTurn: room.gameState.currentTurn === player.id
 
     };
-
-
 
     if (room.gameState.gameStarted) {
 
