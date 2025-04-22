@@ -93,34 +93,31 @@ setInterval(async () => {
     }
 }, 300000); // 5 minutos
 
-// Función para guardar el estado del juego
 async function saveGameState(roomId) {
     const room = rooms.get(roomId);
     if (!room) return;
 
-    const query = `
-      INSERT INTO game_states (room_id, state_data, last_activity)
-      VALUES ($1, $2, NOW())
-      ON CONFLICT (room_id) 
-      DO UPDATE SET state_data = $2, last_activity = NOW()
-    `;
-
     try {
-        await pool.query(query, [
-            roomId,
-            JSON.stringify({
-                players: room.players.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    isHost: p.isHost,
-                    cards: p.cards,
-                    lastActivity: p.lastActivity
-                })),
-                gameState: room.gameState,
-                history: boardHistory.get(roomId)
-            })
-        ]);
-        console.log(`Estado de sala ${roomId} guardado`);
+        const stateData = {
+            players: room.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                isHost: p.isHost,
+                cards: p.cards,
+                lastActivity: p.lastActivity
+            })),
+            gameState: room.gameState,
+            history: boardHistory.get(roomId)
+        };
+
+        // Asegurarse de guardar como string JSON
+        await pool.query(
+            `INSERT INTO game_states (room_id, state_data, last_activity)
+             VALUES ($1, $2, NOW())
+             ON CONFLICT (room_id) 
+             DO UPDATE SET state_data = $2, last_activity = NOW()`,
+            [roomId, JSON.stringify(stateData)]
+        );
     } catch (err) {
         console.error(`Error guardando estado para sala ${roomId}:`, err);
     }
@@ -136,21 +133,17 @@ async function loadGameState(roomId) {
 
         if (rows.length === 0) return null;
 
-        const data = JSON.parse(rows[0].state_data);
-        const room = {
-            players: data.players,
-            gameState: data.gameState,
-            lastActivity: Date.now()
-        };
+        let stateData = rows[0].state_data;
 
-        rooms.set(roomId, room);
-        reverseRoomMap.set(room, roomId);
-        boardHistory.set(roomId, data.history || {
-            ascending1: [1], ascending2: [1],
-            descending1: [100], descending2: [100]
-        });
+        // Si es un objeto, convertirlo a string y volver a parsear
+        if (typeof stateData === 'object') {
+            stateData = JSON.stringify(stateData);
+        }
 
-        return room;
+        const data = JSON.parse(stateData);
+
+        // Resto de la lógica de carga...
+        return data;
     } catch (err) {
         console.error(`Error cargando estado para sala ${roomId}:`, err);
         return null;
@@ -510,12 +503,10 @@ app.post('/join-room', async (req, res) => {
 
 // Nuevo endpoint para recuperar estado completo
 app.get('/room-state/:roomId', async (req, res) => {
-    const roomId = req.params.roomId;
-
     try {
         const { rows } = await pool.query(
             'SELECT state_data FROM game_states WHERE room_id = $1',
-            [roomId]
+            [req.params.roomId]
         );
 
         if (rows.length === 0) {
@@ -525,9 +516,14 @@ app.get('/room-state/:roomId', async (req, res) => {
             });
         }
 
+        // Asegúrate que state_data es un string JSON válido
+        const stateData = typeof rows[0].state_data === 'object'
+            ? JSON.stringify(rows[0].state_data)
+            : rows[0].state_data;
+
         res.json({
             success: true,
-            state: JSON.parse(rows[0].state_data)
+            state: JSON.parse(stateData) // Parseamos para validar
         });
     } catch (err) {
         console.error('Error recuperando estado:', err);

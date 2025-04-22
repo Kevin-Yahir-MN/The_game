@@ -331,19 +331,41 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    function requestFullState() {
-        fetch(`${API_URL}/room-state/${roomId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    updateGameState(data.state);
-                } else {
-                    showNotification('Error recuperando estado del juego', true);
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching game state:', error);
-            });
+    async function requestFullState() {
+        try {
+            const response = await fetch(`${API_URL}/room-state/${roomId}`);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Error en la respuesta del servidor');
+            }
+
+            // Verificación adicional del estado recibido
+            if (typeof data.state === 'string') {
+                updateGameState(JSON.parse(data.state));
+            } else if (typeof data.state === 'object') {
+                updateGameState(data.state);
+            } else {
+                throw new Error('Formato de estado inválido');
+            }
+        } catch (error) {
+            console.error('Error fetching game state:', error);
+            showNotification('Error al cargar el estado del juego', true);
+
+            // Intento de recuperación
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                safeSend({
+                    type: 'get_game_state',
+                    playerId: currentPlayer.id,
+                    roomId: roomId
+                });
+            }
+        }
     }
 
     function safeSend(message) {
