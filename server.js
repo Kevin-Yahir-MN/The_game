@@ -840,8 +840,55 @@ wss.on('connection', async (ws, req) => {
     }
     safeSend(ws, response);
 });
+// Configuración
+const CLEANUP_INTERVAL = 30 * 60 * 1000; // 30 minutos
+const MAX_AGE = '1 day'; // Puedes cambiar a '2 days' si lo necesitas
 
+// Limpieza con bloqueo para evitar ejecuciones simultáneas
+let isCleaning = false;
+
+async function cleanOldGames() {
+    if (isCleaning) return;
+    isCleaning = true;
+
+    try {
+        const { rows } = await pool.query(
+            `WITH deleted AS (
+                DELETE FROM game_states 
+                WHERE last_activity < NOW() - INTERVAL $1 
+                RETURNING *
+             ) SELECT COUNT(*) FROM deleted`,
+            [MAX_AGE]
+        );
+
+        const count = rows[0]?.count || 0;
+        if (count > 0) {
+            console.log(`[Limpieza] Eliminados ${count} juegos antiguos (${new Date().toISOString()})`);
+        }
+    } catch (error) {
+        console.error('[Error en limpieza]:', error.message);
+    } finally {
+        isCleaning = false;
+    }
+}
+
+// Iniciar el servicio de limpieza
+function startCleanupService() {
+    // Ejecutar inmediatamente
+    cleanOldGames();
+
+    // Programar ejecuciones periódicas
+    const interval = setInterval(cleanOldGames, CLEANUP_INTERVAL);
+
+    // Manejar cierre adecuado
+    process.on('SIGTERM', () => {
+        clearInterval(interval);
+        console.log('Servicio de limpieza detenido');
+    });
+}
+
+// Iniciar todo
+startCleanupService();
 server.listen(PORT, () => {
-    console.log(`🚀 Servidor iniciado en puerto ${PORT}`);
-    console.log(`🌍 Orígenes permitidos: ${allowedOrigins.join(', ')}`);
+    console.log(`Servidor y servicio de limpieza iniciados en puerto ${PORT}`);
 });
