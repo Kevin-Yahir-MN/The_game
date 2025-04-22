@@ -663,31 +663,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const isYourTurn = gameState.currentTurn === currentPlayer.id;
         const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
         const startY = PLAYER_CARDS_Y;
-        gameState.yourCards = cards.map((card, index) => {
-            const value = card instanceof Card ? card.value : card;
-            const playable = isYourTurn && (
-                isValidMove(value, 'asc1') || isValidMove(value, 'asc2') ||
-                isValidMove(value, 'desc1') || isValidMove(value, 'desc2')
-            );
-            const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
-                move => move.value === value && move.playerId === currentPlayer.id
-            );
-            if (card instanceof Card) {
-                card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
-                card.y = startY;
-                card.isPlayable = playable;
-                card.isPlayedThisTurn = isPlayedThisTurn;
-                card.backgroundColor = isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
-                return card;
-            } else {
-                return new Card(
-                    value,
-                    startX + index * (CARD_WIDTH + CARD_SPACING),
-                    startY,
-                    playable,
-                    isPlayedThisTurn
-                );
+
+        gameState.yourCards = cards.map((cardValue, index) => {
+            // Si ya existe una carta válida, reutilízala
+            const existingCard = gameState.yourCards.find(c => c.value === cardValue);
+            if (existingCard && typeof existingCard.draw === 'function') {
+                existingCard.x = startX + index * (CARD_WIDTH + CARD_SPACING);
+                existingCard.y = startY;
+                return existingCard;
             }
+
+            // Crea una nueva carta si no existe
+            const playable = isYourTurn && (
+                isValidMove(cardValue, 'asc1') ||
+                isValidMove(cardValue, 'asc2') ||
+                isValidMove(cardValue, 'desc1') ||
+                isValidMove(cardValue, 'desc2')
+            );
+
+            return new Card(
+                cardValue,
+                startX + index * (CARD_WIDTH + CARD_SPACING),
+                startY,
+                playable,
+                gameState.cardsPlayedThisTurn.some(move => move.value === cardValue)
+            );
         });
     }
 
@@ -988,6 +988,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawPlayerCards() {
         const backgroundHeight = CARD_HEIGHT + 30;
         const backgroundWidth = gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 40;
+
         ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
         ctx.beginPath();
         ctx.roundRect(
@@ -998,14 +999,18 @@ document.addEventListener('DOMContentLoaded', () => {
             15
         );
         ctx.fill();
+
         gameState.yourCards.forEach((card, index) => {
-            if (card && card !== dragStartCard) {
-                card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
-                    index * (CARD_WIDTH + CARD_SPACING);
-                card.y = PLAYER_CARDS_Y;
-                card.hoverOffset = card === selectedCard ? 10 : 0;
-                card.draw();
+            if (!card || typeof card.draw !== 'function') {
+                console.error('Carta inválida en posición', index, card);
+                return;
             }
+
+            card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
+                index * (CARD_WIDTH + CARD_SPACING);
+            card.y = PLAYER_CARDS_Y;
+            card.hoverOffset = card === selectedCard ? 10 : 0;
+            card.draw();
         });
     }
 
@@ -1080,22 +1085,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function gameLoop(timestamp) {
-        if (timestamp - lastRenderTime < 1000 / TARGET_FPS) {
+        try {
+            if (timestamp - lastRenderTime < 1000 / TARGET_FPS) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            lastRenderTime = timestamp;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#1a6b1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawBoard();
+            drawHistoryIcons();
+            handleCardAnimations();
+
+            try {
+                drawPlayerCards();
+            } catch (err) {
+                console.error('Error dibujando cartas:', err);
+                // Intenta recuperar el estado
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    requestGameState();
+                }
+            }
+
+            if (isDragging && dragStartCard && typeof dragStartCard.draw === 'function') {
+                dragStartCard.draw();
+            }
+
             requestAnimationFrame(gameLoop);
-            return;
+        } catch (error) {
+            console.error('Error en gameLoop:', error);
+            // Reiniciar el bucle después de 1 segundo
+            setTimeout(() => requestAnimationFrame(gameLoop), 1000);
         }
-        lastRenderTime = timestamp;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#1a6b1a';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        drawBoard();
-        drawHistoryIcons();
-        handleCardAnimations();
-        drawPlayerCards();
-        if (isDragging && dragStartCard) {
-            dragStartCard.draw();
-        }
-        requestAnimationFrame(gameLoop);
     }
 
     function cleanup() {
