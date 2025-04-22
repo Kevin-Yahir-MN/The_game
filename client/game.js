@@ -1,7 +1,3 @@
-if (!roomId && sessionStorage.getItem('roomId')) {
-    roomId = sessionStorage.getItem('roomId');
-}
-
 window.addEventListener('error', (event) => {
     console.error('Error global capturado:', event.error);
     showNotification('Error crítico en el juego. Recargando...', true);
@@ -84,6 +80,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageQueue = [];
     let isProcessingQueue = false;
 
+    if (!roomId && sessionStorage.getItem('roomId')) {
+        roomId = sessionStorage.getItem('roomId');
+    }
     const reloadState = sessionStorage.getItem('reloadState');
     if (reloadState) {
         try {
