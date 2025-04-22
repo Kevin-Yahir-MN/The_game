@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastStateUpdate = 0;
     let lastRenderTime = 0;
     let reconnectAttempts = 0;
+    const RECONNECT_BASE_DELAY = 2000;
     const MAX_RECONNECT_ATTEMPTS = 5;
     let dragStartCard = null;
     let dragStartX = 0;
@@ -100,6 +101,14 @@ document.addEventListener('DOMContentLoaded', () => {
             this.isDragging = false;
             this.dragOffsetX = 0;
             this.dragOffsetY = 0;
+        }
+
+
+        contains(x, y) {
+            return x >= this.x &&
+                x <= this.x + this.width &&
+                y >= this.y &&
+                y <= this.y + this.height;
         }
 
         draw() {
