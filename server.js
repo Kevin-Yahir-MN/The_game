@@ -120,6 +120,9 @@ const BoardHistory = sequelize.define('BoardHistory', {
     }
 });
 
+let isDatabaseReady = false;
+
+
 Room.hasMany(Player);
 Player.belongsTo(Room);
 Room.hasOne(GameState);
@@ -153,6 +156,18 @@ const wss = new WebSocket.Server({
         done(true);
     }
 });
+
+async function initializeDatabase() {
+    try {
+        await sequelize.authenticate();
+        await sequelize.sync({ alter: true }); // Usar { force: true } solo en desarrollo si necesitas reiniciar las tablas
+        isDatabaseReady = true;
+        console.log('Conexión a PostgreSQL establecida correctamente');
+    } catch (error) {
+        console.error('Error al conectar con PostgreSQL:', error);
+        process.exit(1);
+    }
+}
 
 async function initializeDeck() {
     const deck = [];
@@ -531,9 +546,19 @@ async function checkGameStatus(roomId) {
 }
 
 app.post('/create-room', async (req, res) => {
+    if (!isDatabaseReady) {
+        return res.status(503).json({
+            success: false,
+            message: 'El servidor no está listo. Intenta nuevamente en unos segundos.'
+        });
+    }
+
     const { playerName } = req.body;
     if (!playerName) {
-        return res.status(400).json({ success: false, message: 'Se requiere nombre de jugador' });
+        return res.status(400).json({
+            success: false,
+            message: 'Se requiere nombre de jugador'
+        });
     }
 
     const transaction = await sequelize.transaction();
@@ -541,42 +566,54 @@ app.post('/create-room', async (req, res) => {
         const roomId = Math.floor(1000 + Math.random() * 9000).toString();
         const playerId = uuidv4();
 
-        const room = await Room.create({
-            roomId,
-            lastActivity: new Date()
-        }, { transaction });
+        const [room, player, gameState, boardHistory] = await Promise.all([
+            Room.create({
+                roomId,
+                lastActivity: new Date()
+            }, { transaction }),
 
-        await Player.create({
-            id: playerId,
-            name: playerName,
-            isHost: true,
-            lastActivity: new Date(),
-            RoomRoomId: roomId
-        }, { transaction });
+            Player.create({
+                id: playerId,
+                name: playerName,
+                isHost: true,
+                lastActivity: new Date(),
+                RoomRoomId: roomId
+            }, { transaction }),
 
-        await GameState.create({
-            deck: initializeDeck(),
-            board: { ascending: [1, 1], descending: [100, 100] },
-            currentTurn: playerId,
-            gameStarted: false,
-            initialCards: 6,
-            RoomRoomId: roomId
-        }, { transaction });
+            GameState.create({
+                deck: initializeDeck(),
+                board: { ascending: [1, 1], descending: [100, 100] },
+                currentTurn: playerId,
+                gameStarted: false,
+                initialCards: 6,
+                RoomRoomId: roomId
+            }, { transaction }),
 
-        await BoardHistory.create({
-            ascending1: [1],
-            ascending2: [1],
-            descending1: [100],
-            descending2: [100],
-            RoomRoomId: roomId
-        }, { transaction });
+            BoardHistory.create({
+                ascending1: [1],
+                ascending2: [1],
+                descending1: [100],
+                descending2: [100],
+                RoomRoomId: roomId
+            }, { transaction })
+        ]);
 
         await transaction.commit();
 
-        res.json({ success: true, roomId, playerId, playerName });
+        res.json({
+            success: true,
+            roomId,
+            playerId,
+            playerName
+        });
     } catch (error) {
         await transaction.rollback();
-        res.status(500).json({ success: false, message: 'Error al crear sala' });
+        console.error('Error al crear sala:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error interno al crear sala',
+            error: error.message
+        });
     }
 });
 
@@ -998,7 +1035,13 @@ setInterval(async () => {
     }
 }, ROOM_CLEANUP_INTERVAL);
 
-server.listen(PORT, () => {
-    console.log(`🚀 Servidor iniciado en puerto ${PORT}`);
-    console.log(`🌍 Orígenes permitidos: ${allowedOrigins.join(', ')}`);
+initializeDatabase().then(() => {
+    server.listen(PORT, () => {
+        console.log(`🚀 Servidor iniciado en puerto ${PORT}`);
+        console.log(`🌍 Orígenes permitidos: ${allowedOrigins.join(', ')}`);
+        console.log(`💾 Base de datos conectada: ${sequelize.config.database}`);
+    });
+}).catch(error => {
+    console.error('No se pudo iniciar el servidor:', error);
+    process.exit(1);
 });
