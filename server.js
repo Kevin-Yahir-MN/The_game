@@ -90,6 +90,17 @@ const Player = sequelize.define('Player', {
     tableName: 'players'
 });
 
+// Añadir esto después de definir el modelo
+Player.prototype.safeCloseConnection = function () {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        try {
+            this.ws.close(1000, 'Nueva conexión establecida');
+        } catch (error) {
+            console.error('Error al cerrar conexión:', error);
+        }
+    }
+};
+
 const GameState = sequelize.define('GameState', {
     deck: {
         type: DataTypes.ARRAY(DataTypes.INTEGER),
@@ -747,202 +758,238 @@ wss.on('connection', async (ws, req) => {
     const params = new URLSearchParams(req.url.split('?')[1]);
     const roomId = params.get('roomId');
     const playerId = params.get('playerId');
-    const playerName = params.get('playerName');
+    const playerName = decodeURIComponent(params.get('playerName') || '');
 
+    // Timeout para conexiones que tardan demasiado
     const connectionTimeout = setTimeout(() => {
         if (ws.readyState === WebSocket.CONNECTING) {
             ws.close(1008, 'Tiempo de conexión agotado');
         }
     }, CONNECTION_TIMEOUT);
 
+    // Validación básica de parámetros
     if (!roomId || !playerId) {
         clearTimeout(connectionTimeout);
         return ws.close(1008, 'Datos inválidos');
     }
 
-    const room = await Room.findByPk(roomId, {
-        include: [Player]
-    });
-
-    if (!room) {
-        clearTimeout(connectionTimeout);
-        return ws.close(1008, 'Sala no encontrada');
-    }
-
-    const player = room.Players.find(p => p.id === playerId);
-    if (!player) {
-        clearTimeout(connectionTimeout);
-        return ws.close(1008, 'Jugador no registrado');
-    }
-
-    if (player.wsConnected) {
-        safeSend(player.ws, JSON.stringify({
-            type: 'notification',
-            message: 'Se ha detectado una nueva conexión desde otro dispositivo',
-            isError: true
-        }));
-        player.ws.close(1000, 'Nueva conexión establecida');
-    }
-
-    player.ws = ws;
-    player.wsConnected = true;
-    player.lastActivity = new Date();
-    await player.save();
-
-    const pingInterval = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-            safeSend(ws, { type: 'ping' });
-        }
-    }, PING_INTERVAL);
-
-    ws.on('message', async (message) => {
-        try {
-            const msg = JSON.parse(message);
-            player.lastActivity = new Date();
-            await player.save();
-
-            if (msg.type === 'ping') {
-                return ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
-            }
-
-            switch (msg.type) {
-                case 'start_game':
-                    if (player.isHost && !room.GameState.gameStarted) {
-                        await startGame(roomId, msg.initialCards);
-                    }
-                    break;
-
-                case 'play_card':
-                    if (player.id === room.GameState.currentTurn && room.GameState.gameStarted) {
-                        await handlePlayCard(roomId, player, msg);
-                    }
-                    break;
-
-                case 'end_turn':
-                    if (player.id === room.GameState.currentTurn && room.GameState.gameStarted) {
-                        await endTurn(roomId, player);
-                    }
-                    break;
-
-                case 'undo_move':
-                    if (player.id === room.GameState.currentTurn && room.GameState.gameStarted) {
-                        await handleUndoMove(roomId, player, msg);
-                    }
-                    break;
-
-                case 'get_game_state':
-                    if (room.GameState.gameStarted) await sendGameState(roomId, player.id);
-                    break;
-
-                case 'self_blocked':
-                    if (msg.roomId === roomId) {
-                        await broadcastToRoom(roomId, {
-                            type: 'game_over',
-                            result: 'lose',
-                            message: `¡${player.name} se quedó sin movimientos posibles!`,
-                            reason: 'self_blocked'
-                        });
-                    }
-                    break;
-
-                case 'reset_room':
-                    if (player.isHost) {
-                        await resetRoom(roomId);
-                    }
-                    break;
-
-                case 'update_player':
-                    if (msg.playerId === player.id) {
-                        await Player.update({
-                            name: msg.name
-                        }, {
-                            where: { id: player.id }
-                        });
-
-                        await broadcastToRoom(roomId, {
-                            type: 'player_update',
-                            players: room.Players.map(p => ({
-                                id: p.id,
-                                name: p.name,
-                                isHost: p.isHost,
-                                cardCount: p.cards.length
-                            }))
-                        });
-                    }
-                    break;
-            }
-        } catch (error) {
-            console.error('Error procesando mensaje:', error);
-        }
-    });
-
-    ws.on('close', async () => {
-        clearInterval(pingInterval);
-        await Player.update({
-            wsConnected: false
-        }, {
-            where: { id: playerId }
+    try {
+        // Buscar la sala y el jugador en la base de datos
+        const room = await Room.findByPk(roomId, {
+            include: [
+                { model: Player },
+                { model: GameState }
+            ]
         });
 
-        if (player.isHost) {
-            const newHost = room.Players.find(p => p.id !== player.id && p.wsConnected);
-            if (newHost) {
-                await Player.update({
-                    isHost: true
-                }, {
-                    where: { id: newHost.id }
+        if (!room) {
+            clearTimeout(connectionTimeout);
+            return ws.close(1008, 'Sala no encontrada');
+        }
+
+        const player = room.Players.find(p => p.id === playerId);
+        if (!player) {
+            clearTimeout(connectionTimeout);
+            return ws.close(1008, 'Jugador no registrado');
+        }
+
+        // Manejo de conexión duplicada
+        if (player.wsConnected && player.ws) {
+            try {
+                // Notificar al cliente anterior sobre la nueva conexión
+                safeSend(player.ws, {
+                    type: 'notification',
+                    message: 'Nueva conexión detectada - cerrando esta sesión',
+                    isError: true
                 });
 
-                await broadcastToRoom(roomId, {
-                    type: 'notification',
-                    message: `${newHost.name} es ahora el host`,
-                    isError: false
-                });
+                // Esperar un breve momento antes de cerrar para asegurar la entrega
+                setTimeout(() => {
+                    if (player.ws && player.ws.readyState === WebSocket.OPEN) {
+                        player.ws.close(1000, 'Reemplazado por nueva conexión');
+                    }
+                }, 100);
+            } catch (error) {
+                console.error('Error al manejar conexión duplicada:', error);
             }
         }
-    });
 
-    ws.on('error', (error) => {
-        console.error('Error en WebSocket:', error);
+        // Establecer la nueva conexión
+        player.ws = ws;
+        player.wsConnected = true;
+        player.lastActivity = new Date();
+        await player.save();
+
+        // Configurar ping para mantener la conexión activa
+        const pingInterval = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+                safeSend(ws, { type: 'ping' });
+            }
+        }, PING_INTERVAL);
+
+        // Handler para mensajes entrantes
+        ws.on('message', async (message) => {
+            try {
+                const msg = JSON.parse(message);
+                player.lastActivity = new Date();
+                await player.save();
+
+                switch (msg.type) {
+                    case 'ping':
+                        ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+                        break;
+
+                    case 'start_game':
+                        if (player.isHost && !room.GameState.gameStarted) {
+                            await startGame(roomId, msg.initialCards);
+                        }
+                        break;
+
+                    case 'play_card':
+                        if (player.id === room.GameState.currentTurn && room.GameState.gameStarted) {
+                            await handlePlayCard(roomId, player, msg);
+                        }
+                        break;
+
+                    case 'end_turn':
+                        if (player.id === room.GameState.currentTurn && room.GameState.gameStarted) {
+                            await endTurn(roomId, player);
+                        }
+                        break;
+
+                    case 'undo_move':
+                        if (player.id === room.GameState.currentTurn && room.GameState.gameStarted) {
+                            await handleUndoMove(roomId, player, msg);
+                        }
+                        break;
+
+                    case 'get_game_state':
+                        if (room.GameState.gameStarted) await sendGameState(roomId, player.id);
+                        break;
+
+                    case 'self_blocked':
+                        if (msg.roomId === roomId) {
+                            await broadcastToRoom(roomId, {
+                                type: 'game_over',
+                                result: 'lose',
+                                message: `¡${player.name} se quedó sin movimientos posibles!`,
+                                reason: 'self_blocked'
+                            });
+                        }
+                        break;
+
+                    case 'reset_room':
+                        if (player.isHost) {
+                            await resetRoom(roomId);
+                        }
+                        break;
+
+                    case 'update_player':
+                        if (msg.playerId === player.id) {
+                            await Player.update({
+                                name: msg.name
+                            }, {
+                                where: { id: player.id }
+                            });
+
+                            await broadcastToRoom(roomId, {
+                                type: 'player_update',
+                                players: room.Players.map(p => ({
+                                    id: p.id,
+                                    name: p.name,
+                                    isHost: p.isHost,
+                                    cardCount: p.cards.length
+                                }))
+                            });
+                        }
+                        break;
+
+                    default:
+                        console.log('Mensaje no reconocido:', msg);
+                }
+            } catch (error) {
+                console.error('Error procesando mensaje:', error);
+            }
+        });
+
+        // Handler para cierre de conexión
+        ws.on('close', async () => {
+            clearInterval(pingInterval);
+            await Player.update({
+                wsConnected: false
+            }, {
+                where: { id: playerId }
+            });
+
+            // Transferir host si es necesario
+            if (player.isHost) {
+                const newHost = room.Players.find(p => p.id !== player.id && p.wsConnected);
+                if (newHost) {
+                    await Player.update({
+                        isHost: true
+                    }, {
+                        where: { id: newHost.id }
+                    });
+
+                    await broadcastToRoom(roomId, {
+                        type: 'notification',
+                        message: `${newHost.name} es ahora el host`,
+                        isError: false
+                    });
+                }
+            }
+        });
+
+        // Handler para errores
+        ws.on('error', (error) => {
+            console.error('Error en WebSocket:', error);
+            clearTimeout(connectionTimeout);
+            clearInterval(pingInterval);
+        });
+
+        // Limpiar timeout de conexión
         clearTimeout(connectionTimeout);
-        clearInterval(pingInterval);
-    });
 
-    clearTimeout(connectionTimeout);
+        // Enviar estado inicial al jugador
+        const response = {
+            type: 'init_game',
+            playerId: player.id,
+            playerName: player.name,
+            roomId,
+            isHost: player.isHost,
+            gameState: {
+                board: room.GameState.board,
+                currentTurn: room.GameState.currentTurn,
+                gameStarted: room.GameState.gameStarted,
+                initialCards: room.GameState.initialCards,
+                remainingDeck: room.GameState.deck.length,
+                players: room.Players.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    isHost: p.isHost,
+                    cardCount: p.cards.length
+                }))
+            },
+            isYourTurn: room.GameState.currentTurn === player.id
+        };
 
-    const response = {
-        type: 'init_game',
-        playerId: player.id,
-        playerName: player.name,
-        roomId,
-        isHost: player.isHost,
-        gameState: {
-            board: room.GameState.board,
-            currentTurn: room.GameState.currentTurn,
-            gameStarted: room.GameState.gameStarted,
-            initialCards: room.GameState.initialCards,
-            remainingDeck: room.GameState.deck.length,
-            players: room.Players.map(p => ({
+        if (room.GameState.gameStarted) {
+            response.yourCards = player.cards;
+            response.players = room.Players.map(p => ({
                 id: p.id,
                 name: p.name,
-                isHost: p.isHost,
-                cardCount: p.cards.length
-            }))
-        },
-        isYourTurn: room.GameState.currentTurn === player.id
-    };
+                cardCount: p.cards.length,
+                cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
+            }));
+        }
 
-    if (room.GameState.gameStarted) {
-        response.yourCards = player.cards;
-        response.players = room.Players.map(p => ({
-            id: p.id,
-            name: p.name,
-            cardCount: p.cards.length,
-            cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
-        }));
+        safeSend(ws, response);
+
+    } catch (error) {
+        console.error('Error en handler de conexión:', error);
+        ws.close(1011, 'Error interno del servidor');
+        clearTimeout(connectionTimeout);
     }
-
-    safeSend(ws, response);
 });
 
 async function resetRoom(roomId) {
