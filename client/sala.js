@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const PLAYER_UPDATE_INTERVAL = 5000;
     const MAX_RECONNECT_ATTEMPTS = 5;
     const RECONNECT_BASE_DELAY = 2000;
-    const PING_INTERVAL = 30000; // 30 segundos
+    const PING_INTERVAL = 30000;
+    const GAME_START_TIMEOUT = 45000; // 45 segundos
 
     // Elementos del DOM
     const roomIdDisplay = document.getElementById('roomIdDisplay');
@@ -22,7 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageQueue = [];
     let isStartingGame = false;
     let gameStartTimeout;
-    const GAME_START_TIMEOUT = 20000; // 20 segundos
 
     // Datos de la sesión
     const roomId = sessionStorage.getItem('roomId');
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!players || !Array.isArray(players)) return;
 
         playersList.innerHTML = players.map(player => `
-            <li class="player ${player.isHost ? 'host' : ''} ${player.id === playerId ? 'you' : ''}">
+            <li class="${player.isHost ? 'host' : ''} ${player.id === playerId ? 'you' : ''}">
                 <span class="player-name">${player.name || 'Jugador'}</span>
                 ${player.isHost ? '<span class="host-tag">(Host)</span>' : ''}
                 ${player.id === playerId ? '<span class="you-tag">(Tú)</span>' : ''}
@@ -140,6 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.onmessage = handleSocketMessage;
     }
 
+    // 5. Función para iniciar el juego
     async function handleStartGame() {
         if (isStartingGame) return;
         isStartingGame = true;
@@ -147,39 +148,67 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             // 1. Verificar conexión WebSocket
             if (!socket || socket.readyState !== WebSocket.OPEN) {
-                throw new Error("No hay conexión con el servidor");
+                throw new Error("No hay conexión con el servidor. Recarga la página.");
             }
 
-            // 2. Configurar estado inicial
-            updateStartButton('Iniciando partida...');
-            showNotification("Preparando la partida...", false);
+            // 2. Obtener información actualizada de la sala
+            const response = await fetch(`${API_URL}/room-info/${roomId}`);
+            if (!response.ok) throw new Error("Error al obtener información de la sala");
 
-            // 3. Enviar solicitud de inicio
+            const data = await response.json();
+
+            // 3. Validaciones previas
+            if (!data.success) throw new Error(data.message || "Error en la sala");
+            if (data.players.filter(p => p.connected).length < 2) {
+                throw new Error("Se necesitan al menos 2 jugadores conectados");
+            }
+            if (data.gameStarted) {
+                throw new Error("El juego ya está en progreso");
+            }
+
+            // 4. Configurar timeout
+            updateStartButton("Preparando juego...");
+
+            // 5. Enviar solicitud de inicio
             const requestId = `startreq_${Date.now()}`;
             const initialCards = parseInt(initialCardsSelect.value) || 6;
 
             safeSend({
                 type: 'start_game',
-                requestId: requestId,
-                playerId: playerId,
-                roomId: roomId,
-                initialCards: initialCards,
+                requestId,
+                playerId,
+                roomId,
+                initialCards,
                 timestamp: Date.now()
             });
 
-            // 4. Configurar timeout
-            gameStartTimeout = setTimeout(() => {
-                throw new Error("El servidor no respondió a tiempo");
-            }, GAME_START_TIMEOUT);
+            // 6. Esperar confirmación con timeout
+            const confirmation = await new Promise((resolve, reject) => {
+                gameStartTimeout = setTimeout(() => {
+                    reject(new Error("El servidor está tardando más de lo esperado"));
+                }, GAME_START_TIMEOUT);
 
-            // 5. Esperar confirmación
-            const success = await waitForGameConfirmation(requestId);
+                const handler = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        if (msg.type === 'game_start_confirmation' && msg.requestId === requestId) {
+                            socket.removeEventListener('message', handler);
+                            clearTimeout(gameStartTimeout);
+                            resolve(msg);
+                        }
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
 
-            if (!success) {
-                throw new Error("El servidor no pudo iniciar el juego");
+                socket.addEventListener('message', handler);
+            });
+
+            if (!confirmation.success) {
+                throw new Error(confirmation.error || "Error al iniciar el juego");
             }
 
-            // 6. Redirigir si todo sale bien
+            // 7. Redirigir al juego
             window.location.href = 'game.html';
 
         } catch (error) {
@@ -188,37 +217,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             clearTimeout(gameStartTimeout);
             isStartingGame = false;
+            resetStartButton();
         }
     }
 
-
-    function waitForGameConfirmation(requestId) {
-        return new Promise((resolve) => {
-            const confirmationHandler = (event) => {
-                try {
-                    const msg = JSON.parse(event.data);
-
-                    if (msg.type === 'game_start_confirmation' && msg.requestId === requestId) {
-                        socket.removeEventListener('message', confirmationHandler);
-                        clearTimeout(gameStartTimeout);
-                        resolve(msg.success);
-
-                        if (msg.success) {
-                            updateStartButton('¡Partida lista!');
-                            setTimeout(() => window.location.href = 'game.html', 1000);
-                        }
-                    }
-                } catch (error) {
-                    console.error("Error procesando confirmación:", error);
-                    resolve(false);
-                }
-            };
-
-            socket.addEventListener('message', confirmationHandler);
-        });
-    }
-
-    // 7. Funciones auxiliares para UI
+    // 6. Funciones auxiliares para UI
     function updateStartButton(text) {
         startBtn.disabled = true;
         startBtn.textContent = text;
@@ -234,11 +237,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleStartGameError(errorMessage) {
         let userMessage = errorMessage;
 
-        // Mensajes más amigables para el usuario
         const errorMessages = {
             "No hay conexión con el servidor": "No se pudo conectar al servidor. Intenta recargar la página.",
-            "El servidor no respondió a tiempo": "El servidor está tardando demasiado. Intenta nuevamente.",
-            "El servidor no pudo iniciar el juego": "No se pudo iniciar la partida. Verifica que todos los jugadores estén conectados."
+            "El servidor está tardando más de lo esperado": "El servidor está tardando demasiado. Intenta nuevamente.",
+            "Se necesitan al menos 2 jugadores conectados": "Invita a otro jugador a unirse antes de iniciar."
         };
 
         userMessage = errorMessages[errorMessage] || errorMessage;
@@ -252,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 8. Funciones de conexión
+    // 7. Funciones de conexión
     function startPingInterval() {
         clearInterval(pingInterval);
         pingInterval = setInterval(() => {
@@ -291,14 +293,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 9. Funciones de datos
+    // 8. Funciones de datos
     function sendPlayerUpdate() {
         safeSend({
             type: 'player_update',
-            playerId: playerId,
+            playerId,
             name: playerName,
-            isHost: isHost,
-            roomId: roomId
+            isHost,
+            roomId
         });
     }
 
@@ -316,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 10. Inicialización
+    // 9. Inicialización
     function initializeUI() {
         roomIdDisplay.textContent = roomId;
 

@@ -15,7 +15,7 @@ const allowedOrigins = ['https://the-game-2xks.onrender.com'];
 const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
 const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000;
 const CONNECTION_TIMEOUT = 10000;
-const PING_INTERVAL = 30000;
+const PING_INTERVAL = 25000;
 
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: 'postgres',
@@ -90,7 +90,6 @@ const Player = sequelize.define('Player', {
     tableName: 'players'
 });
 
-// Añadir esto después de definir el modelo
 Player.prototype.safeCloseConnection = function () {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         try {
@@ -178,13 +177,123 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client')));
 
-const wss = new WebSocket.Server({
-    server,
-    verifyClient: (info, done) => {
-        if (!allowedOrigins.includes(info.origin)) {
-            return done(false, 403, 'Origen no permitido');
+app.get('/room-info/:roomId', async (req, res) => {
+    try {
+        const room = await Room.findByPk(req.params.roomId, {
+            include: [{
+                model: Player,
+                attributes: ['id', 'name', 'isHost', 'wsConnected']
+            }, {
+                model: GameState,
+                attributes: ['gameStarted', 'currentTurn', 'initialCards']
+            }]
+        });
+
+        if (!room) {
+            return res.status(404).json({ success: false, message: 'Sala no encontrada' });
         }
-        done(true);
+
+        res.json({
+            success: true,
+            players: room.Players.map(p => ({
+                id: p.id,
+                name: p.name,
+                isHost: p.isHost,
+                connected: p.wsConnected
+            })),
+            gameStarted: room.GameState.gameStarted,
+            currentTurn: room.GameState.currentTurn,
+            initialCards: room.GameState.initialCards
+        });
+
+    } catch (error) {
+        console.error('Error al obtener info de sala:', error);
+        res.status(500).json({ success: false, message: 'Error interno del servidor' });
+    }
+});
+
+app.post('/create-room', async (req, res) => {
+    const { playerName } = req.body;
+    if (!playerName) {
+        return res.status(400).json({ success: false, message: 'Se requiere nombre de jugador' });
+    }
+
+    const transaction = await sequelize.transaction();
+    try {
+        const roomId = Math.floor(1000 + Math.random() * 9000).toString();
+        const playerId = uuidv4();
+
+        const room = await Room.create({
+            roomId,
+            lastActivity: new Date()
+        }, { transaction });
+
+        await Player.create({
+            id: playerId,
+            name: playerName,
+            isHost: true,
+            lastActivity: new Date(),
+            room_id: roomId
+        }, { transaction });
+
+        await GameState.create({
+            deck: initializeDeck(),
+            board: { ascending: [1, 1], descending: [100, 100] },
+            currentTurn: playerId,
+            gameStarted: false,
+            initialCards: 6,
+            room_id: roomId
+        }, { transaction });
+
+        await BoardHistory.create({
+            ascending1: [1],
+            ascending2: [1],
+            descending1: [100],
+            descending2: [100],
+            room_id: roomId
+        }, { transaction });
+
+        await transaction.commit();
+
+        res.json({ success: true, roomId, playerId, playerName });
+    } catch (error) {
+        await transaction.rollback();
+        res.status(500).json({ success: false, message: 'Error al crear sala' });
+    }
+});
+
+app.post('/join-room', async (req, res) => {
+    const { playerName, roomId } = req.body;
+    if (!playerName || !roomId) {
+        return res.status(400).json({
+            success: false,
+            message: 'Nombre de jugador y código de sala requeridos'
+        });
+    }
+
+    const transaction = await sequelize.transaction();
+    try {
+        const room = await Room.findByPk(roomId, { transaction });
+        if (!room) {
+            await transaction.rollback();
+            return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+        }
+
+        const playerId = uuidv4();
+        await Player.create({
+            id: playerId,
+            name: playerName,
+            isHost: false,
+            lastActivity: new Date(),
+            room_id: roomId
+        }, { transaction });
+
+        await transaction.commit();
+
+        res.json({ success: true, playerId, playerName });
+    } catch (error) {
+        await transaction.rollback();
+        res.status(500).json({ success: false, message: 'Error al unirse a sala' });
     }
 });
 
@@ -221,7 +330,7 @@ async function broadcastToRoom(roomId, message, options = {}) {
     if (!room) return;
 
     for (const player of room.Players) {
-        if (player.id !== skipPlayerId && player.wsConnected) {
+        if (player.id !== skipPlayerId && player.wsConnected && player.ws) {
             safeSend(player.ws, message);
             if (includeGameState) await sendGameState(roomId, player.id);
         }
@@ -564,118 +673,6 @@ async function checkGameStatus(roomId) {
     }
 }
 
-app.post('/create-room', async (req, res) => {
-    const { playerName } = req.body;
-    if (!playerName) {
-        return res.status(400).json({ success: false, message: 'Se requiere nombre de jugador' });
-    }
-
-    const transaction = await sequelize.transaction();
-    try {
-        const roomId = Math.floor(1000 + Math.random() * 9000).toString();
-        const playerId = uuidv4();
-
-        const room = await Room.create({
-            roomId,
-            lastActivity: new Date()
-        }, { transaction });
-
-        await Player.create({
-            id: playerId,
-            name: playerName,
-            isHost: true,
-            lastActivity: new Date(),
-            room_id: roomId
-        }, { transaction });
-
-        await GameState.create({
-            deck: initializeDeck(),
-            board: { ascending: [1, 1], descending: [100, 100] },
-            currentTurn: playerId,
-            gameStarted: false,
-            initialCards: 6,
-            room_id: roomId
-        }, { transaction });
-
-        await BoardHistory.create({
-            ascending1: [1],
-            ascending2: [1],
-            descending1: [100],
-            descending2: [100],
-            room_id: roomId
-        }, { transaction });
-
-        await transaction.commit();
-
-        res.json({ success: true, roomId, playerId, playerName });
-    } catch (error) {
-        await transaction.rollback();
-        res.status(500).json({ success: false, message: 'Error al crear sala' });
-    }
-});
-
-app.post('/join-room', async (req, res) => {
-    const { playerName, roomId } = req.body;
-    if (!playerName || !roomId) {
-        return res.status(400).json({
-            success: false,
-            message: 'Nombre de jugador y código de sala requeridos'
-        });
-    }
-
-    const transaction = await sequelize.transaction();
-    try {
-        const room = await Room.findByPk(roomId, { transaction });
-        if (!room) {
-            await transaction.rollback();
-            return res.status(404).json({ success: false, message: 'Sala no encontrada' });
-        }
-
-        const playerId = uuidv4();
-        await Player.create({
-            id: playerId,
-            name: playerName,
-            isHost: false,
-            lastActivity: new Date(),
-            room_id: roomId
-        }, { transaction });
-
-        await transaction.commit();
-
-        res.json({ success: true, playerId, playerName });
-    } catch (error) {
-        await transaction.rollback();
-        res.status(500).json({ success: false, message: 'Error al unirse a sala' });
-    }
-});
-
-app.get('/room-info/:roomId', async (req, res) => {
-    res.set('Cache-Control', 'public, max-age=5');
-    const roomId = req.params.roomId;
-
-    const room = await Room.findByPk(roomId, {
-        include: [Player, GameState]
-    });
-
-    if (!room) {
-        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
-    }
-
-    res.json({
-        success: true,
-        players: room.Players.map(p => ({
-            id: p.id,
-            name: p.name,
-            isHost: p.isHost,
-            cardCount: p.cards.length,
-            connected: p.wsConnected
-        })),
-        gameStarted: room.GameState.gameStarted,
-        currentTurn: room.GameState.currentTurn,
-        initialCards: room.GameState.initialCards
-    });
-});
-
 async function startGame(roomId, initialCards, requestId) {
     const transaction = await sequelize.transaction();
     try {
@@ -686,18 +683,15 @@ async function startGame(roomId, initialCards, requestId) {
 
         if (!room) throw new Error("Sala no encontrada");
 
-        // 1. Preparar mazo
-        const newDeck = initializeDeck();
-
-        // 2. Notificar progreso
         await broadcastToRoom(roomId, {
             type: 'game_start_progress',
             requestId: requestId,
-            message: 'Repartiendo cartas...',
+            message: 'Barajando cartas...',
             progress: 50
         });
 
-        // 3. Repartir cartas
+        const newDeck = initializeDeck();
+
         await Promise.all(room.Players.map(player => {
             const cards = [];
             for (let i = 0; i < initialCards && newDeck.length > 0; i++) {
@@ -712,7 +706,6 @@ async function startGame(roomId, initialCards, requestId) {
             });
         }));
 
-        // 4. Actualizar estado del juego
         await GameState.update({
             deck: newDeck,
             gameStarted: true,
@@ -724,7 +717,6 @@ async function startGame(roomId, initialCards, requestId) {
             transaction
         });
 
-        // 5. Notificar progreso final
         await broadcastToRoom(roomId, {
             type: 'game_start_progress',
             requestId: requestId,
@@ -740,27 +732,87 @@ async function startGame(roomId, initialCards, requestId) {
     }
 }
 
+async function resetRoom(roomId) {
+    const transaction = await sequelize.transaction();
+    try {
+        const room = await Room.findByPk(roomId, {
+            include: [GameState, Player],
+            transaction
+        });
+
+        if (!room) {
+            await transaction.rollback();
+            return;
+        }
+
+        await GameState.update({
+            deck: initializeDeck(),
+            board: { ascending: [1, 1], descending: [100, 100] },
+            currentTurn: room.Players[0].id,
+            gameStarted: false
+        }, {
+            where: { room_id: roomId },
+            transaction
+        });
+
+        await Player.update({
+            cards: [],
+            cardsPlayedThisTurn: []
+        }, {
+            where: { room_id: roomId },
+            transaction
+        });
+
+        await BoardHistory.update({
+            ascending1: [1],
+            ascending2: [1],
+            descending1: [100],
+            descending2: [100]
+        }, {
+            where: { room_id: roomId },
+            transaction
+        });
+
+        await transaction.commit();
+
+        await broadcastToRoom(roomId, {
+            type: 'room_reset',
+            message: 'La sala ha sido reiniciada para una nueva partida'
+        });
+    } catch (error) {
+        await transaction.rollback();
+        console.error('Error al reiniciar sala:', error);
+    }
+}
+
+const wss = new WebSocket.Server({
+    server,
+    verifyClient: (info, done) => {
+        if (!allowedOrigins.includes(info.origin)) {
+            return done(false, 403, 'Origen no permitido');
+        }
+        done(true);
+    }
+});
+
 wss.on('connection', async (ws, req) => {
     const params = new URLSearchParams(req.url.split('?')[1]);
     const roomId = params.get('roomId');
     const playerId = params.get('playerId');
     const playerName = decodeURIComponent(params.get('playerName') || '');
 
-    // Timeout para conexiones que tardan demasiado
     const connectionTimeout = setTimeout(() => {
         if (ws.readyState === WebSocket.CONNECTING) {
             ws.close(1008, 'Tiempo de conexión agotado');
         }
     }, CONNECTION_TIMEOUT);
 
-    // Validación básica de parámetros
     if (!roomId || !playerId) {
         clearTimeout(connectionTimeout);
         return ws.close(1008, 'Datos inválidos');
     }
 
     try {
-        // Buscar la sala y el jugador en la base de datos
         const room = await Room.findByPk(roomId, {
             include: [
                 { model: Player },
@@ -779,17 +831,14 @@ wss.on('connection', async (ws, req) => {
             return ws.close(1008, 'Jugador no registrado');
         }
 
-        // Manejo de conexión duplicada
         if (player.wsConnected && player.ws) {
             try {
-                // Notificar al cliente anterior sobre la nueva conexión
                 safeSend(player.ws, {
                     type: 'notification',
                     message: 'Nueva conexión detectada - cerrando esta sesión',
                     isError: true
                 });
 
-                // Esperar un breve momento antes de cerrar para asegurar la entrega
                 setTimeout(() => {
                     if (player.ws && player.ws.readyState === WebSocket.OPEN) {
                         player.ws.close(1000, 'Reemplazado por nueva conexión');
@@ -800,20 +849,17 @@ wss.on('connection', async (ws, req) => {
             }
         }
 
-        // Establecer la nueva conexión
         player.ws = ws;
         player.wsConnected = true;
         player.lastActivity = new Date();
         await player.save();
 
-        // Configurar ping para mantener la conexión activa
         const pingInterval = setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
                 safeSend(ws, { type: 'ping' });
             }
         }, PING_INTERVAL);
 
-        // Handler para mensajes entrantes
         ws.on('message', async (message) => {
             try {
                 const msg = JSON.parse(message);
@@ -828,7 +874,11 @@ wss.on('connection', async (ws, req) => {
                     case 'start_game':
                         if (player.isHost && !room.GameState.gameStarted) {
                             try {
-                                // 1. Enviar confirmación inmediata
+                                const activePlayers = room.Players.filter(p => p.wsConnected);
+                                if (activePlayers.length < 2) {
+                                    throw new Error("Se necesitan al menos 2 jugadores conectados");
+                                }
+
                                 safeSend(ws, {
                                     type: 'start_game_ack',
                                     requestId: msg.requestId,
@@ -836,32 +886,21 @@ wss.on('connection', async (ws, req) => {
                                     received: true
                                 });
 
-                                // 2. Validaciones
-                                const activePlayers = room.Players.filter(p => p.wsConnected);
-                                if (activePlayers.length < 2) {
-                                    throw new Error("Se necesitan al menos 2 jugadores conectados");
-                                }
-
-                                const initialCards = Math.min(Math.max(parseInt(msg.initialCards) || 6, 4), 10);
-
-                                // 3. Notificar progreso
-                                safeSend(ws, {
+                                await broadcastToRoom(room.roomId, {
                                     type: 'game_start_progress',
                                     requestId: msg.requestId,
-                                    message: 'Barajando cartas...',
+                                    message: 'Preparando juego...',
                                     progress: 25
                                 });
 
-                                // 4. Iniciar el juego (función asíncrona)
+                                const initialCards = Math.min(Math.max(parseInt(msg.initialCards) || 6, 4, 10));
                                 await startGame(room.roomId, initialCards, msg.requestId);
 
-                                // 5. Notificar éxito a todos
                                 await broadcastToRoom(room.roomId, {
                                     type: 'game_start_confirmation',
                                     requestId: msg.requestId,
                                     success: true,
-                                    initialCards: initialCards,
-                                    firstPlayer: room.GameState.currentTurn
+                                    initialCards: initialCards
                                 });
 
                             } catch (error) {
@@ -943,7 +982,6 @@ wss.on('connection', async (ws, req) => {
             }
         });
 
-        // Handler para cierre de conexión
         ws.on('close', async () => {
             clearInterval(pingInterval);
             await Player.update({
@@ -952,7 +990,6 @@ wss.on('connection', async (ws, req) => {
                 where: { id: playerId }
             });
 
-            // Transferir host si es necesario
             if (player.isHost) {
                 const newHost = room.Players.find(p => p.id !== player.id && p.wsConnected);
                 if (newHost) {
@@ -971,17 +1008,14 @@ wss.on('connection', async (ws, req) => {
             }
         });
 
-        // Handler para errores
         ws.on('error', (error) => {
             console.error('Error en WebSocket:', error);
             clearTimeout(connectionTimeout);
             clearInterval(pingInterval);
         });
 
-        // Limpiar timeout de conexión
         clearTimeout(connectionTimeout);
 
-        // Enviar estado inicial al jugador
         const response = {
             type: 'init_game',
             playerId: player.id,
@@ -1022,59 +1056,6 @@ wss.on('connection', async (ws, req) => {
         clearTimeout(connectionTimeout);
     }
 });
-
-async function resetRoom(roomId) {
-    const transaction = await sequelize.transaction();
-    try {
-        const room = await Room.findByPk(roomId, {
-            include: [GameState, Player],
-            transaction
-        });
-
-        if (!room) {
-            await transaction.rollback();
-            return;
-        }
-
-        await GameState.update({
-            deck: initializeDeck(),
-            board: { ascending: [1, 1], descending: [100, 100] },
-            currentTurn: room.Players[0].id,
-            gameStarted: false
-        }, {
-            where: { room_id: roomId },
-            transaction
-        });
-
-        await Player.update({
-            cards: [],
-            cardsPlayedThisTurn: []
-        }, {
-            where: { room_id: roomId },
-            transaction
-        });
-
-        await BoardHistory.update({
-            ascending1: [1],
-            ascending2: [1],
-            descending1: [100],
-            descending2: [100]
-        }, {
-            where: { room_id: roomId },
-            transaction
-        });
-
-        await transaction.commit();
-
-        await broadcastToRoom(roomId, {
-            type: 'room_reset',
-            message: 'La sala ha sido reiniciada para una nueva partida'
-        });
-    } catch (error) {
-        await transaction.rollback();
-        console.error('Error al reiniciar sala:', error);
-    }
-}
 
 setInterval(async () => {
     const now = new Date();
