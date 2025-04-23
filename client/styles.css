@@ -951,12 +951,18 @@ body {
     }
 }
 
-.start-game-loading {
+/* Estilos para el botón de inicio */
+#startGame {
+    transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
 }
 
-.start-game-loading::after {
+#startGame.loading {
+    cursor: not-allowed;
+}
+
+#startGame.loading::after {
     content: '';
     position: absolute;
     top: 0;
@@ -965,17 +971,48 @@ body {
     height: 100%;
     background: linear-gradient(90deg,
             transparent,
-            rgba(255, 255, 255, 0.3),
+            rgba(255, 255, 255, 0.4),
             transparent);
-    animation: loadingShimmer 2s infinite;
+    animation: loadingAnimation 1.5s infinite;
 }
 
-@keyframes loadingShimmer {
+@keyframes loadingAnimation {
     0% {
         transform: translateX(-100%);
     }
 
     100% {
         transform: translateX(100%);
+    }
+}
+
+/* Estilos para notificaciones */
+.notification {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 24px;
+    border-radius: 8px;
+    background: #2ecc71;
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    animation: slideIn 0.3s ease-out;
+}
+
+.notification.error {
+    background: #e74c3c;
+}
+
+@keyframes slideIn {
+    from {
+        top: -50px;
+        opacity: 0;
+    }
+
+    to {
+        top: 20px;
+        opacity: 1;
     }
 }

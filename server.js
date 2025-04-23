@@ -676,7 +676,7 @@ app.get('/room-info/:roomId', async (req, res) => {
     });
 });
 
-async function startGame(roomId, initialCards = 6) {
+async function startGame(roomId, initialCards, requestId) {
     const transaction = await sequelize.transaction();
     try {
         const room = await Room.findByPk(roomId, {
@@ -684,84 +684,50 @@ async function startGame(roomId, initialCards = 6) {
             transaction
         });
 
-        if (!room) {
-            await transaction.rollback();
-            throw new Error('Sala no encontrada');
-        }
+        if (!room) throw new Error("Sala no encontrada");
 
-        // Validar que haya al menos 2 jugadores
-        if (room.Players.length < 2) {
-            await transaction.rollback();
-            throw new Error('Se necesitan al menos 2 jugadores');
-        }
-
-        // Preparar el mazo y repartir cartas
+        // 1. Preparar el mazo
         const newDeck = initializeDeck();
-        const playerUpdates = room.Players.map(player => {
+
+        // 2. Repartir cartas a cada jugador
+        await Promise.all(room.Players.map(player => {
             const cards = [];
             for (let i = 0; i < initialCards && newDeck.length > 0; i++) {
                 cards.push(newDeck.pop());
             }
             return Player.update({
-                cards,
+                cards: cards,
                 cardsPlayedThisTurn: []
             }, {
                 where: { id: player.id },
                 transaction
             });
-        });
+        }));
 
-        // Actualizar estado del juego
-        await Promise.all([
-            ...playerUpdates,
-            GameState.update({
-                deck: newDeck,
-                gameStarted: true,
-                initialCards,
-                currentTurn: room.Players[0].id,
-                board: { ascending: [1, 1], descending: [100, 100] }
-            }, {
-                where: { room_id: roomId },
-                transaction
-            })
-        ]);
+        // 3. Actualizar estado del juego
+        await GameState.update({
+            deck: newDeck,
+            gameStarted: true,
+            initialCards: initialCards,
+            currentTurn: room.Players[0].id,
+            board: { ascending: [1, 1], descending: [100, 100] }
+        }, {
+            where: { room_id: roomId },
+            transaction
+        });
 
         await transaction.commit();
 
-        // Notificar a todos los jugadores
+        // 4. Notificar a todos los jugadores
         await broadcastToRoom(roomId, {
-            type: 'game_started',
-            state: {
-                board: { ascending: [1, 1], descending: [100, 100] },
-                currentTurn: room.Players[0].id,
-                remainingDeck: newDeck.length,
-                initialCards: initialCards,
-                players: room.Players.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    isHost: p.isHost,
-                    cardCount: initialCards,
-                    cardsPlayedThisTurn: 0
-                }))
-            }
+            type: 'game_started_broadcast',
+            requestId: requestId,
+            initialCards: initialCards,
+            firstPlayer: room.Players[0].id
         });
-
-        // Enviar cartas a cada jugador
-        for (const player of room.Players) {
-            const playerWs = player.ws;
-            if (playerWs && playerWs.readyState === WebSocket.OPEN) {
-                safeSend(playerWs, {
-                    type: 'your_cards',
-                    cards: player.cards,
-                    playerName: player.name,
-                    currentPlayerId: player.id
-                });
-            }
-        }
 
     } catch (error) {
         await transaction.rollback();
-        console.error('Error al iniciar juego:', error);
         throw error;
     }
 }
@@ -854,37 +820,46 @@ wss.on('connection', async (ws, req) => {
                     case 'start_game':
                         if (player.isHost && !room.GameState.gameStarted) {
                             try {
-                                // Responder inmediatamente que la solicitud fue recibida
+                                // Notificar que la solicitud fue recibida
                                 safeSend(ws, {
-                                    type: 'start_game_ack',
-                                    received: true,
-                                    timestamp: Date.now()
+                                    type: 'start_game_progress',
+                                    message: 'Preparando mazo de cartas...',
+                                    requestId: msg.requestId
                                 });
 
-                                // Validar número de jugadores
+                                // Verificar jugadores conectados
                                 const activePlayers = room.Players.filter(p => p.wsConnected);
                                 if (activePlayers.length < 2) {
-                                    throw new Error('Se necesitan al menos 2 jugadores conectados');
+                                    throw new Error("Se necesitan al menos 2 jugadores conectados");
                                 }
 
-                                // Validar y ajustar número de cartas
+                                // Validar número de cartas
                                 const initialCards = Math.min(Math.max(parseInt(msg.initialCards) || 6, 4), 10);
 
-                                // Iniciar el juego (operación asíncrona)
-                                await startGame(room.roomId, initialCards);
+                                // Notificar progreso
+                                safeSend(ws, {
+                                    type: 'start_game_progress',
+                                    message: 'Repartiendo cartas...',
+                                    requestId: msg.requestId
+                                });
+
+                                // Iniciar el juego (función modificada más abajo)
+                                await startGame(room.roomId, initialCards, msg.requestId);
 
                                 // Notificar éxito
                                 safeSend(ws, {
                                     type: 'game_started',
                                     success: true,
-                                    initialCards: initialCards
+                                    requestId: msg.requestId
                                 });
 
                             } catch (error) {
-                                console.error('Error al iniciar juego:', error);
+                                console.error("Error al iniciar juego:", error);
                                 safeSend(ws, {
-                                    type: 'start_game_error',
-                                    error: error.message
+                                    type: 'game_started',
+                                    success: false,
+                                    error: error.message,
+                                    requestId: msg.requestId
                                 });
                             }
                         }
