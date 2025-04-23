@@ -131,19 +131,69 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function handleSocketMessage(event) {
+    async function handleStartGame() {
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+            updateConnectionStatus('Error: No hay conexión', true);
+            return;
+        }
+
         try {
-            const message = JSON.parse(event.data);
-            if (message.type === 'game_started') {
-                handleGameStart();
-            }
-            else if (message.type === 'room_update') {
-                updatePlayersUI(message.players);
-            }
-            else if (message.type === 'pong') {
-            }
+            startBtn.disabled = true;
+            startBtn.textContent = 'Iniciando...';
+
+            // Mostrar feedback visual adicional
+            startBtn.style.backgroundColor = '#f39c12'; // Color naranja de espera
+
+            // Enviar mensaje para iniciar el juego
+            const initialCards = parseInt(initialCardsSelect.value);
+            const message = {
+                type: 'start_game',
+                playerId: playerId,
+                roomId: roomId,
+                initialCards: initialCards
+            };
+
+            // Agregar timeout para evitar bloqueo infinito
+            const startGameTimeout = setTimeout(() => {
+                if (startBtn.textContent === 'Iniciando...') {
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Iniciar Juego';
+                    startBtn.style.backgroundColor = ''; // Restaurar color
+                    updateConnectionStatus('Tiempo de espera agotado', true);
+                }
+            }, 10000); // 10 segundos de timeout
+
+            // Enviar mensaje y esperar confirmación
+            safeSend(message);
+
+            // Esperar respuesta del servidor
+            const gameStartedPromise = new Promise((resolve) => {
+                const handler = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        if (msg.type === 'game_started') {
+                            socket.removeEventListener('message', handler);
+                            clearTimeout(startGameTimeout);
+                            resolve(true);
+                        }
+                    } catch (error) {
+                        console.error('Error procesando mensaje:', error);
+                    }
+                };
+                socket.addEventListener('message', handler);
+            });
+
+            await gameStartedPromise;
+
+            // Redirigir a la página del juego
+            window.location.href = 'game.html';
+
         } catch (error) {
-            console.error('Error procesando mensaje:', error);
+            console.error('Error al iniciar juego:', error);
+            startBtn.disabled = false;
+            startBtn.textContent = 'Iniciar Juego';
+            startBtn.style.backgroundColor = ''; // Restaurar color
+            updateConnectionStatus('Error al iniciar', true);
         }
     }
 
