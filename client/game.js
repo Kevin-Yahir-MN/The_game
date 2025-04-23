@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
     const RECONNECT_DELAY = 2000;
     const MAX_RECONNECT_ATTEMPTS = 5;
+    const WS_RECONNECT_DELAYS = [1000, 3000, 5000, 10000];
 
     const assetCache = new Map();
     let historyIcon = new Image();
@@ -30,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragStartX = 0;
     let dragStartY = 0;
     let isDragging = false;
+    let isManualClose = false;
 
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
@@ -40,8 +42,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomId = sessionStorage.getItem('roomId');
     let activeNotifications = [];
     let selectedCard = null;
-    let gameState = initializeGameState();
-
+    let gameState = {
+        players: [],
+        yourCards: [],
+        board: { ascending: [1, 1], descending: [100, 100] },
+        currentTurn: null,
+        remainingDeck: 98,
+        initialCards: 6,
+        cardsPlayedThisTurn: [],
+        animatingCards: [],
+        columnHistory: {
+            asc1: [],
+            asc2: [],
+            desc1: [],
+            desc2: []
+        }
+    };
 
     let socket;
     let pingInterval;
@@ -118,45 +134,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function initializeGameState() {
-        return {
-            players: [],
-            yourCards: [],
-            board: { ascending: [1, 1], descending: [100, 100] },
-            currentTurn: null,
-            remainingDeck: 98,
-            initialCards: 6,
-            cardsPlayedThisTurn: [],
-            animatingCards: [],
-            columnHistory: {
-                asc1: [],
-                asc2: [],
-                desc1: [],
-                desc2: []
-            }
-        };
-    }
-
-    function loadAsset(url) {
-        if (assetCache.has(url)) {
-            return Promise.resolve(assetCache.get(url));
-        }
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-                assetCache.set(url, img);
-                resolve(img);
-            };
-            img.onerror = () => resolve(null);
-            img.src = url;
-        });
-    }
-
     function connectWebSocket() {
-        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            showNotification('No se puede reconectar. Recarga la página.', true);
+        if (isManualClose || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                showNotification('No se puede reconectar. Recarga la página.', true);
+            }
             return;
         }
+
         if (socket) {
             socket.onopen = null;
             socket.onclose = null;
@@ -166,7 +151,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 socket.close();
             }
         }
+
         socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
+
         socket.onopen = () => {
             reconnectAttempts = 0;
             showNotification('Conectado al servidor', false);
@@ -174,19 +161,21 @@ document.addEventListener('DOMContentLoaded', () => {
             processQueue();
             requestGameState();
         };
+
         socket.onclose = (event) => {
             clearInterval(pingInterval);
-            if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                const delay = Math.min(RECONNECT_DELAY * Math.pow(2, reconnectAttempts - 1), 30000);
+            if (!event.wasClean && !isManualClose && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                const delay = WS_RECONNECT_DELAYS[reconnectAttempts] || RECONNECT_DELAY;
                 reconnectAttempts++;
                 showNotification(`Intentando reconectar (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, true);
                 reconnectTimeout = setTimeout(connectWebSocket, delay);
             }
         };
+
         socket.onerror = (error) => {
-            console.error('Error en WebSocket:', error);
             showNotification('Error de conexión', true);
         };
+
         socket.onmessage = handleSocketMessage;
     }
 
@@ -204,7 +193,6 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 socket.send(JSON.stringify(message));
             } catch (error) {
-                console.error('Error al enviar mensaje:', error);
                 messageQueue.push(message);
             }
         } else {
@@ -228,26 +216,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function showNotification(message, isError = false) {
         const existing = document.querySelector('.notification');
         if (existing) {
-            clearTimeout(notificationTimeout);
             existing.remove();
         }
         const notification = document.createElement('div');
         notification.className = `notification ${isError ? 'error' : ''}`;
         notification.textContent = message;
-        if (message.includes('GAME OVER') || message.includes('terminará') ||
-            message.includes('derrota') || message.includes('no puede jugar')) {
-            notification.style.zIndex = '1001';
-            notification.style.fontSize = '1.2rem';
-            notification.style.padding = '20px 40px';
-            notification.style.maxWidth = '80%';
-            notification.style.textAlign = 'center';
-        }
         document.body.appendChild(notification);
-        const duration = (isError || message.includes('GAME OVER')) ? 5000 : 3000;
-        notificationTimeout = setTimeout(() => {
-            notification.classList.add('notification-fade-out');
-            setTimeout(() => notification.remove(), 300);
-        }, duration);
+        const duration = isError ? 5000 : 3000;
+        setTimeout(() => notification.remove(), duration);
     }
 
     function showColumnHistory(columnId) {
@@ -392,33 +368,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateGameState(newState) {
-        if (!newState) {
-            console.warn('Se recibió un estado vacío');
-            return;
-        }
-
-        // Actualización segura de propiedades
+        if (!newState) return;
         if (newState.p) {
-            gameState.players = Array.isArray(newState.p) ?
-                newState.p.map(player => ({
-                    id: player.i,
-                    name: player.n || `Jugador_${player.i?.slice(0, 4) || 'XXXX'}`,
-                    cardCount: player.c || 0,
-                    isHost: player.h || false,
-                    cardsPlayedThisTurn: player.s || 0
-                })) :
-                [];
+            gameState.players = newState.p.map(player => ({
+                id: player.i,
+                name: player.n || `Jugador_${player.i.slice(0, 4)}`,
+                cardCount: player.c,
+                isHost: player.h,
+                cardsPlayedThisTurn: player.s || 0
+            }));
+            if (!currentPlayer.name && currentPlayer.id) {
+                const player = gameState.players.find(p => p.id === currentPlayer.id);
+                if (player) {
+                    currentPlayer.name = player.name;
+                    sessionStorage.setItem('playerName', player.name);
+                }
+            }
         }
-
-        gameState.board = newState.b || gameState.board || { ascending: [1, 1], descending: [100, 100] };
+        gameState.board = newState.b || gameState.board;
         gameState.currentTurn = newState.t || gameState.currentTurn;
-        gameState.remainingDeck = typeof newState.d === 'number' ? newState.d : gameState.remainingDeck;
-        gameState.initialCards = typeof newState.i === 'number' ? newState.i : gameState.initialCards;
-
+        gameState.remainingDeck = newState.d || gameState.remainingDeck;
+        gameState.initialCards = newState.i || gameState.initialCards;
         if (newState.y) {
             updatePlayerCards(newState.y);
         }
-
         if (gameState.currentTurn !== currentPlayer.id) {
             selectedCard = null;
         }
@@ -458,28 +431,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updatePlayerCards(cards) {
-        // Validación e inicialización de arrays
-        if (!cards || !Array.isArray(cards)) {
-            console.warn('Cards no está definido o no es un array');
-            cards = [];
-        }
-
-        gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn || [];
         const isYourTurn = gameState.currentTurn === currentPlayer.id;
         const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
         const startY = PLAYER_CARDS_Y;
-
         gameState.yourCards = cards.map((card, index) => {
             const value = card instanceof Card ? card.value : card;
             const playable = isYourTurn && (
                 isValidMove(value, 'asc1') || isValidMove(value, 'asc2') ||
                 isValidMove(value, 'desc1') || isValidMove(value, 'desc2')
             );
-
             const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
                 move => move.value === value && move.playerId === currentPlayer.id
             );
-
             if (card instanceof Card) {
                 card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
                 card.y = startY;
@@ -758,10 +721,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawBoard() {
-        // Inicialización de propiedades necesarias
-        gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn || [];
-        gameState.board = gameState.board || { ascending: [1, 1], descending: [100, 100] };
-
         ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
         ctx.beginPath();
         ctx.roundRect(
@@ -772,7 +731,6 @@ document.addEventListener('DOMContentLoaded', () => {
             15
         );
         ctx.fill();
-
         ctx.fillStyle = 'white';
         ctx.font = 'bold 36px Arial';
         ctx.textAlign = 'center';
@@ -780,20 +738,16 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
         ctx.shadowBlur = 5;
         ctx.shadowOffsetY = 2;
-
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2;
             ctx.fillText(i < 2 ? '↑' : '↓', x, BOARD_POSITION.y - 25);
         });
-
         ctx.shadowColor = 'transparent';
-
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const value = i < 2 ? gameState.board.ascending[i % 2] : gameState.board.descending[i % 2];
             const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
-                c => c && c.value === value && c.playerId === currentPlayer.id
+                c => c.value === value && c.playerId === currentPlayer.id
             );
-
             const card = new Card(
                 value,
                 BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i,
@@ -830,17 +784,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateGameInfo() {
-        // Validación defensiva
-        if (!gameState.players || !Array.isArray(gameState.players)) {
-            console.warn('gameState.players no está definido o no es un array');
-            document.getElementById('currentTurn').textContent = 'Esperando jugadores...';
-            document.getElementById('remainingDeck').textContent = '?';
-            return;
-        }
-
         const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
         let currentPlayerName;
-
         if (currentPlayerObj) {
             currentPlayerName = currentPlayerObj.id === currentPlayer.id ?
                 'Tu turno' :
@@ -848,23 +793,18 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             currentPlayerName = 'Esperando jugador...';
         }
-
         document.getElementById('currentTurn').textContent = currentPlayerName;
-        document.getElementById('remainingDeck').textContent = gameState.remainingDeck || 0;
-
+        document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
         if (gameState.currentTurn === currentPlayer.id) {
-            const currentPlayerCardsPlayed = (gameState.cardsPlayedThisTurn || []).filter(
+            const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
                 card => card.playerId === currentPlayer.id
             ).length;
-
             const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
             const progressText = `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
             document.getElementById('progressText').textContent = progressText;
-
             const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
             document.getElementById('progressBar').style.width = `${progressPercentage}%`;
         }
-
         updatePlayersPanel();
     }
 
@@ -933,6 +873,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function cleanup() {
+        isManualClose = true;
         clearInterval(pingInterval);
         clearTimeout(reconnectTimeout);
         if (socket) {
@@ -969,9 +910,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const message = JSON.parse(event.data);
             if (message.type === 'gs' && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
                 return;
-            }
-            if (message.type === 'init_game' && !message.gameState) {
-                message.gameState = initializeGameState();
             }
             switch (message.type) {
                 case 'init_game':
@@ -1034,8 +972,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('Error procesando mensaje:', error);
-            gameState = initializeGameState();
-            updateGameUI();
         }
     }
 
@@ -1056,8 +992,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initGame() {
-        gameState = initializeGameState();
-
         if (!canvas || !ctx || !currentPlayer.id || !roomId) {
             alert('Error: No se pudo inicializar el juego. Vuelve a la sala.');
             return;
