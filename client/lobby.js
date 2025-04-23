@@ -5,7 +5,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const joinRoomBtn = document.getElementById('joinRoom');
     const roomCodeInput = document.getElementById('roomCode');
 
-    // Función para mostrar errores
     function showError(message) {
         const errorElement = document.createElement('div');
         errorElement.className = 'notification error';
@@ -17,7 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
 
-    // Función para validar el nombre del jugador
     function validatePlayerName(name) {
         if (!name || name.trim() === '') {
             showError('Ingresa tu nombre');
@@ -30,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
-    // Función para validar el código de sala
     function validateRoomCode(code) {
         if (!code || code.trim() === '') {
             showError('Ingresa el código de sala');
@@ -43,7 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
-    // Evento para crear sala
     createRoomBtn.addEventListener('click', async () => {
         const playerName = playerNameInput.value.trim();
 
@@ -69,13 +65,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data.success) {
-                // Guardar datos en sessionStorage
                 sessionStorage.setItem('playerName', playerName);
                 sessionStorage.setItem('playerId', data.playerId);
                 sessionStorage.setItem('roomId', data.roomId);
                 sessionStorage.setItem('isHost', 'true');
-
-                // Redirigir a la sala
                 window.location.href = 'sala.html';
             } else {
                 showError(data.message || 'Error al crear la sala');
@@ -89,7 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Evento para unirse a sala
     joinRoomBtn.addEventListener('click', async () => {
         const playerName = playerNameInput.value.trim();
         const roomCode = roomCodeInput.value.trim();
@@ -120,13 +112,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data.success) {
-                // Guardar datos en sessionStorage
                 sessionStorage.setItem('playerName', playerName);
                 sessionStorage.setItem('playerId', data.playerId);
                 sessionStorage.setItem('roomId', roomCode);
                 sessionStorage.setItem('isHost', 'false');
-
-                // Redirigir a la sala
                 window.location.href = 'sala.html';
             } else {
                 showError(data.message || 'Error al unirse a la sala');
@@ -140,7 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Permitir enviar con Enter
     playerNameInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             createRoomBtn.click();
