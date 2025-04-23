@@ -854,24 +854,37 @@ wss.on('connection', async (ws, req) => {
                     case 'start_game':
                         if (player.isHost && !room.GameState.gameStarted) {
                             try {
-                                // Validar número de cartas iniciales
-                                const initialCards = Math.min(Math.max(parseInt(msg.initialCards) || 6, 10));
+                                // Responder inmediatamente que la solicitud fue recibida
+                                safeSend(ws, {
+                                    type: 'start_game_ack',
+                                    received: true,
+                                    timestamp: Date.now()
+                                });
 
-                                // Iniciar el juego
-                                await startGame(roomId, initialCards);
+                                // Validar número de jugadores
+                                const activePlayers = room.Players.filter(p => p.wsConnected);
+                                if (activePlayers.length < 2) {
+                                    throw new Error('Se necesitan al menos 2 jugadores conectados');
+                                }
 
-                                // Confirmar al host que el juego ha comenzado
+                                // Validar y ajustar número de cartas
+                                const initialCards = Math.min(Math.max(parseInt(msg.initialCards) || 6, 4), 10);
+
+                                // Iniciar el juego (operación asíncrona)
+                                await startGame(room.roomId, initialCards);
+
+                                // Notificar éxito
                                 safeSend(ws, {
                                     type: 'game_started',
                                     success: true,
                                     initialCards: initialCards
                                 });
+
                             } catch (error) {
                                 console.error('Error al iniciar juego:', error);
                                 safeSend(ws, {
-                                    type: 'notification',
-                                    message: 'Error al iniciar el juego',
-                                    isError: true
+                                    type: 'start_game_error',
+                                    error: error.message
                                 });
                             }
                         }

@@ -68,12 +68,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     handleGameStart(message);
                     break;
 
-                case 'room_update':
-                    updatePlayersUI(message.players);
+                case 'start_game_ack':
+                    // Confirmación de que el servidor recibió la solicitud
+                    showNotification('El servidor está preparando el juego...', false);
                     break;
 
-                case 'notification':
-                    showNotification(message.message, message.isError);
+                case 'start_game_error':
+                    resetStartButton();
+                    showNotification('Error: ' + message.error, true);
+                    break;
+
+                case 'room_update':
+                    updatePlayersUI(message.players);
                     break;
 
                 case 'pong':
@@ -87,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error procesando mensaje:', error);
         }
     }
-
     // Función para conectar WebSocket
     function connectWebSocket() {
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
@@ -205,9 +210,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return statusElement;
     }
 
+    function checkWebSocketConnection() {
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+            updateConnectionStatus('Conexión perdida', true);
+            connectWebSocket();
+            return false;
+        }
+        return true;
+    }
+
     // Función para manejar el inicio del juego
     async function handleStartGame() {
-        if (!socket || socket.readyState !== WebSocket.OPEN) {
+        if ((!checkWebSocketConnection())) {
             updateConnectionStatus('Error: No hay conexión', true);
             return;
         }
@@ -225,22 +239,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 initialCards: initialCards
             };
 
-            // Timeout para evitar bloqueo
+            // Crear un ID único para esta solicitud
+            const requestId = Date.now();
+            window.startGameRequestId = requestId;
+
+            // Timeout extendido a 20 segundos
             const timeout = setTimeout(() => {
-                if (startBtn.textContent === 'Iniciando...') {
+                if (window.startGameRequestId === requestId && startBtn.textContent === 'Iniciando...') {
                     startBtn.disabled = false;
                     startBtn.textContent = 'Iniciar Juego';
                     startBtn.style.backgroundColor = '';
-                    updateConnectionStatus('Tiempo de espera agotado', true);
+                    updateConnectionStatus('El servidor no respondió', true);
+                    showNotification('El servidor está tardando más de lo esperado. Intenta nuevamente.', true);
                 }
-            }, 10000);
+            }, 20000); // Aumentado a 20 segundos
 
             // Esperar confirmación de inicio
             const gameStarted = await new Promise((resolve) => {
                 const handler = (event) => {
                     try {
                         const msg = JSON.parse(event.data);
-                        if (msg.type === 'game_started') {
+                        if (msg.type === 'game_started' && window.startGameRequestId === requestId) {
                             clearTimeout(timeout);
                             socket.removeEventListener('message', handler);
                             resolve(true);
@@ -258,11 +277,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('Error al iniciar juego:', error);
-            startBtn.disabled = false;
-            startBtn.textContent = 'Iniciar Juego';
-            startBtn.style.backgroundColor = '';
+            resetStartButton();
             updateConnectionStatus('Error al iniciar', true);
+            showNotification('Error al iniciar el juego: ' + error.message, true);
         }
+    }
+
+    function resetStartButton() {
+        startBtn.disabled = false;
+        startBtn.textContent = 'Iniciar Juego';
+        startBtn.style.backgroundColor = '';
     }
 
     // Función para actualizar la lista de jugadores
