@@ -686,10 +686,18 @@ async function startGame(roomId, initialCards, requestId) {
 
         if (!room) throw new Error("Sala no encontrada");
 
-        // 1. Preparar el mazo
+        // 1. Preparar mazo
         const newDeck = initializeDeck();
 
-        // 2. Repartir cartas a cada jugador
+        // 2. Notificar progreso
+        await broadcastToRoom(roomId, {
+            type: 'game_start_progress',
+            requestId: requestId,
+            message: 'Repartiendo cartas...',
+            progress: 50
+        });
+
+        // 3. Repartir cartas
         await Promise.all(room.Players.map(player => {
             const cards = [];
             for (let i = 0; i < initialCards && newDeck.length > 0; i++) {
@@ -704,7 +712,7 @@ async function startGame(roomId, initialCards, requestId) {
             });
         }));
 
-        // 3. Actualizar estado del juego
+        // 4. Actualizar estado del juego
         await GameState.update({
             deck: newDeck,
             gameStarted: true,
@@ -716,15 +724,15 @@ async function startGame(roomId, initialCards, requestId) {
             transaction
         });
 
-        await transaction.commit();
-
-        // 4. Notificar a todos los jugadores
+        // 5. Notificar progreso final
         await broadcastToRoom(roomId, {
-            type: 'game_started_broadcast',
+            type: 'game_start_progress',
             requestId: requestId,
-            initialCards: initialCards,
-            firstPlayer: room.Players[0].id
+            message: '¡Todo listo!',
+            progress: 100
         });
+
+        await transaction.commit();
 
     } catch (error) {
         await transaction.rollback();
@@ -820,46 +828,49 @@ wss.on('connection', async (ws, req) => {
                     case 'start_game':
                         if (player.isHost && !room.GameState.gameStarted) {
                             try {
-                                // Notificar que la solicitud fue recibida
+                                // 1. Enviar confirmación inmediata
                                 safeSend(ws, {
-                                    type: 'start_game_progress',
-                                    message: 'Preparando mazo de cartas...',
-                                    requestId: msg.requestId
+                                    type: 'start_game_ack',
+                                    requestId: msg.requestId,
+                                    timestamp: msg.timestamp,
+                                    received: true
                                 });
 
-                                // Verificar jugadores conectados
+                                // 2. Validaciones
                                 const activePlayers = room.Players.filter(p => p.wsConnected);
                                 if (activePlayers.length < 2) {
                                     throw new Error("Se necesitan al menos 2 jugadores conectados");
                                 }
 
-                                // Validar número de cartas
                                 const initialCards = Math.min(Math.max(parseInt(msg.initialCards) || 6, 4), 10);
 
-                                // Notificar progreso
+                                // 3. Notificar progreso
                                 safeSend(ws, {
-                                    type: 'start_game_progress',
-                                    message: 'Repartiendo cartas...',
-                                    requestId: msg.requestId
+                                    type: 'game_start_progress',
+                                    requestId: msg.requestId,
+                                    message: 'Barajando cartas...',
+                                    progress: 25
                                 });
 
-                                // Iniciar el juego (función modificada más abajo)
+                                // 4. Iniciar el juego (función asíncrona)
                                 await startGame(room.roomId, initialCards, msg.requestId);
 
-                                // Notificar éxito
-                                safeSend(ws, {
-                                    type: 'game_started',
+                                // 5. Notificar éxito a todos
+                                await broadcastToRoom(room.roomId, {
+                                    type: 'game_start_confirmation',
+                                    requestId: msg.requestId,
                                     success: true,
-                                    requestId: msg.requestId
+                                    initialCards: initialCards,
+                                    firstPlayer: room.GameState.currentTurn
                                 });
 
                             } catch (error) {
                                 console.error("Error al iniciar juego:", error);
                                 safeSend(ws, {
-                                    type: 'game_started',
+                                    type: 'game_start_confirmation',
+                                    requestId: msg.requestId,
                                     success: false,
-                                    error: error.message,
-                                    requestId: msg.requestId
+                                    error: error.message
                                 });
                             }
                         }

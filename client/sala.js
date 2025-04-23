@@ -21,6 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastPong = Date.now();
     const messageQueue = [];
     let isStartingGame = false;
+    let gameStartTimeout;
+    const GAME_START_TIMEOUT = 20000; // 20 segundos
 
     // Datos de la sesión
     const roomId = sessionStorage.getItem('roomId');
@@ -138,65 +140,81 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.onmessage = handleSocketMessage;
     }
 
-    // 5. Función para iniciar el juego
     async function handleStartGame() {
         if (isStartingGame) return;
         isStartingGame = true;
 
-        if (!socket || socket.readyState !== WebSocket.OPEN) {
-            showNotification("Error: No hay conexión con el servidor", true);
-            resetStartButton();
-            isStartingGame = false;
-            return;
-        }
-
-        updateStartButton('Preparando juego...');
-
         try {
+            // 1. Verificar conexión WebSocket
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                throw new Error("No hay conexión con el servidor");
+            }
+
+            // 2. Configurar estado inicial
+            updateStartButton('Iniciando partida...');
+            showNotification("Preparando la partida...", false);
+
+            // 3. Enviar solicitud de inicio
+            const requestId = `startreq_${Date.now()}`;
             const initialCards = parseInt(initialCardsSelect.value) || 6;
-            const requestId = 'req_' + Date.now();
 
             safeSend({
                 type: 'start_game',
                 requestId: requestId,
                 playerId: playerId,
                 roomId: roomId,
-                initialCards: initialCards
+                initialCards: initialCards,
+                timestamp: Date.now()
             });
 
-            // Esperar máximo 15 segundos por respuesta
-            const gameStarted = await Promise.race([
-                waitForGameStart(requestId),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Tiempo de espera agotado')), 15000))
-            ]);
+            // 4. Configurar timeout
+            gameStartTimeout = setTimeout(() => {
+                throw new Error("El servidor no respondió a tiempo");
+            }, GAME_START_TIMEOUT);
 
-            if (!gameStarted) {
-                throw new Error('El servidor no pudo iniciar el juego');
+            // 5. Esperar confirmación
+            const success = await waitForGameConfirmation(requestId);
+
+            if (!success) {
+                throw new Error("El servidor no pudo iniciar el juego");
             }
+
+            // 6. Redirigir si todo sale bien
+            window.location.href = 'game.html';
 
         } catch (error) {
             console.error("Error al iniciar juego:", error);
             handleStartGameError(error.message);
         } finally {
+            clearTimeout(gameStartTimeout);
             isStartingGame = false;
         }
     }
 
-    // 6. Función auxiliar para esperar inicio de juego
-    function waitForGameStart(requestId) {
+
+    function waitForGameConfirmation(requestId) {
         return new Promise((resolve) => {
-            const listener = (event) => {
+            const confirmationHandler = (event) => {
                 try {
                     const msg = JSON.parse(event.data);
-                    if (msg.type === 'game_started' && msg.requestId === requestId) {
-                        socket.removeEventListener('message', listener);
+
+                    if (msg.type === 'game_start_confirmation' && msg.requestId === requestId) {
+                        socket.removeEventListener('message', confirmationHandler);
+                        clearTimeout(gameStartTimeout);
                         resolve(msg.success);
+
+                        if (msg.success) {
+                            updateStartButton('¡Partida lista!');
+                            setTimeout(() => window.location.href = 'game.html', 1000);
+                        }
                     }
                 } catch (error) {
-                    console.error("Error procesando mensaje:", error);
+                    console.error("Error procesando confirmación:", error);
+                    resolve(false);
                 }
             };
-            socket.addEventListener('message', listener);
+
+            socket.addEventListener('message', confirmationHandler);
         });
     }
 
@@ -214,8 +232,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleStartGameError(errorMessage) {
-        showNotification(errorMessage, true);
+        let userMessage = errorMessage;
+
+        // Mensajes más amigables para el usuario
+        const errorMessages = {
+            "No hay conexión con el servidor": "No se pudo conectar al servidor. Intenta recargar la página.",
+            "El servidor no respondió a tiempo": "El servidor está tardando demasiado. Intenta nuevamente.",
+            "El servidor no pudo iniciar el juego": "No se pudo iniciar la partida. Verifica que todos los jugadores estén conectados."
+        };
+
+        userMessage = errorMessages[errorMessage] || errorMessage;
+
+        showNotification(userMessage, true);
         resetStartButton();
+
+        // Intentar reconectar si es un error de conexión
+        if (errorMessage.includes("conexión") || errorMessage.includes("servidor")) {
+            setTimeout(connectWebSocket, 3000);
+        }
     }
 
     // 8. Funciones de conexión
