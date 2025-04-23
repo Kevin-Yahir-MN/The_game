@@ -1,352 +1,433 @@
 document.addEventListener('DOMContentLoaded', () => {
+
     const API_URL = 'https://the-game-2xks.onrender.com';
+
     const WS_URL = 'wss://the-game-2xks.onrender.com';
+
     const PLAYER_UPDATE_INTERVAL = 5000;
+
     const MAX_RECONNECT_ATTEMPTS = 5;
+
     const RECONNECT_BASE_DELAY = 2000;
-    const PING_INTERVAL = 30000;
-    const GAME_START_TIMEOUT = 45000; // 45 segundos
 
-    // Elementos del DOM
-    const roomIdDisplay = document.getElementById('roomIdDisplay');
-    const playersList = document.getElementById('playersList');
-    const startBtn = document.getElementById('startGame');
-    const gameSettings = document.getElementById('gameSettings');
-    const initialCardsSelect = document.getElementById('initialCards');
+    const PING_INTERVAL = 5 * 60 * 1000;
 
-    // Variables de estado
+
+
     let socket;
-    let reconnectAttempts = 0;
-    let playerUpdateInterval;
-    let pingInterval;
-    let lastPong = Date.now();
-    const messageQueue = [];
-    let isStartingGame = false;
-    let gameStartTimeout;
 
-    // Datos de la sesión
+    let reconnectAttempts = 0;
+
+    let playerUpdateInterval;
+
+    let pingInterval;
+
+    const messageQueue = [];
+
     const roomId = sessionStorage.getItem('roomId');
+
     const playerId = sessionStorage.getItem('playerId');
+
     const playerName = sessionStorage.getItem('playerName');
+
     const isHost = sessionStorage.getItem('isHost') === 'true';
 
-    // 1. Función para mostrar notificaciones
-    function showNotification(message, isError = false) {
-        const notification = document.createElement('div');
-        notification.className = `notification ${isError ? 'error' : ''}`;
-        notification.textContent = message;
-        document.body.appendChild(notification);
+    const roomIdDisplay = document.getElementById('roomIdDisplay');
 
-        setTimeout(() => {
-            notification.classList.add('fade-out');
-            setTimeout(() => notification.remove(), 300);
-        }, isError ? 5000 : 3000);
-    }
+    const playersList = document.getElementById('playersList');
 
-    // 2. Actualizar lista de jugadores en la UI
-    function updatePlayersUI(players) {
-        if (!players || !Array.isArray(players)) return;
+    const startBtn = document.getElementById('startGame');
 
-        playersList.innerHTML = players.map(player => `
-            <li class="${player.isHost ? 'host' : ''} ${player.id === playerId ? 'you' : ''}">
-                <span class="player-name">${player.name || 'Jugador'}</span>
-                ${player.isHost ? '<span class="host-tag">(Host)</span>' : ''}
-                ${player.id === playerId ? '<span class="you-tag">(Tú)</span>' : ''}
-                <span class="connection-status">${player.connected ? '🟢' : '🔴'}</span>
-            </li>
-        `).join('');
-    }
+    const gameSettings = document.getElementById('gameSettings');
 
-    // 3. Handler de mensajes WebSocket
-    function handleSocketMessage(event) {
-        try {
-            const message = JSON.parse(event.data);
+    const initialCardsSelect = document.getElementById('initialCards');
 
-            switch (message.type) {
-                case 'game_started':
-                    if (message.success) {
-                        window.location.href = 'game.html';
-                    } else {
-                        handleStartGameError(message.error || "Error desconocido al iniciar el juego");
-                    }
-                    break;
 
-                case 'start_game_progress':
-                    updateStartButton(message.message);
-                    break;
 
-                case 'room_update':
-                    updatePlayersUI(message.players);
-                    break;
+    function initializeUI() {
 
-                case 'notification':
-                    showNotification(message.message, message.isError);
-                    break;
+        roomIdDisplay.textContent = roomId;
 
-                case 'pong':
-                    lastPong = Date.now();
-                    break;
+        displayPlayerInfo();
 
-                default:
-                    console.log('Mensaje no reconocido:', message);
-            }
-        } catch (error) {
-            console.error('Error procesando mensaje:', error);
+        if (isHost) {
+
+            gameSettings.style.display = 'block';
+
+            startBtn.classList.add('visible');
+
+            startBtn.addEventListener('click', handleStartGame);
+
+        } else {
+
+            startBtn.remove();
+
         }
+
     }
 
-    // 4. Conexión WebSocket
+
+
+    function displayPlayerInfo() {
+
+        const playerInfo = document.createElement('div');
+
+        playerInfo.id = 'playerInfo';
+
+        playerInfo.className = 'player-info';
+
+        document.querySelector('.room-header').appendChild(playerInfo);
+
+    }
+
+
+
+    function updateConnectionStatus(status, isError = false) {
+
+        const statusElement = document.getElementById('connectionStatusText');
+
+        if (statusElement) {
+
+            statusElement.textContent = status;
+
+            statusElement.className = isError ? 'error' : '';
+
+        }
+
+    }
+
+
+
     function connectWebSocket() {
+
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            showNotification('No se puede reconectar. Recarga la página.', true);
+
+            updateConnectionStatus('No se puede reconectar. Recarga la página.', true);
+
             return;
+
         }
 
         if (socket) {
+
             socket.onopen = null;
+
             socket.onclose = null;
+
             socket.onerror = null;
+
             socket.onmessage = null;
+
             if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+
                 socket.close();
+
             }
+
         }
+
+        updateConnectionStatus('Conectando...');
 
         socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${playerId}&playerName=${encodeURIComponent(playerName)}`);
 
         socket.onopen = () => {
+
             reconnectAttempts = 0;
-            showNotification('Conectado al servidor', false);
+
+            updateConnectionStatus('Conectado');
+
             startPingInterval();
+
             processQueue();
+
             sendPlayerUpdate();
+
         };
 
         socket.onclose = (event) => {
+
             clearInterval(pingInterval);
+
             if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+
                 const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1), 30000);
+
                 reconnectAttempts++;
-                showNotification(`Reconectando (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, true);
+
+                updateConnectionStatus(`Reconectando (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+
                 setTimeout(connectWebSocket, delay);
+
+            } else {
+
+                updateConnectionStatus('Desconectado', true);
+
             }
+
         };
 
         socket.onerror = (error) => {
-            console.error('Error en WebSocket:', error);
-            showNotification('Error de conexión', true);
+
+            updateConnectionStatus('Error de conexión', true);
+
         };
 
         socket.onmessage = handleSocketMessage;
+
     }
 
-    // 5. Función para iniciar el juego
-    async function handleStartGame() {
-        if (isStartingGame) return;
-        isStartingGame = true;
 
-        try {
-            // 1. Verificar conexión WebSocket
-            if (!socket || socket.readyState !== WebSocket.OPEN) {
-                throw new Error("No hay conexión con el servidor. Recarga la página.");
-            }
 
-            // 2. Obtener información actualizada de la sala
-            const response = await fetch(`${API_URL}/room-info/${roomId}`);
-            if (!response.ok) throw new Error("Error al obtener información de la sala");
-
-            const data = await response.json();
-
-            // 3. Validaciones previas
-            if (!data.success) throw new Error(data.message || "Error en la sala");
-            if (data.players.filter(p => p.connected).length < 2) {
-                throw new Error("Se necesitan al menos 2 jugadores conectados");
-            }
-            if (data.gameStarted) {
-                throw new Error("El juego ya está en progreso");
-            }
-
-            // 4. Configurar timeout
-            updateStartButton("Preparando juego...");
-
-            // 5. Enviar solicitud de inicio
-            const requestId = `startreq_${Date.now()}`;
-            const initialCards = parseInt(initialCardsSelect.value) || 6;
-
-            safeSend({
-                type: 'start_game',
-                requestId,
-                playerId,
-                roomId,
-                initialCards,
-                timestamp: Date.now()
-            });
-
-            // 6. Esperar confirmación con timeout
-            const confirmation = await new Promise((resolve, reject) => {
-                gameStartTimeout = setTimeout(() => {
-                    reject(new Error("El servidor está tardando más de lo esperado"));
-                }, GAME_START_TIMEOUT);
-
-                const handler = (event) => {
-                    try {
-                        const msg = JSON.parse(event.data);
-                        if (msg.type === 'game_start_confirmation' && msg.requestId === requestId) {
-                            socket.removeEventListener('message', handler);
-                            clearTimeout(gameStartTimeout);
-                            resolve(msg);
-                        }
-                    } catch (error) {
-                        reject(error);
-                    }
-                };
-
-                socket.addEventListener('message', handler);
-            });
-
-            if (!confirmation.success) {
-                throw new Error(confirmation.error || "Error al iniciar el juego");
-            }
-
-            // 7. Redirigir al juego
-            window.location.href = 'game.html';
-
-        } catch (error) {
-            console.error("Error al iniciar juego:", error);
-            handleStartGameError(error.message);
-        } finally {
-            clearTimeout(gameStartTimeout);
-            isStartingGame = false;
-            resetStartButton();
-        }
-    }
-
-    // 6. Funciones auxiliares para UI
-    function updateStartButton(text) {
-        startBtn.disabled = true;
-        startBtn.textContent = text;
-        startBtn.classList.add('loading');
-    }
-
-    function resetStartButton() {
-        startBtn.disabled = false;
-        startBtn.textContent = 'Iniciar Juego';
-        startBtn.classList.remove('loading');
-    }
-
-    function handleStartGameError(errorMessage) {
-        let userMessage = errorMessage;
-
-        const errorMessages = {
-            "No hay conexión con el servidor": "No se pudo conectar al servidor. Intenta recargar la página.",
-            "El servidor está tardando más de lo esperado": "El servidor está tardando demasiado. Intenta nuevamente.",
-            "Se necesitan al menos 2 jugadores conectados": "Invita a otro jugador a unirse antes de iniciar."
-        };
-
-        userMessage = errorMessages[errorMessage] || errorMessage;
-
-        showNotification(userMessage, true);
-        resetStartButton();
-
-        // Intentar reconectar si es un error de conexión
-        if (errorMessage.includes("conexión") || errorMessage.includes("servidor")) {
-            setTimeout(connectWebSocket, 3000);
-        }
-    }
-
-    // 7. Funciones de conexión
     function startPingInterval() {
+
         clearInterval(pingInterval);
+
         pingInterval = setInterval(() => {
+
             if (socket && socket.readyState === WebSocket.OPEN) {
+
                 safeSend({ type: 'ping' });
 
-                // Verificar si hemos recibido pong recientemente
-                if (Date.now() - lastPong > PING_INTERVAL * 1.5) {
-                    showNotification('Reconectando...', true);
-                    connectWebSocket();
-                }
             }
+
         }, PING_INTERVAL);
+
     }
+
+
 
     function safeSend(message) {
+
         if (socket && socket.readyState === WebSocket.OPEN) {
+
             try {
+
                 socket.send(JSON.stringify(message));
+
             } catch (error) {
+
                 console.error('Error al enviar mensaje:', error);
+
                 messageQueue.push(message);
+
             }
+
         } else {
+
             messageQueue.push(message);
-            connectWebSocket();
+
+            if (!socket || socket.readyState === WebSocket.CLOSED) {
+
+                connectWebSocket();
+
+            }
+
         }
+
     }
 
+
+
     function processQueue() {
+
         if (!socket || socket.readyState !== WebSocket.OPEN || messageQueue.length === 0) return;
 
         while (messageQueue.length > 0) {
+
             const message = messageQueue.shift();
+
             safeSend(message);
+
         }
+
     }
 
-    // 8. Funciones de datos
+
+
     function sendPlayerUpdate() {
+
         safeSend({
+
             type: 'player_update',
-            playerId,
+
+            playerId: playerId,
+
             name: playerName,
-            isHost,
-            roomId
+
+            isHost: isHost,
+
+            roomId: roomId
+
         });
+
     }
+
+
+
+    function handleSocketMessage(event) {
+
+        try {
+
+            const message = JSON.parse(event.data);
+
+            if (message.type === 'game_started') {
+
+                handleGameStart();
+
+            }
+
+            else if (message.type === 'room_update') {
+
+                updatePlayersUI(message.players);
+
+            }
+
+            else if (message.type === 'pong') {
+
+            }
+
+        } catch (error) {
+
+            console.error('Error procesando mensaje:', error);
+
+        }
+
+    }
+
+
+
+    function updatePlayersUI(players) {
+
+        if (!players || !Array.isArray(players)) return;
+
+        playersList.innerHTML = players.map(player => `
+
+            <li class="${player.isHost ? 'host' : ''} ${player.id === playerId ? 'you' : ''}">
+
+                <span class="player-name">${player.name || 'Jugador'}</span>
+
+                ${player.isHost ? '<span class="host-tag">(Host)</span>' : ''}
+
+                ${player.id === playerId ? '<span class="you-tag">(Tú)</span>' : ''}
+
+                <span class="connection-status">${player.connected ? '🟢' : '🔴'}</span>
+
+            </li>
+
+        `).join('');
+
+    }
+
+
+
+    function handleGameStart() {
+
+        clearInterval(playerUpdateInterval);
+
+        clearInterval(pingInterval);
+
+        window.location.href = 'game.html';
+
+    }
+
+
+
+    async function handleStartGame() {
+
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+
+            updateConnectionStatus('Error: No hay conexión', true);
+
+            return;
+
+        }
+
+        try {
+
+            startBtn.disabled = true;
+
+            startBtn.textContent = 'Iniciando...';
+
+            safeSend({
+
+                type: 'start_game',
+
+                playerId: playerId,
+
+                playerName: playerName,
+
+                roomId: roomId,
+
+                initialCards: parseInt(initialCardsSelect.value)
+
+            });
+
+        } catch (error) {
+
+            console.error('Error al iniciar juego:', error);
+
+            startBtn.disabled = false;
+
+            startBtn.textContent = 'Iniciar Juego';
+
+            updateConnectionStatus('Error al iniciar', true);
+
+        }
+
+    }
+
+
 
     async function updatePlayersList() {
+
         try {
+
             const response = await fetch(`${API_URL}/room-info/${roomId}`);
+
             if (response.ok) {
+
                 const data = await response.json();
-                if (data.success) {
-                    updatePlayersUI(data.players);
-                }
+
+                if (data.success) updatePlayersUI(data.players);
+
             }
+
         } catch (error) {
+
             console.error('Error actualizando jugadores:', error);
+
         }
+
     }
 
-    // 9. Inicialización
-    function initializeUI() {
-        roomIdDisplay.textContent = roomId;
 
-        if (isHost) {
-            gameSettings.style.display = 'block';
-            startBtn.style.display = 'block';
-            startBtn.addEventListener('click', handleStartGame);
-        } else {
-            gameSettings.style.display = 'none';
-            startBtn.style.display = 'none';
-        }
-    }
 
     function initialize() {
+
         initializeUI();
+
         connectWebSocket();
+
         updatePlayersList();
 
         playerUpdateInterval = setInterval(updatePlayersList, PLAYER_UPDATE_INTERVAL);
+
     }
 
-    // Limpieza al salir
+
+
     window.addEventListener('beforeunload', () => {
+
         clearInterval(playerUpdateInterval);
+
         clearInterval(pingInterval);
+
         if (socket) socket.close();
+
     });
 
-    // Iniciar la aplicación
+
+
     initialize();
+
 });
