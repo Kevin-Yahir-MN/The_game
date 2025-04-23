@@ -18,7 +18,9 @@ const PING_INTERVAL = 30000;
 
 const pool = new Pool({
     connectionString: process.env.NEON_DATABASE_URL,
-    ssl: true
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
 
 pool.query('SELECT NOW()', (err) => {
