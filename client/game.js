@@ -40,22 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomId = sessionStorage.getItem('roomId');
     let activeNotifications = [];
     let selectedCard = null;
-    let gameState = {
-        players: [],
-        yourCards: [],
-        board: { ascending: [1, 1], descending: [100, 100] },
-        currentTurn: null,
-        remainingDeck: 98,
-        initialCards: 6,
-        cardsPlayedThisTurn: [],
-        animatingCards: [],
-        columnHistory: {
-            asc1: [],
-            asc2: [],
-            desc1: [],
-            desc2: []
-        }
-    };
+    let gameState = initializeGameState();
+
 
     let socket;
     let pingInterval;
@@ -130,6 +116,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 this.y = y - this.dragOffsetY;
             }
         }
+    }
+
+    function initializeGameState() {
+        return {
+            players: [],
+            yourCards: [],
+            board: { ascending: [1, 1], descending: [100, 100] },
+            currentTurn: null,
+            remainingDeck: 98,
+            initialCards: 6,
+            cardsPlayedThisTurn: [],
+            animatingCards: [],
+            columnHistory: {
+                asc1: [],
+                asc2: [],
+                desc1: [],
+                desc2: []
+            }
+        };
     }
 
     function loadAsset(url) {
@@ -387,30 +392,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateGameState(newState) {
-        if (!newState) return;
-        if (newState.p) {
-            gameState.players = newState.p.map(player => ({
-                id: player.i,
-                name: player.n || `Jugador_${player.i.slice(0, 4)}`,
-                cardCount: player.c,
-                isHost: player.h,
-                cardsPlayedThisTurn: player.s || 0
-            }));
-            if (!currentPlayer.name && currentPlayer.id) {
-                const player = gameState.players.find(p => p.id === currentPlayer.id);
-                if (player) {
-                    currentPlayer.name = player.name;
-                    sessionStorage.setItem('playerName', player.name);
-                }
-            }
+        if (!newState) {
+            console.warn('Se recibió un estado vacío');
+            return;
         }
-        gameState.board = newState.b || gameState.board;
+
+        // Actualización segura de propiedades
+        if (newState.p) {
+            gameState.players = Array.isArray(newState.p) ?
+                newState.p.map(player => ({
+                    id: player.i,
+                    name: player.n || `Jugador_${player.i?.slice(0, 4) || 'XXXX'}`,
+                    cardCount: player.c || 0,
+                    isHost: player.h || false,
+                    cardsPlayedThisTurn: player.s || 0
+                })) :
+                [];
+        }
+
+        gameState.board = newState.b || gameState.board || { ascending: [1, 1], descending: [100, 100] };
         gameState.currentTurn = newState.t || gameState.currentTurn;
-        gameState.remainingDeck = newState.d || gameState.remainingDeck;
-        gameState.initialCards = newState.i || gameState.initialCards;
+        gameState.remainingDeck = typeof newState.d === 'number' ? newState.d : gameState.remainingDeck;
+        gameState.initialCards = typeof newState.i === 'number' ? newState.i : gameState.initialCards;
+
         if (newState.y) {
             updatePlayerCards(newState.y);
         }
+
         if (gameState.currentTurn !== currentPlayer.id) {
             selectedCard = null;
         }
@@ -450,18 +458,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updatePlayerCards(cards) {
+        // Validación e inicialización de arrays
+        if (!cards || !Array.isArray(cards)) {
+            console.warn('Cards no está definido o no es un array');
+            cards = [];
+        }
+
+        gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn || [];
         const isYourTurn = gameState.currentTurn === currentPlayer.id;
         const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
         const startY = PLAYER_CARDS_Y;
+
         gameState.yourCards = cards.map((card, index) => {
             const value = card instanceof Card ? card.value : card;
             const playable = isYourTurn && (
                 isValidMove(value, 'asc1') || isValidMove(value, 'asc2') ||
                 isValidMove(value, 'desc1') || isValidMove(value, 'desc2')
             );
+
             const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
                 move => move.value === value && move.playerId === currentPlayer.id
             );
+
             if (card instanceof Card) {
                 card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
                 card.y = startY;
@@ -740,6 +758,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawBoard() {
+        // Inicialización de propiedades necesarias
+        gameState.cardsPlayedThisTurn = gameState.cardsPlayedThisTurn || [];
+        gameState.board = gameState.board || { ascending: [1, 1], descending: [100, 100] };
+
         ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
         ctx.beginPath();
         ctx.roundRect(
@@ -750,6 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
             15
         );
         ctx.fill();
+
         ctx.fillStyle = 'white';
         ctx.font = 'bold 36px Arial';
         ctx.textAlign = 'center';
@@ -757,19 +780,26 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
         ctx.shadowBlur = 5;
         ctx.shadowOffsetY = 2;
+
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2;
             ctx.fillText(i < 2 ? '↑' : '↓', x, BOARD_POSITION.y - 25);
         });
+
         ctx.shadowColor = 'transparent';
+
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const value = i < 2 ? gameState.board.ascending[i % 2] : gameState.board.descending[i % 2];
+            const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
+                c => c && c.value === value && c.playerId === currentPlayer.id
+            );
+
             const card = new Card(
                 value,
                 BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i,
                 BOARD_POSITION.y,
                 false,
-                gameState.cardsPlayedThisTurn.some(c => c.value === value)
+                isPlayedThisTurn
             );
             card.draw();
         });
@@ -800,8 +830,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateGameInfo() {
+        // Validación defensiva
+        if (!gameState.players || !Array.isArray(gameState.players)) {
+            console.warn('gameState.players no está definido o no es un array');
+            document.getElementById('currentTurn').textContent = 'Esperando jugadores...';
+            document.getElementById('remainingDeck').textContent = '?';
+            return;
+        }
+
         const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
         let currentPlayerName;
+
         if (currentPlayerObj) {
             currentPlayerName = currentPlayerObj.id === currentPlayer.id ?
                 'Tu turno' :
@@ -809,18 +848,23 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             currentPlayerName = 'Esperando jugador...';
         }
+
         document.getElementById('currentTurn').textContent = currentPlayerName;
-        document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
+        document.getElementById('remainingDeck').textContent = gameState.remainingDeck || 0;
+
         if (gameState.currentTurn === currentPlayer.id) {
-            const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+            const currentPlayerCardsPlayed = (gameState.cardsPlayedThisTurn || []).filter(
                 card => card.playerId === currentPlayer.id
             ).length;
+
             const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
             const progressText = `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
             document.getElementById('progressText').textContent = progressText;
+
             const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
             document.getElementById('progressBar').style.width = `${progressPercentage}%`;
         }
+
         updatePlayersPanel();
     }
 
@@ -926,6 +970,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (message.type === 'gs' && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
                 return;
             }
+            if (message.type === 'init_game' && !message.gameState) {
+                message.gameState = initializeGameState();
+            }
             switch (message.type) {
                 case 'init_game':
                     handleInitGame(message);
@@ -987,6 +1034,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('Error procesando mensaje:', error);
+            gameState = initializeGameState();
+            updateGameUI();
         }
     }
 
@@ -1007,6 +1056,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initGame() {
+        gameState = initializeGameState();
+
         if (!canvas || !ctx || !currentPlayer.id || !roomId) {
             alert('Error: No se pudo inicializar el juego. Vuelve a la sala.');
             return;
