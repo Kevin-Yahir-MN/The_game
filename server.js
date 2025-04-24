@@ -470,6 +470,29 @@ app.post('/join-room', async (req, res) => {
     res.json({ success: true, playerId, playerName });
 });
 
+// Nuevo endpoint para registro inicial
+app.post('/register-connection', async (req, res) => {
+    try {
+        const { playerId, roomId } = req.body;
+
+        await pool.query(`
+            INSERT INTO player_connections 
+            (player_id, room_id, last_ping, connection_status)
+            VALUES ($1, $2, NOW(), 'connected')
+            ON CONFLICT (player_id) 
+            DO UPDATE SET
+                room_id = $2,
+                last_ping = NOW(),
+                connection_status = 'connected'
+        `, [playerId, roomId]);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error en register-connection:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 app.get('/room-info/:roomId', async (req, res) => {
     res.set('Cache-Control', 'public, max-age=5');
     const roomId = req.params.roomId;
@@ -493,42 +516,72 @@ app.get('/room-info/:roomId', async (req, res) => {
     });
 });
 
-function startGame(room, initialCards = 6) {
-    room.gameState.gameStarted = true;
-    room.gameState.initialCards = initialCards;
-
-    room.players.forEach(player => {
-        player.cards = [];
-        for (let i = 0; i < initialCards && room.gameState.deck.length > 0; i++) {
-            player.cards.push(room.gameState.deck.pop());
-        }
-    });
-
-    broadcastToRoom(room, {
-        type: 'game_started',
-        state: {
-            board: room.gameState.board,
-            currentTurn: room.players[0].id,
-            remainingDeck: room.gameState.deck.length,
-            initialCards: initialCards,
-            players: room.players.map(p => ({
+async function startGame(room, initialCards = 6) {
+    try {
+        // 1. Registrar estado inicial de conexiones
+        await pool.query(`
+            INSERT INTO player_connections (player_id, room_id, last_ping, connection_status)
+            SELECT id, $1, NOW(), 
+                   CASE WHEN ws IS NOT NULL THEN 'connected' ELSE 'disconnected' END
+            FROM jsonb_array_elements($2::jsonb) AS players(id, name, ws)
+            ON CONFLICT (player_id) DO UPDATE SET
+                room_id = $1,
+                last_ping = NOW(),
+                connection_status = EXCLUDED.connection_status
+        `, [
+            reverseRoomMap.get(room),
+            JSON.stringify(room.players.map(p => ({
                 id: p.id,
                 name: p.name,
-                isHost: p.isHost,
-                cardCount: p.cards.length,
-                cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
-            }))
-        }
-    });
+                ws: p.ws?.readyState === WebSocket.OPEN
+            })))
+        ]);
 
-    room.players.forEach(player => {
-        safeSend(player.ws, {
-            type: 'your_cards',
-            cards: player.cards,
-            playerName: player.name,
-            currentPlayerId: player.id
+        // 2. Iniciar lógica del juego
+        room.gameState.gameStarted = true;
+        room.gameState.initialCards = initialCards;
+
+        room.players.forEach(player => {
+            player.cards = [];
+            for (let i = 0; i < initialCards && room.gameState.deck.length > 0; i++) {
+                player.cards.push(room.gameState.deck.pop());
+            }
         });
-    });
+
+        // 3. Notificar a todos los jugadores
+        broadcastToRoom(room, {
+            type: 'game_started',
+            state: {
+                board: room.gameState.board,
+                currentTurn: room.players[0].id,
+                remainingDeck: room.gameState.deck.length,
+                initialCards: initialCards,
+                players: room.players.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    isHost: p.isHost,
+                    cardCount: p.cards.length,
+                    cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
+                }))
+            }
+        });
+
+        // 4. Enviar cartas a cada jugador
+        room.players.forEach(player => {
+            if (player.ws?.readyState === WebSocket.OPEN) {
+                safeSend(player.ws, {
+                    type: 'your_cards',
+                    cards: player.cards,
+                    playerName: player.name,
+                    currentPlayerId: player.id
+                });
+            }
+        });
+
+    } catch (error) {
+        console.error('Error al iniciar juego:', error);
+        throw error;
+    }
 }
 
 const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
@@ -634,8 +687,31 @@ wss.on('connection', async (ws, req) => {
             }
 
             switch (msg.type) {
+                // En el handler de 'start_game'
                 case 'start_game':
                     if (player.isHost && !room.gameState.gameStarted) {
+                        // Registrar conexiones de todos los jugadores al iniciar
+                        try {
+                            await Promise.all(room.players.map(async (p) => {
+                                await pool.query(`
+                    INSERT INTO player_connections 
+                    (player_id, room_id, last_ping, connection_status)
+                    VALUES ($1, $2, NOW(), $3)
+                    ON CONFLICT (player_id) 
+                    DO UPDATE SET
+                        room_id = $2,
+                        last_ping = NOW(),
+                        connection_status = $3
+                `, [
+                                    p.id,
+                                    roomId,
+                                    p.ws?.readyState === WebSocket.OPEN ? 'connected' : 'disconnected'
+                                ]);
+                            }));
+                        } catch (error) {
+                            console.error('Error registrando conexiones:', error);
+                        }
+
                         startGame(room, msg.initialCards);
                     }
                     break;

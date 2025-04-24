@@ -201,17 +201,26 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'game.html';
     }
 
-    // Iniciar juego (solo host)
     async function handleStartGame() {
         if (!socket || socket.readyState !== WebSocket.OPEN) {
             updateConnectionStatus('Error: No hay conexión', true);
             return;
         }
 
+        startBtn.disabled = true;
+        startBtn.textContent = 'Iniciando...';
+        startBtn.classList.add('loading');
+
         try {
-            startBtn.disabled = true;
-            startBtn.textContent = 'Iniciando...';
-            startBtn.classList.add('loading');
+            // Forzar registro inicial antes de empezar
+            await fetch(`${API_URL}/register-connection`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    playerId: playerId,
+                    roomId: roomId
+                })
+            });
 
             socket.send(JSON.stringify({
                 type: 'start_game',
