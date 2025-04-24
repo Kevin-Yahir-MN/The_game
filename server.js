@@ -15,11 +15,21 @@ const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
 const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000;
 const CONNECTION_TIMEOUT = 10000;
 const PING_INTERVAL = 30000;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_BASE_DELAY = 2000;
+const HEALTH_CHECK_INTERVAL = 15000;
+const MAX_INACTIVE_TIME = 45000;
 
 const pool = new Pool({
     connectionString: process.env.NEON_DATABASE_URL,
     ssl: {
         rejectUnauthorized: false
+    },
+    retry_strategy: (options) => {
+        if (options.error.code === 'ECONNREFUSED') {
+            return Math.min(options.attempt * 1000, 5000);
+        }
+        return 5000;
     }
 });
 
@@ -29,41 +39,65 @@ pool.query('SELECT NOW()', (err) => {
 });
 
 async function initializeDatabase() {
-    try {
-        await pool.query(`
-      CREATE TABLE IF NOT EXISTS rooms (
-        room_id VARCHAR(4) PRIMARY KEY,
-        game_state JSONB NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        is_active BOOLEAN DEFAULT TRUE
-      );
-      
-      CREATE TABLE IF NOT EXISTS players (
-        player_id UUID PRIMARY KEY,
-        room_id VARCHAR(4) REFERENCES rooms(room_id),
-        name VARCHAR(20) NOT NULL,
-        is_host BOOLEAN DEFAULT FALSE,
-        is_connected BOOLEAN DEFAULT FALSE,
-        last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        cards INTEGER[],
-        cards_played_this_turn JSONB,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-      
-      CREATE TABLE IF NOT EXISTS game_history (
-        id SERIAL PRIMARY KEY,
-        room_id VARCHAR(4) REFERENCES rooms(room_id),
-        event_type VARCHAR(50) NOT NULL,
-        event_data JSONB NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-      
-      CREATE INDEX IF NOT EXISTS idx_players_room ON players(room_id);
-      CREATE INDEX IF NOT EXISTS idx_players_connection ON players(is_connected);
-    `);
-    } catch (err) {
-        console.error('Error initializing database:', err);
+    const maxRetries = 3;
+    let retries = 0;
+
+    while (retries < maxRetries) {
+        try {
+            await pool.query('BEGIN');
+
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS rooms (
+                    room_id VARCHAR(4) PRIMARY KEY,
+                    game_state JSONB NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    is_active BOOLEAN DEFAULT TRUE,
+                    last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    state_version INTEGER DEFAULT 0
+                );
+                
+                CREATE TABLE IF NOT EXISTS players (
+                    player_id UUID PRIMARY KEY,
+                    room_id VARCHAR(4) REFERENCES rooms(room_id) ON DELETE CASCADE,
+                    name VARCHAR(20) NOT NULL,
+                    is_host BOOLEAN DEFAULT FALSE,
+                    is_connected BOOLEAN DEFAULT FALSE,
+                    last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    cards INTEGER[],
+                    cards_played_this_turn JSONB,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    CONSTRAINT unique_player_name_per_room UNIQUE (room_id, name)
+                );
+                
+                CREATE TABLE IF NOT EXISTS game_history (
+                    id SERIAL PRIMARY KEY,
+                    room_id VARCHAR(4) REFERENCES rooms(room_id) ON DELETE CASCADE,
+                    event_type VARCHAR(50) NOT NULL,
+                    event_data JSONB NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+                
+                CREATE INDEX IF NOT EXISTS idx_rooms_activity ON rooms(last_activity);
+                CREATE INDEX IF NOT EXISTS idx_players_connection ON players(is_connected, last_seen);
+                CREATE INDEX IF NOT EXISTS idx_players_room ON players(room_id);
+                CREATE INDEX IF NOT EXISTS idx_history_room ON game_history(room_id, created_at);
+            `);
+
+            await pool.query('COMMIT');
+            console.log('Database initialized successfully');
+            return;
+        } catch (err) {
+            await pool.query('ROLLBACK');
+            retries++;
+            console.error(`Database initialization attempt ${retries}/${maxRetries}:`, err);
+
+            if (retries >= maxRetries) {
+                throw new Error('Failed to initialize database after multiple attempts');
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 2000 * retries));
+        }
     }
 }
 
@@ -88,7 +122,8 @@ app.get('/health', (req, res) => {
     res.status(200).json({
         status: 'active',
         timestamp: Date.now(),
-        activeRooms: rooms.size
+        activeRooms: rooms.size,
+        dbStatus: pool.totalCount > 0 ? 'connected' : 'disconnected'
     });
 });
 
@@ -105,16 +140,19 @@ const wss = new WebSocket.Server({
 const rooms = new Map();
 const reverseRoomMap = new Map();
 const boardHistory = new Map();
+const connectionHealth = new Map();
 
 async function saveRoomState(roomId, gameState) {
     try {
         await pool.query(
-            'INSERT INTO rooms (room_id, game_state) VALUES ($1, $2) ' +
-            'ON CONFLICT (room_id) DO UPDATE SET game_state = $2, updated_at = NOW(), is_active = TRUE',
+            'INSERT INTO rooms (room_id, game_state, updated_at, last_activity, is_active, state_version) ' +
+            'VALUES ($1, $2, NOW(), NOW(), TRUE, COALESCE((SELECT state_version FROM rooms WHERE room_id = $1), 0) + 1) ' +
+            'ON CONFLICT (room_id) DO UPDATE SET game_state = $2, updated_at = NOW(), last_activity = NOW(), is_active = TRUE, state_version = rooms.state_version + 1',
             [roomId, gameState]
         );
     } catch (err) {
         console.error('Error saving room state:', err);
+        throw err;
     }
 }
 
@@ -126,19 +164,20 @@ async function updatePlayerConnection(playerId, isConnected) {
         );
     } catch (err) {
         console.error('Error updating player connection:', err);
+        throw err;
     }
 }
 
 async function getRoomState(roomId) {
     try {
         const res = await pool.query(
-            'SELECT game_state FROM rooms WHERE room_id = $1 AND is_active = TRUE',
+            'SELECT game_state, state_version FROM rooms WHERE room_id = $1 AND is_active = TRUE',
             [roomId]
         );
-        return res.rows[0]?.game_state;
+        return res.rows[0] || null;
     } catch (err) {
         console.error('Error getting room state:', err);
-        return null;
+        throw err;
     }
 }
 
@@ -151,7 +190,7 @@ async function checkAllDisconnected(roomId) {
         return parseInt(res.rows[0].count) === 0;
     } catch (err) {
         console.error('Error checking connections:', err);
-        return false;
+        throw err;
     }
 }
 
@@ -189,7 +228,8 @@ function sendGameState(room, player) {
             h: p.isHost,
             c: p.cards.length,
             s: p.cardsPlayedThisTurn.length
-        }))
+        })),
+        v: room.gameState.stateVersion
     };
     safeSend(player.ws, {
         type: 'gs',
@@ -273,6 +313,7 @@ function handlePlayCard(room, player, msg) {
         position: msg.position,
         isPlayedThisTurn: true
     });
+    room.gameState.stateVersion++;
     broadcastToRoom(room, {
         type: 'card_played',
         cardValue: msg.cardValue,
@@ -314,6 +355,7 @@ function handleUndoMove(room, player, msg) {
         room.gameState.board.descending[idx] = lastMove.previousValue;
     }
     player.cardsPlayedThisTurn.splice(lastMoveIndex, 1);
+    room.gameState.stateVersion++;
     broadcastToRoom(room, {
         type: 'move_undone',
         playerId: player.id,
@@ -363,6 +405,7 @@ function endTurn(room, player) {
         });
     }
     player.cardsPlayedThisTurn = [];
+    room.gameState.stateVersion++;
     broadcastGameState(room);
     broadcastToRoom(room, {
         type: 'turn_changed',
@@ -415,7 +458,8 @@ app.post('/create-room', async (req, res) => {
             board: { ascending: [1, 1], descending: [100, 100] },
             currentTurn: playerId,
             gameStarted: false,
-            initialCards: 6
+            initialCards: 6,
+            stateVersion: 1
         }
     };
     rooms.set(roomId, room);
@@ -427,7 +471,7 @@ app.post('/create-room', async (req, res) => {
     try {
         await pool.query('BEGIN');
         await pool.query(
-            'INSERT INTO rooms (room_id, game_state) VALUES ($1, $2)',
+            'INSERT INTO rooms (room_id, game_state, state_version) VALUES ($1, $2, 1)',
             [roomId, room.gameState]
         );
         await pool.query(
@@ -454,7 +498,7 @@ app.post('/join-room', async (req, res) => {
     if (!rooms.has(roomId)) {
         try {
             const roomRes = await pool.query(
-                'SELECT game_state FROM rooms WHERE room_id = $1 AND is_active = TRUE',
+                'SELECT game_state, state_version FROM rooms WHERE room_id = $1 AND is_active = TRUE',
                 [roomId]
             );
             if (roomRes.rows.length === 0) {
@@ -462,7 +506,10 @@ app.post('/join-room', async (req, res) => {
             }
             const room = {
                 players: [],
-                gameState: roomRes.rows[0].game_state
+                gameState: {
+                    ...roomRes.rows[0].game_state,
+                    stateVersion: roomRes.rows[0].state_version
+                }
             };
             rooms.set(roomId, room);
             reverseRoomMap.set(room, roomId);
@@ -505,7 +552,7 @@ app.get('/room-info/:roomId', async (req, res) => {
     if (!rooms.has(roomId)) {
         try {
             const roomRes = await pool.query(
-                'SELECT game_state FROM rooms WHERE room_id = $1 AND is_active = TRUE',
+                'SELECT game_state, state_version FROM rooms WHERE room_id = $1 AND is_active = TRUE',
                 [roomId]
             );
             if (roomRes.rows.length === 0) {
@@ -520,7 +567,8 @@ app.get('/room-info/:roomId', async (req, res) => {
                 players: playersRes.rows,
                 gameStarted: roomRes.rows[0].game_state.gameStarted,
                 currentTurn: roomRes.rows[0].game_state.currentTurn,
-                initialCards: roomRes.rows[0].game_state.initialCards
+                initialCards: roomRes.rows[0].game_state.initialCards,
+                stateVersion: roomRes.rows[0].state_version
             });
         } catch (err) {
             console.error('Error getting room info:', err);
@@ -539,7 +587,8 @@ app.get('/room-info/:roomId', async (req, res) => {
         })),
         gameStarted: room.gameState.gameStarted,
         currentTurn: room.gameState.currentTurn,
-        initialCards: room.gameState.initialCards
+        initialCards: room.gameState.initialCards,
+        stateVersion: room.gameState.stateVersion
     });
 });
 
@@ -566,6 +615,7 @@ function startGame(room, initialCards = 6) {
             player.cards.push(room.gameState.deck.pop());
         }
     });
+    room.gameState.stateVersion++;
     broadcastToRoom(room, {
         type: 'game_started',
         state: {
@@ -579,7 +629,8 @@ function startGame(room, initialCards = 6) {
                 isHost: p.isHost,
                 cardCount: p.cards.length,
                 cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
-            }))
+            })),
+            stateVersion: room.gameState.stateVersion
         }
     });
     room.players.forEach(player => {
@@ -598,6 +649,7 @@ wss.on('connection', async (ws, req) => {
     const roomId = params.get('roomId');
     const playerId = params.get('playerId');
     const playerName = params.get('playerName');
+    const lastStateVersion = parseInt(params.get('lastState')) || 0;
     const connectionTimeout = setTimeout(() => {
         if (ws.readyState === WebSocket.CONNECTING) {
             ws.close(1008, 'Tiempo de conexión agotado');
@@ -613,7 +665,7 @@ wss.on('connection', async (ws, req) => {
     if (!room) {
         try {
             const roomRes = await pool.query(
-                'SELECT game_state FROM rooms WHERE room_id = $1 AND is_active = TRUE',
+                'SELECT game_state, state_version FROM rooms WHERE room_id = $1 AND is_active = TRUE',
                 [roomId]
             );
             if (roomRes.rows.length === 0) {
@@ -622,7 +674,10 @@ wss.on('connection', async (ws, req) => {
             }
             room = {
                 players: [],
-                gameState: roomRes.rows[0].game_state
+                gameState: {
+                    ...roomRes.rows[0].game_state,
+                    stateVersion: roomRes.rows[0].state_version
+                }
             };
             rooms.set(roomId, room);
             reverseRoomMap.set(room, roomId);
@@ -671,19 +726,32 @@ wss.on('connection', async (ws, req) => {
 
     player.ws = ws;
     player.lastActivity = Date.now();
-    await updatePlayerConnection(playerId, true);
+    connectionHealth.set(playerId, { lastPong: Date.now() });
+
+    try {
+        await updatePlayerConnection(playerId, true);
+    } catch (err) {
+        console.error('Error updating player connection:', err);
+    }
 
     const pingInterval = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
-            safeSend(ws, { type: 'ping' });
+            safeSend(ws, { type: 'ping', timestamp: Date.now() });
         }
     }, PING_INTERVAL);
 
-    const savedState = await getRoomState(roomId);
-    if (savedState) {
+    const healthCheckInterval = setInterval(() => {
+        const health = connectionHealth.get(playerId);
+        if (health && Date.now() - health.lastPong > MAX_INACTIVE_TIME) {
+            ws.close(1001, 'Inactividad prolongada');
+        }
+    }, HEALTH_CHECK_INTERVAL);
+
+    if (lastStateVersion < room.gameState.stateVersion) {
         safeSend(ws, {
-            type: 'game_state_restored',
-            state: savedState
+            type: 'state_update',
+            state: room.gameState,
+            fullSync: true
         });
     }
 
@@ -692,8 +760,16 @@ wss.on('connection', async (ws, req) => {
             const msg = JSON.parse(message);
             player.lastActivity = Date.now();
 
-            if (msg.type === 'ping') {
-                return ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+            if (msg.type === 'pong') {
+                connectionHealth.set(playerId, { lastPong: Date.now() });
+                return;
+            }
+
+            if (msg.type === 'sync_request') {
+                if (msg.lastStateVersion < room.gameState.stateVersion) {
+                    sendGameState(room, player);
+                }
+                return;
             }
 
             switch (msg.type) {
@@ -709,45 +785,7 @@ wss.on('connection', async (ws, req) => {
                     break;
                 case 'end_turn':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
-                        if (player.cardsPlayedThisTurn.length < minCardsRequired) {
-                            return safeSend(player.ws, {
-                                type: 'notification',
-                                message: `Debes jugar al menos ${minCardsRequired} cartas este turno`,
-                                isError: true
-                            });
-                        }
-                        const cardsToDraw = Math.min(
-                            room.gameState.initialCards - player.cards.length,
-                            room.gameState.deck.length
-                        );
-                        for (let i = 0; i < cardsToDraw; i++) {
-                            player.cards.push(room.gameState.deck.pop());
-                        }
-                        const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
-                        const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
-                        const nextPlayer = room.players[nextIndex];
-                        const nextPlayerPlayableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-                        const nextPlayerRequired = room.gameState.deck.length > 0 ? 2 : 1;
-                        if (nextPlayerPlayableCards.length < nextPlayerRequired && nextPlayer.cards.length > 0) {
-                            return broadcastToRoom(room, {
-                                type: 'game_over',
-                                result: 'lose',
-                                message: `¡${nextPlayer.name} no puede jugar el mínimo de ${nextPlayerRequired} carta(s) requerida(s)!`,
-                                reason: 'min_cards_not_met'
-                            });
-                        }
-                        player.cardsPlayedThisTurn = [];
-                        room.gameState.currentTurn = nextPlayer.id;
-                        broadcastToRoom(room, {
-                            type: 'turn_changed',
-                            newTurn: nextPlayer.id,
-                            previousPlayer: player.id,
-                            playerName: nextPlayer.name,
-                            cardsPlayedThisTurn: 0,
-                            minCardsRequired: nextPlayerRequired
-                        }, { includeGameState: true });
-                        checkGameStatus(room);
+                        endTurn(room, player);
                     }
                     break;
                 case 'undo_move':
@@ -780,7 +818,8 @@ wss.on('connection', async (ws, req) => {
                             board: { ascending: [1, 1], descending: [100, 100] },
                             currentTurn: room.players[0].id,
                             gameStarted: false,
-                            initialCards: room.gameState.initialCards || 6
+                            initialCards: room.gameState.initialCards || 6,
+                            stateVersion: room.gameState.stateVersion + 1
                         };
                         room.players.forEach(player => {
                             player.cards = [];
@@ -817,21 +856,40 @@ wss.on('connection', async (ws, req) => {
 
     ws.on('close', async () => {
         clearInterval(pingInterval);
+        clearInterval(healthCheckInterval);
+        connectionHealth.delete(playerId);
         player.ws = null;
-        await updatePlayerConnection(playerId, false);
 
-        const allDisconnected = await checkAllDisconnected(roomId);
-        if (allDisconnected) {
-            await pool.query(
-                'UPDATE rooms SET is_active = FALSE WHERE room_id = $1',
-                [roomId]
-            );
+        try {
+            await updatePlayerConnection(playerId, false);
+        } catch (err) {
+            console.error('Error updating player connection:', err);
+        }
+
+        try {
+            const allDisconnected = await checkAllDisconnected(roomId);
+            if (allDisconnected) {
+                await pool.query(
+                    'UPDATE rooms SET is_active = FALSE WHERE room_id = $1',
+                    [roomId]
+                );
+            }
+        } catch (err) {
+            console.error('Error checking disconnections:', err);
         }
 
         if (player.isHost && room.players.length > 1) {
             const newHost = room.players.find(p => p.id !== player.id && p.ws?.readyState === WebSocket.OPEN);
             if (newHost) {
                 newHost.isHost = true;
+                try {
+                    await pool.query(
+                        'UPDATE players SET is_host = TRUE WHERE player_id = $1',
+                        [newHost.id]
+                    );
+                } catch (err) {
+                    console.error('Error updating host:', err);
+                }
                 broadcastToRoom(room, {
                     type: 'notification',
                     message: `${newHost.name} es ahora el host`,
@@ -845,6 +903,7 @@ wss.on('connection', async (ws, req) => {
         console.error('Error en WebSocket:', error);
         clearTimeout(connectionTimeout);
         clearInterval(pingInterval);
+        clearInterval(healthCheckInterval);
     });
 
     clearTimeout(connectionTimeout);
@@ -866,7 +925,8 @@ wss.on('connection', async (ws, req) => {
                 name: p.name,
                 isHost: p.isHost,
                 cardCount: p.cards.length
-            }))
+            })),
+            stateVersion: room.gameState.stateVersion
         },
         isYourTurn: room.gameState.currentTurn === player.id
     };
