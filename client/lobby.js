@@ -59,7 +59,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!response.ok) {
-                throw new Error(`Error HTTP: ${response.status}`);
+                const errorData = await response.json().catch(() => ({}));
+                const errorMessage = errorData.message || 'Error al crear la sala';
+                throw new Error(`Error HTTP: ${response.status} - ${errorMessage}`);
             }
 
             const data = await response.json();
@@ -75,7 +77,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('Error:', error);
-            showError('Error al conectar con el servidor');
+            showError(error.message.includes('Error HTTP')
+                ? error.message.replace('Error HTTP: 500 - ', '')
+                : 'Error al conectar con el servidor');
         } finally {
             createRoomBtn.disabled = false;
             createRoomBtn.textContent = 'Crear Sala';
@@ -106,7 +110,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!response.ok) {
-                throw new Error(`Error HTTP: ${response.status}`);
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(`Error HTTP: ${response.status} - ${errorData.message || 'Error al unirse a la sala'}`);
             }
 
             const data = await response.json();
@@ -122,7 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('Error:', error);
-            showError('Error al conectar con el servidor');
+            showError(error.message.includes('Error HTTP')
+                ? error.message.replace('Error HTTP: ', '')
+                : 'Error al conectar con el servidor');
         } finally {
             joinRoomBtn.disabled = false;
             joinRoomBtn.textContent = 'Unirse';
