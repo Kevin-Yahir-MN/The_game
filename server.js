@@ -45,19 +45,25 @@ app.use((req, res, next) => {
 async function initializeDatabase() {
     try {
         await pool.query(`
+            CREATE TABLE IF NOT EXISTS game_states (
+                room_id VARCHAR(4) PRIMARY KEY,
+                game_data JSONB NOT NULL,
+                last_activity TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW(),
+                CONSTRAINT valid_json CHECK (jsonb_typeof(game_data) = 'object')
+            );
+            
             CREATE TABLE IF NOT EXISTS player_connections (
                 player_id UUID PRIMARY KEY,
                 room_id VARCHAR(4) REFERENCES game_states(room_id),
                 last_ping TIMESTAMP NOT NULL,
                 connection_status VARCHAR(10) NOT NULL
             );
-            
-            CREATE INDEX IF NOT EXISTS idx_player_connections_room ON player_connections(room_id);
-            CREATE INDEX IF NOT EXISTS idx_player_connections_status ON player_connections(connection_status);
-            CREATE INDEX IF NOT EXISTS idx_player_connections_ping ON player_connections(last_ping);
         `);
+        console.log('✔ Base de datos inicializada correctamente');
     } catch (error) {
-        console.error('Error inicializando player_connections:', error);
+        console.error('❌ Error al inicializar base de datos:', error);
+        throw error;
     }
 }
 
@@ -66,15 +72,7 @@ async function saveGameState(roomId) {
     if (!room) return;
 
     try {
-        await pool.query(`
-      INSERT INTO game_states 
-      (room_id, game_data, last_activity) 
-      VALUES ($1, $2, NOW())
-      ON CONFLICT (room_id) 
-      DO UPDATE SET 
-        game_data = EXCLUDED.game_data,
-        last_activity = NOW()
-    `, [roomId, JSON.stringify({
+        const gameData = {
             players: room.players.map(p => ({
                 id: p.id,
                 name: p.name,
@@ -84,37 +82,91 @@ async function saveGameState(roomId) {
             })),
             gameState: room.gameState,
             history: boardHistory.get(roomId)
-        })]);
+        };
+
+        // Validar datos antes de guardar
+        if (!gameData.players || !gameData.gameState) {
+            throw new Error('Datos del juego no válidos');
+        }
+
+        await pool.query(`
+            INSERT INTO game_states 
+            (room_id, game_data, last_activity) 
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (room_id) 
+            DO UPDATE SET 
+                game_data = EXCLUDED.game_data,
+                last_activity = NOW()
+        `, [roomId, JSON.stringify(gameData)]);
+
+        console.log(`💾 Estado del juego guardado para sala ${roomId}`);
     } catch (error) {
-        console.error(error);
+        console.error(`❌ Error al guardar estado para sala ${roomId}:`, error);
     }
 }
 
 async function restoreActiveGames() {
     try {
+        console.log('⏳ Restaurando juegos activos...');
+
         const { rows } = await pool.query(`
-      SELECT * FROM game_states 
-      WHERE last_activity > NOW() - INTERVAL '4 hours'
-    `);
+            SELECT * FROM game_states 
+            WHERE last_activity > NOW() - INTERVAL '4 hours'
+        `);
 
-        rows.forEach(row => {
-            const data = JSON.parse(row.game_data);
-            const roomId = row.room_id;
+        if (!rows || rows.length === 0) {
+            console.log('ℹ️ No hay juegos activos para restaurar');
+            return;
+        }
 
-            rooms.set(roomId, {
-                players: data.players.map(p => ({
-                    ...p,
-                    ws: null,
-                    lastActivity: Date.now()
-                })),
-                gameState: data.gameState
-            });
+        for (const row of rows) {
+            try {
+                // Verificar que game_data existe y es string
+                if (!row.game_data || typeof row.game_data !== 'string') {
+                    console.error('❌ game_data no es válido en fila:', row);
+                    continue;
+                }
 
-            boardHistory.set(roomId, data.history);
-            reverseRoomMap.set(rooms.get(roomId), roomId);
-        });
-    } catch (error) {
-        console.error(error);
+                const data = JSON.parse(row.game_data);
+                const roomId = row.room_id;
+
+                console.log(`🔄 Restaurando sala ${roomId}`);
+
+                // Validar estructura básica de los datos
+                if (!data.players || !data.gameState) {
+                    console.error('Estructura de datos inválida para sala:', roomId);
+                    continue;
+                }
+
+                const room = {
+                    players: data.players.map(p => ({
+                        ...p,
+                        ws: null,
+                        lastActivity: Date.now()
+                    })),
+                    gameState: data.gameState
+                };
+
+                rooms.set(roomId, room);
+                reverseRoomMap.set(room, roomId);
+
+                if (data.history) {
+                    boardHistory.set(roomId, data.history);
+                } else {
+                    boardHistory.set(roomId, {
+                        ascending1: [1], ascending2: [1],
+                        descending1: [100], descending2: [100]
+                    });
+                }
+
+                console.log(`✅ Sala ${roomId} restaurada correctamente`);
+            } catch (parseError) {
+                console.error(`❌ Error al parsear datos de sala ${row.room_id}:`, parseError);
+                console.error('Datos problemáticos:', row.game_data);
+            }
+        }
+    } catch (dbError) {
+        console.error('Error al restaurar juegos activos:', dbError);
     }
 }
 
