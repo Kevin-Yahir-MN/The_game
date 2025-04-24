@@ -45,22 +45,19 @@ app.use((req, res, next) => {
 async function initializeDatabase() {
     try {
         await pool.query(`
-      CREATE TABLE IF NOT EXISTS game_states (
-        room_id VARCHAR(4) PRIMARY KEY,
-        game_data JSONB NOT NULL,
-        last_activity TIMESTAMP NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW()
-      );
-      
-      CREATE TABLE IF NOT EXISTS player_connections (
-        player_id UUID PRIMARY KEY,
-        room_id VARCHAR(4) REFERENCES game_states(room_id),
-        last_ping TIMESTAMP,
-        connection_status VARCHAR(10)
-      );
-    `);
+            CREATE TABLE IF NOT EXISTS player_connections (
+                player_id UUID PRIMARY KEY,
+                room_id VARCHAR(4) REFERENCES game_states(room_id),
+                last_ping TIMESTAMP NOT NULL,
+                connection_status VARCHAR(10) NOT NULL
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_player_connections_room ON player_connections(room_id);
+            CREATE INDEX IF NOT EXISTS idx_player_connections_status ON player_connections(connection_status);
+            CREATE INDEX IF NOT EXISTS idx_player_connections_ping ON player_connections(last_ping);
+        `);
     } catch (error) {
-        console.error(error);
+        console.error('Error inicializando player_connections:', error);
     }
 }
 
@@ -554,7 +551,7 @@ initializeDatabase().then(() => {
     }, 15000);
 });
 
-wss.on('connection', (ws, req) => {
+wss.on('connection', async (ws, req) => {
     const params = new URLSearchParams(req.url.split('?')[1]);
     const roomId = params.get('roomId');
     const playerId = params.get('playerId');
@@ -567,6 +564,22 @@ wss.on('connection', (ws, req) => {
     const room = rooms.get(roomId);
     const player = room.players.find(p => p.id === playerId);
     if (!player) return ws.close(1008, 'Jugador no registrado');
+
+    try {
+        // Actualizar player_connections al conectar
+        await pool.query(`
+            INSERT INTO player_connections 
+            (player_id, room_id, last_ping, connection_status)
+            VALUES ($1, $2, NOW(), 'connected')
+            ON CONFLICT (player_id) 
+            DO UPDATE SET 
+                room_id = $2,
+                last_ping = NOW(),
+                connection_status = 'connected'
+        `, [playerId, roomId]);
+    } catch (error) {
+        console.error('Error al actualizar player_connections:', error);
+    }
 
     player.ws = ws;
     player.lastActivity = Date.now();
@@ -610,6 +623,15 @@ wss.on('connection', (ws, req) => {
         try {
             const msg = JSON.parse(message);
             player.lastActivity = Date.now();
+
+            if (msg.type === 'ping') {
+                await pool.query(`
+                    UPDATE player_connections
+                    SET last_ping = NOW()
+                    WHERE player_id = $1
+                `, [playerId]);
+                return;
+            }
 
             switch (msg.type) {
                 case 'start_game':
@@ -752,6 +774,25 @@ wss.on('connection', (ws, req) => {
                         }
                     }
                     break;
+                case 'ping':
+                    // Actualizar last_ping en la base de datos
+                    try {
+                        await pool.query(`
+            UPDATE player_connections
+            SET last_ping = NOW()
+            WHERE player_id = $1
+        `, [message.playerId]);
+
+                        // Responder con pong
+                        safeSend(ws, {
+                            type: 'pong',
+                            timestamp: message.timestamp,
+                            serverTime: Date.now()
+                        });
+                    } catch (error) {
+                        console.error('Error al procesar ping:', error);
+                    }
+                    break;
                 default:
                     console.log('Tipo de mensaje no reconocido:', msg.type);
             }
@@ -760,8 +801,19 @@ wss.on('connection', (ws, req) => {
         }
     });
 
-    ws.on('close', () => {
+    ws.on('close', async () => {
         player.ws = null;
+        try {
+            // Marcar como desconectado en la base de datos
+            await pool.query(`
+                UPDATE player_connections
+                SET connection_status = 'disconnected'
+                WHERE player_id = $1
+            `, [playerId]);
+        } catch (error) {
+            console.error('Error al actualizar estado de conexión:', error);
+        }
+
         if (player.isHost && room.players.length > 1) {
             const newHost = room.players.find(p => p.id !== player.id && p.ws?.readyState === WebSocket.OPEN);
             if (newHost) {

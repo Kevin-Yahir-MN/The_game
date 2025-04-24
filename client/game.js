@@ -159,8 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let socket;
 
     function connectWebSocket() {
-        clearTimeout(reconnectTimeout);
-
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             showNotification('No se puede conectar al servidor. Recarga la página.', true);
             updateConnectionStatus('Desconectado', true);
@@ -173,14 +171,36 @@ document.addEventListener('DOMContentLoaded', () => {
             socket.close();
         }
 
-        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}&playerName=${encodeURIComponent(currentPlayer.name)}`);
+        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
+
+        let pingInterval;
 
         socket.onopen = () => {
             reconnectAttempts = 0;
             updateConnectionStatus('Conectado');
             showNotification('Conectado al servidor');
 
-            // Solicitar estado completo al reconectar
+            pingInterval = setInterval(() => {
+                if (socket?.readyState === WebSocket.OPEN) {
+                    try {
+                        socket.send(JSON.stringify({
+                            type: 'ping',
+                            playerId: currentPlayer.id,
+                            roomId: roomId,
+                            timestamp: Date.now()
+                        }));
+                    } catch (error) {
+                        console.error('Error enviando ping:', error);
+                    }
+                }
+            }, 15000);
+
+            socket.send(JSON.stringify({
+                type: 'get_game_state',
+                playerId: currentPlayer.id,
+                roomId: roomId
+            }));
+
             if (connectionStatus === 'reconnecting') {
                 socket.send(JSON.stringify({
                     type: 'get_full_state',
@@ -192,10 +212,11 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         socket.onclose = (event) => {
+            clearInterval(pingInterval);
             if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                 reconnectAttempts++;
                 const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1), 30000);
-                reconnectTimeout = setTimeout(connectWebSocket, delay);
+                setTimeout(connectWebSocket, delay);
                 updateConnectionStatus(`Reconectando (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
                 connectionStatus = 'reconnecting';
             } else {
@@ -210,7 +231,79 @@ document.addEventListener('DOMContentLoaded', () => {
             connectionStatus = 'error';
         };
 
-        socket.onmessage = handleSocketMessage;
+        socket.onmessage = (event) => {
+            try {
+                const now = Date.now();
+                const message = JSON.parse(event.data);
+
+                if (message.type === 'pong') {
+                    updateConnectionStatus('Conectado');
+                    return;
+                }
+
+                if (message.type === 'gs' && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
+                    return;
+                }
+
+                switch (message.type) {
+                    case 'full_state_update':
+                        handleFullStateUpdate(message);
+                        break;
+                    case 'init_game':
+                        handleInitGame(message);
+                        break;
+                    case 'gs':
+                        lastStateUpdate = now;
+                        updateGameState(message.s);
+                        updateGameInfo();
+                        break;
+                    case 'game_started':
+                        updateGameState(message.state);
+                        showNotification('¡El juego ha comenzado!');
+                        updateGameInfo();
+                        break;
+                    case 'your_cards':
+                        updatePlayerCards(message.cards);
+                        updateGameInfo();
+                        break;
+                    case 'game_over':
+                        handleGameOver(message.message);
+                        break;
+                    case 'notification':
+                        showNotification(message.message, message.isError);
+                        break;
+                    case 'card_played':
+                        handleOpponentCardPlayed(message);
+                        updateGameInfo();
+                        break;
+                    case 'invalid_move':
+                        if (message.playerId === currentPlayer.id && selectedCard) {
+                            animateInvalidCard(selectedCard);
+                        }
+                        break;
+                    case 'turn_changed':
+                        handleTurnChanged(message);
+                        updateGameInfo();
+                        break;
+                    case 'move_undone':
+                        handleMoveUndone(message);
+                        updateGameInfo();
+                        break;
+                    case 'room_reset':
+                        break;
+                    case 'player_update':
+                        if (message.players) {
+                            gameState.players = message.players;
+                            updateGameInfo();
+                        }
+                        break;
+                    default:
+                        console.log('Mensaje no reconocido:', message);
+                }
+            } catch (error) {
+                console.error('Error procesando mensaje:', error);
+            }
+        };
     }
 
     function updateConnectionStatus(status, isError = false) {

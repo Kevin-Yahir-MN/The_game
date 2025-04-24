@@ -53,32 +53,46 @@ document.addEventListener('DOMContentLoaded', () => {
         return statusElement;
     }
 
-    // Conectar WebSocket con reconexión automática
     function connectWebSocket() {
         clearTimeout(reconnectTimeout);
 
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            updateConnectionStatus('Desconectado', true);
             showNotification('No se puede conectar al servidor. Recarga la página.', true);
             return;
         }
 
         updateConnectionStatus('Conectando...');
 
-        // Cerrar conexión existente si hay una
         if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
             socket.close();
         }
 
         socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${playerId}&playerName=${encodeURIComponent(playerName)}`);
 
+        let pingInterval;
+
         socket.onopen = () => {
             reconnectAttempts = 0;
             updateConnectionStatus('Conectado');
             showNotification('Conectado al servidor');
+
+            pingInterval = setInterval(() => {
+                if (socket?.readyState === WebSocket.OPEN) {
+                    try {
+                        socket.send(JSON.stringify({
+                            type: 'ping',
+                            playerId: playerId,
+                            roomId: roomId,
+                            timestamp: Date.now()
+                        }));
+                    } catch (error) {
+                        console.error('Error enviando ping:', error);
+                    }
+                }
+            }, 15000);
+
             sendPlayerUpdate();
 
-            // Solicitar estado completo al reconectar
             if (connectionStatus === 'reconnecting') {
                 socket.send(JSON.stringify({
                     type: 'get_full_state',
@@ -90,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         socket.onclose = (event) => {
+            clearInterval(pingInterval);
             if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                 reconnectAttempts++;
                 const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1), 30000);
@@ -108,7 +123,20 @@ document.addEventListener('DOMContentLoaded', () => {
             connectionStatus = 'error';
         };
 
-        socket.onmessage = handleSocketMessage;
+        socket.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+
+                if (message.type === 'pong') {
+                    updateConnectionStatus('Conectado');
+                    return;
+                }
+
+                handleSocketMessage(event);
+            } catch (error) {
+                console.error('Error procesando mensaje:', error);
+            }
+        };
     }
 
     // Enviar actualización de jugador
