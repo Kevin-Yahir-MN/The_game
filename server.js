@@ -15,21 +15,11 @@ const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
 const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000;
 const CONNECTION_TIMEOUT = 10000;
 const PING_INTERVAL = 30000;
-const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_BASE_DELAY = 2000;
-const HEALTH_CHECK_INTERVAL = 15000;
-const MAX_INACTIVE_TIME = 45000;
 
 const pool = new Pool({
     connectionString: process.env.NEON_DATABASE_URL,
     ssl: {
         rejectUnauthorized: false
-    },
-    retry_strategy: (options) => {
-        if (options.error.code === 'ECONNREFUSED') {
-            return Math.min(options.attempt * 1000, 5000);
-        }
-        return 5000;
     }
 });
 
@@ -52,9 +42,7 @@ async function initializeDatabase() {
                     game_state JSONB NOT NULL,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                    is_active BOOLEAN DEFAULT TRUE,
-                    last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                    state_version INTEGER DEFAULT 0
+                    is_active BOOLEAN DEFAULT TRUE
                 );
                 
                 CREATE TABLE IF NOT EXISTS players (
@@ -66,8 +54,7 @@ async function initializeDatabase() {
                     last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                     cards INTEGER[],
                     cards_played_this_turn JSONB,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                    CONSTRAINT unique_player_name_per_room UNIQUE (room_id, name)
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                 );
                 
                 CREATE TABLE IF NOT EXISTS game_history (
@@ -78,7 +65,6 @@ async function initializeDatabase() {
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                 );
                 
-                CREATE INDEX IF NOT EXISTS idx_rooms_activity ON rooms(last_activity);
                 CREATE INDEX IF NOT EXISTS idx_players_connection ON players(is_connected, last_seen);
                 CREATE INDEX IF NOT EXISTS idx_players_room ON players(room_id);
                 CREATE INDEX IF NOT EXISTS idx_history_room ON game_history(room_id, created_at);
@@ -93,7 +79,8 @@ async function initializeDatabase() {
             console.error(`Database initialization attempt ${retries}/${maxRetries}:`, err);
 
             if (retries >= maxRetries) {
-                throw new Error('Failed to initialize database after multiple attempts');
+                console.error('Failed to initialize database after multiple attempts. Starting with basic functionality.');
+                return;
             }
 
             await new Promise(resolve => setTimeout(resolve, 2000 * retries));
