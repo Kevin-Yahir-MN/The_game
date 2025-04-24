@@ -1016,3 +1016,17 @@ body {
         opacity: 1;
     }
 }
+
+/* En el panel de información */
+.info-panel .connection-status {
+    color: var(--secondary);
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.info-panel .connection-error {
+    color: var(--danger);
+    font-weight: bold;
+    margin: 10px 0;
+    animation: pulseError 0.5s infinite alternate;
+}

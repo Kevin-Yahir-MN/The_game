@@ -56,7 +56,7 @@ async function initializeDatabase() {
                 player_id UUID PRIMARY KEY,
                 room_id VARCHAR(4) NOT NULL,
                 last_ping TIMESTAMP NOT NULL,
-                connection_status VARCHAR(10) NOT NULL,
+                connection_status VARCHAR(20) NOT NULL,
                 FOREIGN KEY (room_id) REFERENCES game_states(room_id) ON DELETE CASCADE
             );
             

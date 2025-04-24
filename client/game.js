@@ -309,18 +309,22 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateConnectionStatus(status, isError = false) {
         connectionStatus = status;
         const statusElement = document.getElementById('connectionStatus') || createConnectionStatusElement();
-        statusElement.textContent = status;
-        statusElement.className = isError ? 'error' : '';
+        statusElement.textContent = `Estado: ${status}`;
+        statusElement.className = isError ? 'connection-error' : 'connection-status';
     }
 
     function createConnectionStatusElement() {
-        const statusElement = document.createElement('div');
+        const panelContent = document.querySelector('.panel-content');
+        const statusElement = document.createElement('p');
         statusElement.id = 'connectionStatus';
         statusElement.className = 'connection-status';
-        document.querySelector('.game-controls').appendChild(statusElement);
+
+        // Insertar después del elemento de cartas restantes
+        const remainingDeckElement = document.getElementById('remainingDeck').parentNode;
+        remainingDeckElement.parentNode.insertBefore(statusElement, remainingDeckElement.nextSibling);
+
         return statusElement;
     }
-
     function handleSocketMessage(event) {
         try {
             const now = Date.now();
