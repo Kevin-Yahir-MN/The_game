@@ -412,14 +412,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Actualizar historial
+        // Actualizar historial con valores por defecto si no existen
+        gameState.columnHistory = {
+            asc1: message.history?.ascending1 || [1],
+            asc2: message.history?.ascending2 || [1],
+            desc1: message.history?.descending1 || [100],
+            desc2: message.history?.descending2 || [100]
+        };
+
+        // Notificar si hay un historial cargado
         if (message.history) {
-            gameState.columnHistory = {
-                asc1: message.history.ascending1 || [],
-                asc2: message.history.ascending2 || [],
-                desc1: message.history.descending1 || [],
-                desc2: message.history.descending2 || []
-            };
+            console.log('Historial de cartas cargado:', message.history);
         }
 
         updateGameInfo();
@@ -429,13 +432,22 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.currentTurn = message.gameState.currentTurn;
         gameState.board = message.gameState.board;
         gameState.remainingDeck = message.gameState.remainingDeck;
+        gameState.initialCards = message.gameState.initialCards || 6;
+
+        // Inicializar historial
+        gameState.columnHistory = {
+            asc1: message.history?.ascending1 || [1],
+            asc2: message.history?.ascending2 || [1],
+            desc1: message.history?.descending1 || [100],
+            desc2: message.history?.descending2 || [100]
+        };
 
         if (message.gameState.gameStarted && message.yourCards) {
             updatePlayerCards(message.yourCards);
         }
 
         updateGameInfo();
-        console.log('Juego inicializado correctamente');
+        console.log('Juego inicializado con historial:', gameState.columnHistory);
     }
 
     // Notificaciones optimizadas
@@ -502,61 +514,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     }
 
-
-
     function showColumnHistory(columnId) {
-
         const modal = document.getElementById('historyModal');
-
         const backdrop = document.getElementById('modalBackdrop');
-
         const title = document.getElementById('historyColumnTitle');
-
         const container = document.getElementById('historyCardsContainer');
 
-
-
         const columnNames = {
-
             asc1: 'Pila Ascendente 1 (↑)',
-
             asc2: 'Pila Ascendente 2 (↑)',
-
             desc1: 'Pila Descendente 1 (↓)',
-
             desc2: 'Pila Descendente 2 (↓)'
-
         };
 
-
-
         title.textContent = columnNames[columnId];
-
         container.innerHTML = '';
 
-
+        // Asegurarse de que el historial existe
+        if (!gameState.columnHistory[columnId]) {
+            gameState.columnHistory[columnId] = columnId.includes('asc') ? [1] : [100];
+        }
 
         gameState.columnHistory[columnId].forEach((card, index) => {
-
             const cardElement = document.createElement('div');
-
             cardElement.className = `history-card ${index === gameState.columnHistory[columnId].length - 1 ? 'recent' : ''}`;
-
             cardElement.textContent = card;
-
             container.appendChild(cardElement);
-
         });
 
-
-
         modal.style.display = 'block';
-
         backdrop.style.display = 'block';
-
     }
-
-
 
     function closeHistoryModal() {
 
@@ -565,8 +553,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('modalBackdrop').style.display = 'none';
 
     }
-
-
 
     function isValidMove(cardValue, position) {
 

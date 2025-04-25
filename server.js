@@ -80,10 +80,22 @@ async function saveGameState(roomId) {
                 name: p.name,
                 cards: p.cards,
                 isHost: p.isHost,
-                cardsPlayedThisTurn: p.cardsPlayedThisTurn
+                cardsPlayedThisTurn: p.cardsPlayedThisTurn,
+                connected: p.ws !== null
             })),
-            gameState: room.gameState,
-            history: boardHistory.get(roomId)
+            gameState: {
+                deck: room.gameState.deck,
+                board: room.gameState.board,
+                currentTurn: room.gameState.currentTurn,
+                gameStarted: room.gameState.gameStarted,
+                initialCards: room.gameState.initialCards
+            },
+            history: boardHistory.get(roomId) || {
+                ascending1: [1],
+                ascending2: [1],
+                descending1: [100],
+                descending2: [100]
+            }
         };
 
         // Validar datos antes de guardar
@@ -101,7 +113,7 @@ async function saveGameState(roomId) {
                 last_activity = NOW()
         `, [roomId, JSON.stringify(gameData)]);
 
-        console.log(`💾 Estado del juego guardado para sala ${roomId}`);
+        console.log(`💾 Estado del juego guardado para sala ${roomId} (incluyendo historial)`);
     } catch (error) {
         console.error(`❌ Error al guardar estado para sala ${roomId}:`, error);
     }
@@ -109,7 +121,7 @@ async function saveGameState(roomId) {
 
 async function restoreActiveGames() {
     try {
-        console.log('⏳ Restaurando juegos activos...');
+        console.log('⏳ Restaurando juegos activos con historial...');
 
         const { rows } = await pool.query(`
             SELECT room_id, game_data::text, last_activity 
@@ -127,10 +139,22 @@ async function restoreActiveGames() {
                     continue;
                 }
 
+                // Asegurar que el historial existe
+                if (!gameData.history) {
+                    gameData.history = {
+                        ascending1: [1],
+                        ascending2: [1],
+                        descending1: [100],
+                        descending2: [100]
+                    };
+                }
+
                 const room = {
                     players: gameData.players?.map(p => ({
                         ...p,
                         ws: null,
+                        cards: p.cards || [],
+                        cardsPlayedThisTurn: p.cardsPlayedThisTurn || [],
                         lastActivity: Date.now()
                     })) || [],
                     gameState: gameData.gameState || {
@@ -144,12 +168,9 @@ async function restoreActiveGames() {
 
                 rooms.set(row.room_id, room);
                 reverseRoomMap.set(room, row.room_id);
-                boardHistory.set(row.room_id, gameData.history || {
-                    ascending1: [1], ascending2: [1],
-                    descending1: [100], descending2: [100]
-                });
+                boardHistory.set(row.room_id, gameData.history);
 
-                console.log(`✅ Sala ${row.room_id} restaurada`);
+                console.log(`✅ Sala ${row.room_id} restaurada con historial`, gameData.history);
             } catch (error) {
                 console.error(`❌ Error restaurando sala ${row.room_id}:`, error);
             }
@@ -215,7 +236,18 @@ function sendGameState(room, player) {
 
 function updateBoardHistory(room, position, newValue) {
     const roomId = reverseRoomMap.get(room);
-    const history = boardHistory.get(roomId);
+    if (!roomId) {
+        console.error('No se encontró roomId para la sala');
+        return;
+    }
+
+    const history = boardHistory.get(roomId) || {
+        ascending1: [1],
+        ascending2: [1],
+        descending1: [100],
+        descending2: [100]
+    };
+
     const historyKey = {
         'asc1': 'ascending1',
         'asc2': 'ascending2',
@@ -223,8 +255,26 @@ function updateBoardHistory(room, position, newValue) {
         'desc2': 'descending2'
     }[position];
 
+    if (!historyKey) {
+        console.error('Posición de historial no válida:', position);
+        return;
+    }
+
+    // Solo agregar si es diferente al último valor
     if (history[historyKey].slice(-1)[0] !== newValue) {
         history[historyKey].push(newValue);
+
+        // Limitar el historial a 100 entradas por columna
+        if (history[historyKey].length > 100) {
+            history[historyKey] = history[historyKey].slice(-100);
+        }
+
+        boardHistory.set(roomId, history);
+
+        // Guardar el estado de forma asíncrona sin esperar
+        saveGameState(roomId).catch(err =>
+            console.error('Error al guardar historial:', err)
+        );
     }
 }
 
@@ -283,6 +333,9 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
+    // Guardar el valor anterior para posible deshacer
+    const previousValue = targetValue;
+
     if (msg.position.includes('asc')) {
         board.ascending[targetIdx] = msg.cardValue;
     } else {
@@ -293,18 +346,22 @@ function handlePlayCard(room, player, msg) {
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
         position: msg.position,
-        isPlayedThisTurn: true
+        isPlayedThisTurn: true,
+        previousValue: previousValue
     });
+
+    // Actualizar historial
+    updateBoardHistory(room, msg.position, msg.cardValue);
 
     broadcastToRoom(room, {
         type: 'card_played',
         cardValue: msg.cardValue,
         position: msg.position,
         playerId: player.id,
-        playerName: player.name
+        playerName: player.name,
+        previousValue: previousValue
     });
 
-    updateBoardHistory(room, msg.position, msg.cardValue);
     broadcastGameState(room);
     checkGameStatus(room);
 }
