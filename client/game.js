@@ -634,61 +634,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     }
 
-
-
     function handleTurnChanged(message) {
-
         const currentPlayerObj = gameState.players.find(p => p.id === message.newTurn);
-
         let currentPlayerName;
 
-
-
         if (currentPlayerObj) {
-
             currentPlayerName = currentPlayerObj.id === currentPlayer.id ?
-
                 'Tu turno' :
-
                 `Turno de ${currentPlayerObj.name}`;
-
         } else {
-
             currentPlayerName = 'Esperando jugador...';
-
         }
-
-
-
-        // Verificar si es nuestro turno y si tenemos movimientos posibles
-
-        if (message.newTurn === currentPlayer.id) {
-
-            const playableCards = gameState.yourCards.filter(card => {
-
-                return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
-
-                    isValidMove(card.value, pos)
-
-                );
-
-            });
-
-        }
-
-
 
         showNotification(currentPlayerName);
-
         gameState.currentTurn = message.newTurn;
-
         resetCardsPlayedProgress();
-
         updateGameInfo();
 
+        // Opcional: Mostrar confirmación de guardado
+        if (currentPlayerObj.id === currentPlayer.id) {
+            showNotification('Partida guardada - ¡Es tu turno!');
+        }
     }
-
-
 
     function resetCardsPlayedProgress() {
 
