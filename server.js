@@ -27,10 +27,6 @@ const reverseRoomMap = new Map();
 const boardHistory = new Map();
 const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000;
 
-let saveEnabled = true;
-const MAX_CONSECUTIVE_ERRORS = 3;
-let consecutiveErrors = 0;
-
 app.use(compression());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client')));
@@ -45,33 +41,6 @@ app.use((req, res, next) => {
     if (req.method === 'OPTIONS') return res.status(200).end();
     next();
 });
-
-function checkSaveStatus() {
-    return {
-        saveEnabled,
-        consecutiveErrors,
-        maxErrors: MAX_CONSECUTIVE_ERRORS
-    };
-}
-
-// Función para reactivar el guardado (opcional)
-function enableSaving() {
-    if (!saveEnabled) {
-        saveEnabled = true;
-        consecutiveErrors = 0;
-        console.log('✅ Sistema de guardado reactivado');
-
-        // Notificar a todos los clientes
-        rooms.forEach(room => {
-            broadcastToRoom(room, {
-                type: 'notification',
-                message: 'El sistema de guardado ha sido reactivado',
-                isError: false
-            });
-        });
-    }
-    return saveEnabled;
-}
 
 async function initializeDatabase() {
     try {
@@ -101,13 +70,8 @@ async function initializeDatabase() {
 }
 
 async function saveGameState(roomId) {
-    if (!saveEnabled) {
-        console.log('🚫 Guardado desactivado debido a errores previos');
-        return false;
-    }
-
     const room = rooms.get(roomId);
-    if (!room) return false;
+    if (!room) return;
 
     try {
         const gameData = {
@@ -144,26 +108,10 @@ async function saveGameState(roomId) {
                 last_activity = NOW()
         `, [roomId, JSON.stringify(gameData)]);
 
-        consecutiveErrors = 0; // Resetear contador de errores
-        return true;
+        return true; // Indicar éxito
     } catch (error) {
         console.error(`❌ Error al guardar estado para sala ${roomId}:`, error);
-        consecutiveErrors++;
-
-        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-            saveEnabled = false;
-            console.error('🚫 Sistema de guardado desactivado por múltiples errores');
-
-            // Notificar a todos los clientes
-            rooms.forEach(room => {
-                broadcastToRoom(room, {
-                    type: 'notification',
-                    message: 'El sistema de guardado está temporalmente desactivado',
-                    isError: true
-                });
-            });
-        }
-        throw error;
+        throw error; // Propagar el error para manejo externo
     }
 }
 
@@ -511,19 +459,10 @@ async function endTurn(room, player) {
 
     // Guardar el estado al cambiar de turno
     try {
-        if (saveEnabled) {
-            await saveGameState(reverseRoomMap.get(room));
-            console.log(`💾 Estado guardado al iniciar turno de ${nextPlayer.name}`);
-        } else {
-            console.log('⚠️ Turno cambiado pero guardado desactivado');
-            broadcastToRoom(room, {
-                type: 'notification',
-                message: 'Advertencia: El progreso no se está guardando',
-                isError: true
-            });
-        }
+        await saveGameState(reverseRoomMap.get(room));
+        console.log(`💾 Estado guardado al iniciar turno de ${nextPlayer.name}`);
     } catch (error) {
-        console.error('Error en el proceso de cambio de turno:', error);
+        console.error('Error al guardar estado:', error);
     }
 
     broadcastToRoom(room, {
@@ -1178,23 +1117,6 @@ wss.on('connection', async (ws, req) => {
             }
         }
         saveGameState(roomId);
-    });
-
-    ws.on('error', (error) => {
-        console.error('Error en WebSocket:', error);
-        consecutiveErrors++;
-
-        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS && saveEnabled) {
-            saveEnabled = false;
-            console.error('🚫 Guardado desactivado por errores de WebSocket');
-
-            // Notificar a la sala específica
-            broadcastToRoom(room, {
-                type: 'notification',
-                message: 'Error crítico: El sistema de guardado está desactivado',
-                isError: true
-            });
-        }
     });
 });
 
