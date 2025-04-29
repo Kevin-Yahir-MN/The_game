@@ -1227,22 +1227,9 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.save();
             ctx.translate(baseX + 20 + offsetX, baseY + 20 + offsetY);
             ctx.rotate(rotation * Math.PI / 180);
-            ctx.drawImage(historyIcon, -20, -20, 40, 40);
-            ctx.restore();
 
-            // Dibujar sombra para efecto de profundidad
-            ctx.save();
-            ctx.globalAlpha = 0.3 * (1 - progress);
-            ctx.fillStyle = '#000';
-            ctx.beginPath();
-            ctx.ellipse(
-                baseX + 20 + offsetX,
-                baseY + 40 + offsetY * 0.3,
-                20 + 5 * progress,
-                5 + 2 * progress,
-                0, 0, Math.PI * 2
-            );
-            ctx.fill();
+            // Dibujar el icono SIN sombra
+            ctx.drawImage(historyIcon, -20, -20, 40, 40);
             ctx.restore();
         });
     }
