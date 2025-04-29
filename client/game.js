@@ -542,6 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     }
 
+    // Modificar la función showColumnHistory
     async function showColumnHistory(columnId) {
         const modal = document.getElementById('historyModal');
         const backdrop = document.getElementById('modalBackdrop');
@@ -556,39 +557,37 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         title.textContent = columnNames[columnId];
-        container.innerHTML = '<div class="loading-history">Cargando...</div>';
+        container.innerHTML = '<div class="loading-history">Cargando historial...</div>';
 
         modal.style.display = 'block';
         backdrop.style.display = 'block';
 
         try {
-            // Intentar obtener del estado local primero
+            // Obtener historial desde el estado del juego (que ahora persiste)
             let history = gameState.columnHistory[columnId];
 
-            // Si no existe o está vacío, solicitar al servidor
+            // Si no hay historial local, solicitarlo al servidor
             if (!history || history.length <= 1) {
                 socket.send(JSON.stringify({
-                    type: 'get_history',
-                    column: columnId,
-                    roomId: roomId,
-                    playerId: currentPlayer.id
+                    type: 'get_full_state',
+                    playerId: currentPlayer.id,
+                    roomId: roomId
                 }));
 
-                // Esperar breve momento para la respuesta
-                await new Promise(resolve => setTimeout(resolve, 300));
+                // Esperar respuesta (puedes mejorar esto con un sistema de promesas)
+                await new Promise(resolve => setTimeout(resolve, 500));
                 history = gameState.columnHistory[columnId] || [columnId.includes('asc') ? 1 : 100];
             }
 
-            // Mostrar el historial
+            // Mostrar el historial persistente
             container.innerHTML = '';
             history.forEach((card, index) => {
                 const cardElement = document.createElement('div');
                 cardElement.className = `history-card ${index === history.length - 1 ? 'recent' : ''}`;
                 cardElement.textContent = card;
 
-                // Resaltar diferencias con el valor actual
-                const currentValue = getCurrentColumnValue(columnId);
-                if (card === currentValue) {
+                // Resaltar la última carta jugada
+                if (index === history.length - 1) {
                     cardElement.style.border = '2px solid #2ecc71';
                     cardElement.style.fontWeight = 'bold';
                 }
@@ -596,9 +595,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 container.appendChild(cardElement);
             });
         } catch (error) {
-            console.error('Error al mostrar historial:', error);
+            console.error('Error al cargar historial:', error);
             container.innerHTML = '<div class="error-history">Error al cargar historial</div>';
         }
+    }
+
+    // Modificar handleFullStateUpdate para asegurar la carga del historial
+    function handleFullStateUpdate(message) {
+        if (!message.room || !message.gameState) return;
+
+        // Actualizar el historial primero
+        if (message.history) {
+            gameState.columnHistory = {
+                asc1: message.history.ascending1 || [1],
+                asc2: message.history.ascending2 || [1],
+                desc1: message.history.descending1 || [100],
+                desc2: message.history.descending2 || [100]
+            };
+        }
+
+        // Resto de actualizaciones de estado
+        gameState.board = message.gameState.board || gameState.board;
+        gameState.currentTurn = message.gameState.currentTurn || gameState.currentTurn;
+        gameState.remainingDeck = message.gameState.remainingDeck || gameState.remainingDeck;
+        gameState.initialCards = message.gameState.initialCards || gameState.initialCards;
+        gameState.players = message.room.players || gameState.players;
+
+        updateGameInfo();
     }
 
     // Función auxiliar para obtener valor actual de una columna

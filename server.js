@@ -69,6 +69,7 @@ async function initializeDatabase() {
     }
 }
 
+// Asegurar que el historial se guarde correctamente en la base de datos
 async function saveGameState(roomId) {
     const room = rooms.get(roomId);
     if (!room) return;
@@ -80,7 +81,6 @@ async function saveGameState(roomId) {
                 name: p.name,
                 cards: p.cards,
                 isHost: p.isHost,
-                cardsPlayedThisTurn: p.cardsPlayedThisTurn,
                 connected: p.ws !== null
             })),
             gameState: {
@@ -90,6 +90,7 @@ async function saveGameState(roomId) {
                 gameStarted: room.gameState.gameStarted,
                 initialCards: room.gameState.initialCards
             },
+            // Guardar el historial completo
             history: boardHistory.get(roomId) || {
                 ascending1: [1],
                 ascending2: [1],
@@ -108,12 +109,65 @@ async function saveGameState(roomId) {
                 last_activity = NOW()
         `, [roomId, JSON.stringify(gameData)]);
 
-        return true; // Indicar éxito
+        return true;
     } catch (error) {
-        console.error(`❌ Error al guardar estado para sala ${roomId}:`, error);
-        throw error; // Propagar el error para manejo externo
+        console.error(`Error al guardar estado para sala ${roomId}:`, error);
+        throw error;
     }
 }
+
+// Modificar la función de restaurar juegos
+async function restoreActiveGames() {
+    try {
+        const { rows } = await pool.query(`
+            SELECT room_id, game_data::jsonb FROM game_states 
+            WHERE last_activity > NOW() - INTERVAL '4 hours'
+        `);
+
+        for (const row of rows) {
+            try {
+                const gameData = row.game_data;
+                const roomId = row.room_id;
+
+                // Restaurar el historial desde la base de datos
+                if (gameData.history) {
+                    boardHistory.set(roomId, {
+                        ascending1: gameData.history.ascending1 || [1],
+                        ascending2: gameData.history.ascending2 || [1],
+                        descending1: gameData.history.descending1 || [100],
+                        descending2: gameData.history.descending2 || [100]
+                    });
+                }
+
+                // Resto de la lógica de restauración...
+                const room = {
+                    players: gameData.players?.map(p => ({
+                        ...p,
+                        ws: null,
+                        lastActivity: Date.now()
+                    })) || [],
+                    gameState: gameData.gameState || {
+                        deck: initializeDeck(),
+                        board: { ascending: [1, 1], descending: [100, 100] },
+                        currentTurn: null,
+                        gameStarted: false,
+                        initialCards: 6
+                    }
+                };
+
+                rooms.set(roomId, room);
+                reverseRoomMap.set(room, roomId);
+
+                console.log(`Sala ${roomId} restaurada con historial completo`);
+            } catch (error) {
+                console.error(`Error restaurando sala ${row.room_id}:`, error);
+            }
+        }
+    } catch (error) {
+        console.error('Error al restaurar juegos activos:', error);
+    }
+}
+
 async function restoreActiveGames() {
     try {
         console.log('⏳ Restaurando juegos activos con historial...');
@@ -904,13 +958,13 @@ wss.on('connection', async (ws, req) => {
                 name: p.name,
                 isHost: p.isHost,
                 cardCount: p.cards.length
-            })),
-            history: boardHistory.get(roomId) || {
-                ascending1: [1],
-                ascending2: [1],
-                descending1: [100],
-                descending2: [100]
-            }
+            }))
+        },
+        history: boardHistory.get(roomId) || {
+            ascending1: [1],
+            ascending2: [1],
+            descending1: [100],
+            descending2: [100]
         },
         isYourTurn: room.gameState.currentTurn === player.id
     };
