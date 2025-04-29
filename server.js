@@ -69,7 +69,6 @@ async function initializeDatabase() {
     }
 }
 
-// Asegurar que el historial se guarde correctamente en la base de datos
 async function saveGameState(roomId) {
     const room = rooms.get(roomId);
     if (!room) return;
@@ -90,7 +89,6 @@ async function saveGameState(roomId) {
                 gameStarted: room.gameState.gameStarted,
                 initialCards: room.gameState.initialCards
             },
-            // Guardar el historial completo
             history: boardHistory.get(roomId) || {
                 ascending1: [1],
                 ascending2: [1],
@@ -116,58 +114,6 @@ async function saveGameState(roomId) {
     }
 }
 
-// Modificar la función de restaurar juegos
-async function restoreActiveGames() {
-    try {
-        const { rows } = await pool.query(`
-            SELECT room_id, game_data::jsonb FROM game_states 
-            WHERE last_activity > NOW() - INTERVAL '4 hours'
-        `);
-
-        for (const row of rows) {
-            try {
-                const gameData = row.game_data;
-                const roomId = row.room_id;
-
-                // Restaurar el historial desde la base de datos
-                if (gameData.history) {
-                    boardHistory.set(roomId, {
-                        ascending1: gameData.history.ascending1 || [1],
-                        ascending2: gameData.history.ascending2 || [1],
-                        descending1: gameData.history.descending1 || [100],
-                        descending2: gameData.history.descending2 || [100]
-                    });
-                }
-
-                // Resto de la lógica de restauración...
-                const room = {
-                    players: gameData.players?.map(p => ({
-                        ...p,
-                        ws: null,
-                        lastActivity: Date.now()
-                    })) || [],
-                    gameState: gameData.gameState || {
-                        deck: initializeDeck(),
-                        board: { ascending: [1, 1], descending: [100, 100] },
-                        currentTurn: null,
-                        gameStarted: false,
-                        initialCards: 6
-                    }
-                };
-
-                rooms.set(roomId, room);
-                reverseRoomMap.set(room, roomId);
-
-                console.log(`Sala ${roomId} restaurada con historial completo`);
-            } catch (error) {
-                console.error(`Error restaurando sala ${row.room_id}:`, error);
-            }
-        }
-    } catch (error) {
-        console.error('Error al restaurar juegos activos:', error);
-    }
-}
-
 async function restoreActiveGames() {
     try {
         console.log('⏳ Restaurando juegos activos con historial...');
@@ -188,7 +134,6 @@ async function restoreActiveGames() {
                     continue;
                 }
 
-                // Asegurar que el historial existe
                 if (!gameData.history) {
                     gameData.history = {
                         ascending1: [1],
@@ -222,19 +167,21 @@ async function restoreActiveGames() {
                 console.log(`✅ Sala ${row.room_id} restaurada con historial`, gameData.history);
             } catch (error) {
                 console.error(`❌ Error restaurando sala ${row.room_id}:`, error);
+                await pool.query('DELETE FROM game_states WHERE room_id = $1', [row.room_id]);
             }
         }
     } catch (error) {
         console.error('Error al restaurar juegos activos:', error);
+        setTimeout(restoreActiveGames, 30000);
     }
 }
 
 async function cleanupOldGames() {
     try {
         await pool.query(`
-      DELETE FROM game_states 
-      WHERE last_activity < NOW() - INTERVAL '4 hours'
-    `);
+            DELETE FROM game_states 
+            WHERE last_activity < NOW() - INTERVAL '4 hours'
+        `);
     } catch (error) {
         console.error(error);
     }
@@ -366,7 +313,6 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
-    // Guardar el valor anterior para posible deshacer
     const previousValue = targetValue;
 
     if (msg.position.includes('asc')) {
@@ -383,7 +329,6 @@ function handlePlayCard(room, player, msg) {
         previousValue: previousValue
     });
 
-    // Actualizar historial
     updateBoardHistory(room, msg.position, msg.cardValue);
 
     broadcastToRoom(room, {
@@ -482,7 +427,6 @@ async function endTurn(room, player) {
     const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
 
     if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
-        // Guardar estado antes de terminar el juego
         await saveGameState(reverseRoomMap.get(room));
         return broadcastToRoom(room, {
             type: 'game_over',
@@ -494,7 +438,6 @@ async function endTurn(room, player) {
 
     player.cardsPlayedThisTurn = [];
 
-    // Guardar el estado al cambiar de turno
     try {
         await saveGameState(reverseRoomMap.get(room));
         console.log(`💾 Estado guardado al iniciar turno de ${nextPlayer.name}`);
@@ -546,18 +489,15 @@ function shuffleArray(array) {
     return array;
 }
 
-// Modificar la función create-room
 app.post('/create-room', async (req, res) => {
     const { playerName } = req.body;
 
-    // Primero crear la sala en game_states
     const roomId = Math.floor(1000 + Math.random() * 9000).toString();
     const playerId = uuidv4();
 
     try {
-        await pool.query('BEGIN'); // Iniciar transacción
+        await pool.query('BEGIN');
 
-        // 1. Insertar primero en game_states
         await pool.query(`
             INSERT INTO game_states 
             (room_id, game_data, last_activity)
@@ -577,16 +517,14 @@ app.post('/create-room', async (req, res) => {
             }
         })]);
 
-        // 2. Luego insertar en player_connections
         await pool.query(`
             INSERT INTO player_connections 
             (player_id, room_id, last_ping, connection_status)
             VALUES ($1, $2, NOW(), 'connected')
         `, [playerId, roomId]);
 
-        await pool.query('COMMIT'); // Confirmar transacción
+        await pool.query('COMMIT');
 
-        // Crear el objeto room después de confirmar la transacción
         const room = {
             players: [{
                 id: playerId,
@@ -625,7 +563,6 @@ app.post('/create-room', async (req, res) => {
 app.post('/join-room', async (req, res) => {
     const { playerName, roomId } = req.body;
 
-    // Validaciones básicas
     if (!playerName || !roomId) {
         return res.status(400).json({
             success: false,
@@ -634,9 +571,8 @@ app.post('/join-room', async (req, res) => {
     }
 
     try {
-        await pool.query('BEGIN'); // Iniciar transacción
+        await pool.query('BEGIN');
 
-        // 1. Verificar que la sala existe en game_states
         const roomCheck = await pool.query(
             'SELECT 1 FROM game_states WHERE room_id = $1',
             [roomId]
@@ -650,7 +586,6 @@ app.post('/join-room', async (req, res) => {
             });
         }
 
-        // 2. Verificar que la sala existe en memoria
         if (!rooms.has(roomId)) {
             await pool.query('ROLLBACK');
             return res.status(404).json({
@@ -662,7 +597,6 @@ app.post('/join-room', async (req, res) => {
         const room = rooms.get(roomId);
         const playerId = uuidv4();
 
-        // 3. Registrar la conexión en la base de datos
         await pool.query(`
             INSERT INTO player_connections 
             (player_id, room_id, last_ping, connection_status)
@@ -674,7 +608,6 @@ app.post('/join-room', async (req, res) => {
                 connection_status = 'connected'
         `, [playerId, roomId]);
 
-        // 4. Añadir jugador a la sala en memoria
         const newPlayer = {
             id: playerId,
             name: playerName,
@@ -686,12 +619,10 @@ app.post('/join-room', async (req, res) => {
         };
         room.players.push(newPlayer);
 
-        // 5. Actualizar game_states con el nuevo jugador
         await saveGameState(roomId);
 
-        await pool.query('COMMIT'); // Confirmar transacción
+        await pool.query('COMMIT');
 
-        // 6. Notificar a otros jugadores
         broadcastToRoom(room, {
             type: 'player_joined',
             playerId: playerId,
@@ -717,7 +648,7 @@ app.post('/join-room', async (req, res) => {
         await pool.query('ROLLBACK');
         console.error('Error al unirse a sala:', error);
 
-        if (error.code === '23503') { // Foreign key violation
+        if (error.code === '23503') {
             res.status(404).json({
                 success: false,
                 message: 'Sala no existe en la base de datos'
@@ -732,7 +663,6 @@ app.post('/join-room', async (req, res) => {
     }
 });
 
-// Nuevo endpoint para registro inicial
 app.post('/register-connection', async (req, res) => {
     try {
         const { playerId, roomId } = req.body;
@@ -805,7 +735,6 @@ async function startGame(room, initialCards = 6) {
     try {
         await pool.query('BEGIN');
 
-        // Actualizar game_states primero
         await pool.query(`
             UPDATE game_states
             SET game_data = $1,
@@ -821,7 +750,6 @@ async function startGame(room, initialCards = 6) {
             history: boardHistory.get(roomId)
         }), roomId]);
 
-        // Actualizar player_connections correctamente
         await Promise.all(room.players.map(player =>
             pool.query(`
                 INSERT INTO player_connections 
@@ -841,7 +769,6 @@ async function startGame(room, initialCards = 6) {
 
         await pool.query('COMMIT');
 
-        // Resto de la lógica de inicio del juego...
         room.gameState.gameStarted = true;
         room.gameState.initialCards = initialCards;
 
@@ -922,7 +849,6 @@ wss.on('connection', async (ws, req) => {
     if (!player) return ws.close(1008, 'Jugador no registrado');
 
     try {
-        // Actualizar player_connections al conectar
         await pool.query(`
             INSERT INTO player_connections 
             (player_id, room_id, last_ping, connection_status)
@@ -996,22 +922,20 @@ wss.on('connection', async (ws, req) => {
             }
 
             switch (msg.type) {
-                // En el handler de 'start_game'
                 case 'start_game':
                     if (player.isHost && !room.gameState.gameStarted) {
-                        // Registrar conexiones de todos los jugadores al iniciar
                         try {
                             await Promise.all(room.players.map(async (p) => {
                                 await pool.query(`
-                    INSERT INTO player_connections 
-                    (player_id, room_id, last_ping, connection_status)
-                    VALUES ($1, $2, NOW(), $3)
-                    ON CONFLICT (player_id) 
-                    DO UPDATE SET
-                        room_id = $2,
-                        last_ping = NOW(),
-                        connection_status = $3
-                `, [
+                                    INSERT INTO player_connections 
+                                    (player_id, room_id, last_ping, connection_status)
+                                    VALUES ($1, $2, NOW(), $3)
+                                    ON CONFLICT (player_id) 
+                                    DO UPDATE SET
+                                        room_id = $2,
+                                        last_ping = NOW(),
+                                        connection_status = $3
+                                `, [
                                     p.id,
                                     roomId,
                                     p.ws?.readyState === WebSocket.OPEN ? 'connected' : 'disconnected'
@@ -1031,7 +955,7 @@ wss.on('connection', async (ws, req) => {
                     break;
                 case 'end_turn':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        await endTurn(room, player); // Ahora es async
+                        await endTurn(room, player);
                     }
                     break;
                 case 'undo_move':
@@ -1056,12 +980,10 @@ wss.on('connection', async (ws, req) => {
                         }
                     }
                     break;
-                // En el handler de mensajes WebSocket
                 case 'reset_room':
                     if (player.isHost && rooms.has(msg.roomId)) {
                         const room = rooms.get(msg.roomId);
 
-                        // Reiniciar estado del juego
                         room.gameState = {
                             deck: initializeDeck(),
                             board: { ascending: [1, 1], descending: [100, 100] },
@@ -1070,7 +992,6 @@ wss.on('connection', async (ws, req) => {
                             initialCards: room.gameState.initialCards || 6
                         };
 
-                        // Reiniciar historial
                         boardHistory.set(msg.roomId, {
                             ascending1: [1],
                             ascending2: [1],
@@ -1078,13 +999,11 @@ wss.on('connection', async (ws, req) => {
                             descending2: [100]
                         });
 
-                        // Reiniciar jugadores
                         room.players.forEach(player => {
                             player.cards = [];
                             player.cardsPlayedThisTurn = [];
                         });
 
-                        // Guardar el estado reiniciado
                         await saveGameState(msg.roomId);
 
                         broadcastToRoom(room, {
@@ -1138,25 +1057,6 @@ wss.on('connection', async (ws, req) => {
                         }
                     }
                     break;
-                case 'ping':
-                    // Actualizar last_ping en la base de datos
-                    try {
-                        await pool.query(`
-            UPDATE player_connections
-            SET last_ping = NOW()
-            WHERE player_id = $1
-        `, [message.playerId]);
-
-                        // Responder con pong
-                        safeSend(ws, {
-                            type: 'pong',
-                            timestamp: message.timestamp,
-                            serverTime: Date.now()
-                        });
-                    } catch (error) {
-                        console.error('Error al procesar ping:', error);
-                    }
-                    break;
                 default:
                     console.log('Tipo de mensaje no reconocido:', msg.type);
             }
@@ -1168,7 +1068,6 @@ wss.on('connection', async (ws, req) => {
     ws.on('close', async () => {
         player.ws = null;
         try {
-            // Marcar como desconectado en la base de datos
             await pool.query(`
                 UPDATE player_connections
                 SET connection_status = 'disconnected'
