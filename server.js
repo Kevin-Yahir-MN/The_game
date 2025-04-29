@@ -114,7 +114,6 @@ async function saveGameState(roomId) {
         throw error; // Propagar el error para manejo externo
     }
 }
-
 async function restoreActiveGames() {
     try {
         console.log('⏳ Restaurando juegos activos con historial...');
@@ -848,13 +847,7 @@ const wss = new WebSocket.Server({
 initializeDatabase().then(() => {
     restoreActiveGames();
     setInterval(cleanupOldGames, 3600000);
-    /*
-    setInterval(() => {
-        rooms.forEach((_, roomId) => saveGameState(roomId));
-    }, 15000);
-    */
 });
-
 
 wss.on('connection', async (ws, req) => {
     const params = new URLSearchParams(req.url.split('?')[1]);
@@ -939,6 +932,7 @@ wss.on('connection', async (ws, req) => {
             }
 
             switch (msg.type) {
+                // En el handler de 'start_game'
                 case 'start_game':
                     if (player.isHost && !room.gameState.gameStarted) {
                         // Registrar conexiones de todos los jugadores al iniciar

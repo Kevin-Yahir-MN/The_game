@@ -634,6 +634,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     }
 
+
+
     function handleTurnChanged(message) {
         const currentPlayerObj = gameState.players.find(p => p.id === message.newTurn);
         let currentPlayerName;
@@ -656,6 +658,8 @@ document.addEventListener('DOMContentLoaded', () => {
             showNotification('Partida guardada - ¡Es tu turno!');
         }
     }
+
+
 
     function resetCardsPlayedProgress() {
 
