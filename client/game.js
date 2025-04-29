@@ -18,9 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const PLAYER_CARDS_Y = canvas.height * 0.6;
     const BUTTONS_Y = canvas.height * 0.85;
     const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
-    const HIGHLIGHT_COLOR = 'rgb(255, 0, 0)';
-    const VALID_HIGHLIGHT_COLOR = 'rgb(4, 0, 255)';
-    const INVALID_HIGHLIGHT_COLOR = 'rgb(255, 0, 0)';
+    const HIGHLIGHT_COLOR = 'rgb(143, 31, 31)';
+    const VALID_HIGHLIGHT_COLOR = 'rgb(37, 36, 151)';
+    const INVALID_HIGHLIGHT_COLOR = 'rgb(143, 31, 31)';
 
     const assetCache = new Map();
     let historyIcon = new Image();
