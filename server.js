@@ -231,10 +231,7 @@ function sendGameState(room, player) {
 
 function updateBoardHistory(room, position, newValue) {
     const roomId = reverseRoomMap.get(room);
-    if (!roomId) {
-        console.error('No se encontró roomId para la sala');
-        return;
-    }
+    if (!roomId) return;
 
     const history = boardHistory.get(roomId) || {
         ascending1: [1],
@@ -250,23 +247,10 @@ function updateBoardHistory(room, position, newValue) {
         'desc2': 'descending2'
     }[position];
 
-    if (!historyKey) {
-        console.error('Posición de historial no válida:', position);
-        return;
-    }
-
-    // Solo agregar si es diferente al último valor
     if (history[historyKey].slice(-1)[0] !== newValue) {
         history[historyKey].push(newValue);
 
-        // Limitar el historial a 100 entradas por columna
-        if (history[historyKey].length > 100) {
-            history[historyKey] = history[historyKey].slice(-100);
-        }
-
         boardHistory.set(roomId, history);
-
-        // Guardar el estado de forma asíncrona sin esperar
         saveGameState(roomId).catch(err =>
             console.error('Error al guardar historial:', err)
         );
@@ -740,6 +724,26 @@ app.get('/room-info/:roomId', async (req, res) => {
     });
 });
 
+app.get('/room-history/:roomId', async (req, res) => {
+    try {
+        const roomId = req.params.roomId;
+        const history = boardHistory.get(roomId) || {
+            ascending1: [1],
+            ascending2: [1],
+            descending1: [100],
+            descending2: [100]
+        };
+
+        res.json({
+            success: true,
+            history
+        });
+    } catch (error) {
+        console.error('Error al obtener historial:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 async function startGame(room, initialCards = 6) {
     const roomId = reverseRoomMap.get(room);
     if (!roomId) throw new Error('Room ID no encontrado');
@@ -900,7 +904,13 @@ wss.on('connection', async (ws, req) => {
                 name: p.name,
                 isHost: p.isHost,
                 cardCount: p.cards.length
-            }))
+            })),
+            history: boardHistory.get(roomId) || {
+                ascending1: [1],
+                ascending2: [1],
+                descending1: [100],
+                descending2: [100]
+            }
         },
         isYourTurn: room.gameState.currentTurn === player.id
     };

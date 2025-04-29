@@ -1030,3 +1030,47 @@ body {
     margin: 10px 0;
     animation: pulseError 0.5s infinite alternate;
 }
+
+/* Agregar estos estilos */
+.loading-history {
+    text-align: center;
+    padding: 20px;
+    color: #ecf0f1;
+    font-style: italic;
+}
+
+.error-history {
+    text-align: center;
+    padding: 20px;
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+.history-card {
+    /* Estilos existentes... */
+    transition: all 0.3s ease;
+}
+
+.history-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+}
+
+.history-card.recent {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}

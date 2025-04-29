@@ -272,6 +272,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'notification':
                         showNotification(message.message, message.isError);
                         break;
+                    case 'column_history':
+                        if (!gameState.columnHistory[message.column]) {
+                            gameState.columnHistory[message.column] = message.column.includes('asc') ? [1] : [100];
+                        }
+                        gameState.columnHistory[message.column] = message.history;
+                        break;
                     case 'card_played':
                         handleOpponentCardPlayed(message);
                         updateGameInfo();
@@ -404,6 +410,16 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.initialCards = message.gameState.initialCards || gameState.initialCards;
         gameState.players = message.room.players || gameState.players;
 
+        // Actualizar historial desde el servidor
+        if (message.history) {
+            gameState.columnHistory = {
+                asc1: message.history.ascending1 || [1],
+                asc2: message.history.ascending2 || [1],
+                desc1: message.history.descending1 || [100],
+                desc2: message.history.descending2 || [100]
+            };
+        }
+
         // Actualizar cartas del jugador si el juego ha comenzado
         if (message.gameState.gameStarted) {
             const currentPlayerData = message.room.players.find(p => p.id === currentPlayer.id);
@@ -412,21 +428,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Actualizar historial con valores por defecto si no existen
-        gameState.columnHistory = {
-            asc1: message.history?.ascending1 || [1],
-            asc2: message.history?.ascending2 || [1],
-            desc1: message.history?.descending1 || [100],
-            desc2: message.history?.descending2 || [100]
-        };
-
-        // Notificar si hay un historial cargado
-        if (message.history) {
-            console.log('Historial de cartas cargado:', message.history);
-        }
-
         updateGameInfo();
     }
+
 
     function handleInitGame(message) {
         gameState.currentTurn = message.gameState.currentTurn;
@@ -448,6 +452,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateGameInfo();
         console.log('Juego inicializado con historial:', gameState.columnHistory);
+    }
+
+    async function fetchColumnHistory(columnId) {
+        try {
+            const response = await fetch(`${API_URL}/room-history/${roomId}`);
+            if (!response.ok) throw new Error('Error al obtener historial');
+
+            const data = await response.json();
+            if (!data.success) throw new Error(data.error || 'Error en los datos');
+
+            // Mapear los nombres de columnas internos a los del servidor
+            const historyMap = {
+                'asc1': 'ascending1',
+                'asc2': 'ascending2',
+                'desc1': 'descending1',
+                'desc2': 'descending2'
+            };
+
+            return data.history[historyMap[columnId]] || [columnId.includes('asc') ? 1 : 100];
+        } catch (error) {
+            console.error('Error fetching history:', error);
+            showNotification('Error al cargar historial', true);
+            return [columnId.includes('asc') ? 1 : 100]; // Valor por defecto
+        }
     }
 
     // Notificaciones optimizadas
@@ -514,7 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     }
 
-    function showColumnHistory(columnId) {
+    async function showColumnHistory(columnId) {
         const modal = document.getElementById('historyModal');
         const backdrop = document.getElementById('modalBackdrop');
         const title = document.getElementById('historyColumnTitle');
@@ -528,22 +556,58 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         title.textContent = columnNames[columnId];
-        container.innerHTML = '';
-
-        // Asegurarse de que el historial existe
-        if (!gameState.columnHistory[columnId]) {
-            gameState.columnHistory[columnId] = columnId.includes('asc') ? [1] : [100];
-        }
-
-        gameState.columnHistory[columnId].forEach((card, index) => {
-            const cardElement = document.createElement('div');
-            cardElement.className = `history-card ${index === gameState.columnHistory[columnId].length - 1 ? 'recent' : ''}`;
-            cardElement.textContent = card;
-            container.appendChild(cardElement);
-        });
+        container.innerHTML = '<div class="loading-history">Cargando...</div>';
 
         modal.style.display = 'block';
         backdrop.style.display = 'block';
+
+        try {
+            // Intentar obtener del estado local primero
+            let history = gameState.columnHistory[columnId];
+
+            // Si no existe o está vacío, solicitar al servidor
+            if (!history || history.length <= 1) {
+                socket.send(JSON.stringify({
+                    type: 'get_history',
+                    column: columnId,
+                    roomId: roomId,
+                    playerId: currentPlayer.id
+                }));
+
+                // Esperar breve momento para la respuesta
+                await new Promise(resolve => setTimeout(resolve, 300));
+                history = gameState.columnHistory[columnId] || [columnId.includes('asc') ? 1 : 100];
+            }
+
+            // Mostrar el historial
+            container.innerHTML = '';
+            history.forEach((card, index) => {
+                const cardElement = document.createElement('div');
+                cardElement.className = `history-card ${index === history.length - 1 ? 'recent' : ''}`;
+                cardElement.textContent = card;
+
+                // Resaltar diferencias con el valor actual
+                const currentValue = getCurrentColumnValue(columnId);
+                if (card === currentValue) {
+                    cardElement.style.border = '2px solid #2ecc71';
+                    cardElement.style.fontWeight = 'bold';
+                }
+
+                container.appendChild(cardElement);
+            });
+        } catch (error) {
+            console.error('Error al mostrar historial:', error);
+            container.innerHTML = '<div class="error-history">Error al cargar historial</div>';
+        }
+    }
+
+    // Función auxiliar para obtener valor actual de una columna
+    function getCurrentColumnValue(columnId) {
+        if (columnId === 'asc1') return gameState.board.ascending[0];
+        if (columnId === 'asc2') return gameState.board.ascending[1];
+        if (columnId === 'desc1') return gameState.board.descending[0];
+        if (columnId === 'desc2') return gameState.board.descending[1];
+        return columnId.includes('asc') ? 1 : 100;
     }
 
     function closeHistoryModal() {
@@ -865,81 +929,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
     }
 
-
-
     function handleOpponentCardPlayed(message) {
-
         if (message.playerId !== currentPlayer.id) {
-
             const position = message.position;
-
             const value = message.cardValue;
 
-
-
+            // Actualizar el tablero
             if (position.includes('asc')) {
-
                 const idx = position === 'asc1' ? 0 : 1;
-
                 gameState.board.ascending[idx] = value;
-
             } else {
-
                 const idx = position === 'desc1' ? 0 : 1;
-
                 gameState.board.descending[idx] = value;
-
             }
 
+            // Actualizar historial local
+            if (!gameState.columnHistory[position]) {
+                gameState.columnHistory[position] = position.includes('asc') ? [1] : [100];
+            }
+            gameState.columnHistory[position].push(value);
 
-
+            // Animación de carta oponente
             const cardPosition = getColumnPosition(position);
-
             const opponentCard = new Card(value, cardPosition.x, cardPosition.y, false, true);
 
-
-
             gameState.animatingCards.push({
-
                 card: opponentCard,
-
                 startTime: Date.now(),
-
                 duration: 200,
-
                 targetX: cardPosition.x,
-
                 targetY: cardPosition.y,
-
                 fromX: cardPosition.x,
-
                 fromY: -CARD_HEIGHT
-
             });
 
-
-
+            // Registrar jugada en el turno actual
             gameState.cardsPlayedThisTurn.push({
-
                 value: message.cardValue,
-
                 position: message.position,
-
                 playerId: message.playerId,
-
                 isPlayedThisTurn: true
-
             });
 
-
-
-            gameState.columnHistory[message.position].push(message.cardValue);
-
+            // Notificación
             showNotification(`${message.playerName} jugó un ${value}`);
 
+            // Actualizar UI
+            updateGameInfo();
         }
-
     }
+
 
 
 
