@@ -1052,6 +1052,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Verificar si esta carta bloqueará al jugador
+        if (willCardBlockPlayer(cardValue, position)) {
+            const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+
+            if (gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length < minCardsRequired) {
+                showNotification(`No puedes jugar esta carta. Debes jugar al menos ${minCardsRequired} cartas este turno esa acción te dejará sin jugadas, pendejo.`, true);
+                animateInvalidCard(selectedCard);
+                return;
+            }
+        }
+
         const previousValue = position.includes('asc')
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
@@ -1101,6 +1112,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
         selectedCard = null;
         updateGameInfo();
+    }
+
+    // game.js - Agregar esta función en la sección de funciones de utilidad
+    function willCardBlockPlayer(cardValue, position) {
+        // Hacer una copia temporal del estado del juego
+        const tempBoard = JSON.parse(JSON.stringify(gameState.board));
+        const tempPlayerCards = [...gameState.yourCards].filter(c => c.value !== cardValue);
+
+        // Aplicar el movimiento temporal
+        if (position.includes('asc')) {
+            const idx = position === 'asc1' ? 0 : 1;
+            tempBoard.ascending[idx] = cardValue;
+        } else {
+            const idx = position === 'desc1' ? 0 : 1;
+            tempBoard.descending[idx] = cardValue;
+        }
+
+        // Verificar si quedan movimientos posibles
+        const hasOtherMoves = tempPlayerCards.some(card => {
+            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+                const posValue = pos.includes('asc')
+                    ? tempBoard[pos === 'asc1' ? 0 : 1]
+                    : tempBoard[pos === 'desc1' ? 0 : 1];
+
+                return pos.includes('asc')
+                    ? (card.value > posValue || card.value === posValue - 10)
+                    : (card.value < posValue || card.value === posValue + 10);
+            });
+        });
+
+        return !hasOtherMoves;
     }
 
     function endTurn() {

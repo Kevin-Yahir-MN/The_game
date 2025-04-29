@@ -278,6 +278,34 @@ function getPlayableCards(playerCards, board) {
 }
 
 function handlePlayCard(room, player, msg) {
+    // Nueva validación de cartas jugadas
+    const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+    if (player.cardsPlayedThisTurn.length >= minCardsRequired) {
+        const remainingCards = player.cards.filter(c => c !== msg.cardValue);
+        const hasOtherMoves = remainingCards.some(card => {
+            return validPositions.some(pos => {
+                const targetIdx = pos.includes('asc') ?
+                    (pos === 'asc1' ? 0 : 1) :
+                    (pos === 'desc1' ? 0 : 1);
+                const targetValue = pos.includes('asc') ?
+                    room.gameState.board.ascending[targetIdx] :
+                    room.gameState.board.descending[targetIdx];
+
+                return pos.includes('asc') ?
+                    (card > targetValue || card === targetValue - 10) :
+                    (card < targetValue || card === targetValue + 10);
+            });
+        });
+
+        if (!hasOtherMoves) {
+            return safeSend(player.ws, {
+                type: 'notification',
+                message: `No puedes jugar esta carta. Debes jugar al menos ${minCardsRequired} cartas este turno.`,
+                isError: true
+            });
+        }
+    }
+
     if (!validPositions.includes(msg.position)) {
         return safeSend(player.ws, {
             type: 'notification',
