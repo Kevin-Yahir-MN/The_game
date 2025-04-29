@@ -296,6 +296,24 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateGameInfo();
                         break;
                     case 'room_reset':
+                        gameState = {
+                            players: message.players || [],
+                            board: { ascending: [1, 1], descending: [100, 100] },
+                            currentTurn: null,
+                            yourCards: [],
+                            remainingDeck: 98,
+                            initialCards: 6,
+                            cardsPlayedThisTurn: [],
+                            animatingCards: [],
+                            // Reiniciar historial
+                            columnHistory: {
+                                asc1: [1],
+                                asc2: [1],
+                                desc1: [100],
+                                desc2: [100]
+                            }
+                        };
+                        updateGameInfo();
                         break;
                     case 'player_update':
                         if (message.players) {
@@ -820,60 +838,130 @@ document.addEventListener('DOMContentLoaded', () => {
 
     }
 
-
-
     function handleGameOver(message) {
-
+        // Deshabilitar interacciones con el canvas
         canvas.style.pointerEvents = 'none';
-
         endTurnButton.disabled = true;
 
-
-
+        // Crear elementos del overlay de Game Over
         const backdrop = document.createElement('div');
-
         backdrop.className = 'game-over-backdrop';
 
-
-
         const gameOverDiv = document.createElement('div');
-
         gameOverDiv.className = 'game-over-notification';
-
         gameOverDiv.innerHTML = `
-
             <h2>¡GAME OVER!</h2>
-
             <p>${message}</p>
-
-            <button id="returnToRoom">Volver a la Sala</button>
-
+            <div class="game-over-buttons">
+                <button id="returnToRoom" class="game-over-btn">Volver a la Sala</button>
+                <button id="newGame" class="game-over-btn">Nueva Partida</button>
+            </div>
         `;
 
-
-
+        // Añadir elementos al DOM
         document.body.appendChild(backdrop);
-
         backdrop.appendChild(gameOverDiv);
 
+        // Animación de entrada
+        setTimeout(() => {
+            backdrop.style.opacity = '1';
+            gameOverDiv.style.transform = 'translateY(0)';
+        }, 10);
 
+        // Handler para botón "Volver a la Sala"
+        document.getElementById('returnToRoom').addEventListener('click', async () => {
+            try {
+                // Mostrar carga
+                const buttons = document.querySelectorAll('.game-over-btn');
+                buttons.forEach(btn => btn.disabled = true);
+                document.getElementById('returnToRoom').textContent = 'Cargando...';
 
-        document.getElementById('returnToRoom').addEventListener('click', () => {
+                // Reiniciar el historial local inmediatamente
+                gameState.columnHistory = {
+                    asc1: [1],
+                    asc2: [1],
+                    desc1: [100],
+                    desc2: [100]
+                };
 
-            socket.send(JSON.stringify({
+                // Enviar comando de reinicio al servidor
+                socket.send(JSON.stringify({
+                    type: 'reset_room',
+                    roomId: roomId,
+                    playerId: currentPlayer.id,
+                    resetHistory: true  // Flag para reiniciar historial
+                }));
 
-                type: 'reset_room',
+                // Esperar breve momento para que el servidor procese
+                await new Promise(resolve => setTimeout(resolve, 500));
 
-                roomId: roomId,
+                // Redirigir a la sala
+                window.location.href = 'sala.html';
 
-                playerId: currentPlayer.id
+            } catch (error) {
+                console.error('Error al volver a la sala:', error);
+                showNotification('Error al reiniciar la sala', true);
 
-            }));
-
-            window.location.href = 'sala.html';
-
+                // Restaurar botones
+                const buttons = document.querySelectorAll('.game-over-btn');
+                buttons.forEach(btn => btn.disabled = false);
+                document.getElementById('returnToRoom').textContent = 'Volver a la Sala';
+            }
         });
 
+        // Handler para botón "Nueva Partida" (opcional)
+        document.getElementById('newGame').addEventListener('click', async () => {
+            try {
+                // Mostrar carga
+                const buttons = document.querySelectorAll('.game-over-btn');
+                buttons.forEach(btn => btn.disabled = true);
+                document.getElementById('newGame').textContent = 'Preparando...';
+
+                // Reiniciar estado local
+                gameState = {
+                    players: gameState.players,
+                    board: { ascending: [1, 1], descending: [100, 100] },
+                    currentTurn: null,
+                    yourCards: [],
+                    remainingDeck: 98,
+                    initialCards: gameState.initialCards || 6,
+                    cardsPlayedThisTurn: [],
+                    animatingCards: [],
+                    columnHistory: {  // Historial reiniciado
+                        asc1: [1],
+                        asc2: [1],
+                        desc1: [100],
+                        desc2: [100]
+                    }
+                };
+
+                // Solicitar nueva partida al host
+                if (currentPlayer.isHost) {
+                    socket.send(JSON.stringify({
+                        type: 'start_game',
+                        playerId: currentPlayer.id,
+                        roomId: roomId,
+                        initialCards: gameState.initialCards
+                    }));
+                } else {
+                    showNotification('Esperando al host para nueva partida...');
+                }
+
+            } catch (error) {
+                console.error('Error al iniciar nueva partida:', error);
+                showNotification('Error al comenzar nueva partida', true);
+
+                // Restaurar botones
+                const buttons = document.querySelectorAll('.game-over-btn');
+                buttons.forEach(btn => btn.disabled = false);
+                document.getElementById('newGame').textContent = 'Nueva Partida';
+            }
+        });
+
+        // Limpiar el estado de las cartas seleccionadas
+        selectedCard = null;
+        isDragging = false;
+        dragStartCard = null;
     }
 
 

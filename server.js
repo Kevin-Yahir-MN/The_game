@@ -1056,9 +1056,12 @@ wss.on('connection', async (ws, req) => {
                         }
                     }
                     break;
+                // En el handler de mensajes WebSocket
                 case 'reset_room':
                     if (player.isHost && rooms.has(msg.roomId)) {
                         const room = rooms.get(msg.roomId);
+
+                        // Reiniciar estado del juego
                         room.gameState = {
                             deck: initializeDeck(),
                             board: { ascending: [1, 1], descending: [100, 100] },
@@ -1066,10 +1069,24 @@ wss.on('connection', async (ws, req) => {
                             gameStarted: false,
                             initialCards: room.gameState.initialCards || 6
                         };
+
+                        // Reiniciar historial
+                        boardHistory.set(msg.roomId, {
+                            ascending1: [1],
+                            ascending2: [1],
+                            descending1: [100],
+                            descending2: [100]
+                        });
+
+                        // Reiniciar jugadores
                         room.players.forEach(player => {
                             player.cards = [];
                             player.cardsPlayedThisTurn = [];
                         });
+
+                        // Guardar el estado reiniciado
+                        await saveGameState(msg.roomId);
+
                         broadcastToRoom(room, {
                             type: 'room_reset',
                             message: 'La sala ha sido reiniciada para una nueva partida'
