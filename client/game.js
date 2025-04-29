@@ -2051,22 +2051,6 @@ document.addEventListener('DOMContentLoaded', () => {
             gameLoop();
         });
     }
-    // Manejo mejorado de errores de conexión (sin cambiar lógica existente)
-    const originalOnError = WebSocket.prototype.onerror;
-    WebSocket.prototype.onerror = function (error) {
-        showNotification('Problema de conexión con el servidor', true);
-        if (originalOnError) originalOnError.call(this, error);
-    };
-
-    // Mostrar notificaciones del sistema
-    socket.addEventListener('message', (event) => {
-        try {
-            const msg = JSON.parse(event.data);
-            if (msg.type === 'notification' && msg.message.includes('guardado')) {
-                showNotification(msg.message, msg.isError);
-            }
-        } catch (e) { console.error('Error procesando mensaje:', e); }
-    });
 
     initGame();
 });
