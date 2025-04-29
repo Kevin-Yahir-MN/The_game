@@ -36,6 +36,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragStartY = 0;
     let isDragging = false;
 
+    let historyIconsAnimation = {
+        interval: null,
+        isAnimating: false,
+        animationDuration: 10000, // 10 segundos por ciclo completo
+        lastAnimationTime: 0
+    };
+
     // Datos del jugador
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
@@ -471,6 +478,26 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGameInfo();
         console.log('Juego inicializado con historial:', gameState.columnHistory);
     }
+
+    function startHistoryIconsAnimation() {
+        if (historyIconsAnimation.interval) {
+            clearInterval(historyIconsAnimation.interval);
+        }
+
+        historyIconsAnimation.interval = setInterval(() => {
+            historyIconsAnimation.isAnimating = true;
+            historyIconsAnimation.lastAnimationTime = Date.now();
+
+            // La animación real ocurre en drawHistoryIcons()
+            // Forzar redibujado
+            requestAnimationFrame(gameLoop);
+
+            setTimeout(() => {
+                historyIconsAnimation.isAnimating = false;
+            }, 1000); // Duración del movimiento (1 segundo)
+        }, 5000); // Cada 5 segundos
+    }
+
 
     async function fetchColumnHistory(columnId) {
         try {
@@ -1161,33 +1188,64 @@ document.addEventListener('DOMContentLoaded', () => {
 
     }
 
-
-
     function drawHistoryIcons() {
+        if (!historyIcon.complete || historyIcon.naturalWidth === 0) return;
 
-        if (!historyIcon.complete || historyIcon.naturalWidth === 0) {
+        const now = Date.now();
+        const progress = historyIconsAnimation.isAnimating ?
+            Math.min(1, (now - historyIconsAnimation.lastAnimationTime) / 1000) : 0;
 
-            return;
-
-        }
-
-
+        // Easing function para suavizar la animación
+        const easeOutBounce = (t) => {
+            if (t < 1 / 2.75) {
+                return 7.5625 * t * t;
+            } else if (t < 2 / 2.75) {
+                return 7.5625 * (t -= 1.5 / 2.75) * t + 0.75;
+            } else if (t < 2.5 / 2.75) {
+                return 7.5625 * (t -= 2.25 / 2.75) * t + 0.9375;
+            } else {
+                return 7.5625 * (t -= 2.625 / 2.75) * t + 0.984375;
+            }
+        };
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
+            const baseX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
+            const baseY = HISTORY_ICON_Y;
 
-            const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
+            // Calcular posición animada
+            let offsetX = 0;
+            let offsetY = 0;
+            let rotation = 0;
 
-            const y = HISTORY_ICON_Y;
+            if (historyIconsAnimation.isAnimating) {
+                const easedProgress = easeOutBounce(progress);
+                offsetY = -15 * Math.sin(easedProgress * Math.PI);
+                offsetX = 5 * Math.sin(easedProgress * Math.PI * 2);
+                rotation = 15 * Math.sin(easedProgress * Math.PI);
+            }
 
+            ctx.save();
+            ctx.translate(baseX + 20 + offsetX, baseY + 20 + offsetY);
+            ctx.rotate(rotation * Math.PI / 180);
+            ctx.drawImage(historyIcon, -20, -20, 40, 40);
+            ctx.restore();
 
-
-            ctx.drawImage(historyIcon, x, y, 40, 40);
-
+            // Dibujar sombra para efecto de profundidad
+            ctx.save();
+            ctx.globalAlpha = 0.3 * (1 - progress);
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.ellipse(
+                baseX + 20 + offsetX,
+                baseY + 40 + offsetY * 0.3,
+                20 + 5 * progress,
+                5 + 2 * progress,
+                0, 0, Math.PI * 2
+            );
+            ctx.fill();
+            ctx.restore();
         });
-
     }
-
-
 
     // Manejadores de eventos para drag and drop
 
@@ -2124,45 +2182,69 @@ document.addEventListener('DOMContentLoaded', () => {
     // Limpieza al salir
 
     function cleanup() {
+        // Lista de todas las operaciones de limpieza
+        const cleanupTasks = [
+            () => { // Animación de iconos
+                clearInterval(historyIconsAnimation.interval);
+                historyIconsAnimation.interval = null;
+                historyIconsAnimation.isAnimating = false;
+            },
+            () => { // WebSocket
+                if (socket) {
+                    socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null;
+                    if (socket.readyState === WebSocket.OPEN) {
+                        socket.close(1000, 'Juego terminado');
+                    }
+                    socket = null;
+                }
+            },
+            () => { // Intervalos y timeouts
+                clearInterval(playerUpdateInterval);
+                clearTimeout(reconnectTimeout);
+                cancelAnimationFrame(animationFrameId);
+            },
+            () => { // Event listeners del canvas
+                const events = {
+                    click: handleCanvasClick,
+                    mousedown: handleMouseDown,
+                    mousemove: handleMouseMove,
+                    mouseup: handleMouseUp,
+                    mouseleave: handleMouseUp,
+                    touchstart: handleTouchStart,
+                    touchmove: handleTouchMove,
+                    touchend: handleTouchEnd
+                };
 
-        if (socket) {
-
-            socket.onopen = null;
-
-            socket.onmessage = null;
-
-            socket.onclose = null;
-
-            socket.onerror = null;
-
-            if (socket.readyState === WebSocket.OPEN) {
-
-                socket.close();
-
+                Object.entries(events).forEach(([event, handler]) => {
+                    canvas.removeEventListener(event, handler);
+                });
+            },
+            () => { // UI elements
+                document.getElementById('endTurnBtn')?.removeEventListener('click', endTurn);
+                document.getElementById('modalBackdrop')?.removeEventListener('click', closeHistoryModal);
+            },
+            () => { // Limpieza DOM
+                document.querySelectorAll('.notification, .game-over-backdrop').forEach(el => el.remove());
+            },
+            () => { // Estado del juego
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                gameState.animatingCards = [];
+                assetCache.clear();
             }
+        ];
 
+        // Ejecutar todas las tareas con manejo de errores
+        cleanupTasks.forEach(task => {
+            try {
+                task();
+            } catch (error) {
+                console.warn('Error durante limpieza:', error);
+            }
+        });
+
+        if (DEBUG_MODE) {
+            console.log('Cleanup completado - Recursos liberados');
         }
-
-
-
-        canvas.removeEventListener('click', handleCanvasClick);
-
-        canvas.removeEventListener('mousedown', handleMouseDown);
-
-        canvas.removeEventListener('mousemove', handleMouseMove);
-
-        canvas.removeEventListener('mouseup', handleMouseUp);
-
-        canvas.removeEventListener('mouseleave', handleMouseUp);
-
-        canvas.removeEventListener('touchstart', handleTouchStart);
-
-        canvas.removeEventListener('touchmove', handleTouchMove);
-
-        canvas.removeEventListener('touchend', handleTouchEnd);
-
-        endTurnButton.removeEventListener('click', endTurn);
-
     }
 
 
@@ -2201,6 +2283,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
             }
 
+            startHistoryIconsAnimation();
             connectWebSocket();
             gameLoop();
         });
