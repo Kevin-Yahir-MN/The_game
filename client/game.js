@@ -377,6 +377,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (message.gameState.gameStarted && message.yourCards) {
             updatePlayerCards(message.yourCards);
+            // Verificar validez al iniciar juego
+            setTimeout(() => {
+                checkTurnStartValidity();
+            }, 1000);
         }
 
         updateGameInfo();
@@ -525,24 +529,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleTurnChanged(message) {
-        const currentPlayerObj = gameState.players.find(p => p.id === message.newTurn);
-        let currentPlayerName;
-
-        if (currentPlayerObj) {
-            currentPlayerName = currentPlayerObj.id === currentPlayer.id ?
-                'Tu turno' :
-                `Turno de ${currentPlayerObj.name}`;
-        } else {
-            currentPlayerName = 'Esperando jugador...';
-        }
-
-        showNotification(currentPlayerName);
         gameState.currentTurn = message.newTurn;
         resetCardsPlayedProgress();
         updateGameInfo();
 
-        if (currentPlayerObj.id === currentPlayer.id) {
-            showNotification('Partida guardada - ¡Es tu turno!');
+        if (message.newTurn === currentPlayer.id) {
+            showNotification('¡Es tu turno!', false);
+            // Verificar movimientos posibles al inicio del turno
+            setTimeout(() => {
+                checkTurnStartValidity();
+            }, 500);
+        }
+    }
+
+    function checkTurnStartValidity() {
+        if (gameState.currentTurn === currentPlayer.id) {
+            const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+            const playableCardsCount = gameState.yourCards.reduce((count, card) => {
+                return count + (['asc1', 'asc2', 'desc1', 'desc2'].some(pos =>
+                    isValidMove(card.value, pos)) ? 1 : 0);
+            }, 0);
+
+            if (playableCardsCount < minCardsRequired && gameState.yourCards.length > 0) {
+                socket.send(JSON.stringify({
+                    type: 'no_valid_moves',
+                    playerId: currentPlayer.id,
+                    roomId: roomId,
+                    message: `No tienes suficientes movimientos válidos`
+                }));
+            }
         }
     }
 
@@ -697,14 +712,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 isHost: player.h,
                 cardsPlayedThisTurn: player.s || 0
             }));
-
-            if (!currentPlayer.name && currentPlayer.id) {
-                const player = gameState.players.find(p => p.id === currentPlayer.id);
-                if (player) {
-                    currentPlayer.name = player.name;
-                    sessionStorage.setItem('playerName', player.name);
-                }
-            }
         }
 
         gameState.board = newState.b || gameState.board;
@@ -714,11 +721,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (newState.y) {
             updatePlayerCards(newState.y);
+            // Verificar validez al recibir nuevo estado
+            checkTurnStartValidity();
         }
 
-        if (gameState.currentTurn !== currentPlayer.id) {
-            selectedCard = null;
-        }
+        updateGameInfo();
     }
 
     function handleOpponentCardPlayed(message) {
@@ -769,6 +776,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
         const startY = PLAYER_CARDS_Y;
 
+        let playableCount = 0;
         gameState.yourCards = cards.map((card, index) => {
             const value = card instanceof Card ? card.value : card;
             let isPlayable = false;
@@ -779,13 +787,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         ? gameState.board.ascending[pos === 'asc1' ? 0 : 1]
                         : gameState.board.descending[pos === 'desc1' ? 0 : 1];
 
-                    const valid = pos.includes('asc')
+                    if (pos.includes('asc')
                         ? (value > targetValue || value === targetValue - 10)
-                        : (value < targetValue || value === targetValue + 10);
-
-                    if (valid) isPlayable = true;
+                        : (value < targetValue || value === targetValue + 10)) {
+                        isPlayable = true;
+                    }
                 });
             }
+
+            if (isPlayable) playableCount++;
 
             const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
                 move => move.value === value && move.playerId === currentPlayer.id
@@ -808,6 +818,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 );
             }
         });
+
+        // Verificación adicional para casos extremos
+        if (isYourTurn && playableCount === 0 && gameState.yourCards.length > 0) {
+            checkTurnStartValidity();
+        }
     }
 
     function drawHistoryIcons() {

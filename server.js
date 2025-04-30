@@ -202,7 +202,14 @@ function broadcastToRoom(room, message, options = {}) {
     room.players.forEach(player => {
         if (player.id !== skipPlayerId && player.ws?.readyState === WebSocket.OPEN) {
             safeSend(player.ws, message);
-            if (includeGameState) sendGameState(room, player);
+            if (includeGameState) {
+                // Forzar verificación de movimientos al enviar estado
+                setTimeout(() => {
+                    safeSend(player.ws, JSON.stringify({
+                        type: 'force_check_validity'
+                    }));
+                }, 100);
+            }
         }
     });
 }
@@ -958,6 +965,9 @@ wss.on('connection', async (ws, req) => {
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                         await endTurn(room, player);
                     }
+                    break;
+                case 'force_check_validity':
+                    checkTurnStartValidity();
                     break;
                 case 'undo_move':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
