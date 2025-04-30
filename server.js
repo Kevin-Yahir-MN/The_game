@@ -202,14 +202,7 @@ function broadcastToRoom(room, message, options = {}) {
     room.players.forEach(player => {
         if (player.id !== skipPlayerId && player.ws?.readyState === WebSocket.OPEN) {
             safeSend(player.ws, message);
-            if (includeGameState) {
-                // Forzar verificación de movimientos al enviar estado
-                setTimeout(() => {
-                    safeSend(player.ws, JSON.stringify({
-                        type: 'force_check_validity'
-                    }));
-                }, 100);
-            }
+            if (includeGameState) sendGameState(room, player);
         }
     });
 }
@@ -430,6 +423,19 @@ async function endTurn(room, player) {
     const nextPlayer = room.players[nextIndex];
     room.gameState.currentTurn = nextPlayer.id;
 
+    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
+
+    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
+        await saveGameState(reverseRoomMap.get(room));
+        return broadcastToRoom(room, {
+            type: 'game_over',
+            result: 'lose',
+            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
+            reason: 'min_cards_not_met'
+        });
+    }
+
     player.cardsPlayedThisTurn = [];
 
     try {
@@ -445,7 +451,7 @@ async function endTurn(room, player) {
         previousPlayer: player.id,
         playerName: nextPlayer.name,
         cardsPlayedThisTurn: 0,
-        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+        minCardsRequired: requiredCards
     }, { includeGameState: true });
 
     checkGameStatus(room);
@@ -947,27 +953,10 @@ wss.on('connection', async (ws, req) => {
                         handlePlayCard(room, player, msg);
                     }
                     break;
-                case 'no_valid_moves':
-                    if (rooms.has(msg.roomId)) {
-                        const room = rooms.get(msg.roomId);
-                        const player = room.players.find(p => p.id === msg.playerId);
-                        if (player) {
-                            broadcastToRoom(room, {
-                                type: 'game_over',
-                                result: 'lose',
-                                message: `¡${player.name} no puede jugar las 2 cartas requeridas!`,
-                                reason: 'no_valid_moves'
-                            });
-                        }
-                    }
-                    break;
                 case 'end_turn':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                         await endTurn(room, player);
                     }
-                    break;
-                case 'force_check_validity':
-                    checkTurnStartValidity();
                     break;
                 case 'undo_move':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
