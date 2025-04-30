@@ -306,7 +306,6 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
-    // Validar movimiento según reglas del juego
     const board = room.gameState.board;
     const targetIdx = msg.position.includes('asc')
         ? (msg.position === 'asc1' ? 0 : 1)
@@ -329,6 +328,7 @@ function handlePlayCard(room, player, msg) {
 
     // Verificación especial para primer movimiento
     if (msg.isFirstMove) {
+        // Simular el tablero después de este movimiento
         const simulatedBoard = JSON.parse(JSON.stringify(board));
         if (msg.position.includes('asc')) {
             simulatedBoard.ascending[msg.position === 'asc1' ? 0 : 1] = msg.cardValue;
@@ -336,12 +336,24 @@ function handlePlayCard(room, player, msg) {
             simulatedBoard.descending[msg.position === 'desc1' ? 0 : 1] = msg.cardValue;
         }
 
+        // Obtener cartas restantes
         const remainingCards = player.cards.filter(c => c !== msg.cardValue);
-        const playableCards = getPlayableCards(remainingCards, simulatedBoard);
+
+        // Verificar contra TODAS las columnas para cada carta restante
+        const canPlayOtherCards = remainingCards.some(card => {
+            // Verificar contra las 4 columnas
+            const canPlayOnAsc1 = card > simulatedBoard.ascending[0] || card === simulatedBoard.ascending[0] - 10;
+            const canPlayOnAsc2 = card > simulatedBoard.ascending[1] || card === simulatedBoard.ascending[1] - 10;
+            const canPlayOnDesc1 = card < simulatedBoard.descending[0] || card === simulatedBoard.descending[0] + 10;
+            const canPlayOnDesc2 = card < simulatedBoard.descending[1] || card === simulatedBoard.descending[1] + 10;
+
+            return canPlayOnAsc1 || canPlayOnAsc2 || canPlayOnDesc1 || canPlayOnDesc2;
+        });
+
         const minRequired = room.gameState.deck.length > 0 ? 2 : 1;
 
-        // Para multijugador, terminar juego inmediatamente
-        if (!msg.isSoloGame && playableCards.length < minRequired && remainingCards.length > 0) {
+        // Para multijugador: terminar juego si no hay movimientos posibles
+        if (!msg.isSoloGame && !canPlayOtherCards && remainingCards.length > 0) {
             return broadcastToRoom(room, {
                 type: 'game_over',
                 result: 'lose',
@@ -350,23 +362,21 @@ function handlePlayCard(room, player, msg) {
             });
         }
 
-        // Para solitario, marcar como movimiento riesgoso
-        if (msg.isSoloGame && playableCards.length < minRequired && remainingCards.length > 0) {
+        // Para solitario: marcar como movimiento riesgoso
+        if (msg.isSoloGame && !canPlayOtherCards && remainingCards.length > 0) {
             player.specialFlag = 'risky_first_move';
         }
     }
 
-    // Procesar movimiento válido
+    // Procesar movimiento válido...
     const previousValue = targetValue;
 
-    // Actualizar tablero
     if (msg.position.includes('asc')) {
         board.ascending[targetIdx] = msg.cardValue;
     } else {
         board.descending[targetIdx] = msg.cardValue;
     }
 
-    // Actualizar estado del jugador
     player.cards = player.cards.filter(c => c !== msg.cardValue);
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
@@ -375,23 +385,8 @@ function handlePlayCard(room, player, msg) {
         previousValue
     });
 
-    // Actualizar historial
     updateBoardHistory(room, msg.position, msg.cardValue);
-
-    // Notificar a todos los jugadores
-    broadcastToRoom(room, {
-        type: 'card_played',
-        cardValue: msg.cardValue,
-        position: msg.position,
-        playerId: player.id,
-        playerName: player.name,
-        previousValue: previousValue
-    });
-
-    // Actualizar estado del juego
     broadcastGameState(room);
-
-    // Verificar condición de victoria/derrota
     checkGameStatus(room);
 }
 

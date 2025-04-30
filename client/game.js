@@ -1070,10 +1070,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const isSoloGame = gameState.players.length === 1;
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        const cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
+        const isFirstMove = gameState.cardsPlayedThisTurn.filter(
             c => c.playerId === currentPlayer.id
-        ).length;
-        const isFirstMove = cardsPlayedThisTurn === 0;
+        ).length === 0;
 
         // Simular el estado del tablero después de este movimiento
         const simulatedBoard = JSON.parse(JSON.stringify(gameState.board));
@@ -1086,24 +1085,23 @@ document.addEventListener('DOMContentLoaded', () => {
         // Obtener cartas restantes en la mano (excluyendo la actual)
         const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
 
-        // Verificar si las cartas restantes tienen movimientos válidos
-        let hasValidMoves = false;
-        if (remainingCards.length > 0) {
-            hasValidMoves = remainingCards.some(card => {
-                return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
-                    const targetValue = pos.includes('asc')
-                        ? simulatedBoard[pos === 'asc1' ? 0 : 1]
-                        : simulatedBoard[pos === 'desc1' ? 0 : 1];
+        // Verificar contra TODAS las columnas para cada carta restante
+        const canPlayOtherCards = remainingCards.some(remainingCard => {
+            // Verificar contra las 4 columnas
+            const canPlayOnAsc1 = remainingCard.value > simulatedBoard.ascending[0] ||
+                remainingCard.value === simulatedBoard.ascending[0] - 10;
+            const canPlayOnAsc2 = remainingCard.value > simulatedBoard.ascending[1] ||
+                remainingCard.value === simulatedBoard.ascending[1] - 10;
+            const canPlayOnDesc1 = remainingCard.value < simulatedBoard.descending[0] ||
+                remainingCard.value === simulatedBoard.descending[0] + 10;
+            const canPlayOnDesc2 = remainingCard.value < simulatedBoard.descending[1] ||
+                remainingCard.value === simulatedBoard.descending[1] + 10;
 
-                    return pos.includes('asc')
-                        ? (card.value > targetValue || card.value === targetValue - 10)
-                        : (card.value < targetValue || card.value === targetValue + 10);
-                });
-            });
-        }
+            return canPlayOnAsc1 || canPlayOnAsc2 || canPlayOnDesc1 || canPlayOnDesc2;
+        });
 
-        // Mostrar advertencia si es el primer movimiento y no hay jugadas válidas después
-        if (isFirstMove && !hasValidMoves && remainingCards.length > 0) {
+        // Mostrar advertencia solo si es primer movimiento y no hay jugadas posibles para las demás cartas
+        if (isFirstMove && !canPlayOtherCards && remainingCards.length > 0) {
             const confirmMessage = isSoloGame
                 ? 'Jugar esta carta te dejará sin movimientos válidos para completar el turno.\n\n¿Deseas continuar?'
                 : 'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\nSi continúas, el juego terminará con derrota.\n\n¿Deseas continuar?';
@@ -1123,12 +1121,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Procesar el movimiento normalmente
+        // Continuar con el movimiento normal...
         const previousValue = position.includes('asc')
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
 
-        // Registrar el movimiento
         gameState.cardsPlayedThisTurn.push({
             value: cardValue,
             position,
@@ -1136,14 +1133,10 @@ document.addEventListener('DOMContentLoaded', () => {
             previousValue
         });
 
-        // Actualizar historial
         gameState.columnHistory[position].push(cardValue);
-
-        // Marcar carta como jugada
         selectedCard.isPlayedThisTurn = true;
         selectedCard.backgroundColor = '#99CCFF';
 
-        // Configurar animación
         const cardPosition = getColumnPosition(position);
         gameState.animatingCards.push({
             card: selectedCard,
@@ -1155,13 +1148,11 @@ document.addEventListener('DOMContentLoaded', () => {
             fromY: selectedCard.y
         });
 
-        // Eliminar carta de la mano
         const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
         if (cardIndex !== -1) {
             gameState.yourCards.splice(cardIndex, 1);
         }
 
-        // Actualizar tablero
         if (position.includes('asc')) {
             const idx = position === 'asc1' ? 0 : 1;
             gameState.board.ascending[idx] = cardValue;
@@ -1170,7 +1161,6 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.board.descending[idx] = cardValue;
         }
 
-        // Enviar movimiento al servidor
         socket.send(JSON.stringify({
             type: 'play_card',
             playerId: currentPlayer.id,
@@ -1181,7 +1171,6 @@ document.addEventListener('DOMContentLoaded', () => {
             isSoloGame
         }));
 
-        // Resetear selección
         selectedCard = null;
         updateGameInfo();
     }
