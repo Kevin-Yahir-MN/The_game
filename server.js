@@ -313,6 +313,33 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
+    // Verificación especial para partida en solitario
+    if (room.players.length === 1) {
+        const remainingCards = player.cards.filter(c => c !== msg.cardValue);
+        const playableCards = getPlayableCards(remainingCards, {
+            ascending: msg.position.includes('asc') ?
+                [msg.position === 'asc1' ? msg.cardValue : board.ascending[1],
+                msg.position === 'asc2' ? msg.cardValue : board.ascending[0]] :
+                board.ascending,
+            descending: msg.position.includes('desc') ?
+                [msg.position === 'desc1' ? msg.cardValue : board.descending[1],
+                msg.position === 'desc2' ? msg.cardValue : board.descending[0]] :
+                board.descending
+        });
+
+        const minRequired = room.gameState.deck.length > 0 ? 2 : 1;
+        if (playableCards.length < minRequired) {
+            broadcastToRoom(room, {
+                type: 'game_over',
+                result: 'lose',
+                message: `¡No puedes jugar el mínimo de ${minRequired} carta(s) requerida(s)!`,
+                reason: 'min_cards_not_met_solo'
+            });
+            return;
+        }
+    }
+
+    // Resto de la lógica original...
     const previousValue = targetValue;
 
     if (msg.position.includes('asc')) {
@@ -965,6 +992,25 @@ wss.on('connection', async (ws, req) => {
                     break;
                 case 'get_game_state':
                     if (room.gameState.gameStarted) sendGameState(room, player);
+                    break;
+                case 'check_solo_block':
+                    if (rooms.has(msg.roomId)) {
+                        const room = rooms.get(msg.roomId);
+                        const player = room.players.find(p => p.id === msg.playerId);
+
+                        if (player && room.players.length === 1) {
+                            const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+
+                            if (msg.cardsRemaining < minCardsRequired) {
+                                broadcastToRoom(room, {
+                                    type: 'game_over',
+                                    result: 'lose',
+                                    message: `¡No puedes jugar el mínimo de ${minCardsRequired} carta(s) requerida(s)!`,
+                                    reason: 'min_cards_not_met_solo'
+                                });
+                            }
+                        }
+                    }
                     break;
                 case 'self_blocked':
                     if (rooms.has(msg.roomId)) {

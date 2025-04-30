@@ -961,6 +961,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return column ? column.id : null;
     }
 
+    // Reemplazar la función handleCanvasClick o añadir esta lógica
     function handleCanvasClick(e) {
         if (isDragging) return;
 
@@ -968,6 +969,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
+        // Verificar clic en iconos de historial
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const iconX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const iconY = HISTORY_ICON_Y;
@@ -983,54 +985,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const clickedColumn = getClickedColumn(x, y);
         if (clickedColumn && selectedCard) {
-            if (gameState.remainingDeck > 0 &&
-                gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length === 0) {
+            const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+            const isSoloGame = gameState.players.length === 1;
 
-                const tempBoard = JSON.parse(JSON.stringify(gameState.board));
-                if (clickedColumn.includes('asc')) {
-                    tempBoard.ascending[clickedColumn === 'asc1' ? 0 : 1] = selectedCard.value;
-                } else {
-                    tempBoard.descending[clickedColumn === 'desc1' ? 0 : 1] = selectedCard.value;
-                }
+            // Crear tablero temporal para simulación
+            const tempBoard = JSON.parse(JSON.stringify(gameState.board));
+            if (clickedColumn.includes('asc')) {
+                tempBoard.ascending[clickedColumn === 'asc1' ? 0 : 1] = selectedCard.value;
+            } else {
+                tempBoard.descending[clickedColumn === 'desc1' ? 0 : 1] = selectedCard.value;
+            }
 
-                const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
-                const hasOtherMoves = remainingCards.some(card => {
-                    return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
-                        const posValue = pos.includes('asc')
-                            ? tempBoard[pos === 'asc1' ? 0 : 1]
-                            : tempBoard[pos === 'desc1' ? 0 : 1];
+            // Verificar movimientos restantes
+            const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
+            const hasOtherMoves = remainingCards.some(card => {
+                return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+                    const posValue = pos.includes('asc')
+                        ? tempBoard[pos === 'asc1' ? 0 : 1]
+                        : tempBoard[pos === 'desc1' ? 0 : 1];
 
-                        return pos.includes('asc')
-                            ? (card.value > posValue || card.value === posValue - 10)
-                            : (card.value < posValue || card.value === posValue + 10);
-                    });
+                    return pos.includes('asc')
+                        ? (card.value > posValue || card.value === posValue - 10)
+                        : (card.value < posValue || card.value === posValue + 10);
                 });
+            });
 
-                if (!hasOtherMoves) {
-                    const confirmMove = confirm(
-                        'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\n' +
-                        'Si continúas, el juego terminará con derrota.\n\n' +
-                        '¿Deseas continuar?'
-                    );
+            // Lógica especial para partida en solitario
+            if (isSoloGame && !hasOtherMoves && remainingCards.length >= minCardsRequired) {
+                const confirmMove = confirm(
+                    'ADVERTENCIA: Jugar esta carta puede dejarte sin movimientos válidos.\n' +
+                    'Si no puedes completar el mínimo de cartas, perderás automáticamente.\n\n' +
+                    '¿Deseas continuar?'
+                );
 
-                    if (confirmMove) {
-                        playCard(selectedCard.value, clickedColumn);
-                        socket.send(JSON.stringify({
-                            type: 'self_blocked',
-                            playerId: currentPlayer.id,
-                            roomId: roomId
-                        }));
-                        return;
-                    } else {
-                        return;
-                    }
-                }
+                if (!confirmMove) return;
+            }
+            // Lógica normal para multijugador
+            else if (!hasOtherMoves) {
+                const confirmMove = confirm(
+                    'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\n' +
+                    'Si continúas, el juego terminará con derrota.\n\n' +
+                    '¿Deseas continuar?'
+                );
+
+                if (!confirmMove) return;
             }
 
             playCard(selectedCard.value, clickedColumn);
+
+            // Enviar notificación de auto-bloqueo si es necesario
+            if (isSoloGame && !hasOtherMoves) {
+                socket.send(JSON.stringify({
+                    type: 'check_solo_block',
+                    playerId: currentPlayer.id,
+                    roomId: roomId,
+                    cardsRemaining: remainingCards.length
+                }));
+            }
             return;
         }
 
+        // Resto de la lógica para selección de cartas...
         const clickedCard = gameState.yourCards.find(card => card.contains(x, y));
         if (clickedCard) {
             selectedCard = clickedCard.isPlayable ? clickedCard : null;
