@@ -961,7 +961,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return column ? column.id : null;
     }
 
-    // Reemplazar la función handleCanvasClick o añadir esta lógica
     function handleCanvasClick(e) {
         if (isDragging) return;
 
@@ -996,19 +995,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 tempBoard.descending[clickedColumn === 'desc1' ? 0 : 1] = selectedCard.value;
             }
 
-            // Verificar movimientos restantes
+            // Verificar movimientos restantes con la nueva función
             const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
-            const hasOtherMoves = remainingCards.some(card => {
-                return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
-                    const posValue = pos.includes('asc')
-                        ? tempBoard[pos === 'asc1' ? 0 : 1]
-                        : tempBoard[pos === 'desc1' ? 0 : 1];
-
-                    return pos.includes('asc')
-                        ? (card.value > posValue || card.value === posValue - 10)
-                        : (card.value < posValue || card.value === posValue + 10);
-                });
-            });
+            const hasOtherMoves = hasValidMoves(remainingCards, tempBoard);
 
             // Lógica especial para partida en solitario
             if (isSoloGame && !hasOtherMoves && remainingCards.length >= minCardsRequired) {
@@ -1021,7 +1010,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!confirmMove) return;
             }
             // Lógica normal para multijugador
-            else if (!hasOtherMoves) {
+            else if (!isSoloGame && !hasOtherMoves) {
                 const confirmMove = confirm(
                     'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\n' +
                     'Si continúas, el juego terminará con derrota.\n\n' +
@@ -1085,39 +1074,31 @@ document.addEventListener('DOMContentLoaded', () => {
         // Obtener cartas restantes en la mano (excluyendo la actual)
         const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
 
-        // Verificar contra TODAS las columnas para cada carta restante
-        const canPlayOtherCards = remainingCards.some(remainingCard => {
-            // Verificar contra las 4 columnas
-            const canPlayOnAsc1 = remainingCard.value > simulatedBoard.ascending[0] ||
-                remainingCard.value === simulatedBoard.ascending[0] - 10;
-            const canPlayOnAsc2 = remainingCard.value > simulatedBoard.ascending[1] ||
-                remainingCard.value === simulatedBoard.ascending[1] - 10;
-            const canPlayOnDesc1 = remainingCard.value < simulatedBoard.descending[0] ||
-                remainingCard.value === simulatedBoard.descending[0] + 10;
-            const canPlayOnDesc2 = remainingCard.value < simulatedBoard.descending[1] ||
-                remainingCard.value === simulatedBoard.descending[1] + 10;
-
-            return canPlayOnAsc1 || canPlayOnAsc2 || canPlayOnDesc1 || canPlayOnDesc2;
-        });
+        // Verificar movimientos posibles para las cartas restantes
+        const hasOtherMoves = hasValidMoves(remainingCards, simulatedBoard);
 
         // Mostrar advertencia solo si es primer movimiento y no hay jugadas posibles para las demás cartas
-        if (isFirstMove && !canPlayOtherCards && remainingCards.length > 0) {
-            const confirmMessage = isSoloGame
-                ? 'Jugar esta carta te dejará sin movimientos válidos para completar el turno.\n\n¿Deseas continuar?'
-                : 'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\nSi continúas, el juego terminará con derrota.\n\n¿Deseas continuar?';
+        if (isFirstMove && !hasOtherMoves && remainingCards.length >= minCardsRequired) {
+            const reallyNoMoves = !hasValidMoves(remainingCards, simulatedBoard);
 
-            if (!confirm(confirmMessage)) {
-                return; // Cancelar el movimiento si el usuario no confirma
-            }
+            if (reallyNoMoves) {
+                const confirmMessage = isSoloGame
+                    ? 'Jugar esta carta te dejará sin movimientos válidos para completar el turno.\n\n¿Deseas continuar?'
+                    : 'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\nSi continúas, el juego terminará con derrota.\n\n¿Deseas continuar?';
 
-            // En partida multijugador, forzar fin del juego
-            if (!isSoloGame) {
-                socket.send(JSON.stringify({
-                    type: 'self_blocked',
-                    playerId: currentPlayer.id,
-                    roomId: roomId
-                }));
-                return;
+                if (!confirm(confirmMessage)) {
+                    return; // Cancelar el movimiento si el usuario no confirma
+                }
+
+                // En partida multijugador, forzar fin del juego
+                if (!isSoloGame) {
+                    socket.send(JSON.stringify({
+                        type: 'self_blocked',
+                        playerId: currentPlayer.id,
+                        roomId: roomId
+                    }));
+                    return;
+                }
             }
         }
 
@@ -1173,6 +1154,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         selectedCard = null;
         updateGameInfo();
+    }
+
+    function hasValidMoves(cards, board) {
+        return cards.some(card => {
+            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+                const posValue = pos.includes('asc')
+                    ? (pos === 'asc1' ? board.ascending[0] : board.ascending[1])
+                    : (pos === 'desc1' ? board.descending[0] : board.descending[1]);
+
+                // Verifica movimiento normal o especial (+/-10)
+                const isValid = pos.includes('asc')
+                    ? (card.value > posValue || card.value === posValue - 10)
+                    : (card.value < posValue || card.value === posValue + 10);
+
+                return isValid;
+            });
+        });
     }
 
     function endTurn() {
