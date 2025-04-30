@@ -771,10 +771,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         gameState.yourCards = cards.map((card, index) => {
             const value = card instanceof Card ? card.value : card;
-            const playable = isYourTurn && (
-                isValidMove(value, 'asc1') || isValidMove(value, 'asc2') ||
-                isValidMove(value, 'desc1') || isValidMove(value, 'desc2')
-            );
+            let isPlayable = false;
+
+            if (isYourTurn) {
+                ['asc1', 'asc2', 'desc1', 'desc2'].forEach(pos => {
+                    const targetValue = pos.includes('asc')
+                        ? gameState.board.ascending[pos === 'asc1' ? 0 : 1]
+                        : gameState.board.descending[pos === 'desc1' ? 0 : 1];
+
+                    const valid = pos.includes('asc')
+                        ? (value > targetValue || value === targetValue - 10)
+                        : (value < targetValue || value === targetValue + 10);
+
+                    if (valid) isPlayable = true;
+                });
+            }
 
             const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
                 move => move.value === value && move.playerId === currentPlayer.id
@@ -783,7 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (card instanceof Card) {
                 card.x = startX + index * (CARD_WIDTH + CARD_SPACING);
                 card.y = startY;
-                card.isPlayable = playable;
+                card.isPlayable = isPlayable;
                 card.isPlayedThisTurn = isPlayedThisTurn;
                 card.backgroundColor = isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
                 return card;
@@ -792,7 +803,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     value,
                     startX + index * (CARD_WIDTH + CARD_SPACING),
                     startY,
-                    playable,
+                    isPlayable,
                     isPlayedThisTurn
                 );
             }
@@ -968,6 +979,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
+        // Verificar clic en iconos de historial
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const iconX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const iconY = HISTORY_ICON_Y;
@@ -983,50 +995,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const clickedColumn = getClickedColumn(x, y);
         if (clickedColumn && selectedCard) {
-            if (gameState.remainingDeck > 0 &&
-                gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length === 0) {
-
-                const tempBoard = JSON.parse(JSON.stringify(gameState.board));
-                if (clickedColumn.includes('asc')) {
-                    tempBoard.ascending[clickedColumn === 'asc1' ? 0 : 1] = selectedCard.value;
-                } else {
-                    tempBoard.descending[clickedColumn === 'desc1' ? 0 : 1] = selectedCard.value;
-                }
-
-                const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
-                const hasOtherMoves = remainingCards.some(card => {
-                    return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
-                        const posValue = pos.includes('asc')
-                            ? tempBoard[pos === 'asc1' ? 0 : 1]
-                            : tempBoard[pos === 'desc1' ? 0 : 1];
-
-                        return pos.includes('asc')
-                            ? (card.value > posValue || card.value === posValue - 10)
-                            : (card.value < posValue || card.value === posValue + 10);
-                    });
-                });
-
-                if (!hasOtherMoves) {
-                    const confirmMove = confirm(
-                        'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\n' +
-                        'Si continúas, el juego terminará con derrota.\n\n' +
-                        '¿Deseas continuar?'
-                    );
-
-                    if (confirmMove) {
-                        playCard(selectedCard.value, clickedColumn);
-                        socket.send(JSON.stringify({
-                            type: 'self_blocked',
-                            playerId: currentPlayer.id,
-                            roomId: roomId
-                        }));
-                        return;
-                    } else {
-                        return;
-                    }
-                }
-            }
-
             playCard(selectedCard.value, clickedColumn);
             return;
         }
@@ -1056,6 +1024,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
 
+        // Registrar la carta jugada
         gameState.cardsPlayedThisTurn.push({
             value: cardValue,
             position,
@@ -1079,11 +1048,13 @@ document.addEventListener('DOMContentLoaded', () => {
             fromY: selectedCard.y
         });
 
+        // Eliminar la carta de la mano
         const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
         if (cardIndex !== -1) {
             gameState.yourCards.splice(cardIndex, 1);
         }
 
+        // Actualizar el tablero
         if (position.includes('asc')) {
             const idx = position === 'asc1' ? 0 : 1;
             gameState.board.ascending[idx] = cardValue;
@@ -1092,6 +1063,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.board.descending[idx] = cardValue;
         }
 
+        // Enviar movimiento al servidor
         socket.send(JSON.stringify({
             type: 'play_card',
             playerId: currentPlayer.id,
@@ -1099,8 +1071,45 @@ document.addEventListener('DOMContentLoaded', () => {
             position
         }));
 
+        // Verificar condición de game over inmediatamente
+        checkImmediateGameOver();
+
         selectedCard = null;
         updateGameInfo();
+    }
+
+    function checkImmediateGameOver() {
+        // Solo verificar si es el turno del jugador y hay cartas en el mazo (requiere 2 cartas)
+        if (gameState.currentTurn === currentPlayer.id && gameState.remainingDeck > 0) {
+            const cardsPlayedThisTurn = gameState.cardsPlayedThisTurn.filter(
+                c => c.playerId === currentPlayer.id
+            ).length;
+
+            // Si ha jugado menos de 2 cartas
+            if (cardsPlayedThisTurn < 2) {
+                const hasPlayableCards = gameState.yourCards.some(card => {
+                    return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+                        const targetValue = pos.includes('asc')
+                            ? gameState.board.ascending[pos === 'asc1' ? 0 : 1]
+                            : gameState.board.descending[pos === 'desc1' ? 0 : 1];
+
+                        return pos.includes('asc')
+                            ? (card.value > targetValue || card.value === targetValue - 10)
+                            : (card.value < targetValue || card.value === targetValue + 10);
+                    });
+                });
+
+                // Si no quedan cartas jugables
+                if (!hasPlayableCards) {
+                    socket.send(JSON.stringify({
+                        type: 'no_valid_moves',
+                        playerId: currentPlayer.id,
+                        roomId: roomId,
+                        message: `No puedes jugar las 2 cartas requeridas`
+                    }));
+                }
+            }
+        }
     }
 
     function endTurn() {

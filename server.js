@@ -423,19 +423,6 @@ async function endTurn(room, player) {
     const nextPlayer = room.players[nextIndex];
     room.gameState.currentTurn = nextPlayer.id;
 
-    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
-
-    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
-        await saveGameState(reverseRoomMap.get(room));
-        return broadcastToRoom(room, {
-            type: 'game_over',
-            result: 'lose',
-            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
-            reason: 'min_cards_not_met'
-        });
-    }
-
     player.cardsPlayedThisTurn = [];
 
     try {
@@ -451,7 +438,7 @@ async function endTurn(room, player) {
         previousPlayer: player.id,
         playerName: nextPlayer.name,
         cardsPlayedThisTurn: 0,
-        minCardsRequired: requiredCards
+        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
     }, { includeGameState: true });
 
     checkGameStatus(room);
@@ -951,6 +938,20 @@ wss.on('connection', async (ws, req) => {
                 case 'play_card':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                         handlePlayCard(room, player, msg);
+                    }
+                    break;
+                case 'no_valid_moves':
+                    if (rooms.has(msg.roomId)) {
+                        const room = rooms.get(msg.roomId);
+                        const player = room.players.find(p => p.id === msg.playerId);
+                        if (player) {
+                            broadcastToRoom(room, {
+                                type: 'game_over',
+                                result: 'lose',
+                                message: `¡${player.name} no puede jugar las 2 cartas requeridas!`,
+                                reason: 'no_valid_moves'
+                            });
+                        }
                     }
                     break;
                 case 'end_turn':
