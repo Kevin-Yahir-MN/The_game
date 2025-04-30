@@ -393,7 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
             requestAnimationFrame(gameLoop);
             setTimeout(() => {
                 historyIconsAnimation.isAnimating = false;
-            }, 2000);
+            }, 1000);
         }, 20000);
     }
 
