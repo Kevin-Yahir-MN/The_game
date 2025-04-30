@@ -1058,6 +1058,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Modificar la función playCard para incluir validación inmediata
     function playCard(cardValue, position) {
         if (!selectedCard) return;
 
@@ -1067,6 +1068,57 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Verificación especial para partida en solitario
+        const isSoloGame = gameState.players.length === 1;
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+
+        // Simular el estado después de jugar esta carta
+        const simulatedBoard = JSON.parse(JSON.stringify(gameState.board));
+        if (position.includes('asc')) {
+            simulatedBoard.ascending[position === 'asc1' ? 0 : 1] = cardValue;
+        } else {
+            simulatedBoard.descending[position === 'desc1' ? 0 : 1] = cardValue;
+        }
+
+        // Obtener cartas restantes después de este movimiento
+        const remainingCards = gameState.yourCards.filter(card => card !== selectedCard);
+
+        // Verificar si hay movimientos posibles con las cartas restantes
+        const hasValidMoves = remainingCards.some(card => {
+            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+                const targetValue = pos.includes('asc')
+                    ? simulatedBoard[pos === 'asc1' ? 0 : 1]
+                    : simulatedBoard[pos === 'desc1' ? 0 : 1];
+
+                return pos.includes('asc')
+                    ? (card.value > targetValue || card.value === targetValue - 10)
+                    : (card.value < targetValue || card.value === targetValue + 10);
+            });
+        });
+
+        // Si es partida en solitario y no hay movimientos válidos con las cartas restantes
+        if (isSoloGame && !hasValidMoves) {
+            const confirmMove = confirm(
+                'ADVERTENCIA: Esta jugada te dejará sin movimientos válidos.\n' +
+                'El juego terminará inmediatamente.\n\n' +
+                '¿Deseas continuar?'
+            );
+
+            if (!confirmMove) {
+                return; // Cancelar el movimiento si el usuario no confirma
+            }
+
+            // Forzar fin del juego si confirman
+            socket.send(JSON.stringify({
+                type: 'force_game_over',
+                playerId: currentPlayer.id,
+                roomId: roomId,
+                reason: 'solo_no_valid_moves'
+            }));
+            return;
+        }
+
+        // Continuar con el movimiento normal si pasa todas las validaciones
         const previousValue = position.includes('asc')
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
@@ -1079,7 +1131,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         gameState.columnHistory[position].push(cardValue);
-
         selectedCard.isPlayedThisTurn = true;
         selectedCard.backgroundColor = '#99CCFF';
 
@@ -1111,7 +1162,9 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'play_card',
             playerId: currentPlayer.id,
             cardValue,
-            position
+            position,
+            isSoloGame: isSoloGame,
+            remainingCardsCount: remainingCards.length
         }));
 
         selectedCard = null;

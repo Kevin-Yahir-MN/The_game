@@ -269,14 +269,17 @@ function getNextActivePlayerIndex(currentIndex, players) {
 }
 
 function getPlayableCards(playerCards, board) {
+    if (!playerCards || playerCards.length === 0) return [];
+
     return playerCards.filter(card => {
-        return (card > board.ascending[0] || card === board.ascending[0] - 10) ||
-            (card > board.ascending[1] || card === board.ascending[1] - 10) ||
-            (card < board.descending[0] || card === board.descending[0] + 10) ||
-            (card < board.descending[1] || card === board.descending[1] + 10);
+        const validAsc1 = card > board.ascending[0] || card === board.ascending[0] - 10;
+        const validAsc2 = card > board.ascending[1] || card === board.ascending[1] - 10;
+        const validDesc1 = card < board.descending[0] || card === board.descending[0] + 10;
+        const validDesc2 = card < board.descending[1] || card === board.descending[1] + 10;
+
+        return validAsc1 || validAsc2 || validDesc1 || validDesc2;
     });
 }
-
 function handlePlayCard(room, player, msg) {
     if (!validPositions.includes(msg.position)) {
         return safeSend(player.ws, {
@@ -339,7 +342,6 @@ function handlePlayCard(room, player, msg) {
         }
     }
 
-    // Resto de la lógica original...
     const previousValue = targetValue;
 
     if (msg.position.includes('asc')) {
@@ -369,6 +371,21 @@ function handlePlayCard(room, player, msg) {
 
     broadcastGameState(room);
     checkGameStatus(room);
+
+    // Verificación inmediata para partida en solitario
+    if (msg.isSoloGame && room.players.length === 1) {
+        const playableNow = getPlayableCards(player.cards, room.gameState.board);
+        const requiredNow = room.gameState.deck.length > 0 ? 2 : 1;
+
+        if (playableNow.length < requiredNow) {
+            broadcastToRoom(room, {
+                type: 'game_over',
+                result: 'lose',
+                message: `¡No puedes jugar el mínimo de ${requiredNow} carta(s) requerida(s)!`,
+                reason: 'min_cards_not_met_solo'
+            });
+        }
+    }
 }
 
 function handleUndoMove(room, player, msg) {
@@ -993,6 +1010,22 @@ wss.on('connection', async (ws, req) => {
                 case 'get_game_state':
                     if (room.gameState.gameStarted) sendGameState(room, player);
                     break;
+                case 'force_game_over':
+                    if (rooms.has(msg.roomId)) {
+                        const room = rooms.get(msg.roomId);
+                        const player = room.players.find(p => p.id === msg.playerId);
+
+                        if (player) {
+                            broadcastToRoom(room, {
+                                type: 'game_over',
+                                result: 'lose',
+                                message: '¡Juego terminado! No hay movimientos válidos disponibles.',
+                                reason: msg.reason || 'no_valid_moves'
+                            });
+                        }
+                    }
+                    break;
+
                 case 'check_solo_block':
                     if (rooms.has(msg.roomId)) {
                         const room = rooms.get(msg.roomId);
