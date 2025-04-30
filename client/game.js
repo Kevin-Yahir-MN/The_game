@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let historyIconsAnimation = {
         interval: null,
         isAnimating: false,
-        animationDuration: 10000,
+        animationDuration: 20000,
         lastAnimationTime: 0
     };
 
@@ -393,8 +393,8 @@ document.addEventListener('DOMContentLoaded', () => {
             requestAnimationFrame(gameLoop);
             setTimeout(() => {
                 historyIconsAnimation.isAnimating = false;
-            }, 1000);
-        }, 5000);
+            }, 2000);
+        }, 20000);
     }
 
     function showNotification(message, isError = false) {
@@ -757,7 +757,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const now = Date.now();
         const progress = historyIconsAnimation.isAnimating ?
-            Math.min(1, (now - historyIconsAnimation.lastAnimationTime) / 1000) : 0;
+            Math.min(1, (now - historyIconsAnimation.lastAnimationTime) / 2000) : 0; // Aumentado de 1000 a 2000 ms
 
         const easeOutBounce = (t) => {
             if (t < 1 / 2.75) {
