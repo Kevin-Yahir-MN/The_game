@@ -394,7 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 historyIconsAnimation.isAnimating = false;
             }, 1000);
-        }, 5000);
+        }, 20000);
     }
 
     function showNotification(message, isError = false) {
