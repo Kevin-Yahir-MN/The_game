@@ -423,7 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         notificationTimeout = setTimeout(() => {
             notification.classList.add('notification-fade-out');
-            setTimeout(() => notification.remove(), 2000);
+            setTimeout(() => notification.remove(), 300);
         }, duration);
     }
 
@@ -1052,17 +1052,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Verificación menos restrictiva
-        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
-
-        if (cardsPlayed < minCardsRequired && willCardBlockPlayer(cardValue, position)) {
-            showNotification(`Juega ${minCardsRequired - cardsPlayed} carta(s) más antes de esta`, true);
-            animateInvalidCard(selectedCard);
-            return;
-        }
-
-        // Resto de la lógica original de playCard...
         const previousValue = position.includes('asc')
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
@@ -1112,50 +1101,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         selectedCard = null;
         updateGameInfo();
-    }
-
-    // Reemplazar la función willCardBlockPlayer con esta versión mejorada
-    function willCardBlockPlayer(cardValue, position) {
-        // Solo aplicamos esta regla si el jugador aún no ha jugado el mínimo de cartas
-        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
-
-        if (cardsPlayed >= minCardsRequired) {
-            return false; // Si ya cumplió con el mínimo, no hay restricción
-        }
-
-        // Hacer una copia temporal del estado
-        const tempBoard = JSON.parse(JSON.stringify(gameState.board));
-        const tempPlayerCards = [...gameState.yourCards].filter(c => c.value !== cardValue);
-
-        // Aplicar el movimiento temporal
-        if (position.includes('asc')) {
-            const idx = position === 'asc1' ? 0 : 1;
-            tempBoard.ascending[idx] = cardValue;
-        } else {
-            const idx = position === 'desc1' ? 0 : 1;
-            tempBoard.descending[idx] = cardValue;
-        }
-
-        // Verificar si quedan movimientos posibles para cumplir el mínimo
-        let possibleMoves = 0;
-
-        tempPlayerCards.forEach(card => {
-            ['asc1', 'asc2', 'desc1', 'desc2'].forEach(pos => {
-                const posValue = pos.includes('asc')
-                    ? tempBoard[pos === 'asc1' ? 0 : 1]
-                    : tempBoard[pos === 'desc1' ? 0 : 1];
-
-                const isValid = pos.includes('asc')
-                    ? (card.value > posValue || card.value === posValue - 10)
-                    : (card.value < posValue || card.value === posValue + 10);
-
-                if (isValid) possibleMoves++;
-            });
-        });
-
-        // Solo bloqueamos si no hay suficientes movimientos para alcanzar el mínimo
-        return possibleMoves < (minCardsRequired - cardsPlayed - 1);
     }
 
     function endTurn() {

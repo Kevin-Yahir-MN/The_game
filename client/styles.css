@@ -1193,18 +1193,3 @@ body {
 .history-icon.pulse {
     animation: iconPulse 2s infinite;
 }
-
-.notification.block-warning {
-    background-color: #f39c12;
-    animation: pulseWarning 0.5s infinite alternate;
-}
-
-@keyframes pulseWarning {
-    from {
-        box-shadow: 0 0 0 0 rgba(243, 156, 18, 0.4);
-    }
-
-    to {
-        box-shadow: 0 0 0 10px rgba(243, 156, 18, 0);
-    }
-}
