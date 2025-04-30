@@ -278,34 +278,7 @@ function getPlayableCards(playerCards, board) {
 }
 
 function handlePlayCard(room, player, msg) {
-    // Nueva validación de cartas jugadas
-    const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
-    if (player.cardsPlayedThisTurn.length >= minCardsRequired) {
-        const remainingCards = player.cards.filter(c => c !== msg.cardValue);
-        const hasOtherMoves = remainingCards.some(card => {
-            return validPositions.some(pos => {
-                const targetIdx = pos.includes('asc') ?
-                    (pos === 'asc1' ? 0 : 1) :
-                    (pos === 'desc1' ? 0 : 1);
-                const targetValue = pos.includes('asc') ?
-                    room.gameState.board.ascending[targetIdx] :
-                    room.gameState.board.descending[targetIdx];
-
-                return pos.includes('asc') ?
-                    (card > targetValue || card === targetValue - 10) :
-                    (card < targetValue || card === targetValue + 10);
-            });
-        });
-
-        if (!hasOtherMoves) {
-            return safeSend(player.ws, {
-                type: 'notification',
-                message: `No puedes jugar esta carta. Debes jugar al menos ${minCardsRequired} cartas este turno.`,
-                isError: true
-            });
-        }
-    }
-
+    // 1. Validaciones básicas
     if (!validPositions.includes(msg.position)) {
         return safeSend(player.ws, {
             type: 'notification',
@@ -322,6 +295,16 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
+    // 2. Validación de turno
+    if (player.id !== room.gameState.currentTurn) {
+        return safeSend(player.ws, {
+            type: 'notification',
+            message: 'No es tu turno',
+            isError: true
+        });
+    }
+
+    // 3. Validación de movimiento válido
     const board = room.gameState.board;
     const targetIdx = msg.position.includes('asc') ?
         (msg.position === 'asc1' ? 0 : 1) :
@@ -341,6 +324,42 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
+    // 4. Validación de mínimo de cartas por turno
+    const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+    const cardsPlayed = player.cardsPlayedThisTurn.length;
+
+    if (cardsPlayed < minCardsRequired) {
+        // Verificar si al jugar esta carta aún puede cumplir el mínimo
+        const remainingCards = player.cards.filter(c => c !== msg.cardValue);
+        let possibleMoves = 0;
+
+        remainingCards.forEach(card => {
+            validPositions.forEach(pos => {
+                const posIdx = pos.includes('asc') ?
+                    (pos === 'asc1' ? 0 : 1) :
+                    (pos === 'desc1' ? 0 : 1);
+                const posValue = pos.includes('asc') ?
+                    board.ascending[posIdx] :
+                    board.descending[posIdx];
+
+                const isValidMove = pos.includes('asc') ?
+                    (card > posValue || card === posValue - 10) :
+                    (card < posValue || card === posValue + 10);
+
+                if (isValidMove) possibleMoves++;
+            });
+        });
+
+        if (possibleMoves < (minCardsRequired - cardsPlayed - 1)) {
+            return safeSend(player.ws, {
+                type: 'notification',
+                message: `No puedes jugar esta carta ahora. Necesitas jugar ${minCardsRequired} cartas este turno y esta jugada te dejaría sin movimientos suficientes.`,
+                isError: true
+            });
+        }
+    }
+
+    // 5. Registrar el movimiento
     const previousValue = targetValue;
 
     if (msg.position.includes('asc')) {
@@ -357,8 +376,10 @@ function handlePlayCard(room, player, msg) {
         previousValue: previousValue
     });
 
+    // 6. Actualizar historial
     updateBoardHistory(room, msg.position, msg.cardValue);
 
+    // 7. Notificar a todos los jugadores
     broadcastToRoom(room, {
         type: 'card_played',
         cardValue: msg.cardValue,
@@ -368,8 +389,16 @@ function handlePlayCard(room, player, msg) {
         previousValue: previousValue
     });
 
+    // 8. Actualizar estado del juego
     broadcastGameState(room);
+
+    // 9. Verificar estado del juego
     checkGameStatus(room);
+
+    // 10. Guardar estado en la base de datos
+    saveGameState(reverseRoomMap.get(room)).catch(err =>
+        console.error('Error al guardar estado:', err)
+    );
 }
 
 function handleUndoMove(room, player, msg) {

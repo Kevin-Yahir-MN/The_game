@@ -423,7 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         notificationTimeout = setTimeout(() => {
             notification.classList.add('notification-fade-out');
-            setTimeout(() => notification.remove(), 300);
+            setTimeout(() => notification.remove(), 2000);
         }, duration);
     }
 
@@ -1052,17 +1052,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Verificar si esta carta bloqueará al jugador
-        if (willCardBlockPlayer(cardValue, position)) {
-            const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        // Verificación menos restrictiva
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
 
-            if (gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length < minCardsRequired) {
-                showNotification(`No puedes jugar esta carta. Debes jugar al menos ${minCardsRequired} cartas este turno esa acción te dejará sin jugadas, pendejo.`, true);
-                animateInvalidCard(selectedCard);
-                return;
-            }
+        if (cardsPlayed < minCardsRequired && willCardBlockPlayer(cardValue, position)) {
+            showNotification(`Juega ${minCardsRequired - cardsPlayed} carta(s) más antes de esta`, true);
+            animateInvalidCard(selectedCard);
+            return;
         }
 
+        // Resto de la lógica original de playCard...
         const previousValue = position.includes('asc')
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
@@ -1114,9 +1114,17 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGameInfo();
     }
 
-    // game.js - Agregar esta función en la sección de funciones de utilidad
+    // Reemplazar la función willCardBlockPlayer con esta versión mejorada
     function willCardBlockPlayer(cardValue, position) {
-        // Hacer una copia temporal del estado del juego
+        // Solo aplicamos esta regla si el jugador aún no ha jugado el mínimo de cartas
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        const cardsPlayed = gameState.cardsPlayedThisTurn.filter(c => c.playerId === currentPlayer.id).length;
+
+        if (cardsPlayed >= minCardsRequired) {
+            return false; // Si ya cumplió con el mínimo, no hay restricción
+        }
+
+        // Hacer una copia temporal del estado
         const tempBoard = JSON.parse(JSON.stringify(gameState.board));
         const tempPlayerCards = [...gameState.yourCards].filter(c => c.value !== cardValue);
 
@@ -1129,20 +1137,25 @@ document.addEventListener('DOMContentLoaded', () => {
             tempBoard.descending[idx] = cardValue;
         }
 
-        // Verificar si quedan movimientos posibles
-        const hasOtherMoves = tempPlayerCards.some(card => {
-            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+        // Verificar si quedan movimientos posibles para cumplir el mínimo
+        let possibleMoves = 0;
+
+        tempPlayerCards.forEach(card => {
+            ['asc1', 'asc2', 'desc1', 'desc2'].forEach(pos => {
                 const posValue = pos.includes('asc')
                     ? tempBoard[pos === 'asc1' ? 0 : 1]
                     : tempBoard[pos === 'desc1' ? 0 : 1];
 
-                return pos.includes('asc')
+                const isValid = pos.includes('asc')
                     ? (card.value > posValue || card.value === posValue - 10)
                     : (card.value < posValue || card.value === posValue + 10);
+
+                if (isValid) possibleMoves++;
             });
         });
 
-        return !hasOtherMoves;
+        // Solo bloqueamos si no hay suficientes movimientos para alcanzar el mínimo
+        return possibleMoves < (minCardsRequired - cardsPlayed - 1);
     }
 
     function endTurn() {
