@@ -596,7 +596,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <p>${message}</p>
             <div class="game-over-buttons">
                 <button id="returnToRoom" class="game-over-btn">Volver a la Sala</button>
-                <button id="newGame" class="game-over-btn">Nueva Partida</button>
             </div>
         `;
 
@@ -610,9 +609,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('returnToRoom').addEventListener('click', async () => {
             try {
-                const buttons = document.querySelectorAll('.game-over-btn');
-                buttons.forEach(btn => btn.disabled = true);
-                document.getElementById('returnToRoom').textContent = 'Cargando...';
+                const button = document.getElementById('returnToRoom');
+                button.disabled = true;
+                button.textContent = 'Cargando...';
 
                 gameState.columnHistory = {
                     asc1: [1],
@@ -633,57 +632,11 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error('Error al volver a la sala:', error);
                 showNotification('Error al reiniciar la sala', true);
-                const buttons = document.querySelectorAll('.game-over-btn');
-                buttons.forEach(btn => btn.disabled = false);
-                document.getElementById('returnToRoom').textContent = 'Volver a la Sala';
+                const button = document.getElementById('returnToRoom');
+                button.disabled = false;
+                button.textContent = 'Volver a la Sala';
             }
         });
-
-        document.getElementById('newGame').addEventListener('click', async () => {
-            try {
-                const buttons = document.querySelectorAll('.game-over-btn');
-                buttons.forEach(btn => btn.disabled = true);
-                document.getElementById('newGame').textContent = 'Preparando...';
-
-                gameState = {
-                    players: gameState.players,
-                    board: { ascending: [1, 1], descending: [100, 100] },
-                    currentTurn: null,
-                    yourCards: [],
-                    remainingDeck: 98,
-                    initialCards: gameState.initialCards || 6,
-                    cardsPlayedThisTurn: [],
-                    animatingCards: [],
-                    columnHistory: {
-                        asc1: [1],
-                        asc2: [1],
-                        desc1: [100],
-                        desc2: [100]
-                    }
-                };
-
-                if (currentPlayer.isHost) {
-                    socket.send(JSON.stringify({
-                        type: 'start_game',
-                        playerId: currentPlayer.id,
-                        roomId: roomId,
-                        initialCards: gameState.initialCards
-                    }));
-                } else {
-                    showNotification('Esperando al host para nueva partida...');
-                }
-            } catch (error) {
-                console.error('Error al iniciar nueva partida:', error);
-                showNotification('Error al comenzar nueva partida', true);
-                const buttons = document.querySelectorAll('.game-over-btn');
-                buttons.forEach(btn => btn.disabled = false);
-                document.getElementById('newGame').textContent = 'Nueva Partida';
-            }
-        });
-
-        selectedCard = null;
-        isDragging = false;
-        dragStartCard = null;
     }
 
     function updateGameState(newState) {
