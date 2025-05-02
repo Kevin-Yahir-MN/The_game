@@ -83,47 +83,25 @@ document.addEventListener('DOMContentLoaded', () => {
             this.isDragging = false;
             this.dragOffsetX = 0;
             this.dragOffsetY = 0;
-            this.glowColor = '#99CCFF';
-            this.glowAlpha = 0;
-            this.glowMaxAlpha = 0.8;
-            this.glowDirection = 1; // 1 para aumentar, -1 para disminuir
-            this.glowStartTime = 0;
-            this.glowDuration = 0;
-            this.isAnimating = false;
-
         }
 
         draw() {
             ctx.save();
             if (!this.isDragging) ctx.translate(this.shakeOffset, 0);
 
-            // Dibujar sombra
             ctx.shadowColor = this.shadowColor;
             ctx.shadowBlur = 8;
             ctx.shadowOffsetY = 4;
 
-            // Dibujar carta
             ctx.beginPath();
             ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
-
-            // Color base de la carta
             ctx.fillStyle = this === selectedCard ? '#FFFF99' : this.backgroundColor;
             ctx.fill();
 
-            // Efecto de brillo si está activo
-            if (this.glowAlpha > 0) {
-                ctx.fillStyle = this.glowColor;
-                ctx.globalAlpha = this.glowAlpha;
-                ctx.fill();
-                ctx.globalAlpha = 1.0;
-            }
-
-            // Borde
             ctx.strokeStyle = this.isPlayable ? '#27ae60' : '#34495e';
             ctx.lineWidth = this.isPlayable ? 3 : 2;
             ctx.stroke();
 
-            // Texto (valor de la carta)
             ctx.fillStyle = '#2c3e50';
             ctx.font = 'bold 28px Arial';
             ctx.textAlign = 'center';
@@ -269,15 +247,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'init_game':
                         handleInitGame(message);
                         break;
-                    case 'gs': // game state update
+                    case 'gs':
                         lastStateUpdate = now;
                         updateGameState(message.s);
-
-                        // Forzar redibujado de cartas del jugador
-                        if (message.y) {
-                            updatePlayerCards(message.y);
-                        }
-
                         updateGameInfo();
                         break;
                     case 'game_started':
@@ -302,10 +274,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         gameState.columnHistory[message.column] = message.history;
                         break;
                     case 'card_played':
-                        // Solo animar si no es nuestra propia carta
-                        if (message.playerId !== currentPlayer.id) {
-                            handleOpponentCardPlayed(message);
-                        }
+                        handleOpponentCardPlayed(message);
+                        updateGameInfo();
                         break;
                     case 'invalid_move':
                         if (message.playerId === currentPlayer.id && selectedCard) {
@@ -705,43 +675,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleOpponentCardPlayed(message) {
-        if (!message || !message.position || message.playerId === currentPlayer.id) return;
+        if (message.playerId !== currentPlayer.id) {
+            const position = message.position;
+            const value = message.cardValue;
 
-        // Actualizar estado del tablero
-        const position = message.position;
-        const value = message.cardValue;
+            if (position.includes('asc')) {
+                const idx = position === 'asc1' ? 0 : 1;
+                gameState.board.ascending[idx] = value;
+            } else {
+                const idx = position === 'desc1' ? 0 : 1;
+                gameState.board.descending[idx] = value;
+            }
 
-        if (position.includes('asc')) {
-            const idx = position === 'asc1' ? 0 : 1;
-            gameState.board.ascending[idx] = value;
-        } else {
-            const idx = position === 'desc1' ? 0 : 1;
-            gameState.board.descending[idx] = value;
-        }
+            if (!gameState.columnHistory[position]) {
+                gameState.columnHistory[position] = position.includes('asc') ? [1] : [100];
+            }
+            gameState.columnHistory[position].push(value);
 
-        // Crear animación sin rebote (movimiento lineal)
-        const cardPosition = getColumnPosition(position);
-        const opponentCard = new Card(value, cardPosition.x, -100, false, true);
+            const cardPosition = getColumnPosition(position);
+            const opponentCard = new Card(value, cardPosition.x, cardPosition.y, false, true);
 
-        // Configuración de animación simplificada
-        opponentCard.targetY = cardPosition.y;
-        opponentCard.startTime = Date.now();
-        opponentCard.animationDuration = 600; // Duración más corta
-        opponentCard.easing = 'linear';
+            gameState.animatingCards.push({
+                card: opponentCard,
+                startTime: Date.now(),
+                duration: 200,
+                targetX: cardPosition.x,
+                targetY: cardPosition.y,
+                fromX: cardPosition.x,
+                fromY: -CARD_HEIGHT
+            });
 
-        // Efecto de brillo (más sutil)
-        opponentCard.glowColor = '#99CCFF';
-        opponentCard.glowAlpha = 0.6;
-        opponentCard.glowDuration = 800;
+            gameState.cardsPlayedThisTurn.push({
+                value: message.cardValue,
+                position: message.position,
+                playerId: message.playerId,
+                isPlayedThisTurn: true
+            });
 
-        gameState.animatingCards.push(opponentCard);
-
-        // Mostrar notificación
-        if (message.playerName) {
             showNotification(`${message.playerName} jugó un ${value}`);
+            updateGameInfo();
         }
-
-        updateGameInfo();
     }
 
     function updatePlayerCards(cards) {
@@ -1030,18 +1003,90 @@ document.addEventListener('DOMContentLoaded', () => {
     function playCard(cardValue, position) {
         if (!selectedCard) return;
 
-        // Validar movimiento
+        // Validación básica del movimiento
         if (!isValidMove(cardValue, position)) {
             showNotification('Movimiento inválido', true);
             animateInvalidCard(selectedCard);
             return;
         }
 
-        // Guardar referencia a la carta jugada
-        const playedCard = selectedCard;
-        const cardIndex = gameState.yourCards.findIndex(c => c === playedCard);
+        const isSoloGame = gameState.players.length === 1;
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        const isFirstMove = gameState.cardsPlayedThisTurn.filter(
+            c => c.playerId === currentPlayer.id
+        ).length === 0;
 
-        // Actualizar estado del tablero
+        // Simular el estado del tablero después de este movimiento
+        const simulatedBoard = JSON.parse(JSON.stringify(gameState.board));
+        if (position.includes('asc')) {
+            simulatedBoard.ascending[position === 'asc1' ? 0 : 1] = cardValue;
+        } else {
+            simulatedBoard.descending[position === 'desc1' ? 0 : 1] = cardValue;
+        }
+
+        // Obtener cartas restantes en la mano (excluyendo la actual)
+        const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
+
+        // Verificar movimientos posibles para las cartas restantes
+        const hasOtherMoves = hasValidMoves(remainingCards, simulatedBoard);
+
+        // Mostrar advertencia solo si es primer movimiento y no hay jugadas posibles para las demás cartas
+        if (isFirstMove && !hasOtherMoves && remainingCards.length >= minCardsRequired) {
+            const reallyNoMoves = !hasValidMoves(remainingCards, simulatedBoard);
+
+            if (reallyNoMoves) {
+                const confirmMessage = isSoloGame
+                    ? 'Jugar esta carta te dejará sin movimientos válidos para completar el turno.\n\n¿Deseas continuar?'
+                    : 'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\nSi continúas, el juego terminará con derrota.\n\n¿Deseas continuar?';
+
+                if (!confirm(confirmMessage)) {
+                    return; // Cancelar el movimiento si el usuario no confirma
+                }
+
+                // En partida multijugador, forzar fin del juego
+                if (!isSoloGame) {
+                    socket.send(JSON.stringify({
+                        type: 'self_blocked',
+                        playerId: currentPlayer.id,
+                        roomId: roomId
+                    }));
+                    return;
+                }
+            }
+        }
+
+        // Continuar con el movimiento normal...
+        const previousValue = position.includes('asc')
+            ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
+            : gameState.board.descending[position === 'desc1' ? 0 : 1];
+
+        gameState.cardsPlayedThisTurn.push({
+            value: cardValue,
+            position,
+            playerId: currentPlayer.id,
+            previousValue
+        });
+
+        gameState.columnHistory[position].push(cardValue);
+        selectedCard.isPlayedThisTurn = true;
+        selectedCard.backgroundColor = '#99CCFF';
+
+        const cardPosition = getColumnPosition(position);
+        gameState.animatingCards.push({
+            card: selectedCard,
+            startTime: Date.now(),
+            duration: 200,
+            targetX: cardPosition.x,
+            targetY: cardPosition.y,
+            fromX: selectedCard.x,
+            fromY: selectedCard.y
+        });
+
+        const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
+        if (cardIndex !== -1) {
+            gameState.yourCards.splice(cardIndex, 1);
+        }
+
         if (position.includes('asc')) {
             const idx = position === 'asc1' ? 0 : 1;
             gameState.board.ascending[idx] = cardValue;
@@ -1050,38 +1095,16 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.board.descending[idx] = cardValue;
         }
 
-        // Configurar animación para la carta jugada
-        const cardPosition = getColumnPosition(position);
-        playedCard.targetX = cardPosition.x;
-        playedCard.targetY = cardPosition.y;
-        playedCard.startTime = Date.now();
-        playedCard.animationDuration = 500;
-        playedCard.isAnimating = true;
-
-        // Marcar como jugada en este turno
-        gameState.cardsPlayedThisTurn.push({
-            value: cardValue,
-            position,
-            playerId: currentPlayer.id,
-            previousValue: position.includes('asc')
-                ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
-                : gameState.board.descending[position === 'desc1' ? 0 : 1]
-        });
-
-        // No eliminar la carta inmediatamente - se manejará en la animación
-        gameState.animatingCards.push(playedCard);
-
-        // Enviar movimiento al servidor
         socket.send(JSON.stringify({
             type: 'play_card',
             playerId: currentPlayer.id,
             cardValue,
             position,
-            isFirstMove: gameState.cardsPlayedThisTurn.length === 0,
-            isSoloGame: gameState.players.length === 1
+            isFirstMove,
+            remainingCardsCount: remainingCards.length,
+            isSoloGame
         }));
 
-        // Actualizar UI
         selectedCard = null;
         updateGameInfo();
     }
@@ -1197,9 +1220,8 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         ctx.fill();
 
-        // Dibujar solo cartas que no estén siendo animadas
         gameState.yourCards.forEach((card, index) => {
-            if (!card.isAnimating) {
+            if (card && card !== dragStartCard) {
                 card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 +
                     index * (CARD_WIDTH + CARD_SPACING);
                 card.y = PLAYER_CARDS_Y;
@@ -1272,37 +1294,22 @@ document.addEventListener('DOMContentLoaded', () => {
             </ul>
         `;
     }
+
     function handleCardAnimations() {
         const now = Date.now();
-
         for (let i = gameState.animatingCards.length - 1; i >= 0; i--) {
-            const card = gameState.animatingCards[i];
+            const anim = gameState.animatingCards[i];
+            const elapsed = now - anim.startTime;
+            const progress = Math.min(elapsed / anim.duration, 1);
 
-            if (card.isAnimating) {
-                const elapsed = now - card.startTime;
-                const progress = Math.min(elapsed / card.animationDuration, 1);
+            anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * progress;
+            anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * progress;
 
-                // Movimiento lineal
-                card.x = card.x + (card.targetX - card.x) * progress;
-                card.y = card.y + (card.targetY - card.y) * progress;
+            anim.card.draw();
 
-                // Cuando termine la animación
-                if (progress === 1) {
-                    card.isAnimating = false;
-
-                    // Si es una carta del jugador, quitarla de su mano
-                    if (gameState.yourCards.includes(card)) {
-                        const index = gameState.yourCards.indexOf(card);
-                        if (index !== -1) {
-                            gameState.yourCards.splice(index, 1);
-                        }
-                    }
-
-                    gameState.animatingCards.splice(i, 1);
-                }
+            if (progress === 1 || now - anim.startTime > 1000) {
+                gameState.animatingCards.splice(i, 1);
             }
-
-            card.draw();
         }
     }
 
@@ -1318,17 +1325,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillStyle = '#1a6b1a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Dibujar tablero primero
         drawBoard();
-
-        // Dibujar animaciones de cartas (incluyendo las que se están moviendo)
-        handleCardAnimations();
-
-        // Luego dibujar las cartas del jugador
-        drawPlayerCards();
-
-        // Finalmente dibujar iconos de historial
         drawHistoryIcons();
+        handleCardAnimations();
+        drawPlayerCards();
 
         if (isDragging && dragStartCard) {
             dragStartCard.draw();

@@ -1016,17 +1016,6 @@ wss.on('connection', async (ws, req) => {
                 case 'play_card':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                         handlePlayCard(room, player, msg);
-
-                        // Enviar notificación a todos los jugadores
-                        broadcastToRoom(room, {
-                            type: 'card_played',
-                            playerId: player.id,
-                            playerName: player.name,
-                            cardValue: msg.cardValue,
-                            position: msg.position,
-                            isFirstMove: msg.isFirstMove,
-                            isSoloGame: msg.isSoloGame
-                        });
                     }
                     break;
                 case 'end_turn':
