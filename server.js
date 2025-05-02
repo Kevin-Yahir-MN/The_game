@@ -261,8 +261,16 @@ function updateBoardHistory(room, position, newValue) {
 
     if (history[historyKey].slice(-1)[0] !== newValue) {
         history[historyKey].push(newValue);
-
         boardHistory.set(roomId, history);
+
+        // Enviar actualización del historial a todos los jugadores
+        broadcastToRoom(room, {
+            type: 'column_history_update',
+            column: position,
+            history: history[historyKey],
+            newValue: newValue
+        });
+
         saveGameState(roomId).catch(err =>
             console.error('Error al guardar historial:', err)
         );

@@ -24,6 +24,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const assetCache = new Map();
     let historyIcon = new Image();
+    let lastHistoryUpdate = {
+        asc1: 0,
+        asc2: 0,
+        desc1: 0,
+        desc2: 0
+    };
     let lastStateUpdate = 0;
     let lastRenderTime = 0;
     let reconnectAttempts = 0;
@@ -286,6 +292,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         gameState.columnHistory[message.column] = message.history;
                         break;
+                    case 'column_history_update':
+                        updateColumnHistoryUI(message.column, message.history, message.newValue);
+                        break;
                     case 'card_played':
                         handleOpponentCardPlayed(message);
                         updateGameInfo();
@@ -443,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, duration);
     }
 
-    async function showColumnHistory(columnId) {
+    function showColumnHistory(columnId) {
         const modal = document.getElementById('historyModal');
         const backdrop = document.getElementById('modalBackdrop');
         const title = document.getElementById('historyColumnTitle');
@@ -462,36 +471,37 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.style.display = 'block';
         backdrop.style.display = 'block';
 
-        try {
-            let history = gameState.columnHistory[columnId];
+        // Usar el historial actual del estado del juego
+        const history = gameState.columnHistory[columnId] ||
+            (columnId.includes('asc') ? [1] : [100]);
 
-            if (!history || history.length <= 1) {
-                socket.send(JSON.stringify({
-                    type: 'get_full_state',
-                    playerId: currentPlayer.id,
-                    roomId: roomId
-                }));
-                await new Promise(resolve => setTimeout(resolve, 500));
-                history = gameState.columnHistory[columnId] || [columnId.includes('asc') ? 1 : 100];
+        updateHistoryDisplay(container, history);
+    }
+
+    function updateHistoryDisplay(container, history) {
+        container.innerHTML = '';
+
+        history.forEach((card, index) => {
+            const cardElement = document.createElement('div');
+            cardElement.className = `history-card ${index === history.length - 1 ? 'recent' : ''}`;
+            cardElement.textContent = card;
+
+            if (index > 0) {
+                const difference = card - history[index - 1];
+                const diffElement = document.createElement('span');
+                diffElement.className = 'history-difference';
+                diffElement.textContent = ` (${difference > 0 ? '+' : ''}${difference})`;
+                cardElement.appendChild(diffElement);
             }
 
-            container.innerHTML = '';
-            history.forEach((card, index) => {
-                const cardElement = document.createElement('div');
-                cardElement.className = `history-card ${index === history.length - 1 ? 'recent' : ''}`;
-                cardElement.textContent = card;
+            if (index === history.length - 1) {
+                cardElement.classList.add('recent');
+                cardElement.style.border = '2px solid #2ecc71';
+                cardElement.style.fontWeight = 'bold';
+            }
 
-                if (index === history.length - 1) {
-                    cardElement.style.border = '2px solid #2ecc71';
-                    cardElement.style.fontWeight = 'bold';
-                }
-
-                container.appendChild(cardElement);
-            });
-        } catch (error) {
-            console.error('Error al cargar historial:', error);
-            container.innerHTML = '<div class="error-history">Error al cargar historial</div>';
-        }
+            container.appendChild(cardElement);
+        });
     }
 
     function closeHistoryModal() {
@@ -783,45 +793,106 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function updateColumnHistoryUI(column, history, newValue) {
+        // Actualizar el historial en el estado del juego
+        if (!gameState.columnHistory[column]) {
+            gameState.columnHistory[column] = column.includes('asc') ? [1] : [100];
+        }
+        gameState.columnHistory[column] = history;
+
+        // Mostrar notificación visual
+        const columnNames = {
+            'asc1': 'Pila Ascendente 1',
+            'asc2': 'Pila Ascendente 2',
+            'desc1': 'Pila Descendente 1',
+            'desc2': 'Pila Descendente 2'
+        };
+
+        showNotification(`${columnNames[column]}: ${history.slice(-2)[0]} → ${newValue}`);
+
+        // Animación de actualización en el icono de historial
+        animateHistoryIcon(column);
+    }
+
+    function animateHistoryIcon(column) {
+        const iconIndex = ['asc1', 'asc2', 'desc1', 'desc2'].indexOf(column);
+        if (iconIndex === -1) return;
+
+        const iconX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * iconIndex + CARD_WIDTH / 2 - 20;
+        const iconY = HISTORY_ICON_Y;
+
+        // Crear efecto de pulso
+        const pulse = {
+            x: iconX,
+            y: iconY,
+            size: 40,
+            startTime: Date.now(),
+            duration: 1000,
+            alpha: 1
+        };
+
+        // Dibujar animación
+        function drawPulse() {
+            const now = Date.now();
+            const elapsed = now - pulse.startTime;
+            const progress = Math.min(elapsed / pulse.duration, 1);
+
+            ctx.save();
+            ctx.globalAlpha = pulse.alpha * (1 - progress);
+            ctx.fillStyle = '#2ecc71';
+            ctx.beginPath();
+            ctx.arc(
+                pulse.x + 20,
+                pulse.y + 20,
+                pulse.size * (1 + progress * 0.5),
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+            ctx.restore();
+
+            if (progress < 1) {
+                requestAnimationFrame(drawPulse);
+            }
+        }
+
+        drawPulse();
+    }
+
     function drawHistoryIcons() {
         if (!historyIcon.complete || historyIcon.naturalWidth === 0) return;
-
-        const now = Date.now();
-        const progress = historyIconsAnimation.isAnimating ?
-            Math.min(1, (now - historyIconsAnimation.lastAnimationTime) / 1000) : 0;
-
-        const easeOutBounce = (t) => {
-            if (t < 1 / 2.75) {
-                return 7.5625 * t * t;
-            } else if (t < 2 / 2.75) {
-                return 7.5625 * (t -= 1.5 / 2.75) * t + 0.75;
-            } else if (t < 2.5 / 2.75) {
-                return 7.5625 * (t -= 2.25 / 2.75) * t + 0.9375;
-            } else {
-                return 7.5625 * (t -= 2.625 / 2.75) * t + 0.984375;
-            }
-        };
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const baseX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const baseY = HISTORY_ICON_Y;
 
-            let offsetX = 0;
-            let offsetY = 0;
-            let rotation = 0;
-
-            if (historyIconsAnimation.isAnimating) {
-                const easedProgress = easeOutBounce(progress);
-                offsetY = -15 * Math.sin(easedProgress * Math.PI);
-                offsetX = 5 * Math.sin(easedProgress * Math.PI * 2);
-                rotation = 15 * Math.sin(easedProgress * Math.PI);
-            }
+            // Resaltar si hay nuevo historial
+            const hasNewHistory = gameState.columnHistory[col] &&
+                gameState.columnHistory[col].length > 1 &&
+                Date.now() - lastHistoryUpdate[col] < 2000;
 
             ctx.save();
-            ctx.translate(baseX + 20 + offsetX, baseY + 20 + offsetY);
-            ctx.rotate(rotation * Math.PI / 180);
-            ctx.drawImage(historyIcon, -20, -20, 40, 40);
+
+            if (hasNewHistory) {
+                ctx.shadowColor = 'rgba(46, 204, 113, 0.7)';
+                ctx.shadowBlur = 15;
+            }
+
+            ctx.drawImage(historyIcon, baseX, baseY, 40, 40);
             ctx.restore();
+
+            // Mostrar contador de historial
+            if (gameState.columnHistory[col] && gameState.columnHistory[col].length > 1) {
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(
+                    gameState.columnHistory[col].length - 1,
+                    baseX + 30,
+                    baseY + 10
+                );
+            }
         });
     }
 

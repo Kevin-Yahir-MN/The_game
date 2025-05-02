@@ -1193,3 +1193,65 @@ body {
 .history-icon.pulse {
     animation: iconPulse 2s infinite;
 }
+
+.history-card {
+    width: 60px;
+    height: 90px;
+    background-color: white;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #2c3e50;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    margin: 5px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.history-card.recent {
+    border: 2px solid #2ecc71;
+    transform: scale(1.05);
+}
+
+.history-difference {
+    font-size: 0.8em;
+    color: #7f8c8d;
+    margin-top: 5px;
+}
+
+.history-card:hover {
+    transform: scale(1.1);
+    z-index: 2;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.history-icon {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.history-icon:hover {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 5px rgba(46, 204, 113, 0.7));
+}
+
+.history-icon.active {
+    animation: pulse 1s infinite;
+}
