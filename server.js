@@ -199,20 +199,10 @@ function safeSend(ws, message) {
 
 function broadcastToRoom(room, message, options = {}) {
     const { includeGameState = false, skipPlayerId = null } = options;
-
     room.players.forEach(player => {
         if (player.id !== skipPlayerId && player.ws?.readyState === WebSocket.OPEN) {
-            // Asegurar que el mensaje tenga todos los datos necesarios
-            const completeMessage = {
-                ...message,
-                timestamp: Date.now()
-            };
-
-            safeSend(player.ws, completeMessage);
-
-            if (includeGameState) {
-                sendGameState(room, player);
-            }
+            safeSend(player.ws, message);
+            if (includeGameState) sendGameState(room, player);
         }
     });
 }
@@ -230,8 +220,7 @@ function sendGameState(room, player) {
             n: p.name,
             h: p.isHost,
             c: p.cards.length,
-            s: p.cardsPlayedThisTurn.length,
-            pt: p.cardsPlayedThisTurn // Enviar cartas jugadas este turno
+            s: p.cardsPlayedThisTurn.length
         }))
     };
 
@@ -261,15 +250,8 @@ function updateBoardHistory(room, position, newValue) {
 
     if (history[historyKey].slice(-1)[0] !== newValue) {
         history[historyKey].push(newValue);
+
         boardHistory.set(roomId, history);
-
-        // Enviar actualización simplificada
-        broadcastToRoom(room, {
-            type: 'column_history_update',
-            column: position,
-            history: history[historyKey]
-        });
-
         saveGameState(roomId).catch(err =>
             console.error('Error al guardar historial:', err)
         );
@@ -344,7 +326,49 @@ function handlePlayCard(room, player, msg) {
         });
     }
 
-    // Procesar movimiento válido
+    // Verificación especial para primer movimiento
+    if (msg.isFirstMove) {
+        // Simular el tablero después de este movimiento
+        const simulatedBoard = JSON.parse(JSON.stringify(board));
+        if (msg.position.includes('asc')) {
+            simulatedBoard.ascending[msg.position === 'asc1' ? 0 : 1] = msg.cardValue;
+        } else {
+            simulatedBoard.descending[msg.position === 'desc1' ? 0 : 1] = msg.cardValue;
+        }
+
+        // Obtener cartas restantes
+        const remainingCards = player.cards.filter(c => c !== msg.cardValue);
+
+        // Verificar contra TODAS las columnas para cada carta restante
+        const canPlayOtherCards = remainingCards.some(card => {
+            // Verificar contra las 4 columnas
+            const canPlayOnAsc1 = card > simulatedBoard.ascending[0] || card === simulatedBoard.ascending[0] - 10;
+            const canPlayOnAsc2 = card > simulatedBoard.ascending[1] || card === simulatedBoard.ascending[1] - 10;
+            const canPlayOnDesc1 = card < simulatedBoard.descending[0] || card === simulatedBoard.descending[0] + 10;
+            const canPlayOnDesc2 = card < simulatedBoard.descending[1] || card === simulatedBoard.descending[1] + 10;
+
+            return canPlayOnAsc1 || canPlayOnAsc2 || canPlayOnDesc1 || canPlayOnDesc2;
+        });
+
+        const minRequired = room.gameState.deck.length > 0 ? 2 : 1;
+
+        // Para multijugador: terminar juego si no hay movimientos posibles
+        if (!msg.isSoloGame && !canPlayOtherCards && remainingCards.length > 0) {
+            return broadcastToRoom(room, {
+                type: 'game_over',
+                result: 'lose',
+                message: `¡${player.name} se quedó sin movimientos válidos en su turno!`,
+                reason: 'invalid_first_move'
+            });
+        }
+
+        // Para solitario: marcar como movimiento riesgoso
+        if (msg.isSoloGame && !canPlayOtherCards && remainingCards.length > 0) {
+            player.specialFlag = 'risky_first_move';
+        }
+    }
+
+    // Procesar movimiento válido...
     const previousValue = targetValue;
 
     if (msg.position.includes('asc')) {
@@ -361,19 +385,8 @@ function handlePlayCard(room, player, msg) {
         previousValue
     });
 
-    // Notificar a todos los jugadores con color azul
-    broadcastToRoom(room, {
-        type: 'card_played_animated',
-        playerId: player.id,
-        playerName: player.name,
-        cardValue: msg.cardValue,
-        position: msg.position,
-        previousValue: targetValue,
-        isCurrentTurn: true,  // Marcar como carta del turno actual (azul)
-        timestamp: Date.now()
-    }, { includeGameState: true });
-
     updateBoardHistory(room, msg.position, msg.cardValue);
+    broadcastGameState(room);
     checkGameStatus(room);
 }
 
@@ -450,16 +463,6 @@ async function endTurn(room, player) {
         });
     }
 
-    // Notificar normalización de cartas (quitar color azul)
-    player.cardsPlayedThisTurn.forEach(move => {
-        broadcastToRoom(room, {
-            type: 'card_normalized',
-            cardValue: move.value,
-            position: move.position,
-            isCurrentTurn: false
-        });
-    });
-
     // Robar cartas si es necesario
     const targetCardCount = room.gameState.initialCards;
     const cardsToDraw = Math.min(
@@ -486,6 +489,20 @@ async function endTurn(room, player) {
     const nextPlayer = room.players[nextIndex];
     room.gameState.currentTurn = nextPlayer.id;
 
+    // Verificar movimientos posibles para el siguiente jugador
+    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
+
+    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
+        await saveGameState(reverseRoomMap.get(room));
+        return broadcastToRoom(room, {
+            type: 'game_over',
+            result: 'lose',
+            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
+            reason: 'min_cards_not_met'
+        });
+    }
+
     // Resetear contadores
     player.cardsPlayedThisTurn = [];
 
@@ -498,7 +515,7 @@ async function endTurn(room, player) {
         previousPlayer: player.id,
         playerName: nextPlayer.name,
         cardsPlayedThisTurn: 0,
-        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+        minCardsRequired: requiredCards
     }, { includeGameState: true });
 
     // Verificar condición de victoria
@@ -621,7 +638,10 @@ app.post('/join-room', async (req, res) => {
     try {
         await pool.query('BEGIN');
 
-        const roomCheck = await pool.query('SELECT EXISTS(SELECT 1 FROM game_states WHERE room_id = $1) as exists', [roomId]);
+        const roomCheck = await pool.query(
+            'SELECT 1 FROM game_states WHERE room_id = $1',
+            [roomId]
+        );
 
         if (roomCheck.rowCount === 0) {
             await pool.query('ROLLBACK');
@@ -995,11 +1015,7 @@ wss.on('connection', async (ws, req) => {
                     break;
                 case 'play_card':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        const enhancedMsg = {
-                            ...msg,
-                            isPlayedThisTurn: true
-                        };
-                        handlePlayCard(room, player, enhancedMsg);
+                        handlePlayCard(room, player, msg);
                     }
                     break;
                 case 'end_turn':

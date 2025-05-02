@@ -1164,62 +1164,32 @@ body {
     background-color: #27ae60;
 }
 
-.history-card {
-    width: 60px;
-    height: 90px;
-    background-color: white;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    color: #2c3e50;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    margin: 5px;
-}
-
-.history-card.recent {
-    border: 2px solid #3498db;
-}
-
+/* Añadir estos estilos para los iconos */
 .history-icon {
+    transition: all 0.5s ease;
     cursor: pointer;
-    transition: transform 0.2s ease;
 }
 
 .history-icon:hover {
-    transform: scale(1.05);
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.7));
 }
 
-/* Animación para cartas recién jugadas */
-@keyframes cardPlayedAnimation {
+/* Animación para el efecto de latido */
+@keyframes iconPulse {
     0% {
         transform: scale(1);
-        box-shadow: 0 0 15px rgba(0, 100, 255, 0);
     }
 
     50% {
-        transform: scale(1.05);
-        box-shadow: 0 0 20px rgba(0, 100, 255, 0.7);
+        transform: scale(1.1);
     }
 
     100% {
         transform: scale(1);
-        box-shadow: 0 0 15px rgba(0, 100, 255, 0.3);
     }
 }
 
-.card-played {
-    animation: cardPlayedAnimation 0.6s ease-out;
-}
-
-/* Estilo para cartas del turno actual */
-.card-current-turn {
-    background-color: #99CCFF !important;
-    box-shadow: 0 0 15px rgba(0, 100, 255, 0.3);
-}
-
-/* Transición suave para cambio de color */
-.card {
-    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+.history-icon.pulse {
+    animation: iconPulse 2s infinite;
 }
