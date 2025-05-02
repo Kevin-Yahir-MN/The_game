@@ -263,12 +263,11 @@ function updateBoardHistory(room, position, newValue) {
         history[historyKey].push(newValue);
         boardHistory.set(roomId, history);
 
-        // Enviar actualización del historial a todos los jugadores
+        // Enviar actualización simplificada
         broadcastToRoom(room, {
             type: 'column_history_update',
             column: position,
-            history: history[historyKey],
-            newValue: newValue
+            history: history[historyKey]
         });
 
         saveGameState(roomId).catch(err =>

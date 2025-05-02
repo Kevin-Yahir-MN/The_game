@@ -24,12 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const assetCache = new Map();
     let historyIcon = new Image();
-    let lastHistoryUpdate = {
-        asc1: 0,
-        asc2: 0,
-        desc1: 0,
-        desc2: 0
-    };
     let lastStateUpdate = 0;
     let lastRenderTime = 0;
     let reconnectAttempts = 0;
@@ -466,16 +460,25 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         title.textContent = columnNames[columnId];
-        container.innerHTML = '<div class="loading-history">Cargando historial...</div>';
+        container.innerHTML = '';
 
-        modal.style.display = 'block';
-        backdrop.style.display = 'block';
-
-        // Usar el historial actual del estado del juego
         const history = gameState.columnHistory[columnId] ||
             (columnId.includes('asc') ? [1] : [100]);
 
-        updateHistoryDisplay(container, history);
+        history.forEach((card, index) => {
+            const cardElement = document.createElement('div');
+            cardElement.className = `history-card ${index === history.length - 1 ? 'recent' : ''}`;
+            cardElement.textContent = card;
+
+            if (index === history.length - 1) {
+                cardElement.classList.add('recent');
+            }
+
+            container.appendChild(cardElement);
+        });
+
+        modal.style.display = 'block';
+        backdrop.style.display = 'block';
     }
 
     function updateHistoryDisplay(container, history) {
@@ -793,70 +796,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function updateColumnHistoryUI(column, history, newValue) {
+    function updateColumnHistoryUI(column, history) {
         // Actualizar el historial en el estado del juego
         if (!gameState.columnHistory[column]) {
             gameState.columnHistory[column] = column.includes('asc') ? [1] : [100];
         }
         gameState.columnHistory[column] = history;
-
-        // Mostrar notificación visual
-        const columnNames = {
-            'asc1': 'Pila Ascendente 1',
-            'asc2': 'Pila Ascendente 2',
-            'desc1': 'Pila Descendente 1',
-            'desc2': 'Pila Descendente 2'
-        };
-
-        showNotification(`${columnNames[column]}: ${history.slice(-2)[0]} → ${newValue}`);
-
-        // Animación de actualización en el icono de historial
-        animateHistoryIcon(column);
-    }
-
-    function animateHistoryIcon(column) {
-        const iconIndex = ['asc1', 'asc2', 'desc1', 'desc2'].indexOf(column);
-        if (iconIndex === -1) return;
-
-        const iconX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * iconIndex + CARD_WIDTH / 2 - 20;
-        const iconY = HISTORY_ICON_Y;
-
-        // Crear efecto de pulso
-        const pulse = {
-            x: iconX,
-            y: iconY,
-            size: 40,
-            startTime: Date.now(),
-            duration: 1000,
-            alpha: 1
-        };
-
-        // Dibujar animación
-        function drawPulse() {
-            const now = Date.now();
-            const elapsed = now - pulse.startTime;
-            const progress = Math.min(elapsed / pulse.duration, 1);
-
-            ctx.save();
-            ctx.globalAlpha = pulse.alpha * (1 - progress);
-            ctx.fillStyle = '#2ecc71';
-            ctx.beginPath();
-            ctx.arc(
-                pulse.x + 20,
-                pulse.y + 20,
-                pulse.size * (1 + progress * 0.5),
-                0,
-                Math.PI * 2
-            );
-            ctx.fill();
-            ctx.restore();
-
-            if (progress < 1) {
-                requestAnimationFrame(drawPulse);
-            }
-        }
-
-        drawPulse();
     }
 
     function drawHistoryIcons() {
@@ -866,33 +811,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const baseX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const baseY = HISTORY_ICON_Y;
 
-            // Resaltar si hay nuevo historial
-            const hasNewHistory = gameState.columnHistory[col] &&
-                gameState.columnHistory[col].length > 1 &&
-                Date.now() - lastHistoryUpdate[col] < 2000;
-
-            ctx.save();
-
-            if (hasNewHistory) {
-                ctx.shadowColor = 'rgba(46, 204, 113, 0.7)';
-                ctx.shadowBlur = 15;
-            }
-
             ctx.drawImage(historyIcon, baseX, baseY, 40, 40);
-            ctx.restore();
-
-            // Mostrar contador de historial
-            if (gameState.columnHistory[col] && gameState.columnHistory[col].length > 1) {
-                ctx.fillStyle = 'white';
-                ctx.font = 'bold 12px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(
-                    gameState.columnHistory[col].length - 1,
-                    baseX + 30,
-                    baseY + 10
-                );
-            }
         });
     }
 
