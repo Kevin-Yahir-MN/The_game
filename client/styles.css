@@ -1190,3 +1190,36 @@ body {
 .history-icon:hover {
     transform: scale(1.05);
 }
+
+/* Animación para cartas recién jugadas */
+@keyframes cardPlayedAnimation {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 15px rgba(0, 100, 255, 0);
+    }
+
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 20px rgba(0, 100, 255, 0.7);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 15px rgba(0, 100, 255, 0.3);
+    }
+}
+
+.card-played {
+    animation: cardPlayedAnimation 0.6s ease-out;
+}
+
+/* Estilo para cartas del turno actual */
+.card-current-turn {
+    background-color: #99CCFF !important;
+    box-shadow: 0 0 15px rgba(0, 100, 255, 0.3);
+}
+
+/* Transición suave para cambio de color */
+.card {
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}

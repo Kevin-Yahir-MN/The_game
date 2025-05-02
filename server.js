@@ -361,9 +361,7 @@ function handlePlayCard(room, player, msg) {
         previousValue
     });
 
-    updateBoardHistory(room, msg.position, msg.cardValue);
-
-    // Enviar a todos los jugadores con persistencia de color
+    // Notificar a todos los jugadores con color azul
     broadcastToRoom(room, {
         type: 'card_played_animated',
         playerId: player.id,
@@ -371,9 +369,11 @@ function handlePlayCard(room, player, msg) {
         cardValue: msg.cardValue,
         position: msg.position,
         previousValue: targetValue,
-        persistColor: true
+        isCurrentTurn: true,  // Marcar como carta del turno actual (azul)
+        timestamp: Date.now()
     }, { includeGameState: true });
 
+    updateBoardHistory(room, msg.position, msg.cardValue);
     checkGameStatus(room);
 }
 
@@ -450,6 +450,16 @@ async function endTurn(room, player) {
         });
     }
 
+    // Notificar normalización de cartas (quitar color azul)
+    player.cardsPlayedThisTurn.forEach(move => {
+        broadcastToRoom(room, {
+            type: 'card_normalized',
+            cardValue: move.value,
+            position: move.position,
+            isCurrentTurn: false
+        });
+    });
+
     // Robar cartas si es necesario
     const targetCardCount = room.gameState.initialCards;
     const cardsToDraw = Math.min(
@@ -476,20 +486,6 @@ async function endTurn(room, player) {
     const nextPlayer = room.players[nextIndex];
     room.gameState.currentTurn = nextPlayer.id;
 
-    // Verificar movimientos posibles para el siguiente jugador
-    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
-
-    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
-        await saveGameState(reverseRoomMap.get(room));
-        return broadcastToRoom(room, {
-            type: 'game_over',
-            result: 'lose',
-            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
-            reason: 'min_cards_not_met'
-        });
-    }
-
     // Resetear contadores
     player.cardsPlayedThisTurn = [];
 
@@ -502,7 +498,7 @@ async function endTurn(room, player) {
         previousPlayer: player.id,
         playerName: nextPlayer.name,
         cardsPlayedThisTurn: 0,
-        minCardsRequired: requiredCards
+        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
     }, { includeGameState: true });
 
     // Verificar condición de victoria
@@ -625,10 +621,7 @@ app.post('/join-room', async (req, res) => {
     try {
         await pool.query('BEGIN');
 
-        const roomCheck = await pool.query(
-            'SELECT 1 FROM game_states WHERE room_id = $1',
-            [roomId]
-        );
+        const roomCheck = await pool.query('SELECT EXISTS(SELECT 1 FROM game_states WHERE room_id = $1) as exists', [roomId]);
 
         if (roomCheck.rowCount === 0) {
             await pool.query('ROLLBACK');
