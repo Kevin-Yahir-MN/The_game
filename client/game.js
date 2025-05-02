@@ -89,13 +89,23 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.save();
             if (!this.isDragging) ctx.translate(this.shakeOffset, 0);
 
-            ctx.shadowColor = this.shadowColor;
-            ctx.shadowBlur = 8;
-            ctx.shadowOffsetY = 4;
+            // Sombra más pronunciada para cartas jugadas
+            ctx.shadowColor = this.isPlayedThisTurn ? 'rgba(0, 100, 255, 0.5)' : this.shadowColor;
+            ctx.shadowBlur = this.isPlayedThisTurn ? 10 : 8;
+            ctx.shadowOffsetY = this.isPlayedThisTurn ? 8 : 4;
 
             ctx.beginPath();
             ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
-            ctx.fillStyle = this === selectedCard ? '#FFFF99' : this.backgroundColor;
+
+            // Color basado en estado
+            if (this === selectedCard) {
+                ctx.fillStyle = '#FFFF99'; // Amarillo para carta seleccionada
+            } else if (this.isPlayedThisTurn) {
+                ctx.fillStyle = '#99CCFF'; // Azul para cartas jugadas este turno
+            } else {
+                ctx.fillStyle = '#FFFFFF'; // Blanco para cartas normales
+            }
+
             ctx.fill();
 
             ctx.strokeStyle = this.isPlayable ? '#27ae60' : '#34495e';
@@ -276,6 +286,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'card_played':
                         handleOpponentCardPlayed(message);
                         updateGameInfo();
+                        break;
+                    case 'card_played_animated':
+                        handleAnimatedCardPlay(message);
                         break;
                     case 'invalid_move':
                         if (message.playerId === currentPlayer.id && selectedCard) {
@@ -1305,14 +1318,74 @@ document.addEventListener('DOMContentLoaded', () => {
             const elapsed = now - anim.startTime;
             const progress = Math.min(elapsed / anim.duration, 1);
 
-            anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * progress;
-            anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * progress;
+            // Easing function para animación suave
+            const easeOutCubic = t => (--t) * t * t + 1;
+            const easedProgress = easeOutCubic(progress);
 
-            anim.card.draw();
+            anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * easedProgress;
+            anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * easedProgress;
 
-            if (progress === 1 || now - anim.startTime > 1000) {
+            // Efecto especial para cartas del oponente
+            if (anim.isOpponentCard) {
+                ctx.save();
+                ctx.shadowColor = 'rgba(0, 100, 255, 0.7)';
+                ctx.shadowBlur = 15;
+                ctx.shadowOffsetY = 5;
+                anim.card.draw();
+                ctx.restore();
+            } else {
+                anim.card.draw();
+            }
+
+            // Eliminar animación completada
+            if (progress === 1) {
                 gameState.animatingCards.splice(i, 1);
             }
+        }
+    }
+
+    function handleAnimatedCardPlay(message) {
+        // Solo animar si no es nuestra propia carta
+        if (message.playerId !== currentPlayer.id) {
+            const position = message.position;
+            const value = message.cardValue;
+
+            // Crear carta con color azul
+            const card = new Card(
+                value,
+                0, // x temporal
+                0, // y temporal
+                false, // isPlayable
+                true  // isPlayedThisTurn (azul)
+            );
+
+            // Configurar animación
+            const targetPos = getColumnPosition(position);
+            const startX = targetPos.x;
+            const startY = -CARD_HEIGHT * 2; // Comienza fuera de pantalla
+
+            gameState.animatingCards.push({
+                card: card,
+                startTime: Date.now(),
+                duration: 600, // Duración en ms
+                targetX: targetPos.x,
+                targetY: targetPos.y,
+                fromX: startX,
+                fromY: startY,
+                isOpponentCard: true
+            });
+
+            // Actualizar estado del tablero inmediatamente
+            if (position.includes('asc')) {
+                const idx = position === 'asc1' ? 0 : 1;
+                gameState.board.ascending[idx] = value;
+            } else {
+                const idx = position === 'desc1' ? 0 : 1;
+                gameState.board.descending[idx] = value;
+            }
+
+            // Mostrar notificación
+            showNotification(`${message.playerName} jugó un ${value}`);
         }
     }
 
