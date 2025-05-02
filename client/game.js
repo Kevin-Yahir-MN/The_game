@@ -298,7 +298,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (message.playerId !== currentPlayer.id) {
                             handleOpponentCardPlayed(message);
                         }
-                        updateGameInfo();
                         break;
                     case 'invalid_move':
                         if (message.playerId === currentPlayer.id && selectedCard) {
