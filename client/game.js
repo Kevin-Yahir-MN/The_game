@@ -294,7 +294,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         gameState.columnHistory[message.column] = message.history;
                         break;
                     case 'card_played':
-                        handleOpponentCardPlayed(message);
+                        // Solo animar si no es nuestra propia carta
+                        if (message.playerId !== currentPlayer.id) {
+                            handleOpponentCardPlayed(message);
+                        }
                         updateGameInfo();
                         break;
                     case 'invalid_move':
@@ -693,63 +696,51 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedCard = null;
         }
     }
-
     function handleOpponentCardPlayed(message) {
-        if (message.playerId !== currentPlayer.id) {
-            const position = message.position;
-            const value = message.cardValue;
+        // Verificar que el mensaje sea válido
+        if (!message || !message.position || message.playerId === currentPlayer.id) return;
 
-            // Actualizar el estado del tablero
-            if (position.includes('asc')) {
-                const idx = position === 'asc1' ? 0 : 1;
-                gameState.board.ascending[idx] = value;
-            } else {
-                const idx = position === 'desc1' ? 0 : 1;
-                gameState.board.descending[idx] = value;
-            }
+        // Obtener posición y valor de la carta
+        const position = message.position;
+        const value = message.cardValue;
 
-            // Actualizar historial
-            if (!gameState.columnHistory[position]) {
-                gameState.columnHistory[position] = position.includes('asc') ? [1] : [100];
-            }
-            gameState.columnHistory[position].push(value);
-
-            // Crear animación
-            const cardPosition = getColumnPosition(position);
-            const opponentCard = new Card(value, cardPosition.x, -CARD_HEIGHT, false, true);
-
-            // Configurar propiedades especiales para la animación
-            opponentCard.backgroundColor = '#FFFFFF';
-            opponentCard.glowColor = '#99CCFF';
-            opponentCard.glowAlpha = 0;
-            opponentCard.glowMaxAlpha = 0.8;
-            opponentCard.glowDirection = 1;
-
-            gameState.animatingCards.push({
-                card: opponentCard,
-                startTime: Date.now(),
-                duration: 800, // Duración más larga para mejor visibilidad
-                targetX: cardPosition.x,
-                targetY: cardPosition.y,
-                fromX: cardPosition.x,
-                fromY: -CARD_HEIGHT,
-                onComplete: () => {
-                    // Iniciar efecto de brillo después de colocar la carta
-                    opponentCard.glowStartTime = Date.now();
-                    opponentCard.glowDuration = 1000;
-                }
-            });
-
-            gameState.cardsPlayedThisTurn.push({
-                value: message.cardValue,
-                position: message.position,
-                playerId: message.playerId,
-                isPlayedThisTurn: true
-            });
-
-            showNotification(`${message.playerName} jugó un ${value}`);
-            updateGameInfo();
+        // Actualizar el estado del tablero
+        if (position.includes('asc')) {
+            const idx = position === 'asc1' ? 0 : 1;
+            gameState.board.ascending[idx] = value;
+        } else {
+            const idx = position === 'desc1' ? 0 : 1;
+            gameState.board.descending[idx] = value;
         }
+
+        // Crear animación más vistosa
+        const cardPosition = getColumnPosition(position);
+        const opponentCard = new Card(value, cardPosition.x, -100, false, true);
+
+        // Configurar propiedades de animación
+        opponentCard.targetY = cardPosition.y;
+        opponentCard.startTime = Date.now();
+        opponentCard.animationDuration = 1000;
+        opponentCard.easing = 'easeOutBounce';
+
+        // Efecto especial
+        opponentCard.specialEffect = {
+            type: 'glow',
+            color: '#99CCFF',
+            duration: 1500,
+            intensity: 0.8
+        };
+
+        // Agregar a las animaciones
+        gameState.animatingCards.push(opponentCard);
+
+        // Mostrar notificación
+        if (message.playerName) {
+            showNotification(`${message.playerName} jugó un ${value}`);
+        }
+
+        // Actualizar UI
+        updateGameInfo();
     }
 
     function updatePlayerCards(cards) {
@@ -1329,47 +1320,57 @@ document.addEventListener('DOMContentLoaded', () => {
             </ul>
         `;
     }
-
     function handleCardAnimations() {
         const now = Date.now();
+
         for (let i = gameState.animatingCards.length - 1; i >= 0; i--) {
-            const anim = gameState.animatingCards[i];
-            const elapsed = now - anim.startTime;
-            const progress = Math.min(elapsed / anim.duration, 1);
+            const card = gameState.animatingCards[i];
 
             // Animación de movimiento
-            anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * progress;
-            anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * progress;
+            if (card.targetY !== undefined) {
+                const elapsed = now - card.startTime;
+                const progress = Math.min(elapsed / card.animationDuration, 1);
 
-            // Efecto de brillo después de completar el movimiento
-            if (progress === 1 && anim.onComplete && !anim.completed) {
-                anim.completed = true;
-                anim.onComplete();
-            }
-
-            // Manejar el efecto de brillo
-            if (anim.card.glowStartTime > 0) {
-                const glowElapsed = now - anim.card.glowStartTime;
-                if (glowElapsed < anim.card.glowDuration) {
-                    const glowProgress = glowElapsed / anim.card.glowDuration;
-
-                    // Brillo que aumenta y luego disminuye
-                    if (glowProgress < 0.5) {
-                        anim.card.glowAlpha = anim.card.glowMaxAlpha * (glowProgress * 2);
-                    } else {
-                        anim.card.glowAlpha = anim.card.glowMaxAlpha * (2 - glowProgress * 2);
-                    }
+                // Aplicar easing
+                let easedProgress;
+                if (card.easing === 'easeOutBounce') {
+                    easedProgress = easeOutBounce(progress);
                 } else {
-                    anim.card.glowAlpha = 0;
-                    anim.card.glowStartTime = 0;
+                    easedProgress = progress;
+                }
+
+                card.y = -100 + (card.targetY - (-100)) * easedProgress;
+
+                // Efectos especiales
+                if (card.specialEffect) {
+                    const effectProgress = Math.min(elapsed / card.specialEffect.duration, 1);
+
+                    if (card.specialEffect.type === 'glow') {
+                        card.glowAlpha = card.specialEffect.intensity * (1 - effectProgress);
+                        card.glowColor = card.specialEffect.color;
+                    }
+                }
+
+                // Eliminar cuando termine la animación
+                if (progress === 1) {
+                    gameState.animatingCards.splice(i, 1);
                 }
             }
 
-            anim.card.draw();
+            card.draw();
+        }
+    }
 
-            if (progress === 1 && (!anim.card.glowStartTime || now - anim.card.glowStartTime > anim.card.glowDuration)) {
-                gameState.animatingCards.splice(i, 1);
-            }
+    // Función de easing para efecto "bounce"
+    function easeOutBounce(t) {
+        if (t < 1 / 2.75) {
+            return 7.5625 * t * t;
+        } else if (t < 2 / 2.75) {
+            return 7.5625 * (t -= 1.5 / 2.75) * t + 0.75;
+        } else if (t < 2.5 / 2.75) {
+            return 7.5625 * (t -= 2.25 / 2.75) * t + 0.9375;
+        } else {
+            return 7.5625 * (t -= 2.625 / 2.75) * t + 0.984375;
         }
     }
 
