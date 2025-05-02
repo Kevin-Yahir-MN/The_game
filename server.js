@@ -370,7 +370,7 @@ function handlePlayCard(room, player, msg) {
         playerName: player.name,
         cardValue: msg.cardValue,
         position: msg.position,
-        previousValue,
+        previousValue: targetValue,
         persistColor: true
     }, { includeGameState: true });
 
