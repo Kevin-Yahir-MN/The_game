@@ -83,25 +83,45 @@ document.addEventListener('DOMContentLoaded', () => {
             this.isDragging = false;
             this.dragOffsetX = 0;
             this.dragOffsetY = 0;
+            this.glowColor = '#99CCFF';
+            this.glowAlpha = 0;
+            this.glowMaxAlpha = 0.8;
+            this.glowDirection = 1; // 1 para aumentar, -1 para disminuir
+            this.glowStartTime = 0;
+            this.glowDuration = 0;
         }
 
         draw() {
             ctx.save();
             if (!this.isDragging) ctx.translate(this.shakeOffset, 0);
 
+            // Dibujar sombra
             ctx.shadowColor = this.shadowColor;
             ctx.shadowBlur = 8;
             ctx.shadowOffsetY = 4;
 
+            // Dibujar carta
             ctx.beginPath();
             ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
+
+            // Color base de la carta
             ctx.fillStyle = this === selectedCard ? '#FFFF99' : this.backgroundColor;
             ctx.fill();
 
+            // Efecto de brillo si está activo
+            if (this.glowAlpha > 0) {
+                ctx.fillStyle = this.glowColor;
+                ctx.globalAlpha = this.glowAlpha;
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Borde
             ctx.strokeStyle = this.isPlayable ? '#27ae60' : '#34495e';
             ctx.lineWidth = this.isPlayable ? 3 : 2;
             ctx.stroke();
 
+            // Texto (valor de la carta)
             ctx.fillStyle = '#2c3e50';
             ctx.font = 'bold 28px Arial';
             ctx.textAlign = 'center';
@@ -679,6 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const position = message.position;
             const value = message.cardValue;
 
+            // Actualizar el estado del tablero
             if (position.includes('asc')) {
                 const idx = position === 'asc1' ? 0 : 1;
                 gameState.board.ascending[idx] = value;
@@ -687,22 +708,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 gameState.board.descending[idx] = value;
             }
 
+            // Actualizar historial
             if (!gameState.columnHistory[position]) {
                 gameState.columnHistory[position] = position.includes('asc') ? [1] : [100];
             }
             gameState.columnHistory[position].push(value);
 
+            // Crear animación
             const cardPosition = getColumnPosition(position);
-            const opponentCard = new Card(value, cardPosition.x, cardPosition.y, false, true);
+            const opponentCard = new Card(value, cardPosition.x, -CARD_HEIGHT, false, true);
+
+            // Configurar propiedades especiales para la animación
+            opponentCard.backgroundColor = '#FFFFFF';
+            opponentCard.glowColor = '#99CCFF';
+            opponentCard.glowAlpha = 0;
+            opponentCard.glowMaxAlpha = 0.8;
+            opponentCard.glowDirection = 1;
 
             gameState.animatingCards.push({
                 card: opponentCard,
                 startTime: Date.now(),
-                duration: 200,
+                duration: 800, // Duración más larga para mejor visibilidad
                 targetX: cardPosition.x,
                 targetY: cardPosition.y,
                 fromX: cardPosition.x,
-                fromY: -CARD_HEIGHT
+                fromY: -CARD_HEIGHT,
+                onComplete: () => {
+                    // Iniciar efecto de brillo después de colocar la carta
+                    opponentCard.glowStartTime = Date.now();
+                    opponentCard.glowDuration = 1000;
+                }
             });
 
             gameState.cardsPlayedThisTurn.push({
@@ -1302,12 +1337,37 @@ document.addEventListener('DOMContentLoaded', () => {
             const elapsed = now - anim.startTime;
             const progress = Math.min(elapsed / anim.duration, 1);
 
+            // Animación de movimiento
             anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * progress;
             anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * progress;
 
+            // Efecto de brillo después de completar el movimiento
+            if (progress === 1 && anim.onComplete && !anim.completed) {
+                anim.completed = true;
+                anim.onComplete();
+            }
+
+            // Manejar el efecto de brillo
+            if (anim.card.glowStartTime > 0) {
+                const glowElapsed = now - anim.card.glowStartTime;
+                if (glowElapsed < anim.card.glowDuration) {
+                    const glowProgress = glowElapsed / anim.card.glowDuration;
+
+                    // Brillo que aumenta y luego disminuye
+                    if (glowProgress < 0.5) {
+                        anim.card.glowAlpha = anim.card.glowMaxAlpha * (glowProgress * 2);
+                    } else {
+                        anim.card.glowAlpha = anim.card.glowMaxAlpha * (2 - glowProgress * 2);
+                    }
+                } else {
+                    anim.card.glowAlpha = 0;
+                    anim.card.glowStartTime = 0;
+                }
+            }
+
             anim.card.draw();
 
-            if (progress === 1 || now - anim.startTime > 1000) {
+            if (progress === 1 && (!anim.card.glowStartTime || now - anim.card.glowStartTime > anim.card.glowDuration)) {
                 gameState.animatingCards.splice(i, 1);
             }
         }
@@ -1325,10 +1385,17 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillStyle = '#1a6b1a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        // Dibujar tablero primero
         drawBoard();
-        drawHistoryIcons();
+
+        // Dibujar animaciones de cartas (incluyendo las que se están moviendo)
         handleCardAnimations();
+
+        // Luego dibujar las cartas del jugador
         drawPlayerCards();
+
+        // Finalmente dibujar iconos de historial
+        drawHistoryIcons();
 
         if (isDragging && dragStartCard) {
             dragStartCard.draw();
