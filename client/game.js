@@ -679,6 +679,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const position = message.position;
             const value = message.cardValue;
 
+            // Actualizar el tablero
             if (position.includes('asc')) {
                 const idx = position === 'asc1' ? 0 : 1;
                 gameState.board.ascending[idx] = value;
@@ -687,33 +688,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 gameState.board.descending[idx] = value;
             }
 
+            // Crear carta con color azul
+            const cardPosition = getColumnPosition(position);
+            const opponentCard = new Card(
+                value,
+                cardPosition.x,
+                cardPosition.y,
+                false,
+                true  // isPlayedThisTurn = true para color azul
+            );
+
+            // Configurar animación desde arriba
+            gameState.animatingCards.push({
+                card: opponentCard,
+                startTime: Date.now(),
+                duration: 300,  // Duración un poco más larga para mejor visibilidad
+                targetX: cardPosition.x,
+                targetY: cardPosition.y,
+                fromX: cardPosition.x,
+                fromY: -CARD_HEIGHT * 1.5  // Comenzar más arriba
+            });
+
+            // Actualizar historial
             if (!gameState.columnHistory[position]) {
                 gameState.columnHistory[position] = position.includes('asc') ? [1] : [100];
             }
             gameState.columnHistory[position].push(value);
 
-            const cardPosition = getColumnPosition(position);
-            const opponentCard = new Card(value, cardPosition.x, cardPosition.y, false, true);
-
-            gameState.animatingCards.push({
-                card: opponentCard,
-                startTime: Date.now(),
-                duration: 200,
-                targetX: cardPosition.x,
-                targetY: cardPosition.y,
-                fromX: cardPosition.x,
-                fromY: -CARD_HEIGHT
-            });
-
-            gameState.cardsPlayedThisTurn.push({
-                value: message.cardValue,
-                position: message.position,
-                playerId: message.playerId,
-                isPlayedThisTurn: true
-            });
-
+            // Notificación visual
             showNotification(`${message.playerName} jugó un ${value}`);
-            updateGameInfo();
         }
     }
 

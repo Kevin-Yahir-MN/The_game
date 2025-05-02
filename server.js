@@ -201,7 +201,12 @@ function broadcastToRoom(room, message, options = {}) {
     const { includeGameState = false, skipPlayerId = null } = options;
     room.players.forEach(player => {
         if (player.id !== skipPlayerId && player.ws?.readyState === WebSocket.OPEN) {
-            safeSend(player.ws, message);
+            // Asegurar que se envíe el estado de isPlayedThisTurn
+            const enhancedMessage = {
+                ...message,
+                isPlayedThisTurn: message.cardValue && player.id !== message.playerId
+            };
+            safeSend(player.ws, enhancedMessage);
             if (includeGameState) sendGameState(room, player);
         }
     });
@@ -220,7 +225,8 @@ function sendGameState(room, player) {
             n: p.name,
             h: p.isHost,
             c: p.cards.length,
-            s: p.cardsPlayedThisTurn.length
+            s: p.cardsPlayedThisTurn.length,
+            pt: p.cardsPlayedThisTurn // Enviar cartas jugadas este turno
         }))
     };
 
@@ -1015,7 +1021,11 @@ wss.on('connection', async (ws, req) => {
                     break;
                 case 'play_card':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        handlePlayCard(room, player, msg);
+                        const enhancedMsg = {
+                            ...msg,
+                            isPlayedThisTurn: true
+                        };
+                        handlePlayCard(room, player, enhancedMsg);
                     }
                     break;
                 case 'end_turn':
