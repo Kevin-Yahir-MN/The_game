@@ -57,15 +57,15 @@ document.addEventListener('DOMContentLoaded', () => {
         remainingDeck: 98,
         initialCards: 6,
         cardsPlayedThisTurn: [],
+        currentTurnCards: [], // Nuevo array para rastrear cartas del turno
         animatingCards: [],
         columnHistory: {
-            asc1: [],
-            asc2: [],
-            desc1: [],
-            desc2: []
+            asc1: [1],
+            asc2: [1],
+            desc1: [100],
+            desc2: [100]
         }
     };
-
     class Card {
         constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
             this.value = value;
@@ -75,37 +75,40 @@ document.addEventListener('DOMContentLoaded', () => {
             this.height = CARD_HEIGHT;
             this.isPlayable = isPlayable;
             this.isPlayedThisTurn = isPlayedThisTurn;
+            this.playedThisRound = false; // Nueva propiedad
             this.radius = 10;
             this.shakeOffset = 0;
             this.hoverOffset = 0;
-            this.backgroundColor = isPlayedThisTurn ? '#99CCFF' : '#FFFFFF';
+            this.backgroundColor = this.determineColor();
             this.shadowColor = 'rgba(0, 0, 0, 0.3)';
             this.isDragging = false;
             this.dragOffsetX = 0;
             this.dragOffsetY = 0;
         }
 
+        determineColor() {
+            if (this === selectedCard) return '#FFFF99';
+            if (this.isPlayedThisTurn || this.playedThisRound) return '#99CCFF';
+            return '#FFFFFF';
+        }
+
+        updateColor() {
+            this.backgroundColor = this.determineColor();
+        }
+
         draw() {
             ctx.save();
             if (!this.isDragging) ctx.translate(this.shakeOffset, 0);
 
-            // Sombra más pronunciada para cartas jugadas
-            ctx.shadowColor = this.isPlayedThisTurn ? 'rgba(0, 100, 255, 0.5)' : this.shadowColor;
-            ctx.shadowBlur = this.isPlayedThisTurn ? 10 : 8;
-            ctx.shadowOffsetY = this.isPlayedThisTurn ? 8 : 4;
+            ctx.shadowColor = this.isPlayedThisTurn || this.playedThisRound
+                ? 'rgba(0, 100, 255, 0.5)'
+                : 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = this.isPlayedThisTurn || this.playedThisRound ? 10 : 8;
+            ctx.shadowOffsetY = this.isPlayedThisTurn || this.playedThisRound ? 8 : 4;
 
             ctx.beginPath();
             ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
-
-            // Color basado en estado
-            if (this === selectedCard) {
-                ctx.fillStyle = '#FFFF99'; // Amarillo para carta seleccionada
-            } else if (this.isPlayedThisTurn) {
-                ctx.fillStyle = '#99CCFF'; // Azul para cartas jugadas este turno
-            } else {
-                ctx.fillStyle = '#FFFFFF'; // Blanco para cartas normales
-            }
-
+            ctx.fillStyle = this.backgroundColor;
             ctx.fill();
 
             ctx.strokeStyle = this.isPlayable ? '#27ae60' : '#34495e';
@@ -542,19 +545,30 @@ document.addEventListener('DOMContentLoaded', () => {
         let currentPlayerName;
 
         if (currentPlayerObj) {
-            currentPlayerName = currentPlayerObj.id === currentPlayer.id ?
-                'Tu turno' :
-                `Turno de ${currentPlayerObj.name}`;
+            currentPlayerName = currentPlayerObj.id === currentPlayer.id
+                ? 'Tu turno'
+                : `Turno de ${currentPlayerObj.name}`;
         } else {
             currentPlayerName = 'Esperando jugador...';
         }
 
         showNotification(currentPlayerName);
         gameState.currentTurn = message.newTurn;
+
+        // Resetear estados de cartas
+        gameState.yourCards.forEach(card => {
+            card.isPlayedThisTurn = false;
+            card.playedThisRound = false;
+            card.updateColor();
+        });
+
+        // Limpiar registro de cartas del turno
+        gameState.currentTurnCards = [];
+
         resetCardsPlayedProgress();
         updateGameInfo();
 
-        if (currentPlayerObj.id === currentPlayer.id) {
+        if (currentPlayerObj && currentPlayerObj.id === currentPlayer.id) {
             showNotification('Partida guardada - ¡Es tu turno!');
         }
     }
@@ -563,9 +577,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('progressText').textContent = '0/2 cartas jugadas';
         document.getElementById('progressBar').style.width = '0%';
 
+        // No resetear playedThisRound aquí, solo al final del turno
         gameState.yourCards.forEach(card => {
             card.isPlayedThisTurn = false;
-            card.backgroundColor = '#FFFFFF';
+            card.updateColor();
         });
 
         gameState.cardsPlayedThisTurn = [];
@@ -1158,6 +1173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             roomId: roomId
         }));
 
+        // No limpiar currentTurnCards aquí, se hará en handleTurnChanged
         resetCardsPlayedProgress();
     }
 
@@ -1208,15 +1224,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ctx.shadowColor = 'transparent';
 
+        // Dibujar cartas del tablero
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const value = i < 2 ? gameState.board.ascending[i % 2] : gameState.board.descending[i % 2];
+            const wasPlayedThisTurn = gameState.currentTurnCards.some(
+                c => c.value === value && c.position === col
+            );
+
             const card = new Card(
                 value,
                 BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i,
                 BOARD_POSITION.y,
                 false,
-                gameState.cardsPlayedThisTurn.some(c => c.value === value)
+                wasPlayedThisTurn
             );
+
+            if (wasPlayedThisTurn) {
+                card.playedThisRound = true;
+            }
+
             card.draw();
         });
     }
@@ -1345,29 +1371,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleAnimatedCardPlay(message) {
-        // Solo animar si no es nuestra propia carta
         if (message.playerId !== currentPlayer.id) {
             const position = message.position;
             const value = message.cardValue;
 
-            // Crear carta con color azul
-            const card = new Card(
-                value,
-                0, // x temporal
-                0, // y temporal
-                false, // isPlayable
-                true  // isPlayedThisTurn (azul)
-            );
+            const card = new Card(value, 0, 0, false, true);
+            card.playedThisRound = true;
 
-            // Configurar animación
             const targetPos = getColumnPosition(position);
             const startX = targetPos.x;
-            const startY = -CARD_HEIGHT * 2; // Comienza fuera de pantalla
+            const startY = -CARD_HEIGHT * 2;
 
             gameState.animatingCards.push({
                 card: card,
                 startTime: Date.now(),
-                duration: 600, // Duración en ms
+                duration: 600,
                 targetX: targetPos.x,
                 targetY: targetPos.y,
                 fromX: startX,
@@ -1375,7 +1393,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 isOpponentCard: true
             });
 
-            // Actualizar estado del tablero inmediatamente
+            // Actualizar estado del tablero
             if (position.includes('asc')) {
                 const idx = position === 'asc1' ? 0 : 1;
                 gameState.board.ascending[idx] = value;
@@ -1384,11 +1402,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 gameState.board.descending[idx] = value;
             }
 
-            // Mostrar notificación
+            // Registrar carta jugada este turno
+            gameState.currentTurnCards.push({
+                value: value,
+                position: position,
+                playerId: message.playerId
+            });
+
             showNotification(`${message.playerName} jugó un ${value}`);
         }
     }
-
     function gameLoop(timestamp) {
         if (timestamp - lastRenderTime < 1000 / TARGET_FPS) {
             requestAnimationFrame(gameLoop);

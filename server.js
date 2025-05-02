@@ -356,7 +356,7 @@ function handlePlayCard(room, player, msg) {
 
     updateBoardHistory(room, msg.position, msg.cardValue);
 
-    // Enviar a todos los jugadores con animación
+    // Enviar a todos los jugadores con persistencia de color
     broadcastToRoom(room, {
         type: 'card_played_animated',
         playerId: player.id,
@@ -364,7 +364,7 @@ function handlePlayCard(room, player, msg) {
         cardValue: msg.cardValue,
         position: msg.position,
         previousValue,
-        isPlayedThisTurn: true
+        persistColor: true
     }, { includeGameState: true });
 
     checkGameStatus(room);
