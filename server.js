@@ -744,7 +744,10 @@ function handlePlayCard(room, player, msg) {
 
         previousValue: targetValue,
 
-        persistColor: true
+        persistColor: true,
+
+        isPlayedThisTurn: true  // <- Añadir esta propiedad
+
 
     }, { includeGameState: true });
 

@@ -2730,7 +2730,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 position: position,
 
-                playerId: message.playerId
+                playerId: message.playerId,
+
+                isPlayedThisTurn: true  // Añadir esta propiedad
+
 
             });
 
