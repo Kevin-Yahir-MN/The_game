@@ -725,7 +725,7 @@ body {
 }
 
 .current-turn .player-name {
-    animation: pulse 1.5s infinite;
+    animation: pulse 3.5s infinite;
 }
 
 /* Animaciones */
