@@ -746,8 +746,7 @@ function handlePlayCard(room, player, msg) {
 
         persistColor: true,
 
-        isPlayedThisTurn: true  // <- Añadir esta propiedad
-
+        isPlayedThisTurn: true  // Añadir este flag
 
     }, { includeGameState: true });
 
@@ -1011,6 +1010,12 @@ async function endTurn(room, player) {
 
         minCardsRequired: requiredCards
 
+    }, { includeGameState: true });
+
+    // Añadir esta línea antes de cambiar el turno para limpiar el estado
+    broadcastToRoom(room, {
+        type: 'clear_turn_cards',
+        playerId: player.id
     }, { includeGameState: true });
 
 

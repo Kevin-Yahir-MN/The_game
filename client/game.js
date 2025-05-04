@@ -510,6 +510,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 switch (message.type) {
 
+                    case 'clear_turn_cards':
+                        // Limpiar el estado de todas las cartas jugadas este turno
+                        gameState.yourCards.forEach(card => {
+                            card.isPlayedThisTurn = false;
+                            card.updateColor();
+                        });
+                        gameState.cardsPlayedThisTurn = [];
+                        break;
+
                     case 'full_state_update':
 
                         handleFullStateUpdate(message);
@@ -589,6 +598,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
 
                     case 'card_played_animated':
+                        // Modificar para incluir el estado isPlayedThisTurn
+                        const opponentCard = new Card(
+                            value,
+                            cardPosition.x,
+                            cardPosition.y,
+                            false,
+                            message.isPlayedThisTurn  // Pasar el flag al constructor
+                        );
 
                         handleAnimatedCardPlay(message);
 
@@ -2730,10 +2747,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 position: position,
 
-                playerId: message.playerId,
-
-                isPlayedThisTurn: true  // Añadir esta propiedad
-
+                playerId: message.playerId
 
             });
 
