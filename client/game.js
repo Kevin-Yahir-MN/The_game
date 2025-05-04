@@ -89,7 +89,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         determineColor() {
             if (this === selectedCard) return '#FFFF99';
-            if (this.isPlayedThisTurn || this.playedThisRound) return '#99CCFF';
+
+            // Verificar si es una carta del tablero jugada este turno
+            const isBoardCardPlayedThisTurn = gameState.cardsPlayedThisTurn.some(move => {
+                const boardValue = move.position.includes('asc')
+                    ? gameState.board.ascending[move.position === 'asc1' ? 0 : 1]
+                    : gameState.board.descending[move.position === 'desc1' ? 0 : 1];
+                return boardValue === this.value;
+            });
+
+            if (this.isPlayedThisTurn || this.playedThisRound || isBoardCardPlayedThisTurn) {
+                return '#99CCFF';
+            }
             return '#FFFFFF';
         }
 
@@ -569,6 +580,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.updateColor();
         });
 
+        // Limpiar todas las cartas jugadas en este turno
         gameState.cardsPlayedThisTurn = [];
 
         if (currentPlayerObj) {
@@ -581,14 +593,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         showNotification(currentPlayerName);
         gameState.currentTurn = message.newTurn;
-
-        gameState.yourCards.forEach(card => {
-            card.isPlayedThisTurn = false;
-            card.playedThisRound = false;
-            card.updateColor();
-        });
-
-        gameState.currentTurnCards = [];
 
         resetCardsPlayedProgress();
         updateGameInfo();
@@ -739,6 +743,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 gameState.board.descending[idx] = value;
             }
 
+            // Registrar la jugada en el historial del turno actual
+            gameState.cardsPlayedThisTurn.push({
+                value: value,
+                position: position,
+                playerId: message.playerId,
+                previousValue: position.includes('asc')
+                    ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
+                    : gameState.board.descending[position === 'desc1' ? 0 : 1],
+                isPlayedThisTurn: true
+            });
+
             const cardPosition = getColumnPosition(position);
             const opponentCard = new Card(
                 value,
@@ -755,7 +770,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 targetX: cardPosition.x,
                 targetY: cardPosition.y,
                 fromX: cardPosition.x,
-                fromY: -CARD_HEIGHT * 1.5
+                fromY: -CARD_HEIGHT * 1.5,
+                isOpponentCard: true
             });
 
             if (!gameState.columnHistory[position]) {
@@ -766,7 +782,6 @@ document.addEventListener('DOMContentLoaded', () => {
             showNotification(`${message.playerName} jugó un ${value}`);
         }
     }
-
     function updatePlayerCards(cards) {
         const isYourTurn = gameState.currentTurn === currentPlayer.id;
         const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
@@ -1170,8 +1185,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const value = i < 2 ? gameState.board.ascending[i % 2] : gameState.board.descending[i % 2];
+
+            // Verificar si fue jugada en este turno por cualquier jugador
             const wasPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
-                c => c.value === value && c.position === col
+                move => move.value === value && move.position === col
             );
 
             const card = new Card(
