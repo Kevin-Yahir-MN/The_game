@@ -532,16 +532,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         break;
 
+                    // Busca el case 'game_started' y actualízalo:
                     case 'game_started':
+                        gameState.board = message.board || { ascending: [1, 1], descending: [100, 100] };
+                        gameState.currentTurn = message.currentTurn;
+                        gameState.remainingDeck = message.remainingDeck;
+                        gameState.initialCards = message.initialCards;
+                        gameState.gameStarted = true;
 
-                        updateGameState(message.state);
-
-                        showNotification('¡El juego ha comenzado!');
-
-                        updateGameInfo();
-
+                        // Forzar redirección si aún estamos en la sala
+                        if (window.location.pathname.endsWith('sala.html')) {
+                            window.location.href = 'game.html';
+                        }
                         break;
-
                     case 'your_cards':
 
                         updatePlayerCards(message.cards);

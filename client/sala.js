@@ -215,37 +215,44 @@ document.addEventListener('DOMContentLoaded', () => {
         startBtn.classList.add('loading');
 
         try {
-            // Forzar registro inicial antes de empezar
-            await fetch(`${API_URL}/register-connection`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    playerId: playerId,
-                    roomId: roomId
-                })
-            });
+            // Verificar estado de los jugadores primero
+            const response = await fetch(`${API_URL}/room-info/${roomId}`);
+            const data = await response.json();
 
-            // Enviar mensaje para iniciar el juego
+            if (!data.success || data.players.length < 1) {
+                throw new Error('No hay suficientes jugadores');
+            }
+
+            // Enviar comando de inicio al servidor
             socket.send(JSON.stringify({
                 type: 'start_game',
                 playerId: playerId,
-                playerName: playerName,
                 roomId: roomId,
                 initialCards: parseInt(initialCardsSelect.value)
             }));
 
-            // Agregar este timeout de seguridad
-            setTimeout(() => {
+            // Timeout de seguridad reducido a 8 segundos
+            const timeout = setTimeout(() => {
                 if (window.location.pathname.endsWith('sala.html')) {
-                    startBtn.disabled = false;
-                    startBtn.textContent = 'Iniciar Juego';
-                    startBtn.classList.remove('loading');
-                    showNotification('El juego no pudo iniciarse. Intenta nuevamente.', true);
+                    resetStartButton();
+                    showNotification('El servidor está tardando en responder', true);
                 }
-            }, 10000); // 10 segundos de timeout
+            }, 8000);
+
+            // Limpiar timeout si el juego inicia correctamente
+            socket.addEventListener('message', function handler(event) {
+                const message = JSON.parse(event.data);
+                if (message.type === 'game_started') {
+                    clearTimeout(timeout);
+                    socket.removeEventListener('message', handler);
+                    window.location.href = 'game.html';
+                }
+            });
+
         } catch (error) {
             console.error('Error al iniciar juego:', error);
             resetStartButton();
+            showNotification('Error al iniciar: ' + error.message, true);
         }
     }
 
