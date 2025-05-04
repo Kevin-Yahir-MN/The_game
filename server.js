@@ -1950,58 +1950,57 @@ wss.on('connection', async (ws, req) => {
 
             switch (msg.type) {
 
+                // En el manejador de mensajes WebSocket (server.js)
                 case 'start_game':
-
                     if (player.isHost && !room.gameState.gameStarted) {
-
                         try {
-
                             await Promise.all(room.players.map(async (p) => {
-
                                 await pool.query(`
-
-                                    INSERT INTO player_connections 
-
-                                    (player_id, room_id, last_ping, connection_status)
-
-                                    VALUES ($1, $2, NOW(), $3)
-
-                                    ON CONFLICT (player_id) 
-
-                                    DO UPDATE SET
-
-                                        room_id = $2,
-
-                                        last_ping = NOW(),
-
-                                        connection_status = $3
-
-                                `, [
-
+                    INSERT INTO player_connections 
+                    (player_id, room_id, last_ping, connection_status)
+                    VALUES ($1, $2, NOW(), $3)
+                    ON CONFLICT (player_id) 
+                    DO UPDATE SET
+                        room_id = $2,
+                        last_ping = NOW(),
+                        connection_status = $3
+                `, [
                                     p.id,
-
                                     roomId,
-
                                     p.ws?.readyState === WebSocket.OPEN ? 'connected' : 'disconnected'
-
                                 ]);
-
                             }));
 
+                            // Asegurarse de que todos los jugadores están listos
+                            const allPlayersReady = room.players.every(p => p.ws?.readyState === WebSocket.OPEN);
+
+                            if (allPlayersReady) {
+                                await startGame(room, msg.initialCards);
+
+                                // Enviar confirmación a todos los jugadores
+                                broadcastToRoom(room, {
+                                    type: 'game_started',
+                                    success: true,
+                                    message: '¡El juego ha comenzado!'
+                                });
+                            } else {
+                                // Notificar al host que faltan jugadores
+                                safeSend(player.ws, {
+                                    type: 'notification',
+                                    message: 'No todos los jugadores están conectados',
+                                    isError: true
+                                });
+                            }
                         } catch (error) {
-
-                            console.error('Error registrando conexiones:', error);
-
+                            console.error('Error al iniciar juego:', error);
+                            safeSend(player.ws, {
+                                type: 'notification',
+                                message: 'Error al iniciar el juego',
+                                isError: true
+                            });
                         }
-
-
-
-                        startGame(room, msg.initialCards);
-
                     }
-
                     break;
-
                 case 'play_card':
 
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {

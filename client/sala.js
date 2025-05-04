@@ -127,6 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const message = JSON.parse(event.data);
 
+                if (message.type === 'game_started') {
+                    window.location.href = 'game.html';
+                }
                 if (message.type === 'pong') {
                     updateConnectionStatus('Conectado');
                     return;
@@ -222,6 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             });
 
+            // Enviar mensaje para iniciar el juego
             socket.send(JSON.stringify({
                 type: 'start_game',
                 playerId: playerId,
@@ -229,14 +233,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 roomId: roomId,
                 initialCards: parseInt(initialCardsSelect.value)
             }));
+
+            // Agregar este timeout de seguridad
+            setTimeout(() => {
+                if (window.location.pathname.endsWith('sala.html')) {
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Iniciar Juego';
+                    startBtn.classList.remove('loading');
+                    showNotification('El juego no pudo iniciarse. Intenta nuevamente.', true);
+                }
+            }, 10000); // 10 segundos de timeout
         } catch (error) {
             console.error('Error al iniciar juego:', error);
-            startBtn.disabled = false;
-            startBtn.textContent = 'Iniciar Juego';
-            startBtn.classList.remove('loading');
-            updateConnectionStatus('Error al iniciar', true);
+            resetStartButton();
         }
     }
+
+    // Nueva función para resetear el botón
+    function resetStartButton() {
+        startBtn.disabled = false;
+        startBtn.textContent = 'Iniciar Juego';
+        startBtn.classList.remove('loading');
+    }
+
 
     // Actualizar lista de jugadores via API
     async function updatePlayersList() {
