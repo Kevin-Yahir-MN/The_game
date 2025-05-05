@@ -33,12 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragStartX = 0;
     let dragStartY = 0;
     let isDragging = false;
-    let historyIconsAnimation = {
-        interval: null,
-        isAnimating: false,
-        animationDuration: 10000,
-        lastAnimationTime: 0
-    };
+    const HISTORY_ICON_PULSE_INTERVAL = 20000; // 20 segundos
+    const HISTORY_ICON_PULSE_DURATION = 500; // Duración de la animación en ms
 
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
@@ -852,12 +848,39 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawHistoryIcons() {
         if (!historyIcon.complete || historyIcon.naturalWidth === 0) return;
 
+        const pulseProgress = calculatePulseProgress();
+
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const baseX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const baseY = HISTORY_ICON_Y;
 
-            ctx.drawImage(historyIcon, baseX, baseY, 40, 40);
+            // Calcular escala basada en el progreso de la animación
+            const scale = 1 + 0.2 * pulseProgress; // Aumenta hasta 20% más grande
+
+            ctx.save();
+            ctx.translate(baseX + 20, baseY + 20); // Trasladar al centro del icono
+            ctx.scale(scale, scale);
+            ctx.translate(-20, -20); // Compensar la traslación
+
+            ctx.drawImage(historyIcon, 0, 0, 40, 40);
+            ctx.restore();
         });
+    }
+
+    function calculatePulseProgress() {
+        if (!historyIconsAnimation.lastPulseTime) {
+            historyIconsAnimation.lastPulseTime = Date.now();
+        }
+
+        const now = Date.now();
+        const timeSinceLastPulse = (now - historyIconsAnimation.lastPulseTime) % HISTORY_ICON_PULSE_INTERVAL;
+
+        if (timeSinceLastPulse < HISTORY_ICON_PULSE_DURATION) {
+            // Animación de crecimiento
+            return Math.sin((timeSinceLastPulse / HISTORY_ICON_PULSE_DURATION) * Math.PI);
+        }
+
+        return 0;
     }
 
     function handleMouseDown(e) {
@@ -1507,6 +1530,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
             }
 
+            historyIconsAnimation = {
+                interval: null,
+                isAnimating: false,
+                lastPulseTime: Date.now(),
+                animationDuration: HISTORY_ICON_PULSE_DURATION
+            };
             startHistoryIconsAnimation();
             connectWebSocket();
             gameLoop();
