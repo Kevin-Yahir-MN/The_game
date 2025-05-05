@@ -316,6 +316,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateGameInfo();
                         break;
                     case 'card_played_animated':
+                        if (message.playerId === currentPlayer.id) {
+                            const player = gameState.players.find(p => p.id === currentPlayer.id);
+                            if (player) {
+                                player.cardsPlayedCount = (Number(player.cardsPlayedCount) || 0) + 1;
+                            }
+                        }
                         if (message.position.includes('asc')) {
                             const idx = message.position === 'asc1' ? 0 : 1;
                             gameState.board.ascending[idx] = message.cardValue;
@@ -719,7 +725,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 cardCount: player.c,
                 isHost: player.h,
                 cardsPlayedThisTurn: player.s || 0,
-                cardsPlayedCount: player.pt || 0
+                cardsPlayedCount: Number(player.pt) || 0
             }));
 
             if (!currentPlayer.name && currentPlayer.id) {
@@ -1139,15 +1145,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
         if (!currentPlayerObj) return;
 
-        const cardsPlayedCount = currentPlayerObj.cardsPlayedCount || 0;
+        const cardsPlayed = Number(currentPlayerObj.cardsPlayedCount) || 0;
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
 
         document.getElementById('progressText').textContent =
-            `${cardsPlayedCount}/${minCardsRequired} cartas jugadas`;
+            `${cardsPlayed}/${minCardsRequired} cartas jugadas`;
 
-        const progressPercentage = Math.min((cardsPlayedCount / minCardsRequired) * 100, 100);
+        const progressPercentage = Math.min((cardsPlayed / minCardsRequired) * 100, 100);
         document.getElementById('progressBar').style.width = `${progressPercentage}%`;
     }
+
     function hasValidMoves(cards, board) {
         return cards.some(card => {
             return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
@@ -1288,9 +1295,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let currentPlayerName;
 
         if (currentPlayerObj) {
-            currentPlayerName = currentPlayerObj.id === currentPlayer.id ?
-                'Tu turno' :
-                `Turno de ${currentPlayerObj.name}`;
+            currentPlayerName = currentPlayerObj.id === currentPlayer.id
+                ? '¡Es tu turno!'
+                : `Turno de ${currentPlayerObj.name}`;
         } else {
             currentPlayerName = 'Esperando jugador...';
         }
@@ -1298,21 +1305,17 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('currentTurn').textContent = currentPlayerName;
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
 
+        // Corregir la obtención del conteo de cartas jugadas
         if (gameState.currentTurn === currentPlayer.id) {
-            const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
-            const cardsPlayedCount = currentPlayerObj?.cardsPlayedCount || 0;
+            const currentPlayerData = gameState.players.find(p => p.id === currentPlayer.id);
+            const cardsPlayed = Number(currentPlayerData?.cardsPlayedCount) || 0;
             const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
 
             document.getElementById('progressText').textContent =
-                `${cardsPlayedCount}/${minCardsRequired} cartas jugadas`;
+                `${cardsPlayed}/${minCardsRequired} cartas jugadas`;
 
-            const progressPercentage = Math.min((cardsPlayedCount / minCardsRequired) * 100, 100);
+            const progressPercentage = Math.min((cardsPlayed / minCardsRequired) * 100, 100);
             document.getElementById('progressBar').style.width = `${progressPercentage}%`;
-        }
-
-        // Reiniciar la animación cuando es nuestro turno
-        if (gameState.currentTurn === currentPlayer.id) {
-            historyIconsAnimation.lastPulseTime = Date.now();
         }
 
         updatePlayersPanel();

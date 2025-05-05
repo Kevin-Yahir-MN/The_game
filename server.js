@@ -232,7 +232,7 @@ function sendGameState(room, player) {
             h: p.isHost,
             c: p.cards.length,
             s: p.cardsPlayedThisTurn.length,
-            pt: p.cardsPlayedThisTurn
+            pt: p.cardsPlayedThisTurn || 0
         }))
     };
 
@@ -364,7 +364,7 @@ function handlePlayCard(room, player, msg) {
         persistColor: true
     }, { includeGameState: true });
 
-    player.cardsPlayedCount = (player.cardsPlayedCount || 0) + 1;
+    player.cardsPlayedCount = (Number(player.cardsPlayedCount) || 0) + 1;
 
     checkGameStatus(room);
 }
