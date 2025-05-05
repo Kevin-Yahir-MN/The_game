@@ -517,6 +517,8 @@ function shuffleArray(array) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
+
+    array.length = 20;
     return array;
 }
 
