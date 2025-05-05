@@ -473,7 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.body.appendChild(notification);
 
-        const duration = (isError || message.includes('GAME OVER')) ? 8000 : 5000;
+        const duration = (isError || message.includes('GAME OVER')) ? 3000 : 3000;
 
         notificationTimeout = setTimeout(() => {
             notification.style.animation = 'notificationExit 0.3s forwards';
