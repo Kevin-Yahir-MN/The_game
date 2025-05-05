@@ -80,7 +80,6 @@ async function saveGameState(roomId) {
                 name: p.name,
                 cards: p.cards,
                 isHost: p.isHost,
-                cardsPlayedCount: p.cardsPlayedCount || 0, // Nuevo campo
                 connected: p.ws !== null
             })),
             gameState: {
@@ -150,7 +149,6 @@ async function restoreActiveGames() {
                         ws: null,
                         cards: p.cards || [],
                         cardsPlayedThisTurn: p.cardsPlayedThisTurn || [],
-                        cardsPlayedCount: p.cardsPlayedCount || 0,
                         lastActivity: Date.now()
                     })) || [],
                     gameState: gameData.gameState || {
@@ -232,7 +230,7 @@ function sendGameState(room, player) {
             h: p.isHost,
             c: p.cards.length,
             s: p.cardsPlayedThisTurn.length,
-            pt: p.cardsPlayedThisTurn || 0
+            pt: p.cardsPlayedThisTurn
         }))
     };
 
@@ -345,7 +343,6 @@ function handlePlayCard(room, player, msg) {
     }
 
     player.cards = player.cards.filter(c => c !== msg.cardValue);
-    player.cardsPlayedThisTurn = player.cardsPlayedThisTurn || [];
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
         position: msg.position,
@@ -353,15 +350,18 @@ function handlePlayCard(room, player, msg) {
         previousValue
     });
 
-    // Actualización clave: Enviar el conteo actualizado
-    broadcastToRoom(room, {
-        type: 'cards_played_update',
-        playerId: player.id,
-        cardsPlayedCount: player.cardsPlayedThisTurn.length,
-        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
-    });
-
     updateBoardHistory(room, msg.position, msg.cardValue);
+
+    broadcastToRoom(room, {
+        type: 'card_played_animated',
+        playerId: player.id,
+        playerName: player.name,
+        cardValue: msg.cardValue,
+        position: msg.position,
+        previousValue: targetValue,
+        persistColor: true
+    }, { includeGameState: true });
+
     checkGameStatus(room);
 }
 
@@ -436,14 +436,6 @@ async function endTurn(room, player) {
         });
     }
 
-    // Resetear contadores
-    player.cardsPlayedThisTurn = [];
-    broadcastToRoom(room, {
-        type: 'turn_reset',
-        playerId: player.id
-    });
-
-    // Resto de la lógica de endTurn...
     const targetCardCount = room.gameState.initialCards;
     const cardsToDraw = Math.min(
         targetCardCount - player.cards.length,
@@ -480,7 +472,10 @@ async function endTurn(room, player) {
         });
     }
 
+    player.cardsPlayedThisTurn = [];
+
     await saveGameState(reverseRoomMap.get(room));
+
     broadcastToRoom(room, {
         type: 'turn_changed',
         newTurn: nextPlayer.id,
@@ -523,8 +518,7 @@ function shuffleArray(array) {
         [array[i], array[j]] = [array[j], array[i]];
     }
 
-    array.length = 20
-
+    array.length = 20;
     return array;
 }
 
@@ -1159,7 +1153,7 @@ wss.on('connection', async (ws, req) => {
                                 gameState: {
                                     board: room.gameState.board,
                                     currentTurn: room.gameState.currentTurn,
-                                    remainingDeck: 20,
+                                    remainingDeck: room.gameState.deck.length,
                                     initialCards: room.gameState.initialCards,
                                     gameStarted: room.gameState.gameStarted
                                 },
