@@ -296,11 +296,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         updatePlayerCards(message.cards);
                         updateGameInfo();
                         break;
-                    case 'deck_empty':
-                        showNotification(message.message);
-                        gameState.remainingDeck = 0;
-                        updateGameInfo();
-                        break;
                     case 'game_over':
                         handleGameOver(message.message);
                         break;
@@ -317,17 +312,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateColumnHistoryUI(message.column, message.history, message.newValue);
                         break;
                     case 'card_played':
-                        // Forzar actualización del mínimo de cartas
-                        if (message.type === 'deck_empty') {
-                            gameState.remainingDeck = 0;
-                            showNotification(message.message);
-                        }
-                        if (message.type === 'turn_changed' && message.remainingDeck !== undefined) {
-                            gameState.remainingDeck = message.remainingDeck;
-                        }
+                        handleOpponentCardPlayed(message);
                         updateGameInfo();
                         break;
-
                     case 'card_played_animated':
                         if (message.position.includes('asc')) {
                             const idx = message.position === 'asc1' ? 0 : 1;
@@ -1148,7 +1135,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         document.getElementById('progressText').textContent =
-            `${currentPlayerCardsPlayed + 1}/${minCardsRequired} carta(s) jugada(s)`;
+            `${currentPlayerCardsPlayed + 1}/${minCardsRequired} cartas jugadas`;
 
         const progressPercentage = Math.min(((currentPlayerCardsPlayed + 1) / minCardsRequired) * 100, 100);
         document.getElementById('progressBar').style.width = `${progressPercentage}%`;
@@ -1291,34 +1278,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateGameInfo() {
         const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
+        let currentPlayerName;
 
-        // Actualizar información básica
-        document.getElementById('currentTurn').textContent =
-            currentPlayerObj ?
-                (currentPlayerObj.id === currentPlayer.id ? '¡Es tu turno!' : `Turno de ${currentPlayerObj.name}`) :
-                'Esperando jugador...';
+        if (currentPlayerObj) {
+            currentPlayerName = currentPlayerObj.id === currentPlayer.id ?
+                'Tu turno' :
+                `Turno de ${currentPlayerObj.name}`;
+        } else {
+            currentPlayerName = 'Esperando jugador...';
+        }
 
+        document.getElementById('currentTurn').textContent = currentPlayerName;
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
 
-        // Determinar el mínimo de cartas requeridas
-        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        const progressContainer = document.getElementById('progressText');
-        const progressBar = document.getElementById('progressBar');
-
         if (gameState.currentTurn === currentPlayer.id) {
-            // Cuando es nuestro turno
             const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
                 card => card.playerId === currentPlayer.id
             ).length;
 
-            progressContainer.textContent = `${currentPlayerCardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
-            progressBar.style.width = `${Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100)}%`;
-            progressBar.style.backgroundColor = '#2ecc71';
-        } else {
-            // Cuando NO es nuestro turno
-            progressContainer.textContent = `0/${minCardsRequired} carta(s) jugada(s)`;
-            progressBar.style.width = '0%';
-            progressBar.style.backgroundColor = '#7f8c8d';
+            const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+            const progressText = `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
+            document.getElementById('progressText').textContent = progressText;
+
+            const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
+            document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+        }
+
+        // Reiniciar la animación cuando es nuestro turno
+        if (gameState.currentTurn === currentPlayer.id) {
+            historyIconsAnimation.lastPulseTime = Date.now();
         }
 
         updatePlayersPanel();

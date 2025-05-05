@@ -436,51 +436,62 @@ async function endTurn(room, player) {
         });
     }
 
-    // Buscar siguiente jugador con cartas
-    let nextIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
-    let attempts = 0;
-    let skippedPlayers = 0;
-    let nextPlayer = null;
+    const targetCardCount = room.gameState.initialCards;
+    const cardsToDraw = Math.min(
+        targetCardCount - player.cards.length,
+        room.gameState.deck.length
+    );
 
-    do {
-        nextIndex = (nextIndex + 1) % room.players.length;
-        nextPlayer = room.players[nextIndex];
-        attempts++;
-
-        if (attempts > room.players.length * 2) {
-            // Prevención de bucle infinito
-            return checkGameStatus(room);
-        }
-
-        if (nextPlayer.cards.length === 0) {
-            skippedPlayers++;
-        }
-    } while ((nextPlayer.cards.length === 0 ||
-        nextPlayer.ws?.readyState !== WebSocket.OPEN) &&
-        attempts <= room.players.length * 2);
-
-    // Si encontramos un jugador válido
-    if (nextPlayer && nextPlayer.cards.length > 0) {
-        room.gameState.currentTurn = nextPlayer.id;
-        player.cardsPlayedThisTurn = [];
-
-        broadcastToRoom(room, {
-            type: 'turn_changed',
-            newTurn: nextPlayer.id,
-            previousPlayer: player.id,
-            playerName: nextPlayer.name,
-            cardsPlayedThisTurn: 0,
-            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
-            remainingDeck: room.gameState.deck.length,
-            skippedPlayers: skippedPlayers
-        }, { includeGameState: true });
-
-        await saveGameState(reverseRoomMap.get(room));
-        checkGameStatus(room);
-    } else {
-        // Si no hay jugadores con cartas
-        checkGameStatus(room);
+    for (let i = 0; i < cardsToDraw; i++) {
+        player.cards.push(room.gameState.deck.pop());
     }
+
+    if (room.gameState.deck.length === 0) {
+        broadcastToRoom(room, {
+            type: 'notification',
+            message: '¡El mazo se ha agotado!',
+            isError: false
+        });
+    }
+
+    const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
+    const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
+    const nextPlayer = room.players[nextIndex];
+    room.gameState.currentTurn = nextPlayer.id;
+
+    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
+
+    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
+        await saveGameState(reverseRoomMap.get(room));
+        return broadcastToRoom(room, {
+            type: 'game_over',
+            result: 'lose',
+            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
+            reason: 'min_cards_not_met'
+        });
+    }
+
+    player.cardsPlayedThisTurn = [];
+
+    await saveGameState(reverseRoomMap.get(room));
+
+    broadcastToRoom(room, {
+        type: 'turn_changed',
+        newTurn: nextPlayer.id,
+        previousPlayer: player.id,
+        playerName: nextPlayer.name,
+        cardsPlayedThisTurn: 0,
+        minCardsRequired: requiredCards
+    }, { includeGameState: true });
+
+    checkGameStatus(room);
+}
+
+function broadcastGameState(room) {
+    room.players.forEach(player => {
+        sendGameState(room, player);
+    });
 }
 
 function checkGameStatus(room) {
@@ -506,8 +517,6 @@ function shuffleArray(array) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
-
-    array.length = 20;
     return array;
 }
 
