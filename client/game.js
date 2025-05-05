@@ -462,33 +462,21 @@ document.addEventListener('DOMContentLoaded', () => {
     function showNotification(message, isError = false) {
         const existing = document.querySelector('.notification');
         if (existing) {
-            clearTimeout(notificationTimeout);
-            existing.remove();
+            existing.style.animation = 'notificationExit 0.3s forwards';
+            setTimeout(() => existing.remove(), 300);
         }
 
         const notification = document.createElement('div');
         notification.className = `notification ${isError ? 'error' : ''}`;
         notification.textContent = message;
-
-        // Configuración para notificaciones importantes/error
-        if (message.includes('GAME OVER') || message.includes('terminará') ||
-            message.includes('derrota') || message.includes('no puede jugar')) {
-            notification.style.zIndex = '1001';
-            notification.style.fontSize = '1.2rem';
-            notification.style.padding = '20px 40px';
-            notification.style.maxWidth = '80%';
-            notification.style.textAlign = 'center';
-        }
+        notification.style.animation = 'notificationEnter 0.3s forwards';
 
         document.body.appendChild(notification);
 
-        // Aumentar el tiempo de visualización:
-        // - Notificaciones normales: de 3000ms a 5000ms (5 segundos)
-        // - Notificaciones de error/importantes: de 5000ms a 8000ms (8 segundos)
         const duration = (isError || message.includes('GAME OVER')) ? 8000 : 5000;
 
         notificationTimeout = setTimeout(() => {
-            notification.classList.add('notification-fade-out');
+            notification.style.animation = 'notificationExit 0.3s forwards';
             setTimeout(() => notification.remove(), 300);
         }, duration);
     }
