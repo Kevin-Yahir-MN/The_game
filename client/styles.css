@@ -458,8 +458,9 @@ body {
     background: linear-gradient(90deg, var(--secondary), var(--primary));
     border-radius: 6px;
     width: 0%;
-    transition: width 0.2s ease;
+    transition: width 0.3s ease;
     margin-top: 8px;
+    display: block;
 }
 
 .progress-text {
