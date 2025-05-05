@@ -317,9 +317,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateColumnHistoryUI(message.column, message.history, message.newValue);
                         break;
                     case 'card_played':
-                        handleOpponentCardPlayed(message);
+                        // Forzar actualización del mínimo de cartas
+                        if (message.type === 'deck_empty') {
+                            gameState.remainingDeck = 0;
+                            showNotification(message.message);
+                        }
+                        if (message.type === 'turn_changed' && message.remainingDeck !== undefined) {
+                            gameState.remainingDeck = message.remainingDeck;
+                        }
                         updateGameInfo();
                         break;
+
                     case 'card_played_animated':
                         if (message.position.includes('asc')) {
                             const idx = message.position === 'asc1' ? 0 : 1;
@@ -1140,7 +1148,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         document.getElementById('progressText').textContent =
-            `${currentPlayerCardsPlayed + 1}/${minCardsRequired} cartas jugadas`;
+            `${currentPlayerCardsPlayed + 1}/${minCardsRequired} carta(s) jugada(s)`;
 
         const progressPercentage = Math.min(((currentPlayerCardsPlayed + 1) / minCardsRequired) * 100, 100);
         document.getElementById('progressBar').style.width = `${progressPercentage}%`;
@@ -1296,19 +1304,24 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('currentTurn').textContent = currentPlayerName;
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
 
-        // Cambiar el mínimo de cartas requeridas cuando se agota el mazo
+        // Calcular el mínimo de cartas requeridas (este cálculo ahora es constante)
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
 
+        // Mostrar siempre el mínimo correcto, sin importar si es nuestro turno o no
+        const progressText = `${gameState.cardsPlayedThisTurn.length}/${minCardsRequired} cartas jugadas`;
+        document.getElementById('progressText').textContent = progressText;
+
+        // Solo actualizar la barra de progreso si es nuestro turno
         if (gameState.currentTurn === currentPlayer.id) {
             const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
                 card => card.playerId === currentPlayer.id
             ).length;
 
-            const progressText = `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
-            document.getElementById('progressText').textContent = progressText;
-
             const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
             document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+        } else {
+            // Opcional: mostrar barra vacía cuando no es nuestro turno
+            document.getElementById('progressBar').style.width = '0%';
         }
 
         // Reiniciar la animación cuando es nuestro turno

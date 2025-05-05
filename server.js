@@ -447,14 +447,6 @@ async function endTurn(room, player) {
         player.cards.push(room.gameState.deck.pop());
     }
 
-    // Notificar a todos los jugadores si el mazo se agotó
-    if (room.gameState.deck.length === 0) {
-        broadcastToRoom(room, {
-            type: 'deck_empty',
-            message: '¡El mazo se ha agotado! Ahora solo necesitas jugar 1 carta por turno'
-        });
-    }
-
     const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
     const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
     const nextPlayer = room.players[nextIndex];
