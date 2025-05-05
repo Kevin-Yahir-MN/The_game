@@ -508,7 +508,7 @@ function checkGameStatus(room) {
 
 function initializeDeck() {
     const deck = [];
-    for (let i = 2; i < 21; i++) deck.push(i);
+    for (let i = 2; i < 100; i++) deck.push(i);
     return shuffleArray(deck);
 }
 
