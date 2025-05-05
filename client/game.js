@@ -611,7 +611,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetCardsPlayedProgress() {
-        document.getElementById('progressText').textContent = '0/2 cartas jugadas';
+        document.getElementById('progressText').textContent = deck.length > 0 ? '0/2 cartas jugadas' : '0/1 carta jugada';
         document.getElementById('progressBar').style.width = '0%';
 
         gameState.yourCards.forEach(card => {
