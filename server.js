@@ -509,9 +509,6 @@ function checkGameStatus(room) {
 function initializeDeck() {
     const deck = [];
     for (let i = 2; i < 100; i++) deck.push(i);
-
-    deck.length = 20
-
     return shuffleArray(deck);
 }
 
@@ -520,6 +517,9 @@ function shuffleArray(array) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
+
+    array.length = 20
+
     return array;
 }
 
