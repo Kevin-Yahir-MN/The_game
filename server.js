@@ -412,6 +412,7 @@ function handleUndoMove(room, player, msg) {
 }
 
 async function endTurn(room, player) {
+    // Cambiar el mínimo de cartas requeridas cuando se agota el mazo
     const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
     const cardsPlayed = player.cardsPlayedThisTurn.length;
 
@@ -446,11 +447,11 @@ async function endTurn(room, player) {
         player.cards.push(room.gameState.deck.pop());
     }
 
+    // Notificar a todos los jugadores si el mazo se agotó
     if (room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
-            type: 'notification',
-            message: '¡El mazo se ha agotado!',
-            isError: false
+            type: 'deck_empty',
+            message: '¡El mazo se ha agotado! Ahora solo necesitas jugar 1 carta por turno'
         });
     }
 
@@ -460,7 +461,7 @@ async function endTurn(room, player) {
     room.gameState.currentTurn = nextPlayer.id;
 
     const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
+    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1; // Actualizar requerimiento
 
     if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
         await saveGameState(reverseRoomMap.get(room));
@@ -482,18 +483,12 @@ async function endTurn(room, player) {
         previousPlayer: player.id,
         playerName: nextPlayer.name,
         cardsPlayedThisTurn: 0,
-        minCardsRequired: requiredCards
+        minCardsRequired: requiredCards, // Enviar el nuevo requerimiento
+        remainingDeck: room.gameState.deck.length // Enviar estado actual del mazo
     }, { includeGameState: true });
 
     checkGameStatus(room);
 }
-
-function broadcastGameState(room) {
-    room.players.forEach(player => {
-        sendGameState(room, player);
-    });
-}
-
 function checkGameStatus(room) {
     const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
     if (allPlayersEmpty && room.gameState.deck.length === 0) {

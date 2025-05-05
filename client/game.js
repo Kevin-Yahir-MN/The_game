@@ -296,6 +296,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         updatePlayerCards(message.cards);
                         updateGameInfo();
                         break;
+                    case 'deck_empty':
+                        showNotification(message.message);
+                        gameState.remainingDeck = 0;
+                        updateGameInfo();
+                        break;
                     case 'game_over':
                         handleGameOver(message.message);
                         break;
@@ -1282,7 +1287,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (currentPlayerObj) {
             currentPlayerName = currentPlayerObj.id === currentPlayer.id ?
-                'Tu turno' :
+                '¡Es tu turno!' :
                 `Turno de ${currentPlayerObj.name}`;
         } else {
             currentPlayerName = 'Esperando jugador...';
@@ -1291,12 +1296,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('currentTurn').textContent = currentPlayerName;
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
 
+        // Cambiar el mínimo de cartas requeridas cuando se agota el mazo
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+
         if (gameState.currentTurn === currentPlayer.id) {
             const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
                 card => card.playerId === currentPlayer.id
             ).length;
 
-            const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
             const progressText = `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
             document.getElementById('progressText').textContent = progressText;
 
