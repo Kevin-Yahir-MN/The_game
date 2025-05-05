@@ -200,6 +200,11 @@ function safeSend(ws, message) {
 function broadcastToRoom(room, message, options = {}) {
     const { includeGameState = false, skipPlayerId = null } = options;
 
+    // Asegurarse de incluir el estado del deck en todos los mensajes relevantes
+    if (includeGameState && !message.remainingDeck) {
+        message.remainingDeck = room.gameState.deck.length;
+    }
+
     room.players.forEach(player => {
         if (player.id !== skipPlayerId && player.ws?.readyState === WebSocket.OPEN) {
             const completeMessage = {
@@ -446,11 +451,12 @@ async function endTurn(room, player) {
         player.cards.push(room.gameState.deck.pop());
     }
 
+    // Notificar a todos si el deck se agotó
     if (room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
-            type: 'notification',
-            message: '¡El mazo se ha agotado!',
-            isError: false
+            type: 'deck_updated',
+            remaining: 0,
+            minCardsRequired: 1
         });
     }
 
@@ -482,16 +488,11 @@ async function endTurn(room, player) {
         previousPlayer: player.id,
         playerName: nextPlayer.name,
         cardsPlayedThisTurn: 0,
-        minCardsRequired: requiredCards
+        minCardsRequired: requiredCards,
+        remainingDeck: room.gameState.deck.length
     }, { includeGameState: true });
 
     checkGameStatus(room);
-}
-
-function broadcastGameState(room) {
-    room.players.forEach(player => {
-        sendGameState(room, player);
-    });
 }
 
 function checkGameStatus(room) {

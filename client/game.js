@@ -340,9 +340,26 @@ document.addEventListener('DOMContentLoaded', () => {
                             animateInvalidCard(selectedCard);
                         }
                         break;
+                    case 'deck_updated':
+                        handleDeckUpdated(message);
+                        break;
                     case 'turn_changed':
-                        handleTurnChanged(message);
+                        gameState.cardsPlayedThisTurn = [];
+                        gameState.currentTurn = message.newTurn;
+                        gameState.remainingDeck = message.remainingDeck || gameState.remainingDeck;
+
+                        const minCards = message.minCardsRequired !== undefined ?
+                            message.minCardsRequired :
+                            (gameState.remainingDeck > 0 ? 2 : 1);
+
                         updateGameInfo();
+
+                        if (message.playerName) {
+                            const notificationMsg = message.newTurn === currentPlayer.id ?
+                                '¡Es tu turno!' :
+                                `Turno de ${message.playerName}`;
+                            showNotification(notificationMsg);
+                        }
                         break;
                     case 'move_undone':
                         handleMoveUndone(message);
@@ -703,6 +720,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function handleDeckUpdated(message) {
+        gameState.remainingDeck = message.remaining;
+        updateGameInfo();
+    }
+
+    // Función updateGameState modificada
     function updateGameState(newState) {
         if (!newState) return;
 
@@ -714,14 +737,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 isHost: player.h,
                 cardsPlayedThisTurn: player.s || 0
             }));
-
-            if (!currentPlayer.name && currentPlayer.id) {
-                const player = gameState.players.find(p => p.id === currentPlayer.id);
-                if (player) {
-                    currentPlayer.name = player.name;
-                    sessionStorage.setItem('playerName', player.name);
-                }
-            }
         }
 
         gameState.board = newState.b || gameState.board;
@@ -733,8 +748,46 @@ document.addEventListener('DOMContentLoaded', () => {
             updatePlayerCards(newState.y);
         }
 
+        // Actualizar UI inmediatamente
+        updateGameInfo();
+
         if (gameState.currentTurn !== currentPlayer.id) {
             selectedCard = null;
+        }
+    }
+
+    // Función updateGameInfo modificada
+    function updateGameInfo() {
+        const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
+        let currentPlayerName;
+
+        if (currentPlayerObj) {
+            currentPlayerName = currentPlayerObj.id === currentPlayer.id ?
+                'Tu turno' :
+                `Turno de ${currentPlayerObj.name}`;
+        } else {
+            currentPlayerName = 'Esperando jugador...';
+        }
+
+        document.getElementById('currentTurn').textContent = currentPlayerName;
+        document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
+
+        // Calcular minCardsRequired basado en el estado actual del deck
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+            card => card.playerId === currentPlayer.id
+        ).length;
+
+        document.getElementById('progressText').textContent =
+            `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
+
+        const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
+        document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+
+        // Actualizar el botón de terminar turno
+        const endTurnBtn = document.getElementById('endTurnBtn');
+        if (endTurnBtn) {
+            endTurnBtn.disabled = gameState.currentTurn !== currentPlayer.id;
         }
     }
 
