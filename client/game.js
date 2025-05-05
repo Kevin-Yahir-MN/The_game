@@ -320,77 +320,24 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateGameInfo();
                         break;
                     case 'card_played_animated':
-                        // Solo mostrar animación si NO es nuestra propia jugada
+                        if (message.position.includes('asc')) {
+                            const idx = message.position === 'asc1' ? 0 : 1;
+                            gameState.board.ascending[idx] = message.cardValue;
+                        } else {
+                            const idx = message.position === 'desc1' ? 0 : 1;
+                            gameState.board.descending[idx] = message.cardValue;
+                        }
+
+                        // Solo agregar al historial si no es nuestra propia jugada
                         if (message.playerId !== currentPlayer.id) {
-                            // Actualizar el tablero
-                            if (message.position.includes('asc')) {
-                                const idx = message.position === 'asc1' ? 0 : 1;
-                                gameState.board.ascending[idx] = message.cardValue;
-                            } else {
-                                const idx = message.position === 'desc1' ? 0 : 1;
-                                gameState.board.descending[idx] = message.cardValue;
-                            }
-
-                            // Crear carta animada
-                            const animCard = new Card(
-                                message.cardValue,
-                                message.startX || BOARD_POSITION.x,
-                                message.startY || -CARD_HEIGHT * 1.5,
-                                false,
-                                true
-                            );
-
-                            // Carta en el tablero (azul)
-                            const boardCard = new Card(
-                                message.cardValue,
-                                getColumnPosition(message.position).x,
-                                getColumnPosition(message.position).y,
-                                false,
-                                true
-                            );
-
-                            gameState.animatingCards.push({
-                                card: animCard,
-                                startTime: Date.now(),
-                                duration: 500,
-                                targetX: getColumnPosition(message.position).x,
-                                targetY: getColumnPosition(message.position).y,
-                                onComplete: () => {
-                                    gameState.boardCards = gameState.boardCards || [];
-                                    gameState.boardCards.push(boardCard);
-                                }
-                            });
-                        }
-
-                        // Actualizar historial para todos
-                        if (!gameState.columnHistory[message.position]) {
-                            gameState.columnHistory[message.position] = message.position.includes('asc') ? [1] : [100];
-                        }
-                        gameState.columnHistory[message.position].push(message.cardValue);
-
-                        showNotification(`${message.playerName} jugó un ${message.cardValue}`);
-                        break;
-
-                    case 'card_played_confirmation':
-                        // Confirmación del servidor para el jugador actual
-                        if (message.playerId === currentPlayer.id) {
-                            // Actualizar el tablero
-                            if (message.position.includes('asc')) {
-                                const idx = message.position === 'asc1' ? 0 : 1;
-                                gameState.board.ascending[idx] = message.cardValue;
-                            } else {
-                                const idx = message.position === 'desc1' ? 0 : 1;
-                                gameState.board.descending[idx] = message.cardValue;
-                            }
-
-                            // Registrar la jugada
                             gameState.cardsPlayedThisTurn.push({
                                 value: message.cardValue,
                                 position: message.position,
-                                playerId: currentPlayer.id,
+                                playerId: message.playerId,
                                 previousValue: message.previousValue
                             });
                         }
+                        handleAnimatedCardPlay(message);
                         break;
                     case 'invalid_move':
                         if (message.playerId === currentPlayer.id && selectedCard) {
@@ -1129,33 +1076,62 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Eliminar la carta de la mano del jugador inmediatamente
+        const previousValue = position.includes('asc')
+            ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
+            : gameState.board.descending[position === 'desc1' ? 0 : 1];
+
+        // Registrar la jugada localmente (solo una vez)
+        const cardPlayed = {
+            value: cardValue,
+            position: position,
+            playerId: currentPlayer.id,
+            previousValue: previousValue,
+            isPlayedThisTurn: true
+        };
+
+        // Actualizar UI inmediatamente
+        updateCardsPlayedUI();
+
+        const card = new Card(
+            cardValue,
+            selectedCard.x,
+            selectedCard.y,
+            false,
+            true
+        );
+
+        const targetPos = getColumnPosition(position);
+        gameState.animatingCards.push({
+            card: card,
+            startTime: Date.now(),
+            duration: 300,
+            targetX: targetPos.x,
+            targetY: targetPos.y,
+            fromX: selectedCard.x,
+            fromY: selectedCard.y,
+            isCurrentPlayerCard: true
+        });
+
+        if (position.includes('asc')) {
+            const idx = position === 'asc1' ? 0 : 1;
+            gameState.board.ascending[idx] = cardValue;
+        } else {
+            const idx = position === 'desc1' ? 0 : 1;
+            gameState.board.descending[idx] = cardValue;
+        }
+
         const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
         if (cardIndex !== -1) {
             gameState.yourCards.splice(cardIndex, 1);
         }
 
-        // Actualizar UI sin animación para el jugador actual
-        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
-            card => card.playerId === currentPlayer.id
-        ).length + 1; // +1 por la carta actual
-
-        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        document.getElementById('progressText').textContent =
-            `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
-
-        const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
-        document.getElementById('progressBar').style.width = `${progressPercentage}%`;
-
-        // Enviar movimiento al servidor
         socket.send(JSON.stringify({
             type: 'play_card',
             playerId: currentPlayer.id,
             cardValue: cardValue,
             position: position,
-            previousValue: position.includes('asc')
-                ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
-                : gameState.board.descending[position === 'desc1' ? 0 : 1]
+            previousValue: previousValue,
+            isFirstMove: gameState.cardsPlayedThisTurn.length === 0
         }));
 
         selectedCard = null;

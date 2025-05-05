@@ -202,12 +202,7 @@ function broadcastToRoom(room, message, options = {}) {
 
     room.players.forEach(player => {
         if (player.id !== skipPlayerId && player.ws?.readyState === WebSocket.OPEN) {
-            // Asegurar que los mensajes de juego tengan estructura consistente
-            const completeMessage = message.type === 'card_played_animated' ? {
-                ...message,
-                timestamp: Date.now(),
-                cardsPlayed: player.cardsPlayedThisTurn.length
-            } : {
+            const completeMessage = {
                 ...message,
                 timestamp: Date.now()
             };
@@ -341,14 +336,12 @@ function handlePlayCard(room, player, msg) {
 
     const previousValue = targetValue;
 
-    // Actualizar el tablero
     if (msg.position.includes('asc')) {
         board.ascending[targetIdx] = msg.cardValue;
     } else {
         board.descending[targetIdx] = msg.cardValue;
     }
 
-    // Actualizar estado del jugador
     player.cards = player.cards.filter(c => c !== msg.cardValue);
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
@@ -359,32 +352,15 @@ function handlePlayCard(room, player, msg) {
 
     updateBoardHistory(room, msg.position, msg.cardValue);
 
-    // Enviar confirmación al jugador actual (sin animación)
-    safeSend(player.ws, {
-        type: 'card_played_confirmation',
+    broadcastToRoom(room, {
+        type: 'card_played_animated',
         playerId: player.id,
+        playerName: player.name,
         cardValue: msg.cardValue,
         position: msg.position,
-        previousValue: previousValue,
-        cardsPlayedThisTurn: player.cardsPlayedThisTurn.length
-    });
-
-    // Enviar animación a los otros jugadores
-    room.players.forEach(otherPlayer => {
-        if (otherPlayer.id !== player.id && otherPlayer.ws?.readyState === WebSocket.OPEN) {
-            safeSend(otherPlayer.ws, {
-                type: 'card_played_animated',
-                playerId: player.id,
-                playerName: player.name,
-                cardValue: msg.cardValue,
-                position: msg.position,
-                previousValue: previousValue,
-                startX: Math.random() * (800 - CARD_WIDTH), // Ancho del canvas
-                startY: -CARD_HEIGHT * 1.5,
-                persistColor: true
-            });
-        }
-    });
+        previousValue: targetValue,
+        persistColor: true
+    }, { includeGameState: true });
 
     checkGameStatus(room);
 }
@@ -1037,7 +1013,11 @@ wss.on('connection', async (ws, req) => {
                     break;
                 case 'play_card':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        handlePlayCard(room, player, msg);
+                        const enhancedMsg = {
+                            ...msg,
+                            isPlayedThisTurn: true
+                        };
+                        handlePlayCard(room, player, enhancedMsg);
                     }
                     break;
                 case 'end_turn':
