@@ -1321,18 +1321,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const elapsed = now - anim.startTime;
             const progress = Math.min(elapsed / anim.duration, 1);
 
-            // Interpolación suave
-            const easeOut = t => (--t) * t * t + 1;
-            const easedProgress = easeOut(progress);
+            // Usar una curva de aceleración más agresiva (linear en este caso)
+            const easedProgress = progress; // Eliminar easing para movimiento más directo
 
             anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * easedProgress;
             anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * easedProgress;
 
-            // Dibujar con sombra azul
+            // Dibujar la carta
             ctx.save();
             ctx.shadowColor = 'rgba(0, 100, 255, 0.7)';
-            ctx.shadowBlur = 15;
-            ctx.shadowOffsetY = 5;
+            ctx.shadowBlur = 8; // Reducir blur para mayor nitidez
+            ctx.shadowOffsetY = 3; // Reducir sombra
             anim.card.draw();
             ctx.restore();
 
@@ -1372,7 +1371,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.animatingCards.push({
                 card: card,
                 startTime: Date.now(),
-                duration: 600,
+                duration: 250,
                 targetX: targetPos.x,
                 targetY: targetPos.y,
                 fromX: targetPos.x,
