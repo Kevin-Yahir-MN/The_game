@@ -80,6 +80,7 @@ async function saveGameState(roomId) {
                 name: p.name,
                 cards: p.cards,
                 isHost: p.isHost,
+                cardsPlayedCount: p.cardsPlayedCount || 0, // Nuevo campo
                 connected: p.ws !== null
             })),
             gameState: {
@@ -149,6 +150,7 @@ async function restoreActiveGames() {
                         ws: null,
                         cards: p.cards || [],
                         cardsPlayedThisTurn: p.cardsPlayedThisTurn || [],
+                        cardsPlayedCount: p.cardsPlayedCount || 0,
                         lastActivity: Date.now()
                     })) || [],
                     gameState: gameData.gameState || {
@@ -362,6 +364,8 @@ function handlePlayCard(room, player, msg) {
         persistColor: true
     }, { includeGameState: true });
 
+    player.cardsPlayedCount = (player.cardsPlayedCount || 0) + 1;
+
     checkGameStatus(room);
 }
 
@@ -484,6 +488,10 @@ async function endTurn(room, player) {
         cardsPlayedThisTurn: 0,
         minCardsRequired: requiredCards
     }, { includeGameState: true });
+
+    // Resetear contador de cartas jugadas
+    player.cardsPlayedCount = 0;
+    player.cardsPlayedThisTurn = [];
 
     checkGameStatus(room);
 }

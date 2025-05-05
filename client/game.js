@@ -341,6 +341,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         break;
                     case 'turn_changed':
+                        // Resetear contadores locales
+                        gameState.players.forEach(p => {
+                            if (p.id === message.newTurn) {
+                                p.cardsPlayedCount = 0;
+                            }
+                        });
                         handleTurnChanged(message);
                         updateGameInfo();
                         break;
@@ -712,7 +718,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 name: player.n || `Jugador_${player.i.slice(0, 4)}`,
                 cardCount: player.c,
                 isHost: player.h,
-                cardsPlayedThisTurn: player.s || 0
+                cardsPlayedThisTurn: player.s || 0,
+                cardsPlayedCount: player.pt || 0
             }));
 
             if (!currentPlayer.name && currentPlayer.id) {
@@ -1114,6 +1121,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cardValue: cardValue,
             position: position,
             previousValue: previousValue,
+            cardsPlayedCount: gameState.players.find(p => p.id === currentPlayer.id)?.cardsPlayedCount + 1 || 1,
             isFirstMove: gameState.cardsPlayedThisTurn.length === 0
         }));
 
@@ -1127,20 +1135,19 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCardsPlayedUI();
     }
 
-    // Nueva función auxiliar para actualizar UI
     function updateCardsPlayedUI() {
-        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
-            card => card.playerId === currentPlayer.id
-        ).length;
+        const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
+        if (!currentPlayerObj) return;
 
+        const cardsPlayedCount = currentPlayerObj.cardsPlayedCount || 0;
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        document.getElementById('progressText').textContent =
-            `${currentPlayerCardsPlayed + 1}/${minCardsRequired} cartas jugadas`;
 
-        const progressPercentage = Math.min(((currentPlayerCardsPlayed + 1) / minCardsRequired) * 100, 100);
+        document.getElementById('progressText').textContent =
+            `${cardsPlayedCount}/${minCardsRequired} cartas jugadas`;
+
+        const progressPercentage = Math.min((cardsPlayedCount / minCardsRequired) * 100, 100);
         document.getElementById('progressBar').style.width = `${progressPercentage}%`;
     }
-
     function hasValidMoves(cards, board) {
         return cards.some(card => {
             return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
@@ -1292,15 +1299,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
 
         if (gameState.currentTurn === currentPlayer.id) {
-            const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
-                card => card.playerId === currentPlayer.id
-            ).length;
-
+            const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
+            const cardsPlayedCount = currentPlayerObj?.cardsPlayedCount || 0;
             const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-            const progressText = `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
-            document.getElementById('progressText').textContent = progressText;
 
-            const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
+            document.getElementById('progressText').textContent =
+                `${cardsPlayedCount}/${minCardsRequired} cartas jugadas`;
+
+            const progressPercentage = Math.min((cardsPlayedCount / minCardsRequired) * 100, 100);
             document.getElementById('progressBar').style.width = `${progressPercentage}%`;
         }
 
