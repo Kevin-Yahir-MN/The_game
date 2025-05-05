@@ -320,6 +320,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateGameInfo();
                         break;
                     case 'card_played_animated':
+                        if (message.position.includes('asc')) {
+                            const idx = message.position === 'asc1' ? 0 : 1;
+                            gameState.board.ascending[idx] = message.cardValue;
+                        } else {
+                            const idx = message.position === 'desc1' ? 0 : 1;
+                            gameState.board.descending[idx] = message.cardValue;
+                        }
+
+                        // Solo agregar al historial si no es nuestra propia jugada
+                        if (message.playerId !== currentPlayer.id) {
+                            gameState.cardsPlayedThisTurn.push({
+                                value: message.cardValue,
+                                position: message.position,
+                                playerId: message.playerId,
+                                previousValue: message.previousValue
+                            });
+                        }
                         handleAnimatedCardPlay(message);
                         break;
                     case 'invalid_move':
@@ -1063,7 +1080,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
 
-        // Registrar la jugada para todos los jugadores
+        // Registrar la jugada localmente (solo una vez)
         const cardPlayed = {
             value: cardValue,
             position: position,
@@ -1071,7 +1088,9 @@ document.addEventListener('DOMContentLoaded', () => {
             previousValue: previousValue,
             isPlayedThisTurn: true
         };
-        gameState.cardsPlayedThisTurn.push(cardPlayed);
+
+        // Actualizar UI inmediatamente
+        updateCardsPlayedUI();
 
         const card = new Card(
             cardValue,
@@ -1082,7 +1101,6 @@ document.addEventListener('DOMContentLoaded', () => {
         );
 
         const targetPos = getColumnPosition(position);
-
         gameState.animatingCards.push({
             card: card,
             startTime: Date.now(),
@@ -1112,11 +1130,25 @@ document.addEventListener('DOMContentLoaded', () => {
             playerId: currentPlayer.id,
             cardValue: cardValue,
             position: position,
-            isFirstMove: gameState.cardsPlayedThisTurn.length === 1
+            previousValue: previousValue,
+            isFirstMove: gameState.cardsPlayedThisTurn.length === 0
         }));
 
         selectedCard = null;
-        updateGameInfo();
+    }
+
+    // Nueva función auxiliar para actualizar UI
+    function updateCardsPlayedUI() {
+        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+            card => card.playerId === currentPlayer.id
+        ).length;
+
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        document.getElementById('progressText').textContent =
+            `${currentPlayerCardsPlayed + 1}/${minCardsRequired} cartas jugadas`;
+
+        const progressPercentage = Math.min(((currentPlayerCardsPlayed + 1) / minCardsRequired) * 100, 100);
+        document.getElementById('progressBar').style.width = `${progressPercentage}%`;
     }
 
     function hasValidMoves(cards, board) {

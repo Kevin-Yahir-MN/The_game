@@ -202,7 +202,12 @@ function broadcastToRoom(room, message, options = {}) {
 
     room.players.forEach(player => {
         if (player.id !== skipPlayerId && player.ws?.readyState === WebSocket.OPEN) {
-            const completeMessage = {
+            // Asegurar que los mensajes de juego tengan estructura consistente
+            const completeMessage = message.type === 'card_played_animated' ? {
+                ...message,
+                timestamp: Date.now(),
+                cardsPlayed: player.cardsPlayedThisTurn.length
+            } : {
                 ...message,
                 timestamp: Date.now()
             };
@@ -343,12 +348,20 @@ function handlePlayCard(room, player, msg) {
     }
 
     player.cards = player.cards.filter(c => c !== msg.cardValue);
-    player.cardsPlayedThisTurn.push({
-        value: msg.cardValue,
-        position: msg.position,
-        isPlayedThisTurn: true,
-        previousValue
-    });
+
+    // Solo agregar al historial si no existe ya
+    const alreadyPlayed = player.cardsPlayedThisTurn.some(
+        move => move.value === msg.cardValue && move.position === msg.position
+    );
+
+    if (!alreadyPlayed) {
+        player.cardsPlayedThisTurn.push({
+            value: msg.cardValue,
+            position: msg.position,
+            isPlayedThisTurn: true,
+            previousValue
+        });
+    }
 
     updateBoardHistory(room, msg.position, msg.cardValue);
 
@@ -359,7 +372,8 @@ function handlePlayCard(room, player, msg) {
         cardValue: msg.cardValue,
         position: msg.position,
         previousValue: targetValue,
-        persistColor: true
+        persistColor: true,
+        cardsPlayed: player.cardsPlayedThisTurn.length // Enviar conteo actual
     }, { includeGameState: true });
 
     checkGameStatus(room);
