@@ -412,7 +412,6 @@ function handleUndoMove(room, player, msg) {
 }
 
 async function endTurn(room, player) {
-    // Cambiar el mínimo de cartas requeridas cuando se agota el mazo
     const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
     const cardsPlayed = player.cardsPlayedThisTurn.length;
 
@@ -437,50 +436,53 @@ async function endTurn(room, player) {
         });
     }
 
-    const targetCardCount = room.gameState.initialCards;
-    const cardsToDraw = Math.min(
-        targetCardCount - player.cards.length,
-        room.gameState.deck.length
-    );
+    // Buscar siguiente jugador con cartas
+    let nextIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
+    let attempts = 0;
+    let skippedPlayers = 0;
+    let nextPlayer = null;
 
-    for (let i = 0; i < cardsToDraw; i++) {
-        player.cards.push(room.gameState.deck.pop());
-    }
+    do {
+        nextIndex = (nextIndex + 1) % room.players.length;
+        nextPlayer = room.players[nextIndex];
+        attempts++;
 
-    const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
-    const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
-    const nextPlayer = room.players[nextIndex];
-    room.gameState.currentTurn = nextPlayer.id;
+        if (attempts > room.players.length * 2) {
+            // Prevención de bucle infinito
+            return checkGameStatus(room);
+        }
 
-    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1; // Actualizar requerimiento
+        if (nextPlayer.cards.length === 0) {
+            skippedPlayers++;
+        }
+    } while ((nextPlayer.cards.length === 0 ||
+        nextPlayer.ws?.readyState !== WebSocket.OPEN) &&
+        attempts <= room.players.length * 2);
 
-    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
+    // Si encontramos un jugador válido
+    if (nextPlayer && nextPlayer.cards.length > 0) {
+        room.gameState.currentTurn = nextPlayer.id;
+        player.cardsPlayedThisTurn = [];
+
+        broadcastToRoom(room, {
+            type: 'turn_changed',
+            newTurn: nextPlayer.id,
+            previousPlayer: player.id,
+            playerName: nextPlayer.name,
+            cardsPlayedThisTurn: 0,
+            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
+            remainingDeck: room.gameState.deck.length,
+            skippedPlayers: skippedPlayers
+        }, { includeGameState: true });
+
         await saveGameState(reverseRoomMap.get(room));
-        return broadcastToRoom(room, {
-            type: 'game_over',
-            result: 'lose',
-            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
-            reason: 'min_cards_not_met'
-        });
+        checkGameStatus(room);
+    } else {
+        // Si no hay jugadores con cartas
+        checkGameStatus(room);
     }
-
-    player.cardsPlayedThisTurn = [];
-
-    await saveGameState(reverseRoomMap.get(room));
-
-    broadcastToRoom(room, {
-        type: 'turn_changed',
-        newTurn: nextPlayer.id,
-        previousPlayer: player.id,
-        playerName: nextPlayer.name,
-        cardsPlayedThisTurn: 0,
-        minCardsRequired: requiredCards, // Enviar el nuevo requerimiento
-        remainingDeck: room.gameState.deck.length // Enviar estado actual del mazo
-    }, { includeGameState: true });
-
-    checkGameStatus(room);
 }
+
 function checkGameStatus(room) {
     const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
     if (allPlayersEmpty && room.gameState.deck.length === 0) {
