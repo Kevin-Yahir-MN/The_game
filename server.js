@@ -74,12 +74,18 @@ async function saveGameState(roomId) {
     if (!room) return;
 
     try {
+        // Calcular el total de cartas jugadas
+        const totalCardsPlayed = room.players.reduce((total, player) => {
+            return total + (player.totalCardsPlayed || 0);
+        }, 0);
+
         const gameData = {
             players: room.players.map(p => ({
                 id: p.id,
                 name: p.name,
                 cards: p.cards,
                 isHost: p.isHost,
+                cardsPlayed: totalCardsPlayed,
                 connected: p.ws !== null
             })),
             gameState: {
@@ -99,7 +105,7 @@ async function saveGameState(roomId) {
 
         await pool.query(`
             INSERT INTO game_states 
-            (room_id, game_data, last_activity) 
+            (room_id, game_data, last_activity, cards_played) 
             VALUES ($1, $2, NOW())
             ON CONFLICT (room_id) 
             DO UPDATE SET 
@@ -119,7 +125,7 @@ async function restoreActiveGames() {
         console.log('⏳ Restaurando juegos activos con historial...');
 
         const { rows } = await pool.query(`
-            SELECT room_id, game_data::text, last_activity 
+            SELECT room_id, game_data::text, last_activity, cards_played 
             FROM game_states 
             WHERE last_activity > NOW() - INTERVAL '4 hours'
         `);
@@ -168,6 +174,14 @@ async function restoreActiveGames() {
             } catch (error) {
                 console.error(`❌ Error restaurando sala ${row.room_id}:`, error);
                 await pool.query('DELETE FROM game_states WHERE room_id = $1', [row.room_id]);
+            }
+            for (const row of rows) {
+                // ... (código existente)
+
+                // Restaurar contador de cartas jugadas
+                room.players.forEach(player => {
+                    player.totalCardsPlayed = row.cards_played / room.players.length;
+                });
             }
         }
     } catch (error) {
@@ -230,7 +244,8 @@ function sendGameState(room, player) {
             h: p.isHost,
             c: p.cards.length,
             s: p.cardsPlayedThisTurn.length,
-            pt: p.cardsPlayedThisTurn
+            pt: p.cardsPlayedThisTurn,
+            cp: totalCardsPlayed
         }))
     };
 
@@ -362,6 +377,9 @@ function handlePlayCard(room, player, msg) {
         persistColor: true
     }, { includeGameState: true });
 
+    player.totalCardsPlayed = (player.totalCardsPlayed || 0) + 1;
+
+    saveGameState(reverseRoomMap.get(room));
     checkGameStatus(room);
 }
 
@@ -646,6 +664,7 @@ app.post('/join-room', async (req, res) => {
             ws: null,
             cards: [],
             cardsPlayedThisTurn: [],
+            totalCardsPlayed: 0,
             lastActivity: Date.now()
         };
         room.players.push(newPlayer);
