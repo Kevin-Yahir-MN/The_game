@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
             this.height = CARD_HEIGHT;
             this.isPlayable = isPlayable;
             this.isPlayedThisTurn = isPlayedThisTurn;
+            this.isFromCurrentTurn = isPlayedThisTurn;
             this.playedThisRound = false;
             this.radius = 10;
             this.shakeOffset = 0;
@@ -575,6 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleTurnChanged(message) {
         // Limpiar todas las cartas jugadas en este turno
         gameState.cardsPlayedThisTurn = [];
+        gameState.boardCards = [];
 
         gameState.yourCards.forEach(card => {
             card.isPlayedThisTurn = false;
@@ -730,6 +732,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const position = message.position;
             const value = message.cardValue;
 
+            // Actualizar el tablero
             if (position.includes('asc')) {
                 const idx = position === 'asc1' ? 0 : 1;
                 gameState.board.ascending[idx] = value;
@@ -738,35 +741,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 gameState.board.descending[idx] = value;
             }
 
-            // Registrar la jugada para todos los jugadores
+            // Registrar la jugada para el turno actual
             gameState.cardsPlayedThisTurn.push({
                 value: value,
                 position: position,
                 playerId: message.playerId,
-                previousValue: message.previousValue,
-                isPlayedThisTurn: true
+                previousValue: message.previousValue
             });
 
-            const cardPosition = getColumnPosition(position);
-            const opponentCard = new Card(
+            // Carta animada (azul)
+            const animCard = new Card(
                 value,
-                cardPosition.x,
-                cardPosition.y,
+                message.startX || BOARD_POSITION.x,
+                message.startY || -CARD_HEIGHT * 1.5,
                 false,
                 true
             );
+            animCard.isFromCurrentTurn = true;
+
+            // Carta en el tablero (también azul)
+            const boardCard = new Card(
+                value,
+                getColumnPosition(position).x,
+                getColumnPosition(position).y,
+                false,
+                true
+            );
+            boardCard.isFromCurrentTurn = true;
 
             gameState.animatingCards.push({
-                card: opponentCard,
+                card: animCard,
                 startTime: Date.now(),
-                duration: 300,
-                targetX: cardPosition.x,
-                targetY: cardPosition.y,
-                fromX: cardPosition.x,
-                fromY: -CARD_HEIGHT * 1.5,
-                isOpponentCard: true
+                duration: 500,
+                targetX: getColumnPosition(position).x,
+                targetY: getColumnPosition(position).y,
+                onComplete: () => {
+                    // Al completar la animación, mantener la carta azul en el tablero
+                    gameState.boardCards = gameState.boardCards || [];
+                    gameState.boardCards.push(boardCard);
+                }
             });
 
+            // Actualizar historial
             if (!gameState.columnHistory[position]) {
                 gameState.columnHistory[position] = position.includes('asc') ? [1] : [100];
             }
@@ -1197,6 +1213,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             card.draw();
         });
+
+
+        // Dibujar cartas animadas y cartas del tablero persistente
+        handleCardAnimations();
+        if (gameState.boardCards) {
+            gameState.boardCards.forEach(card => card.draw());
+        }
     }
 
     function drawPlayerCards() {
@@ -1296,24 +1319,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const elapsed = now - anim.startTime;
             const progress = Math.min(elapsed / anim.duration, 1);
 
-            const easeOutCubic = t => (--t) * t * t + 1;
-            const easedProgress = easeOutCubic(progress);
+            // Interpolación suave
+            const easeOut = t => (--t) * t * t + 1;
+            const easedProgress = easeOut(progress);
 
             anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * easedProgress;
             anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * easedProgress;
 
-            if (anim.isOpponentCard) {
-                ctx.save();
-                ctx.shadowColor = 'rgba(0, 100, 255, 0.7)';
-                ctx.shadowBlur = 15;
-                ctx.shadowOffsetY = 5;
-                anim.card.draw();
-                ctx.restore();
-            } else {
-                anim.card.draw();
-            }
+            // Dibujar con sombra azul
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 100, 255, 0.7)';
+            ctx.shadowBlur = 15;
+            ctx.shadowOffsetY = 5;
+            anim.card.draw();
+            ctx.restore();
 
             if (progress === 1) {
+                if (anim.onComplete) anim.onComplete();
                 gameState.animatingCards.splice(i, 1);
             }
         }
