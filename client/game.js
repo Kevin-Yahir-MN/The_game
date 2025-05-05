@@ -1306,25 +1306,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const progressBar = document.getElementById('progressBar');
 
         if (gameState.currentTurn === currentPlayer.id) {
-            // Cuando es nuestro turno
+            // Cuando es nuestro turno - mostrar progreso real
             const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
                 card => card.playerId === currentPlayer.id
             ).length;
 
             progressContainer.textContent = `${currentPlayerCardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
             progressBar.style.width = `${Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100)}%`;
-            progressBar.style.display = 'block'; // Mostrar barra de progreso
+            progressBar.style.backgroundColor = '#2ecc71'; // Color normal
         } else {
-            // Cuando NO es nuestro turno
+            // Cuando NO es nuestro turno - mostrar 0/X
             progressContainer.textContent = `0/${minCardsRequired} carta(s) jugada(s)`;
-            progressBar.style.display = 'none'; // Ocultar barra de progreso
+            progressBar.style.width = '0%';
+            progressBar.style.backgroundColor = '#7f8c8d'; // Color gris para indicar inactividad
         }
-
-        /*
-        if (gameState.currentTurn === currentPlayer.id) {
-            historyIconsAnimation.lastPulseTime = Date.now();
-        }
-        */
 
         updatePlayersPanel();
     }
