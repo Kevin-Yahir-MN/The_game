@@ -508,7 +508,7 @@ function checkGameStatus(room) {
 
 function initializeDeck() {
     const deck = [];
-    for (let i = 2; i < 100; i++) deck.push(i);
+    for (let i = 2; i < 21; i++) deck.push(i);
     return shuffleArray(deck);
 }
 
@@ -1151,7 +1151,7 @@ wss.on('connection', async (ws, req) => {
                                 gameState: {
                                     board: room.gameState.board,
                                     currentTurn: room.gameState.currentTurn,
-                                    remainingDeck: room.gameState.deck.length,
+                                    remainingDeck: 20,
                                     initialCards: room.gameState.initialCards,
                                     gameStarted: room.gameState.gameStarted
                                 },
