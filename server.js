@@ -495,54 +495,15 @@ function broadcastGameState(room) {
 }
 
 function checkGameStatus(room) {
-    // Validación inicial
-    if (!room || !room.players || !room.gameState) {
-        console.error('Datos de sala inválidos en checkGameStatus');
-        return;
+    const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
+    if (allPlayersEmpty && room.gameState.deck.length === 0) {
+        broadcastToRoom(room, {
+            type: 'game_over',
+            result: 'win',
+            message: '¡Todos ganan! Todas las cartas jugadas.',
+            reason: 'all_cards_played'
+        });
     }
-
-    const { players, gameState } = room;
-    const deckEmpty = gameState.deck.length === 0;
-
-    // 1. Verificar victoria magistral (0 cartas)
-    const allPlayersEmpty = players.every(player =>
-        player && player.cards && player.cards.length === 0
-    );
-
-    if (allPlayersEmpty && deckEmpty) {
-        return broadcastGameOver(
-            room,
-            'win',
-            '¡Victoria magistral! Todas las cartas jugadas.',
-            'all_cards_played'
-        );
-    }
-
-    // 2. Verificar victoria por menos de 10 cartas
-    const allPlayersUnderTenCards = players.every(player =>
-        player && player.cards && player.cards.length <= 10
-    );
-
-    if (allPlayersUnderTenCards && deckEmpty) {
-        return broadcastGameOver(
-            room,
-            'win',
-            '¡Victoria! Entre todos los jugadores tienen menos de 10 cartas.',
-            'few_cards_remaining'
-        );
-    }
-
-    // Podría añadirse más condiciones de victoria/derrota aquí
-}
-
-// Función auxiliar para evitar duplicación de código
-function broadcastGameOver(room, result, message, reason) {
-    broadcastToRoom(room, {
-        type: 'game_over',
-        result,
-        message,
-        reason
-    });
 }
 
 function initializeDeck() {
@@ -556,9 +517,7 @@ function shuffleArray(array) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
-
     array.length = 20;
-
     return array;
 }
 
