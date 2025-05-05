@@ -609,17 +609,51 @@ document.addEventListener('DOMContentLoaded', () => {
             showNotification(notificationMsg);
         }
     }
-
     function resetCardsPlayedProgress() {
-        document.getElementById('progressText').textContent = deck.length > 0 ? '0/2 cartas jugadas' : '0/1 carta jugada';
-        document.getElementById('progressBar').style.width = '0%';
+        try {
+            // 1. Determinar el mínimo de cartas requeridas de manera más robusta
+            const minCardsRequired = calculateMinCardsRequired();
 
-        gameState.yourCards.forEach(card => {
-            card.isPlayedThisTurn = false;
-            card.updateColor();
-        });
+            // 2. Actualizar UI con validaciones
+            const progressTextEl = document.getElementById('progressText');
+            const progressBarEl = document.getElementById('progressBar');
 
-        gameState.cardsPlayedThisTurn = [];
+            if (progressTextEl) {
+                progressTextEl.textContent = `0/${minCardsRequired} ${minCardsRequired === 1 ? 'carta' : 'cartas'} jugada${minCardsRequired === 1 ? '' : 's'}`;
+            }
+
+            if (progressBarEl) {
+                progressBarEl.style.width = '0%';
+            }
+
+            // 3. Resetear estado de las cartas
+            if (gameState.yourCards) {
+                gameState.yourCards.forEach(card => {
+                    if (card) {
+                        card.isPlayedThisTurn = false;
+                        if (typeof card.updateColor === 'function') {
+                            card.updateColor();
+                        }
+                    }
+                });
+            }
+
+            // 4. Limpiar historial de cartas jugadas en este turno
+            gameState.cardsPlayedThisTurn = [];
+
+        } catch (error) {
+            console.error('Error en resetCardsPlayedProgress:', error);
+            // Podrías añadir aquí notificación al usuario si es necesario
+        }
+    }
+
+    // Función auxiliar para calcular cartas requeridas
+    function calculateMinCardsRequired() {
+        // Verifica primero si gameState existe y tiene la propiedad deck
+        if (gameState?.deck?.length > 0) {
+            return 2;
+        }
+        return 1;
     }
 
     function handleMoveUndone(message) {
