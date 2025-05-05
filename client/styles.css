@@ -1242,3 +1242,25 @@ body {
 .history-icon:hover {
     transform: scale(1.1);
 }
+
+/* Estilo para cuando es el turno del jugador */
+.turn-active .history-icon {
+    cursor: pointer;
+    animation: pulse-hint 20s infinite;
+}
+
+@keyframes pulse-hint {
+
+    0%,
+    95% {
+        transform: scale(1);
+    }
+
+    97.5% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
