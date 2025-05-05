@@ -345,6 +345,7 @@ function handlePlayCard(room, player, msg) {
     }
 
     player.cards = player.cards.filter(c => c !== msg.cardValue);
+    player.cardsPlayedThisTurn = player.cardsPlayedThisTurn || [];
     player.cardsPlayedThisTurn.push({
         value: msg.cardValue,
         position: msg.position,
@@ -352,20 +353,15 @@ function handlePlayCard(room, player, msg) {
         previousValue
     });
 
-    updateBoardHistory(room, msg.position, msg.cardValue);
-
+    // Actualización clave: Enviar el conteo actualizado
     broadcastToRoom(room, {
-        type: 'card_played_animated',
+        type: 'cards_played_update',
         playerId: player.id,
-        playerName: player.name,
-        cardValue: msg.cardValue,
-        position: msg.position,
-        previousValue: targetValue,
-        persistColor: true
-    }, { includeGameState: true });
+        cardsPlayedCount: player.cardsPlayedThisTurn.length,
+        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+    });
 
-    player.cardsPlayedCount = (Number(player.cardsPlayedCount) || 0) + 1;
-
+    updateBoardHistory(room, msg.position, msg.cardValue);
     checkGameStatus(room);
 }
 
@@ -440,6 +436,14 @@ async function endTurn(room, player) {
         });
     }
 
+    // Resetear contadores
+    player.cardsPlayedThisTurn = [];
+    broadcastToRoom(room, {
+        type: 'turn_reset',
+        playerId: player.id
+    });
+
+    // Resto de la lógica de endTurn...
     const targetCardCount = room.gameState.initialCards;
     const cardsToDraw = Math.min(
         targetCardCount - player.cards.length,
@@ -476,10 +480,7 @@ async function endTurn(room, player) {
         });
     }
 
-    player.cardsPlayedThisTurn = [];
-
     await saveGameState(reverseRoomMap.get(room));
-
     broadcastToRoom(room, {
         type: 'turn_changed',
         newTurn: nextPlayer.id,
@@ -488,10 +489,6 @@ async function endTurn(room, player) {
         cardsPlayedThisTurn: 0,
         minCardsRequired: requiredCards
     }, { includeGameState: true });
-
-    // Resetear contador de cartas jugadas
-    player.cardsPlayedCount = 0;
-    player.cardsPlayedThisTurn = [];
 
     checkGameStatus(room);
 }
