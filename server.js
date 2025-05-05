@@ -446,14 +446,6 @@ async function endTurn(room, player) {
         player.cards.push(room.gameState.deck.pop());
     }
 
-    if (room.gameState.deck.length === 0) {
-        broadcastToRoom(room, {
-            type: 'notification',
-            message: '¡El mazo se ha agotado!',
-            isError: false
-        });
-    }
-
     const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
     const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
     const nextPlayer = room.players[nextIndex];
