@@ -733,11 +733,6 @@ document.addEventListener('DOMContentLoaded', () => {
             updatePlayerCards(newState.y);
         }
 
-        if (newState.cp !== undefined) {
-            gameState.totalCardsPlayed = newState.cp;
-            updateGameInfo();
-        }
-
         if (gameState.currentTurn !== currentPlayer.id) {
             selectedCard = null;
         }
@@ -1314,20 +1309,7 @@ document.addEventListener('DOMContentLoaded', () => {
             historyIconsAnimation.lastPulseTime = Date.now();
         }
 
-        // Actualizar el contador de cartas jugadas
-        const cardsPlayedElement = document.getElementById('totalCardsPlayed') || createCardsPlayedElement();
-        cardsPlayedElement.textContent = `Cartas jugadas: ${gameState.totalCardsPlayed || 0}`;
-
         updatePlayersPanel();
-    }
-
-    function createCardsPlayedElement() {
-        const panelContent = document.querySelector('.panel-content');
-        const cardsPlayedElement = document.createElement('p');
-        cardsPlayedElement.id = 'totalCardsPlayed';
-        cardsPlayedElement.className = 'cards-played-counter';
-        panelContent.appendChild(cardsPlayedElement);
-        return cardsPlayedElement;
     }
 
     function createPlayersPanel() {
