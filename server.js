@@ -1015,6 +1015,8 @@ wss.on('connection', async (ws, req) => {
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                         const enhancedMsg = {
                             ...msg,
+                            playerId: player.id,
+                            playerName: player.name,
                             isPlayedThisTurn: true
                         };
                         handlePlayCard(room, player, enhancedMsg);
