@@ -80,9 +80,7 @@ async function saveGameState(roomId) {
                 name: p.name,
                 cards: p.cards,
                 isHost: p.isHost,
-                connected: p.ws !== null,
-                currentCardsPlayed: p.currentCardsPlayed || 0,  // Nuevo campo añadido
-                cardsPlayedThisTurn: p.cardsPlayedThisTurn || []
+                connected: p.ws !== null
             })),
             gameState: {
                 deck: room.gameState.deck,
@@ -150,7 +148,6 @@ async function restoreActiveGames() {
                         ...p,
                         ws: null,
                         cards: p.cards || [],
-                        currentCardsPlayed: p.currentCardsPlayed || 0,  // Restaurar el nuevo campo
                         cardsPlayedThisTurn: p.cardsPlayedThisTurn || [],
                         lastActivity: Date.now()
                     })) || [],
@@ -232,7 +229,7 @@ function sendGameState(room, player) {
             n: p.name,
             h: p.isHost,
             c: p.cards.length,
-            s: p.currentCardsPlayed || 0,  // Usar el nuevo campo
+            s: p.cardsPlayedThisTurn.length,
             pt: p.cardsPlayedThisTurn
         }))
     };
@@ -353,9 +350,6 @@ function handlePlayCard(room, player, msg) {
         previousValue
     });
 
-    // Actualización del nuevo campo
-    player.currentCardsPlayed = (player.currentCardsPlayed || 0) + 1;
-
     updateBoardHistory(room, msg.position, msg.cardValue);
 
     broadcastToRoom(room, {
@@ -365,14 +359,8 @@ function handlePlayCard(room, player, msg) {
         cardValue: msg.cardValue,
         position: msg.position,
         previousValue: targetValue,
-        persistColor: true,
-        currentCardsPlayed: player.currentCardsPlayed  // Enviar el nuevo dato
+        persistColor: true
     }, { includeGameState: true });
-
-    // Guardar estado inmediatamente después de jugar una carta
-    saveGameState(reverseRoomMap.get(room)).catch(err =>
-        console.error('Error al guardar estado:', err)
-    );
 
     checkGameStatus(room);
 }
@@ -425,7 +413,7 @@ function handleUndoMove(room, player, msg) {
 
 async function endTurn(room, player) {
     const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
-    const cardsPlayed = player.currentCardsPlayed || 0;  // Usar el nuevo campo
+    const cardsPlayed = player.cardsPlayedThisTurn.length;
 
     if (player.specialFlag === 'risky_first_move' && room.players.length === 1) {
         if (cardsPlayed < minCardsRequired) {
@@ -458,6 +446,7 @@ async function endTurn(room, player) {
         player.cards.push(room.gameState.deck.pop());
     }
 
+    // Notificar a todos si el deck se agotó
     if (room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
             type: 'deck_updated',
@@ -484,9 +473,7 @@ async function endTurn(room, player) {
         });
     }
 
-    // Reiniciar contadores del jugador
     player.cardsPlayedThisTurn = [];
-    player.currentCardsPlayed = 0;  // Reiniciar el nuevo campo
 
     await saveGameState(reverseRoomMap.get(room));
 
@@ -495,7 +482,7 @@ async function endTurn(room, player) {
         newTurn: nextPlayer.id,
         previousPlayer: player.id,
         playerName: nextPlayer.name,
-        currentCardsPlayed: 0,  // Enviar el contador reiniciado
+        cardsPlayedThisTurn: 0,
         minCardsRequired: requiredCards,
         remainingDeck: room.gameState.deck.length
     }, { includeGameState: true });
