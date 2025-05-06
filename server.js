@@ -113,6 +113,8 @@ async function saveGameState(roomId) {
 
 async function restoreActiveGames() {
     try {
+        console.log('⏳ Restaurando juegos activos con historial...');
+
         const { rows } = await pool.query(`
             SELECT room_id, game_data::text, last_activity 
             FROM game_states 
@@ -121,15 +123,30 @@ async function restoreActiveGames() {
 
         for (const row of rows) {
             try {
-                const gameData = JSON.parse(row.game_data);
+                let gameData;
+                try {
+                    gameData = JSON.parse(row.game_data);
+                } catch (e) {
+                    console.error(`❌ Error parseando JSON para sala ${row.room_id}`);
+                    continue;
+                }
+
+                if (!gameData.history) {
+                    gameData.history = {
+                        ascending1: [1],
+                        ascending2: [1],
+                        descending1: [100],
+                        descending2: [100]
+                    };
+                }
 
                 const room = {
                     players: gameData.players?.map(p => ({
                         ...p,
                         ws: null,
                         cards: p.cards || [],
-                        cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0, // Asegurar número
-                        totalCardsPlayed: Number(p.totalCardsPlayed) || 0,       // Asegurar número
+                        cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0,
+                        totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
                         lastActivity: Date.now()
                     })) || [],
                     gameState: gameData.gameState || {
@@ -143,16 +160,17 @@ async function restoreActiveGames() {
 
                 rooms.set(row.room_id, room);
                 reverseRoomMap.set(room, row.room_id);
-                boardHistory.set(row.room_id, gameData.history || {
-                    ascending1: [1], ascending2: [1],
-                    descending1: [100], descending2: [100]
-                });
+                boardHistory.set(row.room_id, gameData.history);
+
+                console.log(`✅ Sala ${row.room_id} restaurada con historial`, gameData.history);
             } catch (error) {
-                console.error(`Error restaurando sala ${row.room_id}:`, error);
+                console.error(`❌ Error restaurando sala ${row.room_id}:`, error);
+                await pool.query('DELETE FROM game_states WHERE room_id = $1', [row.room_id]);
             }
         }
     } catch (error) {
         console.error('Error al restaurar juegos activos:', error);
+        setTimeout(restoreActiveGames, 30000);
     }
 }
 
@@ -461,15 +479,12 @@ async function endTurn(room, player) {
 
     await saveGameState(reverseRoomMap.get(room));
 
-    // Reinicia el contador al cambiar de turno
-    player.cardsPlayedThisTurn = 0;
-
     broadcastToRoom(room, {
         type: 'turn_changed',
         newTurn: nextPlayer.id,
         previousPlayer: player.id,
         playerName: nextPlayer.name,
-        cardsPlayedThisTurn: 0, // Reinicia a 0
+        cardsPlayedThisTurn: 0, // Enviar 0 ya que es nuevo turno
         minCardsRequired: requiredCards,
         remainingDeck: room.gameState.deck.length
     }, { includeGameState: true });

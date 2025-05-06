@@ -33,8 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragStartX = 0;
     let dragStartY = 0;
     let isDragging = false;
-    const HISTORY_ICON_PULSE_INTERVAL = 20000;
-    const HISTORY_ICON_PULSE_DURATION = 500;
+    const HISTORY_ICON_PULSE_INTERVAL = 20000; // 20 segundos
+    const HISTORY_ICON_PULSE_DURATION = 500; // Duración de la animación en ms
 
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
@@ -84,8 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
             this.dragOffsetY = 0;
         }
 
+        // En game.js, modificar el método determineColor de la clase Card
         determineColor() {
             if (this === selectedCard) return '#FFFF99';
+
+            // Verificar si la carta fue jugada en este turno por cualquier jugador
             const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(move =>
                 move.value === this.value &&
                 ((move.position === 'asc1' && gameState.board.ascending[0] === this.value) ||
@@ -93,14 +96,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     (move.position === 'desc1' && gameState.board.descending[0] === this.value) ||
                     (move.position === 'desc2' && gameState.board.descending[1] === this.value))
             );
+
+            // Verificar si es una carta animada (jugada recientemente)
             const isAnimatedCard = gameState.animatingCards.some(anim =>
                 anim.card.value === this.value &&
                 anim.card.position === this.position
             );
+
             if (isPlayedThisTurn || isAnimatedCard || this.playedThisRound) {
-                return '#99CCFF';
+                return '#99CCFF'; // Azul para cartas jugadas en este turno
             }
-            return '#FFFFFF';
+            return '#FFFFFF'; // Blanco para cartas normales
         }
 
         updateColor() {
@@ -110,24 +116,29 @@ document.addEventListener('DOMContentLoaded', () => {
         draw() {
             ctx.save();
             if (!this.isDragging) ctx.translate(this.shakeOffset, 0);
+
             ctx.shadowColor = this.isPlayedThisTurn || this.playedThisRound
                 ? 'rgba(0, 100, 255, 0.3)'
                 : 'rgba(0, 0, 0, 0.2)';
             ctx.shadowBlur = 8;
             ctx.shadowOffsetY = 4;
+
             ctx.beginPath();
             ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
             ctx.fillStyle = this.backgroundColor;
             ctx.fill();
+
             ctx.strokeStyle = this.isPlayable ? '#27ae60' : '#34495e';
             ctx.lineWidth = this.isPlayable ? 3 : 2;
             ctx.stroke();
+
             ctx.fillStyle = '#2c3e50';
             ctx.font = 'bold 28px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.shadowColor = 'transparent';
             ctx.fillText(this.value.toString(), this.x + this.width / 2, this.y + this.height / 2 - this.hoverOffset);
+
             ctx.restore();
         }
 
@@ -209,22 +220,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, 15000);
 
-            const savedCount = sessionStorage.getItem('cardsPlayedThisTurn');
-            if (savedCount !== null && gameState.currentTurn === currentPlayer.id) {
-                const playerIndex = gameState.players.findIndex(p => p.id === currentPlayer.id);
-                if (playerIndex !== -1) {
-                    gameState.players[playerIndex].cardsPlayedThisTurn = parseInt(savedCount, 10);
-                    updateGameInfo();
-                }
-            }
-
             socket.send(JSON.stringify({
-                type: 'get_full_state',
+                type: 'get_game_state',
                 playerId: currentPlayer.id,
-                roomId: roomId,
-                currentCount: savedCount !== null ? parseInt(savedCount, 10) : 0
+                roomId: roomId
             }));
 
+            if (connectionStatus === 'reconnecting') {
+                socket.send(JSON.stringify({
+                    type: 'get_full_state',
+                    playerId: currentPlayer.id,
+                    roomId: roomId
+                }));
+            }
             connectionStatus = 'connected';
         };
 
@@ -258,10 +266,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                let currentCount = 0;
-                if (gameState.currentTurn === currentPlayer.id) {
-                    const player = gameState.players.find(p => p.id === currentPlayer.id);
-                    currentCount = player?.cardsPlayedThisTurn || 0;
+                if (message.type === 'gs' && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
+                    return;
                 }
 
                 switch (message.type) {
@@ -272,7 +278,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         handleInitGame(message);
                         break;
                     case 'gs':
-                        if (now - lastStateUpdate < STATE_UPDATE_THROTTLE) return;
                         lastStateUpdate = now;
                         updateGameState(message.s);
                         updateGameInfo();
@@ -318,6 +323,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             const idx = message.position === 'desc1' ? 0 : 1;
                             gameState.board.descending[idx] = message.cardValue;
                         }
+
+                        // Solo agregar al historial si no es nuestra propia jugada
                         if (message.playerId !== currentPlayer.id) {
                             gameState.cardsPlayedThisTurn.push({
                                 value: message.cardValue,
@@ -340,18 +347,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         gameState.cardsPlayedThisTurn = [];
                         gameState.currentTurn = message.newTurn;
                         gameState.remainingDeck = message.remainingDeck || gameState.remainingDeck;
+
                         const minCards = message.minCardsRequired !== undefined ?
                             message.minCardsRequired :
                             (gameState.remainingDeck > 0 ? 2 : 1);
+
                         updateGameInfo();
+
                         if (message.playerName) {
                             const notificationMsg = message.newTurn === currentPlayer.id ?
                                 '¡Es tu turno!' :
                                 `Turno de ${message.playerName}`;
                             showNotification(notificationMsg);
-                        }
-                        if (message.previousPlayer === currentPlayer.id) {
-                            sessionStorage.removeItem('cardsPlayedThisTurn');
                         }
                         break;
                     case 'move_undone':
@@ -376,7 +383,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         };
                         updateGameInfo();
-                        sessionStorage.removeItem('cardsPlayedThisTurn');
                         break;
                     case 'player_update':
                         if (message.players) {
@@ -386,19 +392,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     default:
                         console.log('Mensaje no reconocido:', message);
-                }
-
-                if (gameState.currentTurn === currentPlayer.id) {
-                    const playerIndex = gameState.players.findIndex(p => p.id === currentPlayer.id);
-                    if (playerIndex !== -1) {
-                        gameState.players[playerIndex].cardsPlayedThisTurn = currentCount;
-                        sessionStorage.setItem('cardsPlayedThisTurn', currentCount.toString());
-                        updateGameInfo();
-                    }
-                }
-
-                if (message.type === 'card_played_animated' && message.playerId === currentPlayer.id) {
-                    sessionStorage.setItem('cardsPlayedThisTurn', message.cardsPlayedThisTurn.toString());
                 }
             } catch (error) {
                 console.error('Error procesando mensaje:', error);
@@ -425,7 +418,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleFullStateUpdate(message) {
         if (!message.room || !message.gameState) return;
-        const currentCount = gameState.players.find(p => p.id === currentPlayer.id)?.cardsPlayedThisTurn || 0;
 
         if (message.history) {
             gameState.columnHistory = {
@@ -440,17 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.currentTurn = message.gameState.currentTurn || gameState.currentTurn;
         gameState.remainingDeck = message.gameState.remainingDeck || gameState.remainingDeck;
         gameState.initialCards = message.gameState.initialCards || gameState.initialCards;
-
-        gameState.players = message.room.players.map(p => ({
-            id: p.id,
-            name: p.name,
-            isHost: p.isHost,
-            cardCount: p.cards?.length || 0,
-            cardsPlayedThisTurn: (gameState.currentTurn === currentPlayer.id && p.id === currentPlayer.id)
-                ? currentCount
-                : Number(p.cardsPlayedThisTurn) || 0,
-            totalCardsPlayed: Number(p.totalCardsPlayed) || 0
-        }));
+        gameState.players = message.room.players || gameState.players;
 
         updateGameInfo();
     }
@@ -469,19 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         if (message.gameState.gameStarted && message.yourCards) {
-            const currentCount = gameState.players.find(p => p.id === currentPlayer.id)?.cardsPlayedThisTurn || 0;
             updatePlayerCards(message.yourCards);
-
-            gameState.players = message.gameState.players?.map(p => ({
-                id: p.id,
-                name: p.name,
-                isHost: p.isHost,
-                cardCount: p.cards?.length || 0,
-                cardsPlayedThisTurn: (gameState.currentTurn === currentPlayer.id && p.id === currentPlayer.id)
-                    ? currentCount
-                    : Number(p.cardsPlayedThisTurn) || 0,
-                totalCardsPlayed: Number(p.totalCardsPlayed) || 0
-            })) || [];
         }
 
         updateGameInfo();
@@ -632,6 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleTurnChanged(message) {
+        // Limpiar todas las cartas jugadas en este turno
         gameState.cardsPlayedThisTurn = [];
         gameState.boardCards = [];
 
@@ -755,6 +726,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGameInfo();
     }
 
+    // Función updateGameState modificada
     function updateGameState(newState) {
         if (!newState) return;
 
@@ -778,6 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updatePlayerCards(newState.y);
         }
 
+        // Actualizar UI inmediatamente
         updateGameInfo();
 
         if (gameState.currentTurn !== currentPlayer.id) {
@@ -785,6 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Función updateGameInfo modificada
     function updateGameInfo() {
         const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
         let currentPlayerName;
@@ -800,8 +774,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('currentTurn').textContent = currentPlayerName;
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
 
+        // Calcular minCardsRequired basado en el estado actual del deck
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        const currentPlayerCardsPlayed = gameState.players.find(p => p.id === currentPlayer.id)?.cardsPlayedThisTurn || 0;
+        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+            card => card.playerId === currentPlayer.id
+        ).length;
 
         document.getElementById('progressText').textContent =
             `${currentPlayerCardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
@@ -809,6 +786,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
         document.getElementById('progressBar').style.width = `${progressPercentage}%`;
 
+        // Actualizar el botón de terminar turno
         const endTurnBtn = document.getElementById('endTurnBtn');
         if (endTurnBtn) {
             endTurnBtn.disabled = gameState.currentTurn !== currentPlayer.id;
@@ -820,6 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const position = message.position;
             const value = message.cardValue;
 
+            // Actualizar el tablero
             if (position.includes('asc')) {
                 const idx = position === 'asc1' ? 0 : 1;
                 gameState.board.ascending[idx] = value;
@@ -828,6 +807,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 gameState.board.descending[idx] = value;
             }
 
+            // Registrar la jugada para el turno actual
             gameState.cardsPlayedThisTurn.push({
                 value: value,
                 position: position,
@@ -835,6 +815,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 previousValue: message.previousValue
             });
 
+            // Carta animada (azul)
             const animCard = new Card(
                 value,
                 message.startX || BOARD_POSITION.x,
@@ -844,6 +825,7 @@ document.addEventListener('DOMContentLoaded', () => {
             );
             animCard.isFromCurrentTurn = true;
 
+            // Carta en el tablero (también azul)
             const boardCard = new Card(
                 value,
                 getColumnPosition(position).x,
@@ -860,11 +842,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 targetX: getColumnPosition(position).x,
                 targetY: getColumnPosition(position).y,
                 onComplete: () => {
+                    // Al completar la animación, mantener la carta azul en el tablero
                     gameState.boardCards = gameState.boardCards || [];
                     gameState.boardCards.push(boardCard);
                 }
             });
 
+            // Actualizar historial
             if (!gameState.columnHistory[position]) {
                 gameState.columnHistory[position] = position.includes('asc') ? [1] : [100];
             }
@@ -919,6 +903,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawHistoryIcons() {
         if (!historyIcon.complete || historyIcon.naturalWidth === 0) return;
 
+        // Solo animar si es el turno del jugador actual
         const shouldAnimate = gameState.currentTurn === currentPlayer.id;
         const pulseProgress = shouldAnimate ? calculatePulseProgress() : 0;
 
@@ -926,6 +911,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const baseX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
             const baseY = HISTORY_ICON_Y;
 
+            // Calcular escala basada en el progreso de la animación
             const scale = shouldAnimate ? (1 + 0.2 * pulseProgress) : 1;
 
             ctx.save();
@@ -946,6 +932,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const now = Date.now();
         const timeSinceLastPulse = (now - historyIconsAnimation.lastPulseTime) % HISTORY_ICON_PULSE_INTERVAL;
 
+        // Solo animar si es nuestro turno
         if (gameState.currentTurn === currentPlayer.id &&
             timeSinceLastPulse < HISTORY_ICON_PULSE_DURATION) {
             return Math.sin((timeSinceLastPulse / HISTORY_ICON_PULSE_DURATION) * Math.PI);
@@ -1166,6 +1153,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
 
+        // Actualizar el tablero inmediatamente para el jugador actual
         if (position.includes('asc')) {
             const idx = position === 'asc1' ? 0 : 1;
             gameState.board.ascending[idx] = cardValue;
@@ -1174,6 +1162,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.board.descending[idx] = cardValue;
         }
 
+        // Enviar mensaje al servidor
         socket.send(JSON.stringify({
             type: 'play_card',
             playerId: currentPlayer.id,
@@ -1183,6 +1172,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isFirstMove: gameState.cardsPlayedThisTurn.length === 0
         }));
 
+        // Eliminar la carta de la mano del jugador
         const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
         if (cardIndex !== -1) {
             gameState.yourCards.splice(cardIndex, 1);
@@ -1192,8 +1182,12 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCardsPlayedUI();
     }
 
+    // Nueva función auxiliar para actualizar UI
     function updateCardsPlayedUI() {
-        const currentPlayerCardsPlayed = gameState.players.find(p => p.id === currentPlayer.id)?.cardsPlayedThisTurn || 0;
+        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+            card => card.playerId === currentPlayer.id
+        ).length;
+
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         document.getElementById('progressText').textContent =
             `${currentPlayerCardsPlayed + 1}/${minCardsRequired} carta(s) jugada(s)`;
@@ -1220,7 +1214,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function endTurn() {
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        const currentPlayerCardsPlayed = gameState.players.find(p => p.id === currentPlayer.id)?.cardsPlayedThisTurn || 0;
+        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+            card => card.playerId === currentPlayer.id
+        ).length;
 
         if (currentPlayerCardsPlayed < minCardsRequired) {
             return showNotification(`Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`, true);
@@ -1284,6 +1280,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const value = i < 2 ? gameState.board.ascending[i % 2] : gameState.board.descending[i % 2];
+
+            // Verificar si fue jugada en este turno por cualquier jugador
             const wasPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
                 move => move.value === value && move.position === col
             );
@@ -1299,6 +1297,8 @@ document.addEventListener('DOMContentLoaded', () => {
             card.draw();
         });
 
+
+        // Dibujar cartas animadas y cartas del tablero persistente
         handleCardAnimations();
         if (gameState.boardCards) {
             gameState.boardCards.forEach(card => card.draw());
@@ -1347,7 +1347,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
 
         if (gameState.currentTurn === currentPlayer.id) {
-            const currentPlayerCardsPlayed = gameState.players.find(p => p.id === currentPlayer.id)?.cardsPlayedThisTurn || 0;
+            const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
+                card => card.playerId === currentPlayer.id
+            ).length;
 
             const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
             const progressText = `${currentPlayerCardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
@@ -1357,6 +1359,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('progressBar').style.width = `${progressPercentage}%`;
         }
 
+        // Reiniciar la animación cuando es nuestro turno
         if (gameState.currentTurn === currentPlayer.id) {
             historyIconsAnimation.lastPulseTime = Date.now();
         }
@@ -1404,15 +1407,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const elapsed = now - anim.startTime;
             const progress = Math.min(elapsed / anim.duration, 1);
 
-            const easedProgress = progress;
+            // Usar una curva de aceleración más agresiva (linear en este caso)
+            const easedProgress = progress; // Eliminar easing para movimiento más directo
 
             anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * easedProgress;
             anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * easedProgress;
 
+            // Dibujar la carta
             ctx.save();
             ctx.shadowColor = 'rgba(0, 100, 255, 0.7)';
-            ctx.shadowBlur = 8;
-            ctx.shadowOffsetY = 3;
+            ctx.shadowBlur = 8; // Reducir blur para mayor nitidez
+            ctx.shadowOffsetY = 3; // Reducir sombra
             anim.card.draw();
             ctx.restore();
 
@@ -1427,6 +1432,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const position = message.position;
         const value = message.cardValue;
 
+        // Actualizar el tablero
         if (position.includes('asc')) {
             const idx = position === 'asc1' ? 0 : 1;
             gameState.board.ascending[idx] = value;
@@ -1435,6 +1441,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.board.descending[idx] = value;
         }
 
+        // Solo animar si NO es el jugador actual
         if (message.playerId !== currentPlayer.id) {
             const card = new Card(
                 value,
@@ -1459,6 +1466,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        // Registrar la jugada para todos los jugadores
         gameState.cardsPlayedThisTurn.push({
             value: value,
             position: position,
@@ -1588,8 +1596,8 @@ document.addEventListener('DOMContentLoaded', () => {
             historyIconsAnimation = {
                 interval: null,
                 lastPulseTime: Date.now(),
-                pulseDuration: 500,
-                pulseInterval: 20000
+                pulseDuration: 500, // 0.5 segundos de animación
+                pulseInterval: 20000 // Cada 20 segundos
             };
 
             startHistoryIconsAnimation();
