@@ -145,7 +145,8 @@ async function restoreActiveGames() {
                         ...p,
                         ws: null,
                         cards: p.cards || [],
-                        cardsPlayedThisTurn: p.cardsPlayedThisTurn || [],
+                        cardsPlayedThisTurn: p.cardsPlayedThisTurn || 0,
+                        totalCardsPlayed: p.totalCardsPlayed || 0,
                         lastActivity: Date.now()
                     })) || [],
                     gameState: gameData.gameState || {
@@ -217,6 +218,7 @@ function broadcastToRoom(room, message, options = {}) {
         }
     });
 }
+
 function sendGameState(room, player) {
     player.lastActivity = Date.now();
     const state = {
@@ -230,8 +232,8 @@ function sendGameState(room, player) {
             n: p.name,
             h: p.isHost,
             c: p.cards.length,
-            s: p.cardsPlayedThisTurn.length,
-            pt: p.cardsPlayedThisTurn
+            s: p.cardsPlayedThisTurn || 0,
+            pt: p.totalCardsPlayed || 0
         }))
     };
 
@@ -343,9 +345,10 @@ async function handlePlayCard(room, player, msg) {
         board.descending[targetIdx] = msg.cardValue;
     }
 
-    player.cards = player.cards.filter(c => c !== msg.cardValue);
+    // Incrementar contadores
     player.cardsPlayedThisTurn = (player.cardsPlayedThisTurn || 0) + 1;
     player.totalCardsPlayed = (player.totalCardsPlayed || 0) + 1;
+    player.cards = player.cards.filter(c => c !== msg.cardValue);
 
     updateBoardHistory(room, msg.position, msg.cardValue);
 
@@ -356,22 +359,8 @@ async function handlePlayCard(room, player, msg) {
         cardValue: msg.cardValue,
         position: msg.position,
         previousValue: targetValue,
-        persistColor: true
-    });
-
-    broadcastToRoom(room, {
-        type: 'cards_played_update',
-        playerId: player.id,
-        cardsPlayedThisTurn: player.cardsPlayedThisTurn,
-        totalCardsPlayed: player.totalCardsPlayed,
-        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
-    }, { skipPlayerId: player.id });
-
-    safeSend(player.ws, {
-        type: 'cards_played_update',
-        cardsPlayedThisTurn: player.cardsPlayedThisTurn,
-        totalCardsPlayed: player.totalCardsPlayed,
-        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+        persistColor: true,
+        cardsPlayedThisTurn: player.cardsPlayedThisTurn // Enviar el contador actualizado
     });
 
     await saveGameState(reverseRoomMap.get(room));
@@ -426,7 +415,7 @@ function handleUndoMove(room, player, msg) {
 
 async function endTurn(room, player) {
     const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
-    const cardsPlayed = player.cardsPlayedThisTurn.length;
+    const cardsPlayed = player.cardsPlayedThisTurn || 0;
 
     if (player.specialFlag === 'risky_first_move' && room.players.length === 1) {
         if (cardsPlayed < minCardsRequired) {
@@ -459,7 +448,6 @@ async function endTurn(room, player) {
         player.cards.push(room.gameState.deck.pop());
     }
 
-    // Notificar a todos si el deck se agotó
     if (room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
             type: 'deck_updated',
@@ -472,6 +460,9 @@ async function endTurn(room, player) {
     const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
     const nextPlayer = room.players[nextIndex];
     room.gameState.currentTurn = nextPlayer.id;
+
+    // Reiniciar contador de cartas jugadas
+    player.cardsPlayedThisTurn = 0;
 
     const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
     const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
@@ -486,8 +477,6 @@ async function endTurn(room, player) {
         });
     }
 
-    player.cardsPlayedThisTurn = [];
-
     await saveGameState(reverseRoomMap.get(room));
 
     broadcastToRoom(room, {
@@ -495,7 +484,7 @@ async function endTurn(room, player) {
         newTurn: nextPlayer.id,
         previousPlayer: player.id,
         playerName: nextPlayer.name,
-        cardsPlayedThisTurn: 0,
+        cardsPlayedThisTurn: 0, // Enviar 0 ya que es nuevo turno
         minCardsRequired: requiredCards,
         remainingDeck: room.gameState.deck.length
     }, { includeGameState: true });
