@@ -736,7 +736,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 name: player.n || `Jugador_${player.i.slice(0, 4)}`,
                 cardCount: player.c,
                 isHost: player.h,
-                cardsPlayedThisTurn: player.s || 0
+                cardsPlayedThisTurn: Number(player.s) || 0,
+                totalCardsPlayed: Number(player.pt) || 0
             }));
         }
 

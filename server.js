@@ -82,8 +82,8 @@ async function saveGameState(roomId) {
                 cards: p.cards,
                 isHost: p.isHost,
                 connected: p.ws !== null,
-                cardsPlayedThisTurn: p.cardsPlayedThisTurn || 0,
-                totalCardsPlayed: p.totalCardsPlayed || 0,
+                cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0,
+                totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
                 lastActivity: p.lastActivity
             })),
             gameState: {
@@ -145,8 +145,8 @@ async function restoreActiveGames() {
                         ...p,
                         ws: null,
                         cards: p.cards || [],
-                        cardsPlayedThisTurn: p.cardsPlayedThisTurn || 0,
-                        totalCardsPlayed: p.totalCardsPlayed || 0,
+                        cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0,
+                        totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
                         lastActivity: Date.now()
                     })) || [],
                     gameState: gameData.gameState || {
@@ -232,8 +232,8 @@ function sendGameState(room, player) {
             n: p.name,
             h: p.isHost,
             c: p.cards.length,
-            s: p.cardsPlayedThisTurn || 0,
-            pt: p.totalCardsPlayed || 0
+            s: Number(p.cardsPlayedThisTurn) || 0, // Asegurar número
+            pt: Number(p.totalCardsPlayed) || 0
         }))
     };
 
@@ -346,8 +346,8 @@ async function handlePlayCard(room, player, msg) {
     }
 
     // Incrementar contadores
-    player.cardsPlayedThisTurn = (player.cardsPlayedThisTurn || 0) + 1;
-    player.totalCardsPlayed = (player.totalCardsPlayed || 0) + 1;
+    player.cardsPlayedThisTurn = (Number(player.cardsPlayedThisTurn) || 0) + 1;
+    player.totalCardsPlayed = (Number(player.totalCardsPlayed) || 0) + 1;
     player.cards = player.cards.filter(c => c !== msg.cardValue);
 
     updateBoardHistory(room, msg.position, msg.cardValue);
@@ -415,7 +415,7 @@ function handleUndoMove(room, player, msg) {
 
 async function endTurn(room, player) {
     const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
-    const cardsPlayed = player.cardsPlayedThisTurn || 0;
+    const cardsPlayed = Number(player.cardsPlayedThisTurn) || 0;
 
     if (player.specialFlag === 'risky_first_move' && room.players.length === 1) {
         if (cardsPlayed < minCardsRequired) {
