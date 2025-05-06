@@ -80,32 +80,28 @@ async function saveGameState(roomId) {
                 name: p.name,
                 cards: p.cards,
                 isHost: p.isHost,
-                connected: p.ws !== null
+                connected: p.ws !== null,
+                cardsPlayedThisTurn: p.cardsPlayedThisTurn || 0,
+                totalCardsPlayed: p.totalCardsPlayed || 0,
+                lastActivity: p.lastActivity
             })),
             gameState: {
                 deck: room.gameState.deck,
                 board: room.gameState.board,
                 currentTurn: room.gameState.currentTurn,
                 gameStarted: room.gameState.gameStarted,
-                initialCards: room.gameState.initialCards
+                initialCards: room.gameState.initialCards,
+                gameId: room.gameState.gameId || uuidv4()
             },
-            history: boardHistory.get(roomId) || {
-                ascending1: [1],
-                ascending2: [1],
-                descending1: [100],
-                descending2: [100]
-            }
+            history: boardHistory.get(roomId)
         };
 
         await pool.query(`
-            INSERT INTO game_states 
-            (room_id, game_data, last_activity) 
-            VALUES ($1, $2, NOW())
-            ON CONFLICT (room_id) 
-            DO UPDATE SET 
-                game_data = EXCLUDED.game_data,
-                last_activity = NOW()
-        `, [roomId, JSON.stringify(gameData)]);
+            UPDATE game_states 
+            SET game_data = $1, 
+                last_activity = NOW() 
+            WHERE room_id = $2
+        `, [JSON.stringify(gameData), roomId]);
 
         return true;
     } catch (error) {
@@ -297,7 +293,7 @@ function getPlayableCards(playerCards, board) {
     });
 }
 
-function handlePlayCard(room, player, msg) {
+async function handlePlayCard(room, player, msg) {
     if (!validPositions.includes(msg.position)) {
         return safeSend(player.ws, {
             type: 'notification',
@@ -343,12 +339,8 @@ function handlePlayCard(room, player, msg) {
     }
 
     player.cards = player.cards.filter(c => c !== msg.cardValue);
-    player.cardsPlayedThisTurn.push({
-        value: msg.cardValue,
-        position: msg.position,
-        isPlayedThisTurn: true,
-        previousValue
-    });
+    player.cardsPlayedThisTurn = (player.cardsPlayedThisTurn || 0) + 1;
+    player.totalCardsPlayed = (player.totalCardsPlayed || 0) + 1;
 
     updateBoardHistory(room, msg.position, msg.cardValue);
 
@@ -360,8 +352,24 @@ function handlePlayCard(room, player, msg) {
         position: msg.position,
         previousValue: targetValue,
         persistColor: true
-    }, { includeGameState: true });
+    });
 
+    broadcastToRoom(room, {
+        type: 'cards_played_update',
+        playerId: player.id,
+        cardsPlayedThisTurn: player.cardsPlayedThisTurn,
+        totalCardsPlayed: player.totalCardsPlayed,
+        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+    }, { skipPlayerId: player.id });
+
+    safeSend(player.ws, {
+        type: 'cards_played_update',
+        cardsPlayedThisTurn: player.cardsPlayedThisTurn,
+        totalCardsPlayed: player.totalCardsPlayed,
+        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+    });
+
+    await saveGameState(reverseRoomMap.get(room));
     checkGameStatus(room);
 }
 
@@ -413,7 +421,7 @@ function handleUndoMove(room, player, msg) {
 
 async function endTurn(room, player) {
     const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
-    const cardsPlayed = player.cardsPlayedThisTurn.length;
+    const cardsPlayed = player.cardsPlayedThisTurn || 0;
 
     if (player.specialFlag === 'risky_first_move' && room.players.length === 1) {
         if (cardsPlayed < minCardsRequired) {
@@ -446,7 +454,6 @@ async function endTurn(room, player) {
         player.cards.push(room.gameState.deck.pop());
     }
 
-    // Notificar a todos si el deck se agotó
     if (room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
             type: 'deck_updated',
@@ -473,20 +480,19 @@ async function endTurn(room, player) {
         });
     }
 
-    player.cardsPlayedThisTurn = [];
+    // Notificar fin de turno y resetear contador
+    broadcastToRoom(room, {
+        type: 'turn_ended',
+        playerId: player.id,
+        cardsPlayedThisTurn: 0,
+        totalCardsPlayed: player.totalCardsPlayed,
+        newTurn: nextPlayer.id,
+        playerName: nextPlayer.name
+    });
+
+    player.cardsPlayedThisTurn = 0;
 
     await saveGameState(reverseRoomMap.get(room));
-
-    broadcastToRoom(room, {
-        type: 'turn_changed',
-        newTurn: nextPlayer.id,
-        previousPlayer: player.id,
-        playerName: nextPlayer.name,
-        cardsPlayedThisTurn: 0,
-        minCardsRequired: requiredCards,
-        remainingDeck: room.gameState.deck.length
-    }, { includeGameState: true });
-
     checkGameStatus(room);
 }
 

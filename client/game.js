@@ -276,6 +276,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     case 'init_game':
                         handleInitGame(message);
+
+                        // Actualizar contadores al iniciar
+                        if (message.playerId === currentPlayer.id) {
+                            const minCards = message.gameState?.remainingDeck > 0 ? 2 : 1;
+                            updateCardsPlayedUI(
+                                message.cardsPlayedThisTurn || 0,
+                                message.minCardsRequired || minCards
+                            );
+                            updateTotalCardsPlayed(message.totalCardsPlayed || 0);
+                        }
                         break;
                     case 'gs':
                         lastStateUpdate = now;
@@ -324,7 +334,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             gameState.board.descending[idx] = message.cardValue;
                         }
 
-                        // Solo agregar al historial si no es nuestra propia jugada
                         if (message.playerId !== currentPlayer.id) {
                             gameState.cardsPlayedThisTurn.push({
                                 value: message.cardValue,
@@ -359,6 +368,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                 '¡Es tu turno!' :
                                 `Turno de ${message.playerName}`;
                             showNotification(notificationMsg);
+
+                            // Resetear contador si es nuestro turno
+                            if (message.newTurn === currentPlayer.id) {
+                                resetCardsPlayedProgress();
+                            }
                         }
                         break;
                     case 'move_undone':
@@ -388,6 +402,40 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (message.players) {
                             gameState.players = message.players;
                             updateGameInfo();
+                        }
+                        break;
+                    case 'cards_played_update':
+                        // Actualizar contadores cuando jugamos una carta
+                        if (message.playerId === currentPlayer.id) {
+                            updateCardsPlayedUI(message.cardsPlayedThisTurn, message.minCardsRequired);
+                            updateTotalCardsPlayed(message.totalCardsPlayed);
+
+                            // Actualizar estado local
+                            const player = gameState.players.find(p => p.id === currentPlayer.id);
+                            if (player) {
+                                player.cardsPlayedThisTurn = message.cardsPlayedThisTurn;
+                                player.totalCardsPlayed = message.totalCardsPlayed;
+                            }
+                        }
+                        break;
+                    case 'turn_ended':
+                        // Resetear contadores cuando termina nuestro turno
+                        if (message.playerId === currentPlayer.id) {
+                            resetCardsPlayedProgress();
+                            updateTotalCardsPlayed(message.totalCardsPlayed);
+
+                            // Actualizar estado local
+                            const player = gameState.players.find(p => p.id === currentPlayer.id);
+                            if (player) {
+                                player.cardsPlayedThisTurn = 0;
+                                player.totalCardsPlayed = message.totalCardsPlayed;
+                            }
+                        }
+
+                        // Notificar cambio de turno
+                        if (message.newTurn === currentPlayer.id) {
+                            const minCards = gameState.remainingDeck > 0 ? 2 : 1;
+                            showNotification(`¡Es tu turno! Juega al menos ${minCards} carta(s)`);
                         }
                         break;
                     default:
@@ -1180,18 +1228,62 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCardsPlayedUI();
     }
 
-    // Nueva función auxiliar para actualizar UI
-    function updateCardsPlayedUI() {
-        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
-            card => card.playerId === currentPlayer.id
-        ).length;
+    function updateCardsPlayedUI(cardsPlayed, minCardsRequired) {
+        const progressText = document.getElementById('progressText');
+        const progressBar = document.getElementById('progressBar');
+        const progressContainer = document.querySelector('.progress-container');
 
+        // Actualizar texto
+        progressText.innerHTML = `
+            <span>Progreso del turno:</span>
+            <span>${cardsPlayed}/${minCardsRequired}</span>
+        `;
+
+        // Calcular porcentaje
+        const progressPercentage = Math.min((cardsPlayed / minCardsRequired) * 100, 100);
+
+        // Animación suave de la barra
+        progressBar.style.transition = 'width 0.3s ease, background 0.3s ease';
+        progressBar.style.width = `${progressPercentage}%`;
+
+        // Cambiar color según progreso
+        if (cardsPlayed >= minCardsRequired) {
+            progressBar.style.background = 'var(--success)';
+            progressContainer.classList.add('progress-complete');
+        } else {
+            progressBar.style.background = 'linear-gradient(90deg, var(--secondary), var(--primary))';
+            progressContainer.classList.remove('progress-complete');
+        }
+
+        // Animación al jugar carta
+        if (cardsPlayed > 0) {
+            progressBar.classList.add('card-played-animation');
+            setTimeout(() => {
+                progressBar.classList.remove('card-played-animation');
+            }, 500);
+        }
+    }
+
+    function resetCardsPlayedProgress() {
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        document.getElementById('progressText').textContent =
-            `${currentPlayerCardsPlayed + 1}/${minCardsRequired} carta(s) jugada(s)`;
+        updateCardsPlayedUI(0, minCardsRequired);
 
-        const progressPercentage = Math.min(((currentPlayerCardsPlayed + 1) / minCardsRequired) * 100, 100);
-        document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+        // Resetear animación
+        const progressBar = document.getElementById('progressBar');
+        progressBar.style.transition = 'none';
+        progressBar.offsetHeight; // Trigger reflow
+        progressBar.style.transition = 'width 0.3s ease, background 0.3s ease';
+    }
+
+    function updateTotalCardsPlayed(total) {
+        const totalElement = document.getElementById('totalCardsPlayed');
+        totalElement.textContent = total;
+
+        // Animación
+        totalElement.classList.add('count-up-animation');
+        setTimeout(() => {
+            totalElement.classList.remove('count-up-animation');
+        }, 300);
     }
 
     function hasValidMoves(cards, board) {
