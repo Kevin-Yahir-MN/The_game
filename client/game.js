@@ -169,6 +169,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function updateProgressBar() {
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        const progress = gameState.cardsPlayedThisTurn.length;
+
+        document.getElementById('progressText').textContent =
+            `${progress}/${minCardsRequired} carta(s) jugada(s)`;
+
+        document.getElementById('progressBar').style.width =
+            `${Math.min((progress / minCardsRequired) * 100, 100)}%`;
+    }
+
     function loadAsset(url) {
         return assetCache.has(url) ? Promise.resolve(assetCache.get(url)) : new Promise((resolve) => {
             const img = new Image();
@@ -268,6 +279,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (message.type === 'gs' && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
                     return;
+                }
+
+                if (message.type === 'progress_update' && message.playerId === currentPlayer.id) {
+                    gameState.cardsPlayedThisTurn = Array(message.cardsPlayed).fill({});
+                    updateProgressBar();
                 }
 
                 switch (message.type) {
@@ -1180,6 +1196,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         selectedCard = null;
+        gameState.cardsPlayedThisTurn.push({});
+        updateProgressBar();
         updateCardsPlayedUI();
     }
 

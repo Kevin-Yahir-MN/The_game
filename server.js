@@ -72,43 +72,46 @@ async function initializeDatabase() {
 
 async function saveGameState(roomId) {
     const room = rooms.get(roomId);
-    if (!room) return;
-
-    try {
-        const gameData = {
-            players: room.players.map(p => ({
-                id: p.id,
-                name: p.name,
-                cards: p.cards,
-                isHost: p.isHost,
-                connected: p.ws !== null,
-                cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0,
-                totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
-                lastActivity: p.lastActivity
-            })),
-            gameState: {
-                deck: room.gameState.deck,
-                board: room.gameState.board,
-                currentTurn: room.gameState.currentTurn,
-                gameStarted: room.gameState.gameStarted,
-                initialCards: room.gameState.initialCards,
-                gameId: room.gameState.gameId || uuidv4()
-            },
-            history: boardHistory.get(roomId)
-        };
-
-        await pool.query(`
-            UPDATE game_states 
-            SET game_data = jsonb_set(game_data, '{players}', $1::jsonb)
-            WHERE room_id = $2
-        `, [JSON.stringify(gameData), roomId]);
-
-        return true;
-    } catch (error) {
-        console.error(`Error al guardar estado para sala ${roomId}:`, error);
-        throw error;
-    }
+    await pool.query(`
+        UPDATE game_states 
+        SET game_data = jsonb_set(
+            jsonb_set(
+                game_data, 
+                '{players}', 
+                $1::jsonb
+            ),
+            '{currentTurnProgress}',
+            $2::jsonb
+        )
+        WHERE room_id = $3
+    `, [
+        JSON.stringify(room.players),
+        JSON.stringify({
+            playerId: room.gameState.currentTurn,
+            cardsPlayed: room.players.find(p => p.id === room.gameState.currentTurn)?.cardsPlayedThisTurn || 0
+        }),
+        roomId
+    ]);
 }
+
+
+wss.on('connection', async (ws, req) => {
+    const params = new URLSearchParams(req.url.split('?')[1]);
+    const roomId = params.get('roomId');
+    const playerId = params.get('playerId');
+
+    const savedState = await pool.query(
+        'SELECT game_data->\'currentTurnProgress\' as progress FROM game_states WHERE room_id = $1',
+        [roomId]
+    );
+
+    if (savedState.rows[0]?.progress) {
+        ws.send(JSON.stringify({
+            type: 'progress_update',
+            ...savedState.rows[0].progress
+        }));
+    }
+});
 
 async function restoreActiveGames() {
     try {
