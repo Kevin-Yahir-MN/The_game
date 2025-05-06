@@ -628,15 +628,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetCardsPlayedProgress() {
-        document.getElementById('progressText').textContent = '0/2 carta(s) jugada(s)';
-        document.getElementById('progressBar').style.width = '0%';
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        const progressText = document.getElementById('progressText');
+        const progressBar = document.getElementById('progressBar');
 
+        // Actualizar texto con explicación clara
+        progressText.innerHTML = `
+            <span>Cartas jugadas este turno:</span>
+            <span><strong>0</strong> / ${minCardsRequired} mínimo</span>
+        `;
+
+        // Resetear barra con animación
+        progressBar.style.transition = 'width 0.5s ease, background 0.5s ease';
+        progressBar.style.width = '0%';
+        progressBar.style.background = 'linear-gradient(90deg, var(--secondary), var(--primary))';
+
+        // Resetear estado de las cartas
         gameState.yourCards.forEach(card => {
             card.isPlayedThisTurn = false;
             card.updateColor();
         });
 
+        // Resetear tracking interno
         gameState.cardsPlayedThisTurn = [];
+
+        // Cambiar clase según requisitos
+        progressText.parentElement.classList.remove('progress-complete');
+
+        // Mostrar tooltip explicativo en el primer turno
+        if (gameState.firstTurn) {
+            showNotification(`Debes jugar al menos ${minCardsRequired} cartas este turno`);
+            gameState.firstTurn = false;
+        }
     }
 
     function handleMoveUndone(message) {
