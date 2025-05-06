@@ -270,18 +270,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
+                // Manejo de los diferentes tipos de mensajes
                 switch (message.type) {
                     case 'full_state_update':
                         handleFullStateUpdate(message);
                         break;
+
                     case 'init_game':
                         handleInitGame(message);
                         break;
+
                     case 'gs':
                         lastStateUpdate = now;
-                        updateGameState(message.s);
+                        updateGameState({
+                            ...message.s,
+                            p: message.s.p?.map(player => ({
+                                ...player,
+                                cp: player.pt?.length || 0
+                            }))
+                        });
                         updateGameInfo();
                         break;
+
                     case 'game_started':
                         gameState.board = message.board || { ascending: [1, 1], descending: [100, 100] };
                         gameState.currentTurn = message.currentTurn;
@@ -292,65 +302,66 @@ document.addEventListener('DOMContentLoaded', () => {
                             window.location.href = 'game.html';
                         }
                         break;
+
                     case 'your_cards':
                         updatePlayerCards(message.cards);
                         updateGameInfo();
                         break;
+
                     case 'game_over':
                         handleGameOver(message.message);
                         break;
+
                     case 'notification':
                         showNotification(message.message, message.isError);
                         break;
+
                     case 'column_history':
                         if (!gameState.columnHistory[message.column]) {
                             gameState.columnHistory[message.column] = message.column.includes('asc') ? [1] : [100];
                         }
                         gameState.columnHistory[message.column] = message.history;
                         break;
+
                     case 'column_history_update':
                         updateColumnHistoryUI(message.column, message.history, message.newValue);
                         break;
+
                     case 'card_played':
                         handleOpponentCardPlayed(message);
                         updateGameInfo();
                         break;
-                    case 'card_played_animated':
-                        if (message.position.includes('asc')) {
-                            const idx = message.position === 'asc1' ? 0 : 1;
-                            gameState.board.ascending[idx] = message.cardValue;
-                        } else {
-                            const idx = message.position === 'desc1' ? 0 : 1;
-                            gameState.board.descending[idx] = message.cardValue;
-                        }
 
-                        // Solo agregar al historial si no es nuestra propia jugada
-                        if (message.playerId !== currentPlayer.id) {
-                            gameState.cardsPlayedThisTurn.push({
-                                value: message.cardValue,
-                                position: message.position,
-                                playerId: message.playerId,
-                                previousValue: message.previousValue
-                            });
+                    case 'card_played_animated':
+                        // Actualización del contador de cartas jugadas
+                        if (message.playerId === currentPlayer.id) {
+                            const player = gameState.players.find(p => p.id === currentPlayer.id);
+                            if (player) {
+                                player.currentCardsPlayed = message.currentCardsPlayed;
+                            }
                         }
                         handleAnimatedCardPlay(message);
+                        updateGameInfo();
                         break;
+
                     case 'invalid_move':
                         if (message.playerId === currentPlayer.id && selectedCard) {
                             animateInvalidCard(selectedCard);
                         }
                         break;
-                    case 'deck_updated':
-                        handleDeckUpdated(message);
-                        break;
+
                     case 'turn_changed':
                         gameState.cardsPlayedThisTurn = [];
                         gameState.currentTurn = message.newTurn;
                         gameState.remainingDeck = message.remainingDeck || gameState.remainingDeck;
 
-                        const minCards = message.minCardsRequired !== undefined ?
-                            message.minCardsRequired :
-                            (gameState.remainingDeck > 0 ? 2 : 1);
+                        // Reiniciar el contador para el jugador cuyo turno comienza
+                        if (message.newTurn === currentPlayer.id) {
+                            const player = gameState.players.find(p => p.id === currentPlayer.id);
+                            if (player) {
+                                player.currentCardsPlayed = 0;
+                            }
+                        }
 
                         updateGameInfo();
 
@@ -361,10 +372,21 @@ document.addEventListener('DOMContentLoaded', () => {
                             showNotification(notificationMsg);
                         }
                         break;
+
+                    case 'deck_updated':
+                        gameState.remainingDeck = message.remaining;
+                        updateGameInfo();
+
+                        if (message.remaining === 0 && gameState.currentTurn === currentPlayer.id) {
+                            showNotification('¡El mazo se ha agotado! Ahora solo necesitas jugar 1 carta por turno');
+                        }
+                        break;
+
                     case 'move_undone':
                         handleMoveUndone(message);
                         updateGameInfo();
                         break;
+
                     case 'room_reset':
                         gameState = {
                             players: message.players || [],
@@ -384,12 +406,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         };
                         updateGameInfo();
                         break;
+
                     case 'player_update':
                         if (message.players) {
                             gameState.players = message.players;
                             updateGameInfo();
                         }
                         break;
+
                     default:
                         console.log('Mensaje no reconocido:', message);
                 }
@@ -725,7 +749,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGameInfo();
     }
 
-    // Función updateGameState modificada
     function updateGameState(newState) {
         if (!newState) return;
 
@@ -735,8 +758,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 name: player.n || `Jugador_${player.i.slice(0, 4)}`,
                 cardCount: player.c,
                 isHost: player.h,
-                cardsPlayedThisTurn: player.s || 0
+                currentCardsPlayed: player.s || 0,  // Usar el nuevo campo
+                cardsPlayedThisTurn: player.pt || []
             }));
+
+            if (!currentPlayer.name && currentPlayer.id) {
+                const player = gameState.players.find(p => p.id === currentPlayer.id);
+                if (player) {
+                    currentPlayer.name = player.name;
+                    sessionStorage.setItem('playerName', player.name);
+                }
+            }
         }
 
         gameState.board = newState.b || gameState.board;
@@ -748,7 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updatePlayerCards(newState.y);
         }
 
-        // Actualizar UI inmediatamente
+        // Actualizar UI inmediatamente con los nuevos datos
         updateGameInfo();
 
         if (gameState.currentTurn !== currentPlayer.id) {
@@ -756,7 +788,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Función updateGameInfo modificada
     function updateGameInfo() {
         const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
         let currentPlayerName;
@@ -772,22 +803,27 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('currentTurn').textContent = currentPlayerName;
         document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
 
-        // Calcular minCardsRequired basado en el estado actual del deck
+        // Obtener el jugador actual y sus cartas jugadas
+        const player = gameState.players.find(p => p.id === currentPlayer.id);
+        const currentCardsPlayed = player?.currentCardsPlayed || 0;
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
-            card => card.playerId === currentPlayer.id
-        ).length;
 
+        // Actualizar la UI con los valores correctos
         document.getElementById('progressText').textContent =
-            `${currentPlayerCardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
+            `${currentCardsPlayed}/${minCardsRequired} cartas jugadas`;
 
-        const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
+        const progressPercentage = Math.min((currentCardsPlayed / minCardsRequired) * 100, 100);
         document.getElementById('progressBar').style.width = `${progressPercentage}%`;
 
         // Actualizar el botón de terminar turno
         const endTurnBtn = document.getElementById('endTurnBtn');
         if (endTurnBtn) {
             endTurnBtn.disabled = gameState.currentTurn !== currentPlayer.id;
+            if (gameState.currentTurn === currentPlayer.id) {
+                endTurnBtn.textContent = gameState.remainingDeck > 0 ?
+                    `Terminar Turno (${currentCardsPlayed}/${minCardsRequired})` :
+                    `Terminar Turno (${currentCardsPlayed}/1)`;
+            }
         }
     }
 
@@ -1151,13 +1187,20 @@ document.addEventListener('DOMContentLoaded', () => {
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
 
-        // Actualizar el tablero inmediatamente para el jugador actual
+        // Actualizar el tablero inmediatamente para feedback visual
         if (position.includes('asc')) {
             const idx = position === 'asc1' ? 0 : 1;
             gameState.board.ascending[idx] = cardValue;
         } else {
             const idx = position === 'desc1' ? 0 : 1;
             gameState.board.descending[idx] = cardValue;
+        }
+
+        // Actualizar el contador localmente (será sobrescrito por la respuesta del servidor)
+        const player = gameState.players.find(p => p.id === currentPlayer.id);
+        if (player) {
+            player.currentCardsPlayed = (player.currentCardsPlayed || 0) + 1;
+            updateGameInfo();
         }
 
         // Enviar mensaje al servidor
@@ -1167,7 +1210,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cardValue: cardValue,
             position: position,
             previousValue: previousValue,
-            isFirstMove: gameState.cardsPlayedThisTurn.length === 0
+            isFirstMove: player.currentCardsPlayed === 1
         }));
 
         // Eliminar la carta de la mano del jugador
@@ -1177,7 +1220,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         selectedCard = null;
-        updateCardsPlayedUI();
     }
 
     // Nueva función auxiliar para actualizar UI
