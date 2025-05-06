@@ -779,7 +779,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ).length;
 
         document.getElementById('progressText').textContent =
-            `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
+            `${currentPlayerCardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
 
         const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
         document.getElementById('progressBar').style.width = `${progressPercentage}%`;
@@ -1188,7 +1188,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         document.getElementById('progressText').textContent =
-            `${currentPlayerCardsPlayed + 1}/${minCardsRequired} cartas jugadas`;
+            `${currentPlayerCardsPlayed + 1}/${minCardsRequired} carta(s) jugada(s)`;
 
         const progressPercentage = Math.min(((currentPlayerCardsPlayed + 1) / minCardsRequired) * 100, 100);
         document.getElementById('progressBar').style.width = `${progressPercentage}%`;
@@ -1350,7 +1350,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ).length;
 
             const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-            const progressText = `${currentPlayerCardsPlayed}/${minCardsRequired} cartas jugadas`;
+            const progressText = `${currentPlayerCardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
             document.getElementById('progressText').textContent = progressText;
 
             const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
