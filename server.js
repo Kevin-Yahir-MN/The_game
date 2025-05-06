@@ -15,6 +15,7 @@ const allowedOrigins = ['https://the-game-2xks.onrender.com'];
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
+        require: true,
         rejectUnauthorized: false
     },
     max: 5,
