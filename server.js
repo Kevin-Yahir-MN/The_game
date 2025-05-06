@@ -80,32 +80,28 @@ async function saveGameState(roomId) {
                 name: p.name,
                 cards: p.cards,
                 isHost: p.isHost,
-                connected: p.ws !== null
+                connected: p.ws !== null,
+                cardsPlayedThisTurn: p.cardsPlayedThisTurn || 0,
+                totalCardsPlayed: p.totalCardsPlayed || 0,
+                lastActivity: p.lastActivity
             })),
             gameState: {
                 deck: room.gameState.deck,
                 board: room.gameState.board,
                 currentTurn: room.gameState.currentTurn,
                 gameStarted: room.gameState.gameStarted,
-                initialCards: room.gameState.initialCards
+                initialCards: room.gameState.initialCards,
+                gameId: room.gameState.gameId || uuidv4()
             },
-            history: boardHistory.get(roomId) || {
-                ascending1: [1],
-                ascending2: [1],
-                descending1: [100],
-                descending2: [100]
-            }
+            history: boardHistory.get(roomId)
         };
 
         await pool.query(`
-            INSERT INTO game_states 
-            (room_id, game_data, last_activity) 
-            VALUES ($1, $2, NOW())
-            ON CONFLICT (room_id) 
-            DO UPDATE SET 
-                game_data = EXCLUDED.game_data,
-                last_activity = NOW()
-        `, [roomId, JSON.stringify(gameData)]);
+            UPDATE game_states 
+            SET game_data = $1, 
+                last_activity = NOW() 
+            WHERE room_id = $2
+        `, [JSON.stringify(gameData), roomId]);
 
         return true;
     } catch (error) {
@@ -200,6 +196,11 @@ function safeSend(ws, message) {
 function broadcastToRoom(room, message, options = {}) {
     const { includeGameState = false, skipPlayerId = null } = options;
 
+    // Asegurarse de incluir el estado del deck en todos los mensajes relevantes
+    if (includeGameState && !message.remainingDeck) {
+        message.remainingDeck = room.gameState.deck.length;
+    }
+
     room.players.forEach(player => {
         if (player.id !== skipPlayerId && player.ws?.readyState === WebSocket.OPEN) {
             const completeMessage = {
@@ -215,7 +216,6 @@ function broadcastToRoom(room, message, options = {}) {
         }
     });
 }
-
 function sendGameState(room, player) {
     player.lastActivity = Date.now();
     const state = {
@@ -297,7 +297,7 @@ function getPlayableCards(playerCards, board) {
     });
 }
 
-function handlePlayCard(room, player, msg) {
+async function handlePlayCard(room, player, msg) {
     if (!validPositions.includes(msg.position)) {
         return safeSend(player.ws, {
             type: 'notification',
@@ -343,12 +343,8 @@ function handlePlayCard(room, player, msg) {
     }
 
     player.cards = player.cards.filter(c => c !== msg.cardValue);
-    player.cardsPlayedThisTurn.push({
-        value: msg.cardValue,
-        position: msg.position,
-        isPlayedThisTurn: true,
-        previousValue
-    });
+    player.cardsPlayedThisTurn = (player.cardsPlayedThisTurn || 0) + 1;
+    player.totalCardsPlayed = (player.totalCardsPlayed || 0) + 1;
 
     updateBoardHistory(room, msg.position, msg.cardValue);
 
@@ -360,8 +356,24 @@ function handlePlayCard(room, player, msg) {
         position: msg.position,
         previousValue: targetValue,
         persistColor: true
-    }, { includeGameState: true });
+    });
 
+    broadcastToRoom(room, {
+        type: 'cards_played_update',
+        playerId: player.id,
+        cardsPlayedThisTurn: player.cardsPlayedThisTurn,
+        totalCardsPlayed: player.totalCardsPlayed,
+        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+    }, { skipPlayerId: player.id });
+
+    safeSend(player.ws, {
+        type: 'cards_played_update',
+        cardsPlayedThisTurn: player.cardsPlayedThisTurn,
+        totalCardsPlayed: player.totalCardsPlayed,
+        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+    });
+
+    await saveGameState(reverseRoomMap.get(room));
     checkGameStatus(room);
 }
 
@@ -446,11 +458,12 @@ async function endTurn(room, player) {
         player.cards.push(room.gameState.deck.pop());
     }
 
+    // Notificar a todos si el deck se agotó
     if (room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
-            type: 'notification',
-            message: '¡El mazo se ha agotado!',
-            isError: false
+            type: 'deck_updated',
+            remaining: 0,
+            minCardsRequired: 1
         });
     }
 
@@ -482,16 +495,11 @@ async function endTurn(room, player) {
         previousPlayer: player.id,
         playerName: nextPlayer.name,
         cardsPlayedThisTurn: 0,
-        minCardsRequired: requiredCards
+        minCardsRequired: requiredCards,
+        remainingDeck: room.gameState.deck.length
     }, { includeGameState: true });
 
     checkGameStatus(room);
-}
-
-function broadcastGameState(room) {
-    room.players.forEach(player => {
-        sendGameState(room, player);
-    });
 }
 
 function checkGameStatus(room) {
