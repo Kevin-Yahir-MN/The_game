@@ -396,6 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error('Error procesando mensaje:', error);
             }
+            updateProgressBar();
         };
     }
 

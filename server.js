@@ -99,8 +99,7 @@ async function saveGameState(roomId) {
 
         await pool.query(`
             UPDATE game_states 
-            SET game_data = $1, 
-                last_activity = NOW() 
+            SET game_data = jsonb_set(game_data, '{players}', $1::jsonb)
             WHERE room_id = $2
         `, [JSON.stringify(gameData), roomId]);
 
@@ -903,6 +902,7 @@ wss.on('connection', async (ws, req) => {
         type: 'init_game',
         playerId: player.id,
         playerName: player.name,
+        cardsPlayedThisTurn: player.cardsPlayedThisTurn,
         roomId,
         isHost: player.isHost,
         gameState: {
