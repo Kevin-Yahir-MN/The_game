@@ -1,22 +1,3 @@
-// Al cargar la página
-const savedCount = sessionStorage.getItem('cardsPlayedThisTurn');
-if (savedCount && gameState.currentTurn === currentPlayer.id) {
-    const player = gameState.players.find(p => p.id === currentPlayer.id);
-    if (player) {
-        player.cardsPlayedThisTurn = Number(savedCount);
-    }
-}
-
-// Al jugar una carta (en el manejador de mensajes)
-if (message.type === 'card_played_animated' && message.playerId === currentPlayer.id) {
-    sessionStorage.setItem('cardsPlayedThisTurn', message.cardsPlayedThisTurn);
-}
-
-// Al terminar el turno
-if (message.type === 'turn_changed' && message.previousPlayer === currentPlayer.id) {
-    sessionStorage.removeItem('cardsPlayedThisTurn');
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
