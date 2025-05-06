@@ -264,6 +264,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const now = Date.now();
                 const message = JSON.parse(event.data);
 
+                if (message.type === 'card_played_animated' && message.playerId === currentPlayer.id) {
+                    // Actualizar el contador local cuando el jugador actual juega una carta
+                    const playerIndex = gameState.players.findIndex(p => p.id === currentPlayer.id);
+                    if (playerIndex !== -1) {
+                        gameState.players[playerIndex].cardsPlayedThisTurn = message.cardsPlayedThisTurn;
+                        updateGameInfo();
+                    }
+                }
+
                 if (message.type === 'pong') {
                     updateConnectionStatus('Conectado');
                     return;

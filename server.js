@@ -461,12 +461,15 @@ async function endTurn(room, player) {
 
     await saveGameState(reverseRoomMap.get(room));
 
+    // Reinicia el contador al cambiar de turno
+    player.cardsPlayedThisTurn = 0;
+
     broadcastToRoom(room, {
         type: 'turn_changed',
         newTurn: nextPlayer.id,
         previousPlayer: player.id,
         playerName: nextPlayer.name,
-        cardsPlayedThisTurn: 0, // Enviar 0 ya que es nuevo turno
+        cardsPlayedThisTurn: 0, // Reinicia a 0
         minCardsRequired: requiredCards,
         remainingDeck: room.gameState.deck.length
     }, { includeGameState: true });
