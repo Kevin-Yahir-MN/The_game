@@ -1,3 +1,22 @@
+// Al cargar la página
+const savedCount = sessionStorage.getItem('cardsPlayedThisTurn');
+if (savedCount && gameState.currentTurn === currentPlayer.id) {
+    const player = gameState.players.find(p => p.id === currentPlayer.id);
+    if (player) {
+        player.cardsPlayedThisTurn = Number(savedCount);
+    }
+}
+
+// Al jugar una carta (en el manejador de mensajes)
+if (message.type === 'card_played_animated' && message.playerId === currentPlayer.id) {
+    sessionStorage.setItem('cardsPlayedThisTurn', message.cardsPlayedThisTurn);
+}
+
+// Al terminar el turno
+if (message.type === 'turn_changed' && message.previousPlayer === currentPlayer.id) {
+    sessionStorage.removeItem('cardsPlayedThisTurn');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -220,19 +239,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, 15000);
 
+            const savedCount = sessionStorage.getItem('cardsPlayedThisTurn');
+            if (savedCount !== null && gameState.currentTurn === currentPlayer.id) {
+                const playerIndex = gameState.players.findIndex(p => p.id === currentPlayer.id);
+                if (playerIndex !== -1) {
+                    gameState.players[playerIndex].cardsPlayedThisTurn = parseInt(savedCount, 10);
+                    updateGameInfo();
+                }
+            }
+
             socket.send(JSON.stringify({
-                type: 'get_game_state',
+                type: 'get_full_state',
                 playerId: currentPlayer.id,
-                roomId: roomId
+                roomId: roomId,
+                currentCount: savedCount !== null ? parseInt(savedCount, 10) : 0
             }));
 
-            if (connectionStatus === 'reconnecting') {
-                socket.send(JSON.stringify({
-                    type: 'get_full_state',
-                    playerId: currentPlayer.id,
-                    roomId: roomId
-                }));
-            }
             connectionStatus = 'connected';
         };
 
@@ -266,8 +288,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                if (message.type === 'gs' && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
-                    return;
+                let currentCount = 0;
+                if (gameState.currentTurn === currentPlayer.id) {
+                    const player = gameState.players.find(p => p.id === currentPlayer.id);
+                    currentCount = player?.cardsPlayedThisTurn || 0;
                 }
 
                 switch (message.type) {
@@ -278,6 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         handleInitGame(message);
                         break;
                     case 'gs':
+                        if (now - lastStateUpdate < STATE_UPDATE_THROTTLE) return;
                         lastStateUpdate = now;
                         updateGameState(message.s);
                         updateGameInfo();
@@ -323,8 +348,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             const idx = message.position === 'desc1' ? 0 : 1;
                             gameState.board.descending[idx] = message.cardValue;
                         }
-
-                        // Solo agregar al historial si no es nuestra propia jugada
                         if (message.playerId !== currentPlayer.id) {
                             gameState.cardsPlayedThisTurn.push({
                                 value: message.cardValue,
@@ -347,18 +370,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         gameState.cardsPlayedThisTurn = [];
                         gameState.currentTurn = message.newTurn;
                         gameState.remainingDeck = message.remainingDeck || gameState.remainingDeck;
-
                         const minCards = message.minCardsRequired !== undefined ?
                             message.minCardsRequired :
                             (gameState.remainingDeck > 0 ? 2 : 1);
-
                         updateGameInfo();
-
                         if (message.playerName) {
                             const notificationMsg = message.newTurn === currentPlayer.id ?
                                 '¡Es tu turno!' :
                                 `Turno de ${message.playerName}`;
                             showNotification(notificationMsg);
+                        }
+                        if (message.previousPlayer === currentPlayer.id) {
+                            sessionStorage.removeItem('cardsPlayedThisTurn');
                         }
                         break;
                     case 'move_undone':
@@ -383,6 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         };
                         updateGameInfo();
+                        sessionStorage.removeItem('cardsPlayedThisTurn');
                         break;
                     case 'player_update':
                         if (message.players) {
@@ -392,6 +416,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         break;
                     default:
                         console.log('Mensaje no reconocido:', message);
+                }
+
+                if (gameState.currentTurn === currentPlayer.id) {
+                    const playerIndex = gameState.players.findIndex(p => p.id === currentPlayer.id);
+                    if (playerIndex !== -1) {
+                        gameState.players[playerIndex].cardsPlayedThisTurn = currentCount;
+                        sessionStorage.setItem('cardsPlayedThisTurn', currentCount.toString());
+                        updateGameInfo();
+                    }
+                }
+
+                if (message.type === 'card_played_animated' && message.playerId === currentPlayer.id) {
+                    sessionStorage.setItem('cardsPlayedThisTurn', message.cardsPlayedThisTurn.toString());
                 }
             } catch (error) {
                 console.error('Error procesando mensaje:', error);
@@ -419,6 +456,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleFullStateUpdate(message) {
         if (!message.room || !message.gameState) return;
 
+        // Mantener el conteo actual si ya existe
+        const currentCount = gameState.players.find(p => p.id === currentPlayer.id)?.cardsPlayedThisTurn || 0;
+
         if (message.history) {
             gameState.columnHistory = {
                 asc1: message.history.ascending1 || [1],
@@ -432,7 +472,18 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.currentTurn = message.gameState.currentTurn || gameState.currentTurn;
         gameState.remainingDeck = message.gameState.remainingDeck || gameState.remainingDeck;
         gameState.initialCards = message.gameState.initialCards || gameState.initialCards;
-        gameState.players = message.room.players || gameState.players;
+
+        // Actualizar jugadores manteniendo el conteo si es el mismo turno
+        gameState.players = message.room.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            isHost: p.isHost,
+            cardCount: p.cards?.length || 0,
+            cardsPlayedThisTurn: (gameState.currentTurn === currentPlayer.id && p.id === currentPlayer.id)
+                ? currentCount
+                : Number(p.cardsPlayedThisTurn) || 0,
+            totalCardsPlayed: Number(p.totalCardsPlayed) || 0
+        }));
 
         updateGameInfo();
     }
@@ -450,8 +501,21 @@ document.addEventListener('DOMContentLoaded', () => {
             desc2: message.history?.descending2 || [100]
         };
 
+        // Mantener el conteo si es nuestro turno
         if (message.gameState.gameStarted && message.yourCards) {
+            const currentCount = gameState.players.find(p => p.id === currentPlayer.id)?.cardsPlayedThisTurn || 0;
             updatePlayerCards(message.yourCards);
+
+            gameState.players = message.gameState.players?.map(p => ({
+                id: p.id,
+                name: p.name,
+                isHost: p.isHost,
+                cardCount: p.cards?.length || 0,
+                cardsPlayedThisTurn: (gameState.currentTurn === currentPlayer.id && p.id === currentPlayer.id)
+                    ? currentCount
+                    : Number(p.cardsPlayedThisTurn) || 0,
+                totalCardsPlayed: Number(p.totalCardsPlayed) || 0
+            })) || [];
         }
 
         updateGameInfo();

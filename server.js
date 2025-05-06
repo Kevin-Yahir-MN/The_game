@@ -113,8 +113,6 @@ async function saveGameState(roomId) {
 
 async function restoreActiveGames() {
     try {
-        console.log('⏳ Restaurando juegos activos con historial...');
-
         const { rows } = await pool.query(`
             SELECT room_id, game_data::text, last_activity 
             FROM game_states 
@@ -123,30 +121,15 @@ async function restoreActiveGames() {
 
         for (const row of rows) {
             try {
-                let gameData;
-                try {
-                    gameData = JSON.parse(row.game_data);
-                } catch (e) {
-                    console.error(`❌ Error parseando JSON para sala ${row.room_id}`);
-                    continue;
-                }
-
-                if (!gameData.history) {
-                    gameData.history = {
-                        ascending1: [1],
-                        ascending2: [1],
-                        descending1: [100],
-                        descending2: [100]
-                    };
-                }
+                const gameData = JSON.parse(row.game_data);
 
                 const room = {
                     players: gameData.players?.map(p => ({
                         ...p,
                         ws: null,
                         cards: p.cards || [],
-                        cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0,
-                        totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
+                        cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0, // Asegurar número
+                        totalCardsPlayed: Number(p.totalCardsPlayed) || 0,       // Asegurar número
                         lastActivity: Date.now()
                     })) || [],
                     gameState: gameData.gameState || {
@@ -160,17 +143,16 @@ async function restoreActiveGames() {
 
                 rooms.set(row.room_id, room);
                 reverseRoomMap.set(room, row.room_id);
-                boardHistory.set(row.room_id, gameData.history);
-
-                console.log(`✅ Sala ${row.room_id} restaurada con historial`, gameData.history);
+                boardHistory.set(row.room_id, gameData.history || {
+                    ascending1: [1], ascending2: [1],
+                    descending1: [100], descending2: [100]
+                });
             } catch (error) {
-                console.error(`❌ Error restaurando sala ${row.room_id}:`, error);
-                await pool.query('DELETE FROM game_states WHERE room_id = $1', [row.room_id]);
+                console.error(`Error restaurando sala ${row.room_id}:`, error);
             }
         }
     } catch (error) {
         console.error('Error al restaurar juegos activos:', error);
-        setTimeout(restoreActiveGames, 30000);
     }
 }
 
