@@ -21,6 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const HIGHLIGHT_COLOR = 'rgb(248, 51, 51)';
     const VALID_HIGHLIGHT_COLOR = 'rgb(67, 64, 250)';
     const INVALID_HIGHLIGHT_COLOR = 'rgb(248, 51, 51)';
+    const HISTORY_ICON_PULSE_INTERVAL = 20000; // 20 segundos
+    const HISTORY_ICON_PULSE_DURATION = 500; // Duración de la animación en ms
 
     const assetCache = new Map();
     let historyIcon = new Image();
@@ -33,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragStartX = 0;
     let dragStartY = 0;
     let isDragging = false;
+
 
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
