@@ -220,15 +220,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, 15000);
 
-
-            // Solicitar estado completo inmediatamente al conectar
             socket.send(JSON.stringify({
                 type: 'get_full_state',
                 playerId: currentPlayer.id,
                 roomId: roomId
             }));
-
-            // También solicitar el estado del juego
             socket.send(JSON.stringify({
                 type: 'get_game_state',
                 playerId: currentPlayer.id,
@@ -265,12 +261,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (message.type === 'pong') {
                     updateConnectionStatus('Conectado');
-                    return;
-                }
-
-                // Manejar estado completo primero
-                if (message.type === 'full_state_update') {
-                    handleFullStateUpdate(message);
                     return;
                 }
 
@@ -427,24 +417,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleFullStateUpdate(message) {
         if (!message.room || !message.gameState) return;
 
-        // Actualizar jugadores
-        gameState.players = message.room.players.map(player => ({
-            id: player.id,
-            name: player.name,
-            isHost: player.isHost,
-            cardCount: player.cardCount || player.cards?.length || 0,
-            cardsPlayedThisTurn: player.cardsPlayedThisTurn || 0,
-            totalCardsPlayed: player.totalCardsPlayed || 0
-        })) || [];
-
-        // Actualizar estado del juego
-        gameState.board = message.gameState.board || gameState.board;
-        gameState.currentTurn = message.gameState.currentTurn || gameState.currentTurn;
-        gameState.remainingDeck = message.gameState.remainingDeck || gameState.remainingDeck;
-        gameState.initialCards = message.gameState.initialCards || gameState.initialCards;
-        gameState.gameStarted = message.gameState.gameStarted || false;
-
-        // Actualizar historial
         if (message.history) {
             gameState.columnHistory = {
                 asc1: message.history.ascending1 || [1],
@@ -454,14 +426,13 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         }
 
-        // Actualizar cartas del jugador si están disponibles
-        if (message.yourCards) {
-            updatePlayerCards(message.yourCards);
-        }
+        gameState.board = message.gameState.board || gameState.board;
+        gameState.currentTurn = message.gameState.currentTurn || gameState.currentTurn;
+        gameState.remainingDeck = message.gameState.remainingDeck || gameState.remainingDeck;
+        gameState.initialCards = message.gameState.initialCards || gameState.initialCards;
+        gameState.players = message.room.players || gameState.players;
 
-        // Forzar actualización de la UI
         updateGameInfo();
-        requestAnimationFrame(gameLoop);
     }
 
     function handleInitGame(message) {
@@ -1634,17 +1605,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     initGame();
-
-    if (currentPlayer.id && roomId) {
-        // Forzar una actualización del estado después de un breve retraso
-        setTimeout(() => {
-            if (socket?.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: 'get_full_state',
-                    playerId: currentPlayer.id,
-                    roomId: roomId
-                }));
-            }
-        }, 500);
-    }
 });

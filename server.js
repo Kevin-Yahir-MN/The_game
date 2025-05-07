@@ -196,9 +196,9 @@ function safeSend(ws, message) {
 }
 
 function broadcastToRoom(room, message, options = {}) {
-    const { includeGameState = true, skipPlayerId = null } = options; // Cambiado a true por defecto
+    const { includeGameState = false, skipPlayerId = null } = options;
 
-    // Incluir siempre el estado del deck
+    // Asegurarse de incluir el estado del deck en todos los mensajes relevantes
     if (includeGameState && !message.remainingDeck) {
         message.remainingDeck = room.gameState.deck.length;
     }
@@ -899,7 +899,6 @@ wss.on('connection', async (ws, req) => {
     player.lastActivity = Date.now();
     if (playerName) player.name = decodeURIComponent(playerName);
 
-    // Construir respuesta más completa
     const response = {
         type: 'init_game',
         playerId: player.id,
@@ -916,10 +915,7 @@ wss.on('connection', async (ws, req) => {
                 id: p.id,
                 name: p.name,
                 isHost: p.isHost,
-                cardCount: p.cards.length,
-                connected: p.ws?.readyState === WebSocket.OPEN,
-                cardsPlayedThisTurn: p.cardsPlayedThisTurn || 0,
-                totalCardsPlayed: p.totalCardsPlayed || 0
+                cardCount: p.cards.length
             }))
         },
         history: boardHistory.get(roomId) || {
@@ -928,9 +924,18 @@ wss.on('connection', async (ws, req) => {
             descending1: [100],
             descending2: [100]
         },
-        yourCards: room.gameState.gameStarted ? player.cards : [],
         isYourTurn: room.gameState.currentTurn === player.id
     };
+
+    if (room.gameState.gameStarted) {
+        response.yourCards = player.cards;
+        response.players = room.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            cardCount: p.cards.length,
+            cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
+        }));
+    }
 
     safeSend(ws, response);
 
