@@ -221,16 +221,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 15000);
 
             socket.send(JSON.stringify({
-                type: 'get_full_state',
-                playerId: currentPlayer.id,
-                roomId: roomId
-            }));
-            socket.send(JSON.stringify({
                 type: 'get_game_state',
                 playerId: currentPlayer.id,
                 roomId: roomId
             }));
 
+            if (connectionStatus === 'reconnecting') {
+                socket.send(JSON.stringify({
+                    type: 'get_full_state',
+                    playerId: currentPlayer.id,
+                    roomId: roomId
+                }));
+            }
             connectionStatus = 'connected';
         };
 
