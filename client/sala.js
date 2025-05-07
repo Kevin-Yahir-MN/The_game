@@ -204,7 +204,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'game.html';
     }
 
-    // En sala.js, modificar la función handleStartGame
     async function handleStartGame() {
         if (!socket || socket.readyState !== WebSocket.OPEN) {
             updateConnectionStatus('Error: No hay conexión', true);
@@ -213,9 +212,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         startBtn.disabled = true;
         startBtn.textContent = 'Iniciando...';
+        startBtn.classList.add('loading');
 
         try {
-            // 1. Primero enviar el comando de inicio
+            // Verificar estado de los jugadores primero
+            const response = await fetch(`${API_URL}/room-info/${roomId}`);
+            const data = await response.json();
+
+            if (!data.success || data.players.length < 1) {
+                throw new Error('No hay suficientes jugadores');
+            }
+
+            // Enviar comando de inicio al servidor
             socket.send(JSON.stringify({
                 type: 'start_game',
                 playerId: playerId,
@@ -223,31 +231,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 initialCards: parseInt(initialCardsSelect.value)
             }));
 
-            // 2. Esperar confirmación antes de redirigir
-            await new Promise((resolve) => {
-                const handler = (event) => {
-                    const message = JSON.parse(event.data);
-                    if (message.type === 'game_started') {
-                        socket.removeEventListener('message', handler);
-                        resolve();
-                    }
-                };
-                socket.addEventListener('message', handler);
+            // Timeout de seguridad reducido a 8 segundos
+            const timeout = setTimeout(() => {
+                if (window.location.pathname.endsWith('sala.html')) {
+                    resetStartButton();
+                    showNotification('El servidor está tardando en responder', true);
+                }
+            }, 8000);
 
-                // Timeout de seguridad
-                setTimeout(() => {
+            // Limpiar timeout si el juego inicia correctamente
+            socket.addEventListener('message', function handler(event) {
+                const message = JSON.parse(event.data);
+                if (message.type === 'game_started') {
+                    clearTimeout(timeout);
                     socket.removeEventListener('message', handler);
-                    resolve();
-                }, 2000);
+                    window.location.href = 'game.html';
+                }
             });
-
-            // 3. Redirigir después de confirmación
-            window.location.href = 'game.html';
 
         } catch (error) {
             console.error('Error al iniciar juego:', error);
-            startBtn.disabled = false;
-            startBtn.textContent = 'Iniciar Juego';
+            resetStartButton();
+            showNotification('Error al iniciar: ' + error.message, true);
         }
     }
 
