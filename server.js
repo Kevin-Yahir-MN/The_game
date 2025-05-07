@@ -998,9 +998,26 @@ wss.on('connection', async (ws, req) => {
                                 board: room.gameState.board,
                                 currentTurn: room.players[0].id,
                                 remainingDeck: room.gameState.deck.length,
-                                initialCards: msg.initialCards
+                                initialCards: msg.initialCards,
+                                players: room.players.map(p => ({
+                                    id: p.id,
+                                    name: p.name,
+                                    isHost: p.isHost,
+                                    cardCount: p.cards.length
+                                }))
                             });
 
+                            // Enviar cartas individualmente a cada jugador
+                            room.players.forEach(player => {
+                                if (player.ws?.readyState === WebSocket.OPEN) {
+                                    safeSend(player.ws, {
+                                        type: 'your_cards',
+                                        cards: player.cards,
+                                        playerName: player.name,
+                                        currentPlayerId: player.id
+                                    });
+                                }
+                            });
                         } catch (error) {
                             await pool.query('ROLLBACK');
                             console.error('Error al iniciar juego:', error);

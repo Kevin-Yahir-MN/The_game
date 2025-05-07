@@ -221,6 +221,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 15000);
 
             socket.send(JSON.stringify({
+                type: 'get_full_state',
+                playerId: currentPlayer.id,
+                roomId: roomId
+            }));
+
+            socket.send(JSON.stringify({
                 type: 'get_game_state',
                 playerId: currentPlayer.id,
                 roomId: roomId
@@ -288,6 +294,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         gameState.remainingDeck = message.remainingDeck;
                         gameState.initialCards = message.initialCards;
                         gameState.gameStarted = true;
+                        updateGameInfo();
+                        updatePlayersPanel();
                         if (window.location.pathname.endsWith('sala.html')) {
                             window.location.href = 'game.html';
                         }
@@ -397,6 +405,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Error procesando mensaje:', error);
             }
         };
+    }
+
+    function initializeGameState() {
+        // Establecer valores por defecto visibles
+        gameState = {
+            players: [],
+            yourCards: [],
+            board: { ascending: [1, 1], descending: [100, 100] },
+            currentTurn: null,
+            remainingDeck: 98,
+            initialCards: 6,
+            cardsPlayedThisTurn: [],
+            currentTurnCards: [],
+            animatingCards: [],
+            columnHistory: {
+                asc1: [1],
+                asc2: [1],
+                desc1: [100],
+                desc2: [100]
+            },
+            gameStarted: false
+        };
+
+        // Renderizar estado inicial
+        updateGameInfo();
+        updatePlayersPanel();
     }
 
     function updateConnectionStatus(status, isError = false) {
@@ -758,8 +792,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Función updateGameInfo modificada
     function updateGameInfo() {
+
+        // Asegurarse de que los elementos del DOM existen
+        const currentTurnElement = document.getElementById('currentTurn');
+        const remainingDeckElement = document.getElementById('remainingDeck');
+        const progressTextElement = document.getElementById('progressText');
+        const progressBarElement = document.getElementById('progressBar');
+
+        if (!currentTurnElement || !remainingDeckElement || !progressTextElement || !progressBarElement) {
+            console.warn('Elementos del panel de información no encontrados');
+            setTimeout(updateGameInfo, 100); // Reintentar después de 100ms
+            return;
+        }
+
         const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
         let currentPlayerName;
 
@@ -1565,6 +1611,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initGame() {
+        initializeGameState();
         if (!canvas || !ctx || !currentPlayer.id || !roomId) {
             alert('Error: No se pudo inicializar el juego. Vuelve a la sala.');
             return;
