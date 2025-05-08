@@ -1417,10 +1417,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initGame() {
-        createPlayersPanel();
-        updatePlayersPanel();
-        updateGameInfo();
-
         if (!canvas || !ctx || !currentPlayer.id || !roomId) {
             alert('Error: No se pudo inicializar el juego. Vuelve a la sala.');
             return;
