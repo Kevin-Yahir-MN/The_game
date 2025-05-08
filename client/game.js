@@ -270,8 +270,53 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 switch (message.type) {
+                    // Reemplazar el handler de 'game_started'
+                    case 'game_started':
+                        // Mostrar estado de carga
+                        showLoadingState();
+
+                        // Actualizar el estado del juego
+                        gameState.gameStarted = true;
+                        gameState.board = message.board || { ascending: [1, 1], descending: [100, 100] };
+                        gameState.currentTurn = message.currentTurn;
+                        gameState.remainingDeck = message.remainingDeck;
+                        gameState.initialCards = message.initialCards;
+                        gameState.players = message.players || [];
+
+                        // Actualizar UI
+                        updateGameInfo();
+                        updatePlayersPanel();
+
+                        // Mostrar notificación si es nuestro turno
+                        if (gameState.currentTurn === currentPlayer.id) {
+                            showNotification('¡Es tu turno! Comienza a jugar');
+                        }
+                        break;
+
+                    // Añadir handler para 'full_state_update'
                     case 'full_state_update':
-                        handleFullStateUpdate(message);
+                        if (message.room && message.gameState) {
+                            // Actualizar estado del juego
+                            gameState.players = message.room.players || [];
+                            gameState.board = message.gameState.board || gameState.board;
+                            gameState.currentTurn = message.gameState.currentTurn || gameState.currentTurn;
+                            gameState.remainingDeck = message.gameState.remainingDeck || gameState.remainingDeck;
+                            gameState.initialCards = message.gameState.initialCards || gameState.initialCards;
+
+                            // Actualizar historial si está presente
+                            if (message.history) {
+                                gameState.columnHistory = {
+                                    asc1: message.history.ascending1 || [1],
+                                    asc2: message.history.ascending2 || [1],
+                                    desc1: message.history.descending1 || [100],
+                                    desc2: message.history.descending2 || [100]
+                                };
+                            }
+
+                            // Actualizar UI
+                            updateGameInfo();
+                            updatePlayersPanel();
+                        }
                         break;
                     case 'init_game':
                         handleInitGame(message);
@@ -282,17 +327,27 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateGameInfo();
                         break;
                     case 'game_started':
+                        // Mostrar estado de carga
+                        showLoadingState();
+
+                        // Actualizar el estado del juego
+                        gameState.gameStarted = true;
                         gameState.board = message.board || { ascending: [1, 1], descending: [100, 100] };
                         gameState.currentTurn = message.currentTurn;
                         gameState.remainingDeck = message.remainingDeck;
                         gameState.initialCards = message.initialCards;
-                        gameState.gameStarted = true;
+                        gameState.players = message.players || [];
+
+                        // Actualizar UI
                         updateGameInfo();
                         updatePlayersPanel();
-                        if (window.location.pathname.endsWith('sala.html')) {
-                            window.location.href = 'game.html';
+
+                        // Mostrar notificación si es nuestro turno
+                        if (gameState.currentTurn === currentPlayer.id) {
+                            showNotification('¡Es tu turno! Comienza a jugar');
                         }
                         break;
+
                     case 'your_cards':
                         updatePlayerCards(message.cards);
                         updateGameInfo();
@@ -399,6 +454,22 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    // Función mejorada para mostrar estado de carga
+    function showLoadingState() {
+        const elements = [
+            'currentTurn', 'remainingDeck', 'progressText', 'progressBar'
+        ];
+
+        elements.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.textContent = id === 'progressBar' ? '' : 'Cargando...';
+                if (id === 'progressBar') {
+                    el.style.width = '0%';
+                }
+            }
+        });
+    }
     function updateConnectionStatus(status, isError = false) {
         connectionStatus = status;
         const statusElement = document.getElementById('connectionStatus') || createConnectionStatusElement();
@@ -414,27 +485,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const remainingDeckElement = document.getElementById('remainingDeck').parentNode;
         remainingDeckElement.parentNode.insertBefore(statusElement, remainingDeckElement.nextSibling);
         return statusElement;
-    }
-
-    function handleFullStateUpdate(message) {
-        if (!message.room || !message.gameState) return;
-
-        if (message.history) {
-            gameState.columnHistory = {
-                asc1: message.history.ascending1 || [1],
-                asc2: message.history.ascending2 || [1],
-                desc1: message.history.descending1 || [100],
-                desc2: message.history.descending2 || [100]
-            };
-        }
-
-        gameState.board = message.gameState.board || gameState.board;
-        gameState.currentTurn = message.gameState.currentTurn || gameState.currentTurn;
-        gameState.remainingDeck = message.gameState.remainingDeck || gameState.remainingDeck;
-        gameState.initialCards = message.gameState.initialCards || gameState.initialCards;
-        gameState.players = message.room.players || gameState.players;
-
-        updateGameInfo();
     }
 
     function handleInitGame(message) {
@@ -695,36 +745,41 @@ document.addEventListener('DOMContentLoaded', () => {
         const progressTextElement = document.getElementById('progressText');
         const progressBarElement = document.getElementById('progressBar');
 
-        if (!currentTurnElement || !remainingDeckElement || !progressTextElement || !progressBarElement) {
+        if (!currentTurnElement || !remainingDeckElement ||
+            !progressTextElement || !progressBarElement) {
             setTimeout(updateGameInfo, 100);
             return;
         }
 
+        // Determinar texto del turno actual
+        let currentPlayerName = 'Esperando jugador...';
         const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
-        let currentPlayerName;
 
         if (currentPlayerObj) {
             currentPlayerName = currentPlayerObj.id === currentPlayer.id ?
-                'Tu turno' :
-                `Turno de ${currentPlayerObj.name}`;
-        } else {
-            currentPlayerName = 'Esperando jugador...';
+                'Tu turno' : `Turno de ${currentPlayerObj.name || 'Jugador'}`;
         }
 
-        document.getElementById('currentTurn').textContent = currentPlayerName;
-        document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
+        // Actualizar elementos
+        currentTurnElement.textContent = currentPlayerName;
+        remainingDeckElement.textContent = gameState.remainingDeck ?? '98';
 
+        // Calcular progreso del turno
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
             card => card.playerId === currentPlayer.id
         ).length;
 
-        document.getElementById('progressText').textContent =
+        progressTextElement.textContent =
             `${currentPlayerCardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
 
-        const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
-        document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+        const progressPercentage = Math.min(
+            (currentPlayerCardsPlayed / minCardsRequired) * 100,
+            100
+        );
+        progressBarElement.style.width = `${progressPercentage}%`;
 
+        // Actualizar botón de terminar turno
         const endTurnBtn = document.getElementById('endTurnBtn');
         if (endTurnBtn) {
             endTurnBtn.disabled = gameState.currentTurn !== currentPlayer.id;
@@ -1265,12 +1320,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <ul>
                 ${gameState.players.map(player => {
             const displayName = player.name || `Jugador_${player.id.slice(0, 4)}`;
+            const cardCount = player.cardCount ?? player.cards?.length ?? 0;
 
             return `
                         <li class="${player.id === currentPlayer.id ? 'you' : ''} 
                                    ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
                             <span class="player-name">${displayName}</span>
                             ${player.isHost ? ' <span class="host-tag">(Host)</span>' : ''}
+                            <span class="card-count">${cardCount} carta(s)</span>
                         </li>
                     `;
         }).join('')}
@@ -1422,12 +1479,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Mostrar estado de carga inicial
+        showLoadingState();
+
         Promise.all([
             loadAsset('cards-icon.png').then(img => { if (img) historyIcon = img; })
         ]).then(() => {
             canvas.width = 800;
             canvas.height = 700;
 
+            // Configurar event listeners
             endTurnButton.addEventListener('click', endTurn);
             canvas.addEventListener('click', handleCanvasClick);
             canvas.addEventListener('mousedown', handleMouseDown);
@@ -1437,22 +1498,18 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.addEventListener('touchstart', handleTouchStart);
             canvas.addEventListener('touchmove', handleTouchMove);
             canvas.addEventListener('touchend', handleTouchEnd);
-            document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
-            window.addEventListener('beforeunload', cleanup);
+            document.getElementById('modalBackdrop')?.addEventListener('click', closeHistoryModal);
 
+            // Configurar controles
             const controlsDiv = document.querySelector('.game-controls');
             if (controlsDiv) {
                 controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
             }
 
-            historyIconsAnimation = {
-                interval: null,
-                lastPulseTime: Date.now(),
-                pulseDuration: 500,
-                pulseInterval: 20000
-            };
-
+            // Iniciar conexión WebSocket
             connectWebSocket();
+
+            // Iniciar bucle del juego
             gameLoop();
         });
     }

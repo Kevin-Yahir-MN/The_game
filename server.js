@@ -957,9 +957,7 @@ wss.on('connection', async (ws, req) => {
                 case 'start_game':
                     if (player.isHost && !room.gameState.gameStarted) {
                         try {
-                            const connectedPlayers = room.players.filter(p =>
-                                p.ws?.readyState === WebSocket.OPEN
-                            );
+                            const connectedPlayers = room.players.filter(p => p.ws?.readyState === WebSocket.OPEN);
 
                             if (connectedPlayers.length < 1) {
                                 throw new Error('Se necesita al menos 1 jugador conectado');
@@ -967,36 +965,37 @@ wss.on('connection', async (ws, req) => {
 
                             await pool.query('BEGIN');
 
-                            await pool.query(`
-                UPDATE game_states SET 
-                game_data = $1,
-                last_activity = NOW()
-                WHERE room_id = $2
-            `, [JSON.stringify({
-                                players: room.players,
-                                gameState: {
-                                    ...room.gameState,
-                                    gameStarted: true,
-                                    initialCards: msg.initialCards
-                                }
-                            }), roomId]);
-
-                            await pool.query('COMMIT');
-
                             room.gameState.gameStarted = true;
                             room.gameState.initialCards = msg.initialCards;
+                            room.gameState.currentTurn = room.players[0].id;
 
+                            // Repartir cartas a todos los jugadores
                             room.players.forEach(player => {
                                 player.cards = [];
                                 for (let i = 0; i < msg.initialCards && room.gameState.deck.length > 0; i++) {
                                     player.cards.push(room.gameState.deck.pop());
                                 }
+                                player.cardsPlayedThisTurn = 0;
                             });
 
+                            await pool.query(`
+                UPDATE game_states 
+                SET game_data = $1, 
+                    last_activity = NOW() 
+                WHERE room_id = $2
+            `, [JSON.stringify({
+                                players: room.players,
+                                gameState: room.gameState,
+                                history: boardHistory.get(roomId)
+                            }), roomId]);
+
+                            await pool.query('COMMIT');
+
+                            // Notificar a todos que el juego ha comenzado
                             broadcastToRoom(room, {
                                 type: 'game_started',
                                 board: room.gameState.board,
-                                currentTurn: room.players[0].id,
+                                currentTurn: room.gameState.currentTurn,
                                 remainingDeck: room.gameState.deck.length,
                                 initialCards: msg.initialCards,
                                 players: room.players.map(p => ({
@@ -1007,17 +1006,39 @@ wss.on('connection', async (ws, req) => {
                                 }))
                             });
 
-                            // Enviar cartas individualmente a cada jugador
+                            // Enviar estado completo y cartas a cada jugador
                             room.players.forEach(player => {
                                 if (player.ws?.readyState === WebSocket.OPEN) {
+                                    // Enviar cartas del jugador
                                     safeSend(player.ws, {
                                         type: 'your_cards',
-                                        cards: player.cards,
-                                        playerName: player.name,
-                                        currentPlayerId: player.id
+                                        cards: player.cards
+                                    });
+
+                                    // Enviar estado completo del juego
+                                    safeSend(player.ws, {
+                                        type: 'full_state_update',
+                                        room: {
+                                            players: room.players.map(p => ({
+                                                id: p.id,
+                                                name: p.name,
+                                                isHost: p.isHost,
+                                                cardCount: p.cards.length,
+                                                connected: p.ws !== null
+                                            })),
+                                            gameStarted: true
+                                        },
+                                        gameState: {
+                                            board: room.gameState.board,
+                                            currentTurn: room.gameState.currentTurn,
+                                            remainingDeck: room.gameState.deck.length,
+                                            initialCards: msg.initialCards
+                                        },
+                                        history: boardHistory.get(roomId)
                                     });
                                 }
                             });
+
                         } catch (error) {
                             await pool.query('ROLLBACK');
                             console.error('Error al iniciar juego:', error);
