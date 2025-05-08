@@ -1258,40 +1258,81 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updatePlayersPanel() {
-        let panel = document.getElementById('playersPanel');
+        console.log("Actualizando panel de jugadores...");
+        console.log("Jugadores recibidos:", gameState.players);
 
-        // Si no existe el panel, lo creamos
         if (!panel) {
+            console.log("Creando nuevo panel...");
             panel = createPlayersPanel();
+        }
+        // Asegurarse de que gameState.players existe
+        if (!gameState.players || !Array.isArray(gameState.players)) {
+            console.error("gameState.players no es un array válido");
+            return;
+        }
+
+        // Obtener o crear el panel
+        let panel = document.getElementById('playersPanel');
+        console.log("Panel encontrado:", panel);
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'playersPanel';
+            panel.className = 'players-panel';
+            document.body.appendChild(panel);
+
+            // Estilos en línea para asegurar visibilidad
+            panel.style.position = 'fixed';
+            panel.style.top = '20px';
+            panel.style.right = '20px';
+            panel.style.backgroundColor = 'rgba(42, 52, 65, 0.95)';
+            panel.style.padding = '15px';
+            panel.style.borderRadius = '12px';
+            panel.style.width = '250px';
+            panel.style.maxHeight = '60vh';
+            panel.style.overflowY = 'auto';
+            panel.style.zIndex = '20';
+            panel.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+            panel.style.color = 'white';
         }
 
         // Ordenar jugadores: host primero, luego por nombre
         const sortedPlayers = [...gameState.players].sort((a, b) => {
             if (a.isHost && !b.isHost) return -1;
             if (!a.isHost && b.isHost) return 1;
-            return a.name.localeCompare(b.name);
+            return (a.name || '').localeCompare(b.name || '');
         });
 
+        // Generar HTML del panel
         panel.innerHTML = `
-            <h3>Jugadores (${sortedPlayers.length})</h3>
-            <ul>
+            <h3 style="margin-top: 0; color: #3498db; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">
+                Jugadores (${sortedPlayers.length})
+            </h3>
+            <ul style="list-style: none; padding: 0; margin: 10px 0 0;">
                 ${sortedPlayers.map(player => {
             const isCurrentTurn = gameState.currentTurn === player.id;
-            const isYou = player.id === currentPlayer.id;
+            const isYou = currentPlayer && player.id === currentPlayer.id;
 
             return `
-                        <li class="${isYou ? 'you' : ''} ${isCurrentTurn ? 'current-turn' : ''}">
-                            <span class="player-name">${player.name}</span>
-                            ${player.isHost ? ' <span class="host-tag">(Host)</span>' : ''}
-                            <span class="card-count">${player.cardCount} cartas</span>
-                            ${isCurrentTurn ? ' <span class="turn-indicator">▶</span>' : ''}
+                        <li style="
+                            padding: 8px 10px;
+                            margin-bottom: 6px;
+                            border-radius: 6px;
+                            background: ${isYou ? 'rgba(46, 204, 113, 0.1)' : 'rgba(255,255,255,0.05)'};
+                            border-left: 3px solid ${isYou ? '#2ecc71' : isCurrentTurn ? '#3498db' : 'transparent'};
+                            ${isCurrentTurn ? 'animation: pulse 3.5s infinite;' : ''}
+                        ">
+                            <span style="font-weight: bold; color: ${isYou ? '#2ecc71' : '#fff'}; margin-right: 5px;">
+                                ${player.name || `Jugador_${player.id.slice(0, 4)}`}
+                            </span>
+                            ${player.isHost ? '<span style="color: #3498db; font-size: 0.8em;">(Host)</span>' : ''}
+                            <span style="float: right;">${player.cardCount || 0} cartas</span>
                         </li>
                     `;
         }).join('')}
             </ul>
         `;
 
-        // Asegurarse de que el panel sea visible
+        // Asegurar visibilidad
         panel.style.display = 'block';
     }
 
@@ -1476,3 +1517,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initGame();
 });
+
+// Añade esto al final de tu archivo game.js para los estilos de animación
+const style = document.createElement('style');
+style.textContent = `
+     @keyframes pulse {
+         0% { transform: scale(1); }
+         50% { transform: scale(1.05); }
+         100% { transform: scale(1); }
+     }
+ `;
+document.head.appendChild(style);
