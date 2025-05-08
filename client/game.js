@@ -454,6 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updatePlayerCards(message.yourCards);
         }
 
+        updatePlayersPanel();
         updateGameInfo();
     }
 
@@ -663,6 +664,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!newState) return;
 
         if (newState.p) {
+            updatePlayersPanel();
             gameState.players = newState.p.map(player => ({
                 id: player.i,
                 name: player.n || `Jugador_${player.i.slice(0, 4)}`,
@@ -682,6 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updatePlayerCards(newState.y);
         }
 
+        updatePlayersPanel();
         updateGameInfo();
 
         if (gameState.currentTurn !== currentPlayer.id) {
@@ -1453,6 +1456,9 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             connectWebSocket();
+            setTimeout(() => {
+                updatePlayersPanel();
+            }, 1000); // Pequeño delay para asegurar la conexión
             gameLoop();
         });
     }
