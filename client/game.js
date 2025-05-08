@@ -1258,24 +1258,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updatePlayersPanel() {
-        const panel = document.getElementById('playersPanel') || createPlayersPanel();
+        let panel = document.getElementById('playersPanel');
+
+        // Si no existe el panel, lo creamos
+        if (!panel) {
+            panel = createPlayersPanel();
+        }
+
+        // Ordenar jugadores: host primero, luego por nombre
+        const sortedPlayers = [...gameState.players].sort((a, b) => {
+            if (a.isHost && !b.isHost) return -1;
+            if (!a.isHost && b.isHost) return 1;
+            return a.name.localeCompare(b.name);
+        });
 
         panel.innerHTML = `
-            <h3>Jugadores (${gameState.players.length})</h3>
+            <h3>Jugadores (${sortedPlayers.length})</h3>
             <ul>
-                ${gameState.players.map(player => {
-            const displayName = player.name || `Jugador_${player.id.slice(0, 4)}`;
+                ${sortedPlayers.map(player => {
+            const isCurrentTurn = gameState.currentTurn === player.id;
+            const isYou = player.id === currentPlayer.id;
 
             return `
-                        <li class="${player.id === currentPlayer.id ? 'you' : ''} 
-                                   ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
-                            <span class="player-name">${displayName}</span>
+                        <li class="${isYou ? 'you' : ''} ${isCurrentTurn ? 'current-turn' : ''}">
+                            <span class="player-name">${player.name}</span>
                             ${player.isHost ? ' <span class="host-tag">(Host)</span>' : ''}
+                            <span class="card-count">${player.cardCount} cartas</span>
+                            ${isCurrentTurn ? ' <span class="turn-indicator">▶</span>' : ''}
                         </li>
                     `;
         }).join('')}
             </ul>
         `;
+
+        // Asegurarse de que el panel sea visible
+        panel.style.display = 'block';
     }
 
     function handleCardAnimations() {
