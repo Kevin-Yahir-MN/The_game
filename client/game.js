@@ -354,6 +354,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             message.minCardsRequired :
                             (gameState.remainingDeck > 0 ? 2 : 1);
 
+                        // Actualizar el progreso para todos los jugadores
+                        if (message.players) {
+                            gameState.players = message.players;
+                        }
+
                         updateGameInfo();
 
                         if (message.playerName) {
@@ -736,6 +741,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // Actualizar botón de terminar turno
         if (endTurnButton) {
             endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
+            // Actualizar el mensaje de tooltip según las cartas jugadas
+            if (gameState.currentTurn === currentPlayer.id) {
+                const remainingCards = minCardsRequired - cardsPlayed;
+                if (remainingCards > 0) {
+                    endTurnButton.title = `Necesitas jugar ${remainingCards} carta(s) más`;
+                } else {
+                    endTurnButton.title = 'Puedes terminar tu turno';
+                }
+            }
         }
     }
 
@@ -1142,13 +1156,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function endTurn() {
+        const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
+        const cardsPlayed = currentPlayerObj?.cardsPlayedThisTurn || 0;
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
-            card => card.playerId === currentPlayer.id
-        ).length;
 
-        if (currentPlayerCardsPlayed < minCardsRequired) {
-            return showNotification(`Juega ${minCardsRequired - currentPlayerCardsPlayed} carta(s) más`, true);
+        if (cardsPlayed < minCardsRequired) {
+            const remainingCards = minCardsRequired - cardsPlayed;
+            showNotification(`Necesitas jugar ${remainingCards} carta(s) más para terminar tu turno`, true);
+            return;
         }
 
         socket.send(JSON.stringify({
@@ -1157,7 +1172,7 @@ document.addEventListener('DOMContentLoaded', () => {
             roomId: roomId
         }));
 
-        resetCardsPlayedProgress();
+
     }
 
     function drawBoard() {
