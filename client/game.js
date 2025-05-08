@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Constantes del juego
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const WS_URL = 'wss://the-game-2xks.onrender.com';
@@ -11,6 +12,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const CARD_HEIGHT = 120;
     const COLUMN_SPACING = 60;
     const CARD_SPACING = 15;
+    const HISTORY_ICON_PULSE_INTERVAL = 20000; // 20 segundos
+    const HISTORY_ICON_PULSE_DURATION = 500; // Duración de la animación en ms
+    const HIGHLIGHT_COLOR = 'rgb(248, 51, 51)';
+    const VALID_HIGHLIGHT_COLOR = 'rgb(67, 64, 250)';
+    const INVALID_HIGHLIGHT_COLOR = 'rgb(248, 51, 51)';
+
+    // Posiciones del tablero
     const BOARD_POSITION = {
         x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
         y: canvas.height * 0.3
@@ -18,14 +26,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const PLAYER_CARDS_Y = canvas.height * 0.6;
     const BUTTONS_Y = canvas.height * 0.85;
     const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
-    const HIGHLIGHT_COLOR = 'rgb(248, 51, 51)';
-    const VALID_HIGHLIGHT_COLOR = 'rgb(67, 64, 250)';
-    const INVALID_HIGHLIGHT_COLOR = 'rgb(248, 51, 51)';
-    const HISTORY_ICON_PULSE_INTERVAL = 20000; // 20 segundos
-    const HISTORY_ICON_PULSE_DURATION = 500; // Duración de la animación en ms
 
+    // Variables del juego
     const assetCache = new Map();
     let historyIcon = new Image();
+    let historyIconsAnimation = {
+        interval: null,
+        lastPulseTime: Date.now(),
+        isAnimating: false
+    };
+    let animationFrameId;
     let lastStateUpdate = 0;
     let lastRenderTime = 0;
     let reconnectAttempts = 0;
@@ -35,8 +45,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragStartX = 0;
     let dragStartY = 0;
     let isDragging = false;
+    let selectedCard = null;
+    let socket;
 
-
+    // Datos del jugador actual
     const currentPlayer = {
         id: sessionStorage.getItem('playerId'),
         name: sessionStorage.getItem('playerName'),
@@ -44,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const roomId = sessionStorage.getItem('roomId');
 
-    let selectedCard = null;
+    // Estado del juego
     let gameState = {
         players: [],
         yourCards: [],
@@ -61,7 +73,6 @@ document.addEventListener('DOMContentLoaded', () => {
             desc2: [100]
         }
     };
-
     class Card {
         constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
             this.value = value;
@@ -174,11 +185,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    let socket;
-
-    restoreGameState();
-
-
     function connectWebSocket() {
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             showNotification('No se puede conectar al servidor. Recarga la página.', true);
@@ -198,6 +204,8 @@ document.addEventListener('DOMContentLoaded', () => {
             reconnectAttempts = 0;
             updateConnectionStatus('Conectado');
             showNotification('Conectado al servidor');
+            restoreGameState();
+
 
             // Solicitar estado completo inmediatamente al conectarse
             socket.send(JSON.stringify({
@@ -474,6 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updatePlayerCards(message.yourCards);
         }
 
+        restoreGameState();
         updatePlayersPanel();
         updateGameInfo();
     }
