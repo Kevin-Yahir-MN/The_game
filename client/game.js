@@ -162,6 +162,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    restoreGameState();
+
     function loadAsset(url) {
         return assetCache.has(url) ? Promise.resolve(assetCache.get(url)) : new Promise((resolve) => {
             const img = new Image();
@@ -205,7 +207,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             type: 'ping',
                             playerId: currentPlayer.id,
                             roomId: roomId,
-                            timestamp: Date.now()
+                            timestamp: Date.now(),
+                            requireCurrentState: true
                         }));
                     } catch (error) {
                         console.error('Error enviando ping:', error);
@@ -259,6 +262,23 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const now = Date.now();
                 const message = JSON.parse(event.data);
+
+                if (message.type === 'player_state_update') {
+                    // Actualizar el progreso de cartas jugadas
+                    const progressText = `${message.cardsPlayedThisTurn}/${message.minCardsRequired} carta(s) jugada(s)`;
+                    const progressPercentage = (message.cardsPlayedThisTurn / message.minCardsRequired) * 100;
+
+                    document.getElementById('progressText').textContent = progressText;
+                    document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+
+                    // Actualizar panel de jugadores
+                    gameState.players = message.players;
+                    updatePlayersPanel();
+
+                    // Actualizar turno actual
+                    gameState.currentTurn = message.currentTurn;
+                    updateGameInfo();
+                }
 
                 if (message.type === 'pong') {
                     updateConnectionStatus('Conectado');
@@ -397,6 +417,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Error procesando mensaje:', error);
             }
         };
+    }
+
+    // Añadir esta nueva función para manejar la restauración del estado
+    function restoreGameState() {
+        if (socket?.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                type: 'get_player_state',
+                playerId: currentPlayer.id,
+                roomId: roomId
+            }));
+        } else {
+            setTimeout(restoreGameState, 500);
+        }
     }
 
     function updateConnectionStatus(status, isError = false) {
@@ -703,31 +736,25 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const currentPlayerObj = gameState.players.find(p => p.id === gameState.currentTurn);
-        let currentPlayerName;
+        // Obtener información del jugador actual
+        const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
+        const currentCardsPlayed = currentPlayerObj?.cardsPlayedThisTurn || 0;
 
-        if (currentPlayerObj) {
-            currentPlayerName = currentPlayerObj.id === currentPlayer.id ?
-                'Tu turno' :
-                `Turno de ${currentPlayerObj.name}`;
-        } else {
-            currentPlayerName = 'Esperando jugador...';
-        }
-
-        document.getElementById('currentTurn').textContent = currentPlayerName;
-        document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
-
+        // Calcular el mínimo de cartas requeridas
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
-            card => card.playerId === currentPlayer.id
-        ).length;
 
-        document.getElementById('progressText').textContent =
-            `${currentPlayerCardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
+        // Actualizar elementos de la UI
+        const currentPlayerName = gameState.currentTurn === currentPlayer.id ?
+            'Tu turno' :
+            `Turno de ${gameState.players.find(p => p.id === gameState.currentTurn)?.name || '...'}`;
 
-        const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
-        document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+        currentTurnElement.textContent = currentPlayerName;
+        remainingDeckElement.textContent = gameState.remainingDeck;
 
+        progressTextElement.textContent = `${currentCardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
+        progressBarElement.style.width = `${(currentCardsPlayed / minCardsRequired) * 100}%`;
+
+        // Actualizar estado del botón de terminar turno
         const endTurnBtn = document.getElementById('endTurnBtn');
         if (endTurnBtn) {
             endTurnBtn.disabled = gameState.currentTurn !== currentPlayer.id;

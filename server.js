@@ -82,7 +82,7 @@ async function saveGameState(roomId) {
                 cards: p.cards,
                 isHost: p.isHost,
                 connected: p.ws !== null,
-                cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0,
+                cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0,  // Asegurar que es número
                 totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
                 lastActivity: p.lastActivity
             })),
@@ -98,11 +98,14 @@ async function saveGameState(roomId) {
         };
 
         await pool.query(`
-            UPDATE game_states 
-            SET game_data = $1, 
-                last_activity = NOW() 
-            WHERE room_id = $2
-        `, [JSON.stringify(gameData), roomId]);
+            INSERT INTO game_states 
+            (room_id, game_data, last_activity)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (room_id) 
+            DO UPDATE SET
+                game_data = EXCLUDED.game_data,
+                last_activity = NOW()
+        `, [roomId, JSON.stringify(gameData)]);
 
         return true;
     } catch (error) {
@@ -954,6 +957,36 @@ wss.on('connection', async (ws, req) => {
             }
 
             switch (msg.type) {
+                case 'get_player_state':
+                    if (rooms.has(msg.roomId)) {
+                        const room = rooms.get(msg.roomId);
+                        const player = room.players.find(p => p.id === msg.playerId);
+
+                        if (player) {
+                            const cardsPlayedThisTurn = room.players.reduce((acc, p) => {
+                                if (typeof p.cardsPlayedThisTurn === 'number') {
+                                    return acc + p.cardsPlayedThisTurn;
+                                }
+                                return acc;
+                            }, 0);
+
+                            safeSend(player.ws, {
+                                type: 'player_state_update',
+                                cardsPlayedThisTurn: player.cardsPlayedThisTurn || 0,
+                                totalCardsPlayed: player.totalCardsPlayed || 0,
+                                minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
+                                currentTurn: room.gameState.currentTurn,
+                                players: room.players.map(p => ({
+                                    id: p.id,
+                                    name: p.name,
+                                    isHost: p.isHost,
+                                    cardCount: p.cards?.length || 0,
+                                    cardsPlayedThisTurn: p.cardsPlayedThisTurn || 0
+                                }))
+                            });
+                        }
+                    }
+                    break;
                 case 'start_game':
                     if (player.isHost && !room.gameState.gameStarted) {
                         try {
@@ -1162,7 +1195,9 @@ wss.on('connection', async (ws, req) => {
                                         name: p.name,
                                         isHost: p.isHost,
                                         cards: p.cards,
-                                        cardsPlayedThisTurn: p.cardsPlayedThisTurn
+                                        cardsPlayedThisTurn: p.cardsPlayedThisTurn,
+                                        totalCardsPlayed: p.totalCardsPlayed || 0,
+                                        lastActivity: p.lastActivity
                                     })),
                                     gameStarted: room.gameState.gameStarted
                                 },
@@ -1173,7 +1208,11 @@ wss.on('connection', async (ws, req) => {
                                     initialCards: room.gameState.initialCards,
                                     gameStarted: room.gameState.gameStarted
                                 },
-                                history: boardHistory.get(roomId)
+                                history: boardHistory.get(roomId),
+                                currentPlayerState: {
+                                    cardsPlayedThisTurn: player.cardsPlayedThisTurn || 0,
+                                    minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+                                }
                             });
                         }
                     }
