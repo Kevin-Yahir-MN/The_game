@@ -1268,11 +1268,13 @@ document.addEventListener('DOMContentLoaded', () => {
             <ul>
                 ${gameState.players.map(player => {
             const displayName = player.name || `Jugador_${player.id.slice(0, 4)}`;
+            const cardCount = player.cardCount || (player.cards ? player.cards.length : 0);
 
             return `
                         <li class="${player.id === currentPlayer.id ? 'you' : ''} 
                                    ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
                             <span class="player-name">${displayName}</span>
+                            <span class="card-count">🃏 ${cardCount}</span>
                             ${player.isHost ? ' <span class="host-tag">(Host)</span>' : ''}
                         </li>
                     `;

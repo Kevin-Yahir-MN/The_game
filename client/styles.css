@@ -1265,3 +1265,28 @@ body {
         transform: scale(1);
     }
 }
+
+/* Estilo para el contador de cartas */
+.players-panel .card-count {
+    color: var(--primary);
+    font-weight: bold;
+    margin-left: 5px;
+}
+
+/* Estilo adicional para resaltar al jugador actual */
+.players-panel .current-turn .card-count {
+    color: var(--secondary);
+    animation: pulse 1.5s infinite;
+}
+
+/* Ajustar espaciado entre elementos */
+.players-panel li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.players-panel .player-name {
+    flex-grow: 1;
+}
