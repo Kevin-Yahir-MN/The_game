@@ -82,7 +82,7 @@ async function saveGameState(roomId) {
                 cards: p.cards,
                 isHost: p.isHost,
                 connected: p.ws !== null,
-                cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0,  // Asegurar que es número
+                cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0, // Asegurar número
                 totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
                 lastActivity: p.lastActivity
             })),
@@ -91,15 +91,13 @@ async function saveGameState(roomId) {
                 board: room.gameState.board,
                 currentTurn: room.gameState.currentTurn,
                 gameStarted: room.gameState.gameStarted,
-                initialCards: room.gameState.initialCards,
-                gameId: room.gameState.gameId || uuidv4()
+                initialCards: room.gameState.initialCards
             },
             history: boardHistory.get(roomId)
         };
 
         await pool.query(`
-            INSERT INTO game_states 
-            (room_id, game_data, last_activity)
+            INSERT INTO game_states (room_id, game_data, last_activity)
             VALUES ($1, $2, NOW())
             ON CONFLICT (room_id) 
             DO UPDATE SET
@@ -963,13 +961,6 @@ wss.on('connection', async (ws, req) => {
                         const player = room.players.find(p => p.id === msg.playerId);
 
                         if (player) {
-                            const cardsPlayedThisTurn = room.players.reduce((acc, p) => {
-                                if (typeof p.cardsPlayedThisTurn === 'number') {
-                                    return acc + p.cardsPlayedThisTurn;
-                                }
-                                return acc;
-                            }, 0);
-
                             safeSend(player.ws, {
                                 type: 'player_state_update',
                                 cardsPlayedThisTurn: player.cardsPlayedThisTurn || 0,

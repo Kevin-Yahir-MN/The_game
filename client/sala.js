@@ -165,6 +165,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Actualizar UI con el estado completo del servidor
                 updatePlayersUI(message.room.players);
 
+                // Nueva: Guardar estado en sessionStorage
+                sessionStorage.setItem('gameState', JSON.stringify({
+                    players: message.room.players,
+                    currentTurn: message.gameState.currentTurn,
+                    initialCards: message.gameState.initialCards
+                }));
+
                 if (isHost) {
                     gameSettings.style.display = 'block';
                     startBtn.classList.add('visible');
