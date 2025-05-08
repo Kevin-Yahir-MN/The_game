@@ -35,6 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragStartX = 0;
     let dragStartY = 0;
     let isDragging = false;
+    let historyIconsAnimation = {
+        interval: null,
+        lastPulseTime: Date.now(),
+        isAnimating: false
+    };
 
 
     const currentPlayer = {
@@ -907,6 +912,11 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.drawImage(historyIcon, 0, 0, 40, 40);
             ctx.restore();
         });
+
+        // Actualizar el último tiempo de pulso si es necesario
+        if (shouldAnimate && pulseProgress === 0) {
+            historyIconsAnimation.lastPulseTime = Date.now();
+        }
     }
 
     function calculatePulseProgress() {
@@ -1474,6 +1484,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initGame() {
+        historyIconsAnimation = {
+            interval: null,
+            lastPulseTime: Date.now(),
+            pulseDuration: 500,
+            pulseInterval: 20000
+        };
+
         if (!canvas || !ctx || !currentPlayer.id || !roomId) {
             alert('Error: No se pudo inicializar el juego. Vuelve a la sala.');
             return;
