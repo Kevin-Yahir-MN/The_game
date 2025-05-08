@@ -1418,6 +1418,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initGame() {
         createPlayersPanel();
+        updatePlayersPanel();
         updateGameInfo();
 
         if (!canvas || !ctx || !currentPlayer.id || !roomId) {
