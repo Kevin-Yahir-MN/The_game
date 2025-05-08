@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
             desc2: [100]
         }
     };
+
     class Card {
         constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
             this.value = value;
@@ -206,7 +207,6 @@ document.addEventListener('DOMContentLoaded', () => {
             showNotification('Conectado al servidor');
             restoreGameState();
 
-
             // Solicitar estado completo inmediatamente al conectarse
             socket.send(JSON.stringify({
                 type: 'get_full_state',
@@ -215,7 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 requireCurrentState: true
             }));
 
-            // Nueva: Solicitar estado específico del jugador
+            // Solicitar estado específico del jugador
             socket.send(JSON.stringify({
                 type: 'get_player_state',
                 playerId: currentPlayer.id,
@@ -223,198 +223,184 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
         };
 
-        if (connectionStatus === 'reconnecting') {
-            socket.send(JSON.stringify({
-                type: 'get_full_state',
-                playerId: currentPlayer.id,
-                roomId: roomId
-            }));
-        }
-        connectionStatus = 'connected';
-    };
-
-    socket.onclose = (event) => {
-        clearInterval(pingInterval);
-        if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-            reconnectAttempts++;
-            const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1), 30000);
-            setTimeout(connectWebSocket, delay);
-            updateConnectionStatus(`Reconectando (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
-            connectionStatus = 'reconnecting';
-        } else {
-            updateConnectionStatus('Desconectado', true);
-            connectionStatus = 'disconnected';
-        }
-    };
-
-    socket.onerror = (error) => {
-        console.error('Error en WebSocket:', error);
-        updateConnectionStatus('Error de conexión', true);
-        connectionStatus = 'error';
-    };
-
-    socket.onmessage = (event) => {
-        try {
-            const now = Date.now();
-            const message = JSON.parse(event.data);
-
-            if (message.type === 'player_state_update') {
-                // Actualizar el progreso de cartas jugadas
-                const progressText = `${message.cardsPlayedThisTurn}/${message.minCardsRequired} carta(s) jugada(s)`;
-                const progressPercentage = (message.cardsPlayedThisTurn / message.minCardsRequired) * 100;
-
-                document.getElementById('progressText').textContent = progressText;
-                document.getElementById('progressBar').style.width = `${progressPercentage}%`;
-
-                // Actualizar panel de jugadores
-                gameState.players = message.players;
-                updatePlayersPanel();
-
-                // Actualizar turno actual
-                gameState.currentTurn = message.currentTurn;
-                updateGameInfo();
+        socket.onclose = (event) => {
+            clearInterval(pingInterval);
+            if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                reconnectAttempts++;
+                const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1), 30000);
+                setTimeout(connectWebSocket, delay);
+                updateConnectionStatus(`Reconectando (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+                connectionStatus = 'reconnecting';
+            } else {
+                updateConnectionStatus('Desconectado', true);
+                connectionStatus = 'disconnected';
             }
+        };
 
-            if (message.type === 'pong') {
-                updateConnectionStatus('Conectado');
-                return;
-            }
+        socket.onerror = (error) => {
+            console.error('Error en WebSocket:', error);
+            updateConnectionStatus('Error de conexión', true);
+            connectionStatus = 'error';
+        };
 
-            if (message.type === 'gs' && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
-                return;
-            }
+        socket.onmessage = (event) => {
+            try {
+                const now = Date.now();
+                const message = JSON.parse(event.data);
 
-            switch (message.type) {
-                case 'full_state_update':
-                    handleFullStateUpdate(message);
-                    break;
-                case 'init_game':
-                    handleInitGame(message);
-                    break;
-                case 'gs':
-                    lastStateUpdate = now;
-                    updateGameState(message.s);
-                    updateGameInfo();
-                    break;
-                case 'game_started':
-                    gameState.board = message.board || { ascending: [1, 1], descending: [100, 100] };
-                    gameState.currentTurn = message.currentTurn;
-                    gameState.remainingDeck = message.remainingDeck;
-                    gameState.initialCards = message.initialCards;
-                    gameState.gameStarted = true;
-                    updateGameInfo();
+                if (message.type === 'player_state_update') {
+                    const progressText = `${message.cardsPlayedThisTurn}/${message.minCardsRequired} carta(s) jugada(s)`;
+                    const progressPercentage = (message.cardsPlayedThisTurn / message.minCardsRequired) * 100;
+
+                    document.getElementById('progressText').textContent = progressText;
+                    document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+
+                    gameState.players = message.players;
                     updatePlayersPanel();
-                    if (window.location.pathname.endsWith('sala.html')) {
-                        window.location.href = 'game.html';
-                    }
-                    break;
-                case 'your_cards':
-                    updatePlayerCards(message.cards);
-                    updateGameInfo();
-                    break;
-                case 'game_over':
-                    handleGameOver(message.message);
-                    break;
-                case 'notification':
-                    showNotification(message.message, message.isError);
-                    break;
-                case 'column_history':
-                    if (!gameState.columnHistory[message.column]) {
-                        gameState.columnHistory[message.column] = message.column.includes('asc') ? [1] : [100];
-                    }
-                    gameState.columnHistory[message.column] = message.history;
-                    break;
-                case 'column_history_update':
-                    updateColumnHistoryUI(message.column, message.history, message.newValue);
-                    break;
-                case 'card_played':
-                    handleOpponentCardPlayed(message);
-                    updateGameInfo();
-                    break;
-                case 'card_played_animated':
-                    if (message.position.includes('asc')) {
-                        const idx = message.position === 'asc1' ? 0 : 1;
-                        gameState.board.ascending[idx] = message.cardValue;
-                    } else {
-                        const idx = message.position === 'desc1' ? 0 : 1;
-                        gameState.board.descending[idx] = message.cardValue;
-                    }
 
-                    if (message.playerId !== currentPlayer.id) {
-                        gameState.cardsPlayedThisTurn.push({
-                            value: message.cardValue,
-                            position: message.position,
-                            playerId: message.playerId,
-                            previousValue: message.previousValue
-                        });
-                    }
-                    handleAnimatedCardPlay(message);
-                    break;
-                case 'invalid_move':
-                    if (message.playerId === currentPlayer.id && selectedCard) {
-                        animateInvalidCard(selectedCard);
-                    }
-                    break;
-                case 'deck_updated':
-                    handleDeckUpdated(message);
-                    break;
-                case 'turn_changed':
-                    gameState.cardsPlayedThisTurn = [];
-                    gameState.currentTurn = message.newTurn;
-                    gameState.remainingDeck = message.remainingDeck || gameState.remainingDeck;
-
-                    const minCards = message.minCardsRequired !== undefined ?
-                        message.minCardsRequired :
-                        (gameState.remainingDeck > 0 ? 2 : 1);
-
+                    gameState.currentTurn = message.currentTurn;
                     updateGameInfo();
+                }
 
-                    if (message.playerName) {
-                        const notificationMsg = message.newTurn === currentPlayer.id ?
-                            '¡Es tu turno!' :
-                            `Turno de ${message.playerName}`;
-                        showNotification(notificationMsg);
-                    }
-                    break;
-                case 'move_undone':
-                    handleMoveUndone(message);
-                    updateGameInfo();
-                    break;
-                case 'room_reset':
-                    gameState = {
-                        players: message.players || [],
-                        board: { ascending: [1, 1], descending: [100, 100] },
-                        currentTurn: null,
-                        yourCards: [],
-                        remainingDeck: 98,
-                        initialCards: 6,
-                        cardsPlayedThisTurn: [],
-                        animatingCards: [],
-                        columnHistory: {
-                            asc1: [1],
-                            asc2: [1],
-                            desc1: [100],
-                            desc2: [100]
-                        }
-                    };
-                    updateGameInfo();
-                    break;
-                case 'player_update':
-                    if (message.players) {
-                        gameState.players = message.players;
+                if (message.type === 'pong') {
+                    updateConnectionStatus('Conectado');
+                    return;
+                }
+
+                if (message.type === 'gs' && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
+                    return;
+                }
+
+                switch (message.type) {
+                    case 'full_state_update':
+                        handleFullStateUpdate(message);
+                        break;
+                    case 'init_game':
+                        handleInitGame(message);
+                        break;
+                    case 'gs':
+                        lastStateUpdate = now;
+                        updateGameState(message.s);
                         updateGameInfo();
-                    }
-                    break;
-                default:
-                    console.log('Mensaje no reconocido:', message);
+                        break;
+                    case 'game_started':
+                        gameState.board = message.board || { ascending: [1, 1], descending: [100, 100] };
+                        gameState.currentTurn = message.currentTurn;
+                        gameState.remainingDeck = message.remainingDeck;
+                        gameState.initialCards = message.initialCards;
+                        gameState.gameStarted = true;
+                        updateGameInfo();
+                        updatePlayersPanel();
+                        if (window.location.pathname.endsWith('sala.html')) {
+                            window.location.href = 'game.html';
+                        }
+                        break;
+                    case 'your_cards':
+                        updatePlayerCards(message.cards);
+                        updateGameInfo();
+                        break;
+                    case 'game_over':
+                        handleGameOver(message.message);
+                        break;
+                    case 'notification':
+                        showNotification(message.message, message.isError);
+                        break;
+                    case 'column_history':
+                        if (!gameState.columnHistory[message.column]) {
+                            gameState.columnHistory[message.column] = message.column.includes('asc') ? [1] : [100];
+                        }
+                        gameState.columnHistory[message.column] = message.history;
+                        break;
+                    case 'column_history_update':
+                        updateColumnHistoryUI(message.column, message.history, message.newValue);
+                        break;
+                    case 'card_played':
+                        handleOpponentCardPlayed(message);
+                        updateGameInfo();
+                        break;
+                    case 'card_played_animated':
+                        if (message.position.includes('asc')) {
+                            const idx = message.position === 'asc1' ? 0 : 1;
+                            gameState.board.ascending[idx] = message.cardValue;
+                        } else {
+                            const idx = message.position === 'desc1' ? 0 : 1;
+                            gameState.board.descending[idx] = message.cardValue;
+                        }
+
+                        if (message.playerId !== currentPlayer.id) {
+                            gameState.cardsPlayedThisTurn.push({
+                                value: message.cardValue,
+                                position: message.position,
+                                playerId: message.playerId,
+                                previousValue: message.previousValue
+                            });
+                        }
+                        handleAnimatedCardPlay(message);
+                        break;
+                    case 'invalid_move':
+                        if (message.playerId === currentPlayer.id && selectedCard) {
+                            animateInvalidCard(selectedCard);
+                        }
+                        break;
+                    case 'deck_updated':
+                        handleDeckUpdated(message);
+                        break;
+                    case 'turn_changed':
+                        gameState.cardsPlayedThisTurn = [];
+                        gameState.currentTurn = message.newTurn;
+                        gameState.remainingDeck = message.remainingDeck || gameState.remainingDeck;
+
+                        const minCards = message.minCardsRequired !== undefined ?
+                            message.minCardsRequired :
+                            (gameState.remainingDeck > 0 ? 2 : 1);
+
+                        updateGameInfo();
+
+                        if (message.playerName) {
+                            const notificationMsg = message.newTurn === currentPlayer.id ?
+                                '¡Es tu turno!' :
+                                `Turno de ${message.playerName}`;
+                            showNotification(notificationMsg);
+                        }
+                        break;
+                    case 'move_undone':
+                        handleMoveUndone(message);
+                        updateGameInfo();
+                        break;
+                    case 'room_reset':
+                        gameState = {
+                            players: message.players || [],
+                            board: { ascending: [1, 1], descending: [100, 100] },
+                            currentTurn: null,
+                            yourCards: [],
+                            remainingDeck: 98,
+                            initialCards: 6,
+                            cardsPlayedThisTurn: [],
+                            animatingCards: [],
+                            columnHistory: {
+                                asc1: [1],
+                                asc2: [1],
+                                desc1: [100],
+                                desc2: [100]
+                            }
+                        };
+                        updateGameInfo();
+                        break;
+                    case 'player_update':
+                        if (message.players) {
+                            gameState.players = message.players;
+                            updateGameInfo();
+                        }
+                        break;
+                    default:
+                        console.log('Mensaje no reconocido:', message);
+                }
+            } catch (error) {
+                console.error('Error procesando mensaje:', error);
             }
-        } catch (error) {
-            console.error('Error procesando mensaje:', error);
-        }
-    };
+        };
+    }
 
-
-    // Añadir esta nueva función para manejar la restauración del estado
     function restoreGameState() {
         if (!socket || socket.readyState !== WebSocket.OPEN) {
             setTimeout(restoreGameState, 500);
@@ -427,6 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
             roomId: roomId
         }));
     }
+
     function updateConnectionStatus(status, isError = false) {
         connectionStatus = status;
         const statusElement = document.getElementById('connectionStatus') || createConnectionStatusElement();
@@ -751,6 +738,7 @@ document.addEventListener('DOMContentLoaded', () => {
             endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
         }
     }
+
     function handleOpponentCardPlayed(message) {
         if (message.playerId !== currentPlayer.id) {
             const position = message.position;
