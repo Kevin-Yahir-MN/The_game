@@ -277,48 +277,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 switch (message.type) {
                     // Reemplazar el handler de 'game_started'
                     case 'game_started':
-                        // Mostrar estado de carga
-                        showLoadingState();
-
-                        // Actualizar el estado del juego
                         gameState.gameStarted = true;
                         gameState.board = message.board || { ascending: [1, 1], descending: [100, 100] };
                         gameState.currentTurn = message.currentTurn;
                         gameState.remainingDeck = message.remainingDeck;
                         gameState.initialCards = message.initialCards;
-                        gameState.players = message.players || [];
 
-                        // Actualizar UI
+                        if (message.players) {
+                            gameState.players = message.players;
+                        }
+
                         updateGameInfo();
                         updatePlayersPanel();
-
-                        // Mostrar notificación si es nuestro turno
-                        if (gameState.currentTurn === currentPlayer.id) {
-                            showNotification('¡Es tu turno! Comienza a jugar');
-                        }
                         break;
 
-                    // Añadir handler para 'full_state_update'
                     case 'full_state_update':
                         if (message.room && message.gameState) {
-                            // Actualizar estado del juego
                             gameState.players = message.room.players || [];
                             gameState.board = message.gameState.board || gameState.board;
                             gameState.currentTurn = message.gameState.currentTurn || gameState.currentTurn;
                             gameState.remainingDeck = message.gameState.remainingDeck || gameState.remainingDeck;
                             gameState.initialCards = message.gameState.initialCards || gameState.initialCards;
 
-                            // Actualizar historial si está presente
-                            if (message.history) {
-                                gameState.columnHistory = {
-                                    asc1: message.history.ascending1 || [1],
-                                    asc2: message.history.ascending2 || [1],
-                                    desc1: message.history.descending1 || [100],
-                                    desc2: message.history.descending2 || [100]
-                                };
-                            }
-
-                            // Actualizar UI
                             updateGameInfo();
                             updatePlayersPanel();
                         }
@@ -717,6 +697,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateGameState(newState) {
         if (!newState) return;
 
+        // Actualizar jugadores
         if (newState.p) {
             gameState.players = newState.p.map(player => ({
                 id: player.i,
@@ -728,20 +709,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
         }
 
+        // Actualizar resto del estado
         gameState.board = newState.b || gameState.board;
         gameState.currentTurn = newState.t || gameState.currentTurn;
         gameState.remainingDeck = newState.d || gameState.remainingDeck;
         gameState.initialCards = newState.i || gameState.initialCards;
 
-        if (newState.y) {
-            updatePlayerCards(newState.y);
-        }
-
+        // Actualizar UI
         updateGameInfo();
-
-        if (gameState.currentTurn !== currentPlayer.id) {
-            selectedCard = null;
-        }
+        updatePlayersPanel(); // Asegurar que se llama para actualizar la lista
     }
 
     function updateGameInfo() {
@@ -1323,24 +1299,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updatePlayersPanel() {
-        const panel = document.getElementById('playersPanel') || createPlayersPanel();
+        const panel = document.getElementById('playersPanel');
+        if (!panel) return;
 
         panel.innerHTML = `
             <h3>Jugadores (${gameState.players.length})</h3>
             <ul>
-                ${gameState.players.map(player => {
-            const displayName = player.name || `Jugador_${player.id.slice(0, 4)}`;
-            const cardCount = player.cardCount ?? player.cards?.length ?? 0;
-
-            return `
-                        <li class="${player.id === currentPlayer.id ? 'you' : ''} 
-                                   ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
-                            <span class="player-name">${displayName}</span>
-                            ${player.isHost ? ' <span class="host-tag">(Host)</span>' : ''}
-                            <span class="card-count">${cardCount} carta(s)</span>
-                        </li>
-                    `;
-        }).join('')}
+                ${gameState.players.map(player => `
+                    <li class="${player.isHost ? 'host' : ''} 
+                               ${player.id === currentPlayer.id ? 'you' : ''}
+                               ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
+                        <span class="player-name">${player.name}</span>
+                        ${player.isHost ? '<span class="host-tag">(Host)</span>' : ''}
+                        <span class="card-count">${player.cardCount} cartas</span>
+                    </li>
+                `).join('')}
             </ul>
         `;
     }
@@ -1497,6 +1470,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Mostrar estado de carga inicial
+        createPlayersPanel();
         showLoadingState();
 
         Promise.all([
