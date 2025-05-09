@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentTurn: null,
         remainingDeck: 98,
         initialCards: 6,
-        cardsPlayedThisTurn: 0,
+        cardsPlayedThisTurn: [],
         animatingCards: [],
         columnHistory: {
             asc1: [1],
@@ -300,14 +300,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         gameState.remainingDeck = message.remainingDeck;
                         gameState.initialCards = message.initialCards;
                         gameState.gameStarted = true;
-                        gameState.cardsPlayedThisTurn = 0;
-                        // Resetear contadores para todos los jugadores
-                        if (message.players) {
-                            gameState.players = message.players.map(p => ({
-                                ...p,
-                                cardsPlayedThisTurn: 0
-                            }));
-                        }
                         updateGameInfo();
                         updatePlayersPanel();
                         if (window.location.pathname.endsWith('sala.html')) {
@@ -376,13 +368,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Actualizar el progreso para todos los jugadores
                         if (message.players) {
                             gameState.players = message.players;
-                        }
-
-                        if (message.newTurn === currentPlayer.id) {
-                            const playerIndex = gameState.players.findIndex(p => p.id === currentPlayer.id);
-                            if (playerIndex !== -1) {
-                                gameState.players[playerIndex].cardsPlayedThisTurn = 0;
-                            }
                         }
 
                         updateGameInfo();
@@ -1134,15 +1119,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Actualizar contador
-        const playerIndex = gameState.players.findIndex(p => p.id === currentPlayer.id);
-        if (playerIndex !== -1) {
-            gameState.players[playerIndex].cardsPlayedThisTurn =
-                (gameState.players[playerIndex].cardsPlayedThisTurn || 0) + 1;
-        }
-
-        updateGameInfo();  // Actualizar UI
-
         const previousValue = position.includes('asc')
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
@@ -1536,14 +1512,6 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 updatePlayersPanel();
             }, 1000); // Pequeño delay para asegurar la conexión
-            // Resetear contadores
-            gameState.cardsPlayedThisTurn = 0;
-            if (gameState.players) {
-                gameState.players.forEach(p => p.cardsPlayedThisTurn = 0);
-            }
-
-            updateGameInfo();  // Actualizar UI
-
             gameLoop();
         });
     }
