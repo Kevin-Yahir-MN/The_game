@@ -1080,48 +1080,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const clickedColumn = getClickedColumn(x, y);
         if (clickedColumn && selectedCard) {
-            const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-            const isSoloGame = gameState.players.length === 1;
-
-            const tempBoard = JSON.parse(JSON.stringify(gameState.board));
-            if (clickedColumn.includes('asc')) {
-                tempBoard.ascending[clickedColumn === 'asc1' ? 0 : 1] = selectedCard.value;
-            } else {
-                tempBoard.descending[clickedColumn === 'desc1' ? 0 : 1] = selectedCard.value;
-            }
-
-            const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
-            const hasOtherMoves = hasValidMoves(remainingCards, tempBoard);
-
-            if (isSoloGame && !hasOtherMoves && remainingCards.length >= minCardsRequired) {
-                const confirmMove = confirm(
-                    'ADVERTENCIA: Jugar esta carta puede dejarte sin movimientos válidos.\n' +
-                    'Si no puedes completar el mínimo de cartas, perderás automáticamente.\n\n' +
-                    '¿Deseas continuar?'
-                );
-
-                if (!confirmMove) return;
-            }
-            else if (!isSoloGame && !hasOtherMoves) {
-                const confirmMove = confirm(
-                    'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\n' +
-                    'Si continúas, el juego terminará con derrota.\n\n' +
-                    '¿Deseas continuar?'
-                );
-
-                if (!confirmMove) return;
-            }
-
             playCard(selectedCard.value, clickedColumn);
-
-            if (isSoloGame && !hasOtherMoves) {
-                socket.send(JSON.stringify({
-                    type: 'check_solo_block',
-                    playerId: currentPlayer.id,
-                    roomId: roomId,
-                    cardsRemaining: remainingCards.length
-                }));
-            }
             return;
         }
 

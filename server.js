@@ -438,18 +438,7 @@ async function endTurn(room, player) {
     const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
     const cardsPlayed = Number(player.cardsPlayedThisTurn) || 0;
 
-    if (player.specialFlag === 'risky_first_move' && room.players.length === 1) {
-        if (cardsPlayed < minCardsRequired) {
-            broadcastToRoom(room, {
-                type: 'game_over',
-                result: 'lose',
-                message: `¡No jugaste el mínimo de ${minCardsRequired} cartas requeridas!`,
-                reason: 'failed_min_cards_after_risky_move'
-            });
-            return;
-        }
-        delete player.specialFlag;
-    }
+    // Eliminamos la verificación de risky_first_move
 
     if (cardsPlayed < minCardsRequired) {
         return safeSend(player.ws, {
@@ -482,20 +471,22 @@ async function endTurn(room, player) {
     const nextPlayer = room.players[nextIndex];
     room.gameState.currentTurn = nextPlayer.id;
 
-    // Reiniciar contador de cartas jugadas
     player.cardsPlayedThisTurn = 0;
 
-    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
+    // Solo verificamos movimientos válidos si hay cartas en la baraja
+    if (room.gameState.deck.length > 0) {
+        const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+        const requiredCards = 2; // Siempre 2 cuando hay baraja
 
-    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
-        await saveGameState(reverseRoomMap.get(room));
-        return broadcastToRoom(room, {
-            type: 'game_over',
-            result: 'lose',
-            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
-            reason: 'min_cards_not_met'
-        });
+        if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
+            await saveGameState(reverseRoomMap.get(room));
+            return broadcastToRoom(room, {
+                type: 'game_over',
+                result: 'lose',
+                message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
+                reason: 'min_cards_not_met'
+            });
+        }
     }
 
     await saveGameState(reverseRoomMap.get(room));
@@ -505,8 +496,8 @@ async function endTurn(room, player) {
         newTurn: nextPlayer.id,
         previousPlayer: player.id,
         playerName: nextPlayer.name,
-        cardsPlayedThisTurn: 0, // Enviar 0 ya que es nuevo turno
-        minCardsRequired: requiredCards,
+        cardsPlayedThisTurn: 0,
+        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
         remainingDeck: room.gameState.deck.length
     }, { includeGameState: true });
 
@@ -1117,8 +1108,8 @@ wss.on('connection', async (ws, req) => {
                         const room = rooms.get(msg.roomId);
                         const player = room.players.find(p => p.id === msg.playerId);
 
-                        if (player && room.players.length === 1) {
-                            const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+                        if (player && room.players.length === 1 && room.gameState.deck.length > 0) {
+                            const minCardsRequired = 2;
 
                             if (msg.cardsRemaining < minCardsRequired) {
                                 broadcastToRoom(room, {
