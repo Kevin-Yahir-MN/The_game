@@ -326,6 +326,26 @@ async function handlePlayCard(room, player, msg) {
         ? board.ascending[targetIdx]
         : board.descending[targetIdx];
 
+    // Verificar primero la regla de diferencia exacta de 10
+    const isExactDifference = msg.position.includes('asc')
+        ? (msg.cardValue === targetValue - 10)
+        : (msg.cardValue === targetValue + 10);
+
+    // Luego verificar la regla normal
+    const isValidNormalMove = msg.position.includes('asc')
+        ? (msg.cardValue > targetValue)
+        : (msg.cardValue < targetValue);
+
+    if (!isExactDifference && !isValidNormalMove) {
+        return safeSend(player.ws, {
+            type: 'invalid_move',
+            message: `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'
+                } que ${targetValue} o igual a ${msg.position.includes('asc') ? targetValue - 10 : targetValue + 10
+                }`,
+            isError: true
+        });
+    }
+
     const isValid = msg.position.includes('asc')
         ? (msg.cardValue > targetValue || msg.cardValue === targetValue - 10)
         : (msg.cardValue < targetValue || msg.cardValue === targetValue + 10);

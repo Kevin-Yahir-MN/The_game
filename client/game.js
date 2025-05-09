@@ -557,9 +557,15 @@ document.addEventListener('DOMContentLoaded', () => {
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
 
-        return position.includes('asc')
-            ? (cardValue > target || cardValue === target - 10)
-            : (cardValue < target || cardValue === target + 10);
+        // Primero verificar las reglas especiales de diferencia exacta de 10
+        if (position.includes('asc') && cardValue === target - 10) return true;
+        if (position.includes('desc') && cardValue === target + 10) return true;
+
+        // Luego verificar las reglas normales
+        if (position.includes('asc') && cardValue > target) return true;
+        if (position.includes('desc') && cardValue < target) return true;
+
+        return false;
     }
 
     function getColumnPosition(position) {
@@ -837,15 +843,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updatePlayerCards(cards) {
         const isYourTurn = gameState.currentTurn === currentPlayer.id;
+        const deckEmpty = gameState.remainingDeck === 0;
         const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
         const startY = PLAYER_CARDS_Y;
 
         gameState.yourCards = cards.map((card, index) => {
             const value = card instanceof Card ? card.value : card;
-            const playable = isYourTurn && (
-                isValidMove(value, 'asc1') || isValidMove(value, 'asc2') ||
-                isValidMove(value, 'desc1') || isValidMove(value, 'desc2')
-            );
+            let playable = false;
+
+            if (isYourTurn) {
+                // Verificación más estricta cuando el mazo está vacío
+                if (deckEmpty) {
+                    playable = (
+                        (value === gameState.board.ascending[0] - 10) ||
+                        (value === gameState.board.ascending[1] - 10) ||
+                        (value === gameState.board.descending[0] + 10) ||
+                        (value === gameState.board.descending[1] + 10) ||
+                        (value > gameState.board.ascending[0]) ||
+                        (value > gameState.board.ascending[1]) ||
+                        (value < gameState.board.descending[0]) ||
+                        (value < gameState.board.descending[1])
+                    );
+                } else {
+                    playable = (
+                        isValidMove(value, 'asc1') ||
+                        isValidMove(value, 'asc2') ||
+                        isValidMove(value, 'desc1') ||
+                        isValidMove(value, 'desc2')
+                    );
+                }
+            }
 
             const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
                 move => move.value === value && move.playerId === currentPlayer.id
