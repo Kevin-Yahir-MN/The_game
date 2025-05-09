@@ -1219,6 +1219,25 @@ wss.on('connection', async (ws, req) => {
                         }
                     }
                     break;
+                case 'surrender':
+                    if (rooms.has(msg.roomId)) {
+                        const room = rooms.get(msg.roomId);
+                        const player = room.players.find(p => p.id === msg.playerId);
+
+                        if (player &&
+                            player.id === room.gameState.currentTurn &&
+                            room.gameState.deck.length > 0 &&
+                            !getPlayableCards(player.cards, room.gameState.board).length) {
+
+                            broadcastToRoom(room, {
+                                type: 'game_over',
+                                result: 'lose',
+                                message: `¡${player.name} se ha rendido!`,
+                                reason: 'surrender'
+                            });
+                        }
+                    }
+                    break;
                 default:
                     console.log('Tipo de mensaje no reconocido:', msg.type);
             }

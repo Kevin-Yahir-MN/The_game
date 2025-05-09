@@ -47,6 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let isDragging = false;
     let selectedCard = null;
     let socket;
+    let surrenderBtn = document.getElementById('surrenderBtn');
+
 
     // Datos del jugador actual
     const currentPlayer = {
@@ -741,12 +743,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Obtener jugador actual y sus cartas jugadas
         const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
         const cardsPlayed = currentPlayerObj?.cardsPlayedThisTurn || 0;
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
 
-        // Actualizar UI
         currentTurnElement.textContent = gameState.currentTurn === currentPlayer.id
             ? 'Tu turno'
             : `Turno de ${gameState.players.find(p => p.id === gameState.currentTurn)?.name || '...'}`;
@@ -755,7 +755,6 @@ document.addEventListener('DOMContentLoaded', () => {
         progressTextElement.textContent = `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
         progressBarElement.style.width = `${Math.min((cardsPlayed / minCardsRequired) * 100, 100)}%`;
 
-        // Actualizar botón de terminar turno
         if (endTurnButton) {
             endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
             const remainingCards = minCardsRequired - cardsPlayed;
@@ -763,13 +762,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `Necesitas jugar ${remainingCards} carta(s) más`
                 : 'Puedes terminar tu turno';
 
-            // Cambiar estilo si se cumplió el mínimo
             if (cardsPlayed >= minCardsRequired) {
-                endTurnButton.style.backgroundColor = '#2ecc71'; // Verde
+                endTurnButton.style.backgroundColor = '#2ecc71';
             } else {
-                endTurnButton.style.backgroundColor = '#e74c3c'; // Rojo
+                endTurnButton.style.backgroundColor = '#e74c3c';
             }
         }
+
+        // Control de visibilidad del botón "Rendirse" (deck.length > 0)
+        const shouldShowSurrender = (
+            gameState.currentTurn === currentPlayer.id &&
+            gameState.remainingDeck > 0 &&
+            !hasValidMoves(gameState.yourCards, gameState.board)
+        );
+
+        surrenderBtn.style.display = shouldShowSurrender ? 'block' : 'none';
+        endTurnButton.style.display = shouldShowSurrender ? 'none' : 'block';
+    }
+
+    // Función agregada para manejar la rendición
+    function setupSurrenderButton() {
+        surrenderBtn.addEventListener('click', () => {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'surrender',
+                    playerId: currentPlayer.id,
+                    roomId: roomId
+                }));
+            }
+        });
     }
 
     function handleOpponentCardPlayed(message) {
@@ -1498,6 +1519,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 updatePlayersPanel();
             }, 1000); // Pequeño delay para asegurar la conexión
+            setupSurrenderButton(); // Agregar esta línea
             gameLoop();
         });
     }

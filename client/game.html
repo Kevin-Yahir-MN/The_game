@@ -1,43 +1,24 @@
 <!DOCTYPE html>
-
 <html lang="es">
 
-
-
 <head>
-
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Partida - The Game</title>
-
     <link rel="stylesheet" href="styles.css">
-
 </head>
 
-
-
 <body>
-
     <!-- Contenedor principal del juego -->
-
     <div id="gameContainer">
-
         <canvas id="gameCanvas" width="800" height="700"></canvas>
-
         <div class="game-controls">
-
             <button id="endTurnBtn">Terminar Turno</button>
-
+            <button id="surrenderBtn" style="display: none;">Rendirse</button>
         </div>
-
     </div>
 
-
-
     <!-- Panel de Información -->
-
     <div class="game-panel info-panel">
         <h3>Información del Juego</h3>
         <div class="panel-content">
@@ -51,58 +32,15 @@
         </div>
     </div>
 
-    <!-- Panel de Instrucciones 
-
-    <div class="game-panel instructions-panel">
-
-        <h3>Instrucciones</h3>
-
-        <div class="panel-content">
-
-            <ul>
-
-                <li>Click en carta para seleccionar</li>
-
-                <li>Click en columna para jugar</li>
-
-                <li>Icono inferior para historial</li>
-
-                <li>Pilas ↑: cartas mayores</li>
-
-                <li>Pilas ↓: cartas menores</li>
-
-                <li>Mínimo 2 cartas por turno</li>
-
-                <li>¡Colabora para ganar!</li>
-
-            </ul>
-
-        </div>
-
-    </div>
-
-    -->
-
-
-
     <!-- Modal para el historial -->
-
     <div id="historyModal" class="history-modal" style="display: none;">
-
         <h3>Historial de Cartas - <span id="historyColumnTitle"></span></h3>
-
         <div id="historyCardsContainer" class="history-cards"></div>
-
     </div>
 
     <div id="modalBackdrop" class="modal-backdrop" style="display: none;"></div>
 
-
-
     <script src="game.js"></script>
-
 </body>
-
-
 
 </html>
