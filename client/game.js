@@ -1221,7 +1221,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cardsPlayed < minCardsRequired) {
             const remainingCards = minCardsRequired - cardsPlayed;
             showNotification(`Necesitas jugar ${remainingCards} carta(s) más para terminar tu turno`, true);
-            return;
+            return false;
+        }
+
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+            showNotification('Error de conexión. No se puede terminar el turno', true);
+            return false;
         }
 
         socket.send(JSON.stringify({
@@ -1230,7 +1235,11 @@ document.addEventListener('DOMContentLoaded', () => {
             roomId: roomId
         }));
 
+        // Resetear el estado local
+        selectedCard = null;
+        resetCardsPlayedProgress();
 
+        return true;
     }
 
     function drawBoard() {

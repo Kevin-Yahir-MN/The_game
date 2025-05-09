@@ -326,29 +326,13 @@ async function handlePlayCard(room, player, msg) {
         ? board.ascending[targetIdx]
         : board.descending[targetIdx];
 
-    // Verificar primero la regla de diferencia exacta de 10
-    const isExactDifference = msg.position.includes('asc')
-        ? (msg.cardValue === targetValue - 10)
-        : (msg.cardValue === targetValue + 10);
-
-    // Luego verificar la regla normal
-    const isValidNormalMove = msg.position.includes('asc')
-        ? (msg.cardValue > targetValue)
-        : (msg.cardValue < targetValue);
-
-    if (!isExactDifference && !isValidNormalMove) {
-        return safeSend(player.ws, {
-            type: 'invalid_move',
-            message: `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'
-                } que ${targetValue} o igual a ${msg.position.includes('asc') ? targetValue - 10 : targetValue + 10
-                }`,
-            isError: true
-        });
+    // Validación de movimiento optimizada
+    let isValid = false;
+    if (msg.position.includes('asc')) {
+        isValid = msg.cardValue > targetValue || msg.cardValue === targetValue - 10;
+    } else {
+        isValid = msg.cardValue < targetValue || msg.cardValue === targetValue + 10;
     }
-
-    const isValid = msg.position.includes('asc')
-        ? (msg.cardValue > targetValue || msg.cardValue === targetValue - 10)
-        : (msg.cardValue < targetValue || msg.cardValue === targetValue + 10);
 
     if (!isValid) {
         return safeSend(player.ws, {
@@ -358,19 +342,19 @@ async function handlePlayCard(room, player, msg) {
         });
     }
 
-    const previousValue = targetValue;
-
+    // Actualizar el tablero
     if (msg.position.includes('asc')) {
         board.ascending[targetIdx] = msg.cardValue;
     } else {
         board.descending[targetIdx] = msg.cardValue;
     }
 
-    // Incrementar contadores
+    // Actualizar estadísticas del jugador
     player.cardsPlayedThisTurn = (Number(player.cardsPlayedThisTurn) || 0) + 1;
     player.totalCardsPlayed = (Number(player.totalCardsPlayed) || 0) + 1;
     player.cards = player.cards.filter(c => c !== msg.cardValue);
 
+    // Actualizar historial y notificar a los jugadores
     updateBoardHistory(room, msg.position, msg.cardValue);
 
     broadcastToRoom(room, {
@@ -381,7 +365,7 @@ async function handlePlayCard(room, player, msg) {
         position: msg.position,
         previousValue: targetValue,
         persistColor: true,
-        cardsPlayedThisTurn: player.cardsPlayedThisTurn // Enviar el contador actualizado
+        cardsPlayedThisTurn: player.cardsPlayedThisTurn
     });
 
     await saveGameState(reverseRoomMap.get(room));
