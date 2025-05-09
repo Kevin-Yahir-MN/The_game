@@ -1027,7 +1027,8 @@ wss.on('connection', async (ws, req) => {
                                     id: p.id,
                                     name: p.name,
                                     isHost: p.isHost,
-                                    cardCount: p.cards.length
+                                    cardCount: p.cards.length,
+                                    cardsPlayedThisTurn: 0
                                 }))
                             });
 
