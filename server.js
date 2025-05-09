@@ -538,7 +538,7 @@ function shuffleArray(array) {
     }
 
     //Solo para pruebas unitarias
-    array.length = 20;
+    //array.length = 20;
     return array;
 }
 
