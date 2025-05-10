@@ -289,6 +289,8 @@ function getNextActivePlayerIndex(currentIndex, players) {
 }
 
 function getPlayableCards(playerCards, board) {
+    if (!playerCards || playerCards.length === 0) return [];
+
     return playerCards.filter(card => {
         const canPlayAsc1 = card > board.ascending[0] || card === board.ascending[0] - 10;
         const canPlayAsc2 = card > board.ascending[1] || card === board.ascending[1] - 10;
@@ -436,6 +438,19 @@ async function endTurn(room, player) {
     const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
     const cardsPlayed = Number(player.cardsPlayedThisTurn) || 0;
 
+    if (player.specialFlag === 'risky_first_move' && room.players.length === 1) {
+        if (cardsPlayed < minCardsRequired) {
+            broadcastToRoom(room, {
+                type: 'game_over',
+                result: 'lose',
+                message: `¡No jugaste el mínimo de ${minCardsRequired} cartas requeridas!`,
+                reason: 'failed_min_cards_after_risky_move'
+            });
+            return;
+        }
+        delete player.specialFlag;
+    }
+
     if (cardsPlayed < minCardsRequired) {
         return safeSend(player.ws, {
             type: 'notification',
@@ -444,32 +459,6 @@ async function endTurn(room, player) {
         });
     }
 
-    // Verificación de movimientos para el siguiente jugador
-    const nextPlayerIndex = getNextActivePlayerIndex(
-        room.players.findIndex(p => p.id === room.gameState.currentTurn),
-        room.players
-    );
-    const nextPlayer = room.players[nextPlayerIndex];
-
-    // Nueva lógica: verificar si el siguiente jugador puede mover cuando el deck está vacío
-    if (room.gameState.deck.length === 0 && nextPlayer.cards.length > 0) {
-        const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-        if (playableCards.length === 0) {
-            return broadcastToRoom(room, {
-                type: 'game_over',
-                result: 'lose',
-                message: `¡${nextPlayer.name} no tiene movimientos posibles!`,
-                reason: 'no_valid_moves_empty_deck',
-                details: {
-                    playerId: nextPlayer.id,
-                    cardsInHand: nextPlayer.cards.length,
-                    boardState: room.gameState.board
-                }
-            });
-        }
-    }
-
-    // Lógica existente para terminar el turno
     const targetCardCount = room.gameState.initialCards;
     const cardsToDraw = Math.min(
         targetCardCount - player.cards.length,
@@ -480,16 +469,44 @@ async function endTurn(room, player) {
         player.cards.push(room.gameState.deck.pop());
     }
 
+    if (room.gameState.deck.length === 0) {
+        broadcastToRoom(room, {
+            type: 'deck_updated',
+            remaining: 0,
+            minCardsRequired: 1
+        });
+    }
+
+    const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
+    const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
+    const nextPlayer = room.players[nextIndex];
     room.gameState.currentTurn = nextPlayer.id;
+
+    // Reiniciar contador de cartas jugadas
     player.cardsPlayedThisTurn = 0;
+
+    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
+
+    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
+        await saveGameState(reverseRoomMap.get(room));
+        return broadcastToRoom(room, {
+            type: 'game_over',
+            result: 'lose',
+            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
+            reason: 'min_cards_not_met'
+        });
+    }
 
     await saveGameState(reverseRoomMap.get(room));
 
     broadcastToRoom(room, {
         type: 'turn_changed',
         newTurn: nextPlayer.id,
+        previousPlayer: player.id,
         playerName: nextPlayer.name,
-        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
+        cardsPlayedThisTurn: 0, // Enviar 0 ya que es nuevo turno
+        minCardsRequired: requiredCards,
         remainingDeck: room.gameState.deck.length
     }, { includeGameState: true });
 
@@ -521,7 +538,7 @@ function shuffleArray(array) {
     }
 
     //Solo para pruebas unitarias
-    array.length = 20;
+    //array.length = 20;
     return array;
 }
 
@@ -1085,21 +1102,12 @@ wss.on('connection', async (ws, req) => {
                         const room = rooms.get(msg.roomId);
                         const player = room.players.find(p => p.id === msg.playerId);
 
-                        if (player &&
-                            player.id === room.gameState.currentTurn &&
-                            room.gameState.deck.length === 0 &&
-                            player.cards.length > 0 &&
-                            !getPlayableCards(player.cards, room.gameState.board).length) {
-
+                        if (player) {
                             broadcastToRoom(room, {
                                 type: 'game_over',
                                 result: 'lose',
-                                message: `¡${player.name} no tiene movimientos posibles!`,
-                                reason: 'no_valid_moves_empty_deck',
-                                details: {
-                                    cardsInHand: player.cards,
-                                    boardState: room.gameState.board
-                                }
+                                message: '¡Juego terminado! No hay movimientos válidos disponibles.',
+                                reason: msg.reason || 'no_valid_moves'
                             });
                         }
                     }
@@ -1109,8 +1117,8 @@ wss.on('connection', async (ws, req) => {
                         const room = rooms.get(msg.roomId);
                         const player = room.players.find(p => p.id === msg.playerId);
 
-                        if (player && room.players.length === 1 && room.gameState.deck.length > 0) {
-                            const minCardsRequired = 2;
+                        if (player && room.players.length === 1) {
+                            const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
 
                             if (msg.cardsRemaining < minCardsRequired) {
                                 broadcastToRoom(room, {
@@ -1217,34 +1225,6 @@ wss.on('connection', async (ws, req) => {
                                     minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
                                 }
                             });
-                        }
-                    }
-                case 'surrender':
-                    if (rooms.has(msg.roomId)) {
-                        const room = rooms.get(msg.roomId);
-                        const player = room.players.find(p => p.id === msg.playerId);
-                        const cardsPlayed = player?.cardsPlayedThisTurn || 0;
-
-                        if (player &&
-                            player.id === room.gameState.currentTurn &&
-                            room.gameState.deck.length > 0 &&
-                            cardsPlayed < 2 &&
-                            !getPlayableCards(player.cards, room.gameState.board).length) {
-
-                            broadcastToRoom(room, {
-                                type: 'game_over',
-                                result: 'lose',
-                                message: `¡${player.name} se ha rendido!`,
-                                reason: 'surrender',
-                                details: {
-                                    cardsPlayed: cardsPlayed,
-                                    remainingDeck: room.gameState.deck.length
-                                }
-                            });
-
-                            // Resetear estado de la sala
-                            room.gameState.gameStarted = false;
-                            await saveGameState(msg.roomId);
                         }
                     }
                     break;

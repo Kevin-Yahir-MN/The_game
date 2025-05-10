@@ -47,8 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let isDragging = false;
     let selectedCard = null;
     let socket;
-    let surrenderBtn = document.getElementById('surrenderBtn');
-
 
     // Datos del jugador actual
     const currentPlayer = {
@@ -743,6 +741,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Obtener jugador actual y sus cartas jugadas
         const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
         const cardsPlayed = currentPlayerObj?.cardsPlayedThisTurn || 0;
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
@@ -756,54 +755,21 @@ document.addEventListener('DOMContentLoaded', () => {
         progressTextElement.textContent = `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
         progressBarElement.style.width = `${Math.min((cardsPlayed / minCardsRequired) * 100, 100)}%`;
 
-        // Control botones
+        // Actualizar botón de terminar turno
         if (endTurnButton) {
             endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
-            endTurnButton.style.backgroundColor = cardsPlayed >= minCardsRequired ? '#2ecc71' : '#e74c3c';
-        }
+            const remainingCards = minCardsRequired - cardsPlayed;
+            endTurnButton.title = remainingCards > 0
+                ? `Necesitas jugar ${remainingCards} carta(s) más`
+                : 'Puedes terminar tu turno';
 
-        // Verificación automática de fin del juego (deck vacío + sin movimientos)
-        if (gameState.currentTurn === currentPlayer.id &&
-            gameState.remainingDeck === 0 &&
-            gameState.yourCards.length > 0 &&
-            !hasValidMoves(gameState.yourCards, gameState.board)) {
-
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: 'force_game_over',
-                    playerId: currentPlayer.id,
-                    roomId: roomId,
-                    reason: 'no_valid_moves_empty_deck'
-                }));
+            // Cambiar estilo si se cumplió el mínimo
+            if (cardsPlayed >= minCardsRequired) {
+                endTurnButton.style.backgroundColor = '#2ecc71'; // Verde
+            } else {
+                endTurnButton.style.backgroundColor = '#e74c3c'; // Rojo
             }
         }
-
-        // Control botón Rendirse (solo cuando hay cartas en el deck)
-        const shouldShowSurrender = (
-            gameState.currentTurn === currentPlayer.id &&
-            gameState.remainingDeck > 0 &&
-            cardsPlayed < 2 &&
-            !hasValidMoves(gameState.yourCards, gameState.board)
-        );
-
-        surrenderBtn.style.display = shouldShowSurrender ? 'block' : 'none';
-        endTurnButton.style.display = shouldShowSurrender ? 'none' : 'block';
-    }
-
-    // Función agregada para manejar la rendición
-    function setupSurrenderButton() {
-        surrenderBtn.addEventListener('click', () => {
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                const confirmSurrender = confirm("¿Estás seguro que quieres rendirte? Esto terminará la partida.");
-                if (confirmSurrender) {
-                    socket.send(JSON.stringify({
-                        type: 'surrender',
-                        playerId: currentPlayer.id,
-                        roomId: roomId
-                    }));
-                }
-            }
-        });
     }
 
     function handleOpponentCardPlayed(message) {
@@ -1114,7 +1080,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const clickedColumn = getClickedColumn(x, y);
         if (clickedColumn && selectedCard) {
+            const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+            const isSoloGame = gameState.players.length === 1;
+
+            const tempBoard = JSON.parse(JSON.stringify(gameState.board));
+            if (clickedColumn.includes('asc')) {
+                tempBoard.ascending[clickedColumn === 'asc1' ? 0 : 1] = selectedCard.value;
+            } else {
+                tempBoard.descending[clickedColumn === 'desc1' ? 0 : 1] = selectedCard.value;
+            }
+
+            const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
+            const hasOtherMoves = hasValidMoves(remainingCards, tempBoard);
+
+            if (isSoloGame && !hasOtherMoves && remainingCards.length >= minCardsRequired) {
+                const confirmMove = confirm(
+                    'ADVERTENCIA: Jugar esta carta puede dejarte sin movimientos válidos.\n' +
+                    'Si no puedes completar el mínimo de cartas, perderás automáticamente.\n\n' +
+                    '¿Deseas continuar?'
+                );
+
+                if (!confirmMove) return;
+            }
+            else if (!isSoloGame && !hasOtherMoves) {
+                const confirmMove = confirm(
+                    'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\n' +
+                    'Si continúas, el juego terminará con derrota.\n\n' +
+                    '¿Deseas continuar?'
+                );
+
+                if (!confirmMove) return;
+            }
+
             playCard(selectedCard.value, clickedColumn);
+
+            if (isSoloGame && !hasOtherMoves) {
+                socket.send(JSON.stringify({
+                    type: 'check_solo_block',
+                    playerId: currentPlayer.id,
+                    roomId: roomId,
+                    cardsRemaining: remainingCards.length
+                }));
+            }
             return;
         }
 
@@ -1191,15 +1198,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function hasValidMoves(cards, board) {
-        if (!cards || !board) return false;
-
         return cards.some(card => {
-            const canPlayAsc1 = card.value > board.ascending[0] || card.value === board.ascending[0] - 10;
-            const canPlayAsc2 = card.value > board.ascending[1] || card.value === board.ascending[1] - 10;
-            const canPlayDesc1 = card.value < board.descending[0] || card.value === board.descending[0] + 10;
-            const canPlayDesc2 = card.value < board.descending[1] || card.value === board.descending[1] + 10;
+            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+                const posValue = pos.includes('asc')
+                    ? (pos === 'asc1' ? board.ascending[0] : board.ascending[1])
+                    : (pos === 'desc1' ? board.descending[0] : board.descending[1]);
 
-            return canPlayAsc1 || canPlayAsc2 || canPlayDesc1 || canPlayDesc2;
+                const isValid = pos.includes('asc')
+                    ? (card.value > posValue || card.value === posValue - 10)
+                    : (card.value < posValue || card.value === posValue + 10);
+
+                return isValid;
+            });
         });
     }
 
@@ -1529,7 +1539,6 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 updatePlayersPanel();
             }, 1000); // Pequeño delay para asegurar la conexión
-            setupSurrenderButton(); // Agregar esta línea
             gameLoop();
         });
     }
