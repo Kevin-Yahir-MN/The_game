@@ -756,18 +756,29 @@ document.addEventListener('DOMContentLoaded', () => {
         progressTextElement.textContent = `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
         progressBarElement.style.width = `${Math.min((cardsPlayed / minCardsRequired) * 100, 100)}%`;
 
-        // Control botón Terminar Turno
+        // Control botones
         if (endTurnButton) {
             endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
-            const remainingCards = minCardsRequired - cardsPlayed;
-            endTurnButton.title = remainingCards > 0
-                ? `Necesitas jugar ${remainingCards} carta(s) más`
-                : 'Puedes terminar tu turno';
-
             endTurnButton.style.backgroundColor = cardsPlayed >= minCardsRequired ? '#2ecc71' : '#e74c3c';
         }
 
-        // Control botón Rendirse (condiciones: es tu turno, hay baraja, menos de 2 jugadas y sin movimientos)
+        // Verificación automática de fin del juego (deck vacío + sin movimientos)
+        if (gameState.currentTurn === currentPlayer.id &&
+            gameState.remainingDeck === 0 &&
+            gameState.yourCards.length > 0 &&
+            !hasValidMoves(gameState.yourCards, gameState.board)) {
+
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'force_game_over',
+                    playerId: currentPlayer.id,
+                    roomId: roomId,
+                    reason: 'no_valid_moves_empty_deck'
+                }));
+            }
+        }
+
+        // Control botón Rendirse (solo cuando hay cartas en el deck)
         const shouldShowSurrender = (
             gameState.currentTurn === currentPlayer.id &&
             gameState.remainingDeck > 0 &&
@@ -1179,7 +1190,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('progressBar').style.width = `${progressPercentage}%`;
     }
 
-    // Función hasValidMoves (actualizada para reutilización)
     function hasValidMoves(cards, board) {
         if (!cards || !board) return false;
 

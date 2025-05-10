@@ -436,8 +436,6 @@ async function endTurn(room, player) {
     const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
     const cardsPlayed = Number(player.cardsPlayedThisTurn) || 0;
 
-    // Eliminamos la verificación de risky_first_move
-
     if (cardsPlayed < minCardsRequired) {
         return safeSend(player.ws, {
             type: 'notification',
@@ -446,6 +444,32 @@ async function endTurn(room, player) {
         });
     }
 
+    // Verificación de movimientos para el siguiente jugador
+    const nextPlayerIndex = getNextActivePlayerIndex(
+        room.players.findIndex(p => p.id === room.gameState.currentTurn),
+        room.players
+    );
+    const nextPlayer = room.players[nextPlayerIndex];
+
+    // Nueva lógica: verificar si el siguiente jugador puede mover cuando el deck está vacío
+    if (room.gameState.deck.length === 0 && nextPlayer.cards.length > 0) {
+        const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+        if (playableCards.length === 0) {
+            return broadcastToRoom(room, {
+                type: 'game_over',
+                result: 'lose',
+                message: `¡${nextPlayer.name} no tiene movimientos posibles!`,
+                reason: 'no_valid_moves_empty_deck',
+                details: {
+                    playerId: nextPlayer.id,
+                    cardsInHand: nextPlayer.cards.length,
+                    boardState: room.gameState.board
+                }
+            });
+        }
+    }
+
+    // Lógica existente para terminar el turno
     const targetCardCount = room.gameState.initialCards;
     const cardsToDraw = Math.min(
         targetCardCount - player.cards.length,
@@ -456,45 +480,15 @@ async function endTurn(room, player) {
         player.cards.push(room.gameState.deck.pop());
     }
 
-    if (room.gameState.deck.length === 0) {
-        broadcastToRoom(room, {
-            type: 'deck_updated',
-            remaining: 0,
-            minCardsRequired: 1
-        });
-    }
-
-    const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
-    const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
-    const nextPlayer = room.players[nextIndex];
     room.gameState.currentTurn = nextPlayer.id;
-
     player.cardsPlayedThisTurn = 0;
-
-    // Solo verificamos movimientos válidos si hay cartas en la baraja
-    if (room.gameState.deck.length > 0) {
-        const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-        const requiredCards = 2; // Siempre 2 cuando hay baraja
-
-        if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
-            await saveGameState(reverseRoomMap.get(room));
-            return broadcastToRoom(room, {
-                type: 'game_over',
-                result: 'lose',
-                message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
-                reason: 'min_cards_not_met'
-            });
-        }
-    }
 
     await saveGameState(reverseRoomMap.get(room));
 
     broadcastToRoom(room, {
         type: 'turn_changed',
         newTurn: nextPlayer.id,
-        previousPlayer: player.id,
         playerName: nextPlayer.name,
-        cardsPlayedThisTurn: 0,
         minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
         remainingDeck: room.gameState.deck.length
     }, { includeGameState: true });
@@ -1091,12 +1085,21 @@ wss.on('connection', async (ws, req) => {
                         const room = rooms.get(msg.roomId);
                         const player = room.players.find(p => p.id === msg.playerId);
 
-                        if (player) {
+                        if (player &&
+                            player.id === room.gameState.currentTurn &&
+                            room.gameState.deck.length === 0 &&
+                            player.cards.length > 0 &&
+                            !getPlayableCards(player.cards, room.gameState.board).length) {
+
                             broadcastToRoom(room, {
                                 type: 'game_over',
                                 result: 'lose',
-                                message: '¡Juego terminado! No hay movimientos válidos disponibles.',
-                                reason: msg.reason || 'no_valid_moves'
+                                message: `¡${player.name} no tiene movimientos posibles!`,
+                                reason: 'no_valid_moves_empty_deck',
+                                details: {
+                                    cardsInHand: player.cards,
+                                    boardState: room.gameState.board
+                                }
                             });
                         }
                     }
