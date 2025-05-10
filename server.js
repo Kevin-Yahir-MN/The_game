@@ -289,8 +289,6 @@ function getNextActivePlayerIndex(currentIndex, players) {
 }
 
 function getPlayableCards(playerCards, board) {
-    if (!playerCards || playerCards.length === 0) return [];
-
     return playerCards.filter(card => {
         const canPlayAsc1 = card > board.ascending[0] || card === board.ascending[0] - 10;
         const canPlayAsc2 = card > board.ascending[1] || card === board.ascending[1] - 10;
@@ -1218,23 +1216,32 @@ wss.on('connection', async (ws, req) => {
                             });
                         }
                     }
-                    break;
                 case 'surrender':
                     if (rooms.has(msg.roomId)) {
                         const room = rooms.get(msg.roomId);
                         const player = room.players.find(p => p.id === msg.playerId);
+                        const cardsPlayed = player?.cardsPlayedThisTurn || 0;
 
                         if (player &&
                             player.id === room.gameState.currentTurn &&
                             room.gameState.deck.length > 0 &&
+                            cardsPlayed < 2 &&
                             !getPlayableCards(player.cards, room.gameState.board).length) {
 
                             broadcastToRoom(room, {
                                 type: 'game_over',
                                 result: 'lose',
                                 message: `¡${player.name} se ha rendido!`,
-                                reason: 'surrender'
+                                reason: 'surrender',
+                                details: {
+                                    cardsPlayed: cardsPlayed,
+                                    remainingDeck: room.gameState.deck.length
+                                }
                             });
+
+                            // Resetear estado de la sala
+                            room.gameState.gameStarted = false;
+                            await saveGameState(msg.roomId);
                         }
                     }
                     break;

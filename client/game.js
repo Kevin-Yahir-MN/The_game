@@ -747,6 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cardsPlayed = currentPlayerObj?.cardsPlayedThisTurn || 0;
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
 
+        // Actualizar UI
         currentTurnElement.textContent = gameState.currentTurn === currentPlayer.id
             ? 'Tu turno'
             : `Turno de ${gameState.players.find(p => p.id === gameState.currentTurn)?.name || '...'}`;
@@ -755,6 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
         progressTextElement.textContent = `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
         progressBarElement.style.width = `${Math.min((cardsPlayed / minCardsRequired) * 100, 100)}%`;
 
+        // Control botón Terminar Turno
         if (endTurnButton) {
             endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
             const remainingCards = minCardsRequired - cardsPlayed;
@@ -762,17 +764,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `Necesitas jugar ${remainingCards} carta(s) más`
                 : 'Puedes terminar tu turno';
 
-            if (cardsPlayed >= minCardsRequired) {
-                endTurnButton.style.backgroundColor = '#2ecc71';
-            } else {
-                endTurnButton.style.backgroundColor = '#e74c3c';
-            }
+            endTurnButton.style.backgroundColor = cardsPlayed >= minCardsRequired ? '#2ecc71' : '#e74c3c';
         }
 
-        // Control de visibilidad del botón "Rendirse" (deck.length > 0)
+        // Control botón Rendirse (condiciones: es tu turno, hay baraja, menos de 2 jugadas y sin movimientos)
         const shouldShowSurrender = (
             gameState.currentTurn === currentPlayer.id &&
             gameState.remainingDeck > 0 &&
+            cardsPlayed < 2 &&
             !hasValidMoves(gameState.yourCards, gameState.board)
         );
 
@@ -784,11 +783,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupSurrenderButton() {
         surrenderBtn.addEventListener('click', () => {
             if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: 'surrender',
-                    playerId: currentPlayer.id,
-                    roomId: roomId
-                }));
+                const confirmSurrender = confirm("¿Estás seguro que quieres rendirte? Esto terminará la partida.");
+                if (confirmSurrender) {
+                    socket.send(JSON.stringify({
+                        type: 'surrender',
+                        playerId: currentPlayer.id,
+                        roomId: roomId
+                    }));
+                }
             }
         });
     }
@@ -1177,19 +1179,17 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('progressBar').style.width = `${progressPercentage}%`;
     }
 
+    // Función hasValidMoves (actualizada para reutilización)
     function hasValidMoves(cards, board) {
+        if (!cards || !board) return false;
+
         return cards.some(card => {
-            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
-                const posValue = pos.includes('asc')
-                    ? (pos === 'asc1' ? board.ascending[0] : board.ascending[1])
-                    : (pos === 'desc1' ? board.descending[0] : board.descending[1]);
+            const canPlayAsc1 = card.value > board.ascending[0] || card.value === board.ascending[0] - 10;
+            const canPlayAsc2 = card.value > board.ascending[1] || card.value === board.ascending[1] - 10;
+            const canPlayDesc1 = card.value < board.descending[0] || card.value === board.descending[0] + 10;
+            const canPlayDesc2 = card.value < board.descending[1] || card.value === board.descending[1] + 10;
 
-                const isValid = pos.includes('asc')
-                    ? (card.value > posValue || card.value === posValue - 10)
-                    : (card.value < posValue || card.value === posValue + 10);
-
-                return isValid;
-            });
+            return canPlayAsc1 || canPlayAsc2 || canPlayDesc1 || canPlayDesc2;
         });
     }
 
