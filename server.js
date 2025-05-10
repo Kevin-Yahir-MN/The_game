@@ -302,6 +302,7 @@ function getPlayableCards(playerCards, board) {
 }
 
 async function handlePlayCard(room, player, msg) {
+    // Validación básica
     if (!validPositions.includes(msg.position)) {
         return safeSend(player.ws, {
             type: 'notification',
@@ -318,6 +319,15 @@ async function handlePlayCard(room, player, msg) {
         });
     }
 
+    // Verificar que es el turno del jugador
+    if (room.gameState.currentTurn !== player.id) {
+        return safeSend(player.ws, {
+            type: 'notification',
+            message: 'No es tu turno',
+            isError: true
+        });
+    }
+
     const board = room.gameState.board;
     const targetIdx = msg.position.includes('asc')
         ? (msg.position === 'asc1' ? 0 : 1)
@@ -326,17 +336,10 @@ async function handlePlayCard(room, player, msg) {
         ? board.ascending[targetIdx]
         : board.descending[targetIdx];
 
-    // Verificar primero la regla de diferencia exacta de 10
-    const isExactDifference = msg.position.includes('asc')
-        ? (msg.cardValue === targetValue - 10)
-        : (msg.cardValue === targetValue + 10);
+    // Validación unificada
+    const isValid = isValidMove(msg.cardValue, msg.position, board);
 
-    // Luego verificar la regla normal
-    const isValidNormalMove = msg.position.includes('asc')
-        ? (msg.cardValue > targetValue)
-        : (msg.cardValue < targetValue);
-
-    if (!isExactDifference && !isValidNormalMove) {
+    if (!isValid) {
         return safeSend(player.ws, {
             type: 'invalid_move',
             message: `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'
@@ -346,27 +349,15 @@ async function handlePlayCard(room, player, msg) {
         });
     }
 
-    const isValid = msg.position.includes('asc')
-        ? (msg.cardValue > targetValue || msg.cardValue === targetValue - 10)
-        : (msg.cardValue < targetValue || msg.cardValue === targetValue + 10);
-
-    if (!isValid) {
-        return safeSend(player.ws, {
-            type: 'notification',
-            message: `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'} que ${targetValue} o igual a ${msg.position.includes('asc') ? targetValue - 10 : targetValue + 10}`,
-            isError: true
-        });
-    }
-
+    // Actualizar tablero
     const previousValue = targetValue;
-
     if (msg.position.includes('asc')) {
         board.ascending[targetIdx] = msg.cardValue;
     } else {
         board.descending[targetIdx] = msg.cardValue;
     }
 
-    // Incrementar contadores
+    // Actualizar contadores
     player.cardsPlayedThisTurn = (Number(player.cardsPlayedThisTurn) || 0) + 1;
     player.totalCardsPlayed = (Number(player.totalCardsPlayed) || 0) + 1;
     player.cards = player.cards.filter(c => c !== msg.cardValue);
@@ -379,15 +370,31 @@ async function handlePlayCard(room, player, msg) {
         playerName: player.name,
         cardValue: msg.cardValue,
         position: msg.position,
-        previousValue: targetValue,
+        previousValue: previousValue,
         persistColor: true,
-        cardsPlayedThisTurn: player.cardsPlayedThisTurn // Enviar el contador actualizado
+        cardsPlayedThisTurn: player.cardsPlayedThisTurn
     });
 
     await saveGameState(reverseRoomMap.get(room));
     checkGameStatus(room);
 }
 
+// Función auxiliar de validación
+function isValidMove(cardValue, position, board) {
+    const targetValue = position.includes('asc')
+        ? board.ascending[position === 'asc1' ? 0 : 1]
+        : board.descending[position === 'desc1' ? 0 : 1];
+
+    // Regla especial: diferencia exacta de 10
+    if (position.includes('asc') && cardValue === targetValue - 10) return true;
+    if (position.includes('desc') && cardValue === targetValue + 10) return true;
+
+    // Regla normal: mayor/menor según la pila
+    if (position.includes('asc') && cardValue > targetValue) return true;
+    if (position.includes('desc') && cardValue < targetValue) return true;
+
+    return false;
+}
 function handleUndoMove(room, player, msg) {
     if (player.cardsPlayedThisTurn.length === 0) {
         return safeSend(player.ws, {
@@ -435,23 +442,32 @@ function handleUndoMove(room, player, msg) {
 }
 
 async function endTurn(room, player) {
+    // Verificar que es el turno del jugador
+    if (room.gameState.currentTurn !== player.id) {
+        return safeSend(player.ws, {
+            type: 'notification',
+            message: 'No es tu turno',
+            isError: true
+        });
+    }
+
     const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
     const cardsPlayed = Number(player.cardsPlayedThisTurn) || 0;
 
-    if (player.specialFlag === 'risky_first_move' && room.players.length === 1) {
-        if (cardsPlayed < minCardsRequired) {
+    // Verificar mínimo de cartas jugadas
+    if (cardsPlayed < minCardsRequired) {
+        // Verificación especial para cuando no hay cartas disponibles
+        if (player.cards.length === 0 && room.gameState.deck.length === 0) {
+            // Caso especial: no hay cartas para jugar
             broadcastToRoom(room, {
                 type: 'game_over',
                 result: 'lose',
-                message: `¡No jugaste el mínimo de ${minCardsRequired} cartas requeridas!`,
-                reason: 'failed_min_cards_after_risky_move'
+                message: '¡No hay cartas disponibles para completar el turno!',
+                reason: 'no_cards_available'
             });
             return;
         }
-        delete player.specialFlag;
-    }
 
-    if (cardsPlayed < minCardsRequired) {
         return safeSend(player.ws, {
             type: 'notification',
             message: `Debes jugar al menos ${minCardsRequired} cartas este turno`,
@@ -459,6 +475,7 @@ async function endTurn(room, player) {
         });
     }
 
+    // Repartir cartas si hay disponibles
     const targetCardCount = room.gameState.initialCards;
     const cardsToDraw = Math.min(
         targetCardCount - player.cards.length,
@@ -469,6 +486,7 @@ async function endTurn(room, player) {
         player.cards.push(room.gameState.deck.pop());
     }
 
+    // Notificar si el mazo se acaba
     if (room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
             type: 'deck_updated',
@@ -477,14 +495,26 @@ async function endTurn(room, player) {
         });
     }
 
+    // Cambiar turno al siguiente jugador activo
     const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
     const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
     const nextPlayer = room.players[nextIndex];
+
+    // Verificar que haya jugadores activos
+    if (!nextPlayer) {
+        broadcastToRoom(room, {
+            type: 'game_over',
+            result: 'lose',
+            message: '¡No hay jugadores activos!',
+            reason: 'no_active_players'
+        });
+        return;
+    }
+
     room.gameState.currentTurn = nextPlayer.id;
+    player.cardsPlayedThisTurn = 0; // Resetear contador
 
-    // Reiniciar contador de cartas jugadas
-    player.cardsPlayedThisTurn = 0;
-
+    // Verificar si el siguiente jugador puede continuar
     const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
     const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
 
@@ -505,10 +535,17 @@ async function endTurn(room, player) {
         newTurn: nextPlayer.id,
         previousPlayer: player.id,
         playerName: nextPlayer.name,
-        cardsPlayedThisTurn: 0, // Enviar 0 ya que es nuevo turno
+        cardsPlayedThisTurn: 0,
         minCardsRequired: requiredCards,
-        remainingDeck: room.gameState.deck.length
-    }, { includeGameState: true });
+        remainingDeck: room.gameState.deck.length,
+        players: room.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            isHost: p.isHost,
+            cardCount: p.cards.length,
+            connected: p.ws !== null
+        }))
+    });
 
     checkGameStatus(room);
 }

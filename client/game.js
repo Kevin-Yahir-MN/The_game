@@ -701,30 +701,37 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateGameState(newState) {
         if (!newState) return;
 
+        // Actualizar jugadores
         if (newState.p) {
-            updatePlayersPanel();
             gameState.players = newState.p.map(player => ({
                 id: player.i,
                 name: player.n || `Jugador_${player.i.slice(0, 4)}`,
                 cardCount: player.c,
                 isHost: player.h,
                 cardsPlayedThisTurn: Number(player.s) || 0,
-                totalCardsPlayed: Number(player.pt) || 0
+                totalCardsPlayed: Number(player.pt) || 0,
+                connected: player.connected || true
             }));
+            updatePlayersPanel();
         }
 
+        // Actualizar estado del juego
         gameState.board = newState.b || gameState.board;
         gameState.currentTurn = newState.t || gameState.currentTurn;
         gameState.remainingDeck = newState.d || gameState.remainingDeck;
         gameState.initialCards = newState.i || gameState.initialCards;
 
-        if (newState.y) {
+        // Actualizar cartas del jugador con validación
+        if (Array.isArray(newState.y)) {
             updatePlayerCards(newState.y);
+        } else if (newState.y === null || newState.y === undefined) {
+            console.warn('Received null/undefined player cards, keeping current');
         }
 
-        updatePlayersPanel();
+        // Actualizar UI
         updateGameInfo();
 
+        // Resetear selección si no es nuestro turno
         if (gameState.currentTurn !== currentPlayer.id) {
             selectedCard = null;
         }
@@ -1435,17 +1442,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function gameLoop(timestamp) {
+        // Control de FPS
         if (timestamp - lastRenderTime < 1000 / TARGET_FPS) {
-            requestAnimationFrame(gameLoop);
+            animationFrameId = requestAnimationFrame(gameLoop);
             return;
         }
 
         lastRenderTime = timestamp;
 
+        // Solo renderizar si hay cambios o animaciones activas
+        const needsRender = gameState.animatingCards.length > 0 ||
+            isDragging ||
+            (gameState.currentTurn === currentPlayer.id && selectedCard);
+
+        if (!needsRender) {
+            animationFrameId = requestAnimationFrame(gameLoop);
+            return;
+        }
+
+        // Limpiar canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#1a6b1a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        // Renderizar elementos
         drawBoard();
         drawHistoryIcons();
         handleCardAnimations();
@@ -1455,7 +1475,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dragStartCard.draw();
         }
 
-        requestAnimationFrame(gameLoop);
+        animationFrameId = requestAnimationFrame(gameLoop);
     }
 
     function cleanup() {
@@ -1500,47 +1520,121 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initGame() {
+        // Verificar requisitos mínimos
         if (!canvas || !ctx || !currentPlayer.id || !roomId) {
             alert('Error: No se pudo inicializar el juego. Vuelve a la sala.');
+            window.location.href = 'sala.html';
             return;
         }
 
+        // Cargar assets primero
         Promise.all([
-            loadAsset('cards-icon.png').then(img => { if (img) historyIcon = img; })
+            loadAsset('cards-icon.png').then(img => {
+                if (img) historyIcon = img;
+            })
         ]).then(() => {
+            // Configurar canvas
             canvas.width = 800;
             canvas.height = 700;
 
-            endTurnButton.addEventListener('click', endTurn);
-            canvas.addEventListener('click', handleCanvasClick);
-            canvas.addEventListener('mousedown', handleMouseDown);
-            canvas.addEventListener('mousemove', handleMouseMove);
-            canvas.addEventListener('mouseup', handleMouseUp);
-            canvas.addEventListener('mouseleave', handleMouseUp);
-            canvas.addEventListener('touchstart', handleTouchStart);
-            canvas.addEventListener('touchmove', handleTouchMove);
-            canvas.addEventListener('touchend', handleTouchEnd);
-            document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
-            window.addEventListener('beforeunload', cleanup);
+            // Configurar eventos
+            setupEventListeners();
 
-            const controlsDiv = document.querySelector('.game-controls');
-            if (controlsDiv) {
-                controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
-            }
-
-            historyIconsAnimation = {
-                interval: null,
-                lastPulseTime: Date.now(),
-                pulseDuration: 500,
-                pulseInterval: 20000
-            };
-
+            // Iniciar conexión WebSocket
             connectWebSocket();
+
+            // Configurar panel de jugadores
             setTimeout(() => {
                 updatePlayersPanel();
-            }, 1000); // Pequeño delay para asegurar la conexión
-            gameLoop();
+                updateGameInfo();
+            }, 500);
+
+            // Iniciar bucle de juego optimizado
+            startOptimizedGameLoop();
+        }).catch(error => {
+            console.error('Error al inicializar el juego:', error);
+            showNotification('Error al cargar recursos del juego', true);
+            setTimeout(() => window.location.href = 'sala.html', 2000);
         });
+
+        // Configurar eventos de la UI
+        function setupEventListeners() {
+            endTurnButton.addEventListener('click', endTurn);
+
+            // Eventos del canvas
+            const events = {
+                click: handleCanvasClick,
+                mousedown: handleMouseDown,
+                mousemove: handleMouseMove,
+                mouseup: handleMouseUp,
+                mouseleave: handleMouseUp,
+                touchstart: handleTouchStart,
+                touchmove: handleTouchMove,
+                touchend: handleTouchEnd
+            };
+
+            Object.entries(events).forEach(([event, handler]) => {
+                canvas.addEventListener(event, handler);
+            });
+
+            // Evento del modal
+            document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
+
+            // Limpieza al salir
+            window.addEventListener('beforeunload', cleanup);
+        }
+
+        // Bucle de juego optimizado
+        function startOptimizedGameLoop() {
+            let lastActiveTime = Date.now();
+            const INACTIVITY_TIMEOUT = 5000; // 5 segundos sin actividad
+
+            function checkActivity() {
+                const now = Date.now();
+                const isActive = gameState.animatingCards.length > 0 ||
+                    isDragging ||
+                    (gameState.currentTurn === currentPlayer.id && selectedCard);
+
+                if (isActive) {
+                    lastActiveTime = now;
+                    if (!animationFrameId) {
+                        animationFrameId = requestAnimationFrame(gameLoop);
+                    }
+                } else if (now - lastActiveTime > INACTIVITY_TIMEOUT && animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+
+                setTimeout(checkActivity, 1000);
+            }
+
+            // Iniciar verificador de actividad
+            checkActivity();
+        }
+
+        // Función de limpieza
+        function cleanup() {
+            clearTimeout(reconnectTimeout);
+            cancelAnimationFrame(animationFrameId);
+
+            if (socket) {
+                socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null;
+                if (socket.readyState === WebSocket.OPEN) {
+                    socket.close(1000, 'Juego terminado');
+                }
+            }
+
+            // Remover event listeners
+            endTurnButton.removeEventListener('click', endTurn);
+            const events = ['click', 'mousedown', 'mousemove', 'mouseup', 'mouseleave',
+                'touchstart', 'touchmove', 'touchend'];
+            events.forEach(event => {
+                canvas.removeEventListener(event, events[event]);
+            });
+
+            document.getElementById('modalBackdrop').removeEventListener('click', closeHistoryModal);
+            window.removeEventListener('beforeunload', cleanup);
+        }
     }
 
     initGame();
