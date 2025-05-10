@@ -1093,25 +1093,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
             const hasOtherMoves = hasValidMoves(remainingCards, tempBoard);
 
-            if (isSoloGame && !hasOtherMoves && remainingCards.length >= minCardsRequired) {
-                const confirmMove = confirm(
-                    'ADVERTENCIA: Jugar esta carta puede dejarte sin movimientos válidos.\n' +
-                    'Si no puedes completar el mínimo de cartas, perderás automáticamente.\n\n' +
-                    '¿Deseas continuar?'
-                );
-
-                if (!confirmMove) return;
-            }
-            else if (!isSoloGame && !hasOtherMoves) {
-                const confirmMove = confirm(
-                    'ADVERTENCIA: Jugar esta carta te dejará sin movimientos posibles.\n' +
-                    'Si continúas, el juego terminará con derrota.\n\n' +
-                    '¿Deseas continuar?'
-                );
-
-                if (!confirmMove) return;
-            }
-
             playCard(selectedCard.value, clickedColumn);
 
             if (isSoloGame && !hasOtherMoves) {
