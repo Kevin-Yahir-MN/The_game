@@ -779,8 +779,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
         const cardsPlayed = currentPlayerObj?.cardsPlayedThisTurn || 0;
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        const deckEmpty = gameState.remainingDeck === 0 ||
-            (message.deckEmpty !== undefined && message.deckEmpty);
+        const deckEmpty = gameState.remainingDeck === 0 || (message.deckEmpty !== undefined && message.deckEmpty);
 
         // Actualizar UI
         currentTurnElement.textContent = gameState.currentTurn === currentPlayer.id
