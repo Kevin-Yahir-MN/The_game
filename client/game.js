@@ -779,6 +779,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
         const cardsPlayed = currentPlayerObj?.cardsPlayedThisTurn || 0;
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        const deckEmpty = gameState.remainingDeck === 0 ||
+            (message.deckEmpty !== undefined && message.deckEmpty);
 
         // Actualizar UI
         currentTurnElement.textContent = gameState.currentTurn === currentPlayer.id
@@ -802,6 +804,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 endTurnButton.style.backgroundColor = '#2ecc71'; // Verde
             } else {
                 endTurnButton.style.backgroundColor = '#e74c3c'; // Rojo
+            }
+
+            if (endTurnButton) {
+                endTurnButton.title = deckEmpty
+                    ? 'Mazo vacío: solo necesitas jugar 1 carta'
+                    : `Necesitas jugar ${minCardsRequired} cartas`;
             }
         }
     }

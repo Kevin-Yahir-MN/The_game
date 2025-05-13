@@ -526,6 +526,7 @@ async function endTurn(room, player) {
         cardsPlayedThisTurn: 0,
         minCardsRequired: minCardsRequired,
         remainingDeck: room.gameState.deck.length,
+        deckEmpty: deckEmpty,
         skippedPlayers: attempts - 1 // Número de jugadores saltados
     }, { includeGameState: true });
 
