@@ -397,6 +397,13 @@ async function handlePlayCard(room, player, msg) {
         cardsPlayedThisTurn: player.cardsPlayedThisTurn // Enviar el contador actualizado
     });
 
+    if (room.gameState.deck.length === 0) {
+        broadcastToRoom(room, {
+            type: 'deck_emptied',
+            minCardsRequired: 1
+        });
+    }
+
     await saveGameState(reverseRoomMap.get(room));
     checkGameStatus(room);
 }
@@ -494,13 +501,6 @@ async function endTurn(room, player) {
         if (!deckEmpty || getPlayableCards(nextPlayer.cards, room.gameState.board).length > 0) {
             break;
         }
-
-        // Notificar que se salta el turno de este jugador
-        broadcastToRoom(room, {
-            type: 'notification',
-            message: `${nextPlayer.name} no puede jugar - turno saltado`,
-            isError: false
-        });
 
     } while (true);
 
