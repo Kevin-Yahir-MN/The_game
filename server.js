@@ -279,18 +279,12 @@ function updateBoardHistory(room, position, newValue) {
 }
 
 function getNextActivePlayerIndex(currentIndex, players) {
-    // Buscar siguiente jugador conectado
     for (let offset = 1; offset < players.length; offset++) {
         const nextIndex = (currentIndex + offset) % players.length;
-        const player = players[nextIndex];
-
-        // Considerar solo jugadores con conexión activa
-        if (player.ws?.readyState === WebSocket.OPEN) {
+        if (players[nextIndex].ws?.readyState === WebSocket.OPEN) {
             return nextIndex;
         }
     }
-
-    // Si no se encuentra ninguno, mantener el actual
     return currentIndex;
 }
 
@@ -444,7 +438,6 @@ async function endTurn(room, player) {
     const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
     const cardsPlayed = Number(player.cardsPlayedThisTurn) || 0;
 
-    // Validación de cartas jugadas en el turno
     if (player.specialFlag === 'risky_first_move' && room.players.length === 1) {
         if (cardsPlayed < minCardsRequired) {
             broadcastToRoom(room, {
@@ -466,7 +459,6 @@ async function endTurn(room, player) {
         });
     }
 
-    // Repartir cartas si hay en el mazo
     const targetCardCount = room.gameState.initialCards;
     const cardsToDraw = Math.min(
         targetCardCount - player.cards.length,
@@ -477,7 +469,6 @@ async function endTurn(room, player) {
         player.cards.push(room.gameState.deck.pop());
     }
 
-    // Notificar si el mazo se vació
     if (room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
             type: 'deck_updated',
@@ -486,126 +477,51 @@ async function endTurn(room, player) {
         });
     }
 
-    // Determinar siguiente jugador
     const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
-    let nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
-    let nextPlayer = room.players[nextIndex];
-    let skippedPlayers = [];
-
-    // Nueva lógica: saltar jugadores sin movimientos cuando el mazo está vacío
-    if (room.gameState.deck.length === 0) {
-        let attempts = 0;
-        while (attempts < room.players.length) {
-            const canMove = canPlayerMakeMove(nextPlayer, room.gameState.board);
-
-            if (!canMove && nextPlayer.cards.length > 0) {
-                skippedPlayers.push(nextPlayer.name);
-                nextIndex = getNextActivePlayerIndex(nextIndex, room.players);
-                nextPlayer = room.players[nextIndex];
-                attempts++;
-            } else {
-                break;
-            }
-        }
-
-        // Si todos los jugadores están bloqueados, terminar el juego
-        if (attempts >= room.players.length) {
-            return broadcastToRoom(room, {
-                type: 'game_over',
-                result: 'win',
-                message: '¡Todos ganan! No hay movimientos posibles.',
-                reason: 'no_valid_moves'
-            });
-        }
-    }
-
-    // Actualizar estado del juego
+    const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
+    const nextPlayer = room.players[nextIndex];
     room.gameState.currentTurn = nextPlayer.id;
+
+    // Reiniciar contador de cartas jugadas
     player.cardsPlayedThisTurn = 0;
+
+    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
+
+    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
+        await saveGameState(reverseRoomMap.get(room));
+        return broadcastToRoom(room, {
+            type: 'game_over',
+            result: 'lose',
+            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
+            reason: 'min_cards_not_met'
+        });
+    }
 
     await saveGameState(reverseRoomMap.get(room));
 
-    // Notificar cambio de turno
     broadcastToRoom(room, {
         type: 'turn_changed',
         newTurn: nextPlayer.id,
         previousPlayer: player.id,
         playerName: nextPlayer.name,
-        skippedPlayers: skippedPlayers.length > 0 ? skippedPlayers : null,
-        skipReason: 'no_valid_moves',
-        cardsPlayedThisTurn: 0,
-        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
-        remainingDeck: room.gameState.deck.length,
-        players: room.players.map(p => ({
-            id: p.id,
-            name: p.name,
-            isHost: p.isHost,
-            cardCount: p.cards.length,
-            cardsPlayedThisTurn: p.cardsPlayedThisTurn,
-            totalCardsPlayed: p.totalCardsPlayed || 0
-        }))
+        cardsPlayedThisTurn: 0, // Enviar 0 ya que es nuevo turno
+        minCardsRequired: requiredCards,
+        remainingDeck: room.gameState.deck.length
     }, { includeGameState: true });
 
     checkGameStatus(room);
 }
 
-function canPlayerMakeMove(player, board) {
-    if (!player || !player.cards || player.cards.length === 0) {
-        return false;
-    }
-
-    for (const card of player.cards) {
-        // Verificar para asc1
-        if (card === board.ascending[0] - 10 || card > board.ascending[0]) {
-            return true;
-        }
-
-        // Verificar para asc2
-        if (card === board.ascending[1] - 10 || card > board.ascending[1]) {
-            return true;
-        }
-
-        // Verificar para desc1
-        if (card === board.descending[0] + 10 || card < board.descending[0]) {
-            return true;
-        }
-
-        // Verificar para desc2
-        if (card === board.descending[1] + 10 || card < board.descending[1]) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 function checkGameStatus(room) {
-    // Verificar condición de victoria: todos sin cartas
     const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
     if (allPlayersEmpty && room.gameState.deck.length === 0) {
         broadcastToRoom(room, {
             type: 'game_over',
             result: 'win',
-            message: '¡Todos ganan! No hay más cartas para jugar.',
+            message: '¡Todos ganan! Todas las cartas jugadas.',
             reason: 'all_cards_played'
         });
-        return;
-    }
-
-    // Verificar si todos los jugadores están bloqueados (solo cuando el mazo está vacío)
-    if (room.gameState.deck.length === 0) {
-        const allPlayersBlocked = room.players.every(p =>
-            p.cards.length === 0 || !canPlayerMakeMove(p, room.gameState.board)
-        );
-
-        if (allPlayersBlocked) {
-            broadcastToRoom(room, {
-                type: 'game_over',
-                result: 'win',
-                message: '¡Todos ganan! No hay movimientos posibles.',
-                reason: 'no_valid_moves'
-            });
-        }
     }
 }
 
@@ -622,7 +538,7 @@ function shuffleArray(array) {
     }
 
     //Solo para pruebas unitarias
-    array.length = 20;
+    //array.length = 20;
     return array;
 }
 
