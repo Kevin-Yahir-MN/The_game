@@ -401,10 +401,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         updateGameInfo();
 
-                        if (message.skippedPlayers > 0) {
-                            showNotification(`${message.skippedPlayers} jugador(es) fueron saltados por no tener movimientos`);
-                        }
-
                         if (message.playerName) {
                             const notificationMsg = message.newTurn === currentPlayer.id ?
                                 '¡Es tu turno!' :
