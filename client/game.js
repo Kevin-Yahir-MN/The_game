@@ -387,6 +387,30 @@ document.addEventListener('DOMContentLoaded', () => {
                             });
                         }
                         handleAnimatedCardPlay(message);
+
+                        if (message.deckEmpty !== undefined && message.deckEmpty) {
+                            gameState.remainingDeck = 0;
+                            document.getElementById('remainingDeck').textContent = '0';
+
+                            // Actualizar inmediatamente el mínimo de cartas requeridas
+                            const minCardsRequired = 1;
+                            const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
+                            const cardsPlayed = currentPlayerObj?.cardsPlayedThisTurn || 0;
+
+                            document.getElementById('progressText').textContent =
+                                `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
+                            document.getElementById('progressBar').style.width =
+                                `${Math.min((cardsPlayed / minCardsRequired) * 100, 100)}%`;
+
+                            // Forzar recálculo de cartas jugables
+                            updatePlayerCards(gameState.yourCards.map(c => c.value));
+                        }
+                        break;
+                    case 'deck_empty':
+                        gameState.remainingDeck = 0;
+                        document.getElementById('remainingDeck').textContent = '0';
+                        updatePlayerCards(gameState.yourCards.map(c => c.value));
+                        updateGameInfo();
                         break;
                     case 'invalid_move':
                         if (message.playerId === currentPlayer.id && selectedCard) {

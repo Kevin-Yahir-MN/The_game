@@ -401,7 +401,16 @@ async function handlePlayCard(room, player, msg) {
         deckEmpty: deckEmpty // Nueva propiedad
     }, { includeGameState: true });
 
-
+    // Si el mazo acaba de vaciarse, enviar actualización especial
+    if (deckEmpty && room.gameState.deck.length === 0) {
+        setTimeout(() => {
+            broadcastToRoom(room, {
+                type: 'deck_empty',
+                roomId: reverseRoomMap.get(room),
+                timestamp: Date.now()
+            });
+        }, 500);
+    }
 
     await saveGameState(reverseRoomMap.get(room));
     checkGameStatus(room);
@@ -1065,6 +1074,17 @@ wss.on('connection', async (ws, req) => {
             }
 
             switch (msg.type) {
+                case 'deck_empty':
+                    if (rooms.has(msg.roomId)) {
+                        const room = rooms.get(msg.roomId);
+                        room.gameState.deck = [];
+                        broadcastToRoom(room, {
+                            type: 'game_state_update',
+                            remainingDeck: 0,
+                            minCardsRequired: 1
+                        });
+                    }
+                    break;
                 case 'get_player_state':
                     if (rooms.has(msg.roomId)) {
                         const room = rooms.get(msg.roomId);
