@@ -386,21 +386,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'deck_updated':
                         handleDeckUpdated(message);
                         break;
-                    case 'deck_emptied':
-                        // Actualizar el mínimo de cartas requeridas inmediatamente
-                        document.getElementById('progressText').textContent =
-                            `0/${message.minCardsRequired} carta(s) jugada(s)`;
-                        document.getElementById('progressBar').style.width = '0%';
-                        break;
                     case 'turn_changed':
                         gameState.cardsPlayedThisTurn = [];
                         gameState.currentTurn = message.newTurn;
                         gameState.remainingDeck = message.remainingDeck || gameState.remainingDeck;
 
-                        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+                        const minCards = message.minCardsRequired !== undefined ?
+                            message.minCardsRequired :
+                            (gameState.remainingDeck > 0 ? 2 : 1);
 
-                        // Actualizar UI
+                        if (message.players) {
+                            gameState.players = message.players;
+                        }
+
                         updateGameInfo();
+
+                        if (message.skippedPlayers > 0) {
+                            showNotification(`${message.skippedPlayers} jugador(es) fueron saltados por no tener movimientos`);
+                        }
 
                         if (message.playerName) {
                             const notificationMsg = message.newTurn === currentPlayer.id ?
@@ -772,13 +775,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const progressBarElement = document.getElementById('progressBar');
 
         if (!currentTurnElement || !remainingDeckElement || !progressTextElement || !progressBarElement) {
+            setTimeout(updateGameInfo, 100);
             return;
         }
 
+        // Obtener jugador actual y sus cartas jugadas
         const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
         const cardsPlayed = currentPlayerObj?.cardsPlayedThisTurn || 0;
-        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1; // Actualización dinámica
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
 
+        // Actualizar UI
         currentTurnElement.textContent = gameState.currentTurn === currentPlayer.id
             ? 'Tu turno'
             : `Turno de ${gameState.players.find(p => p.id === gameState.currentTurn)?.name || '...'}`;
@@ -787,6 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
         progressTextElement.textContent = `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
         progressBarElement.style.width = `${Math.min((cardsPlayed / minCardsRequired) * 100, 100)}%`;
 
+        // Actualizar botón de terminar turno
         if (endTurnButton) {
             endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
             const remainingCards = minCardsRequired - cardsPlayed;
@@ -794,9 +801,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? `Necesitas jugar ${remainingCards} carta(s) más`
                 : 'Puedes terminar tu turno';
 
-            endTurnButton.style.backgroundColor = cardsPlayed >= minCardsRequired
-                ? '#2ecc71' // Verde
-                : '#e74c3c'; // Rojo
+            // Cambiar estilo si se cumplió el mínimo
+            if (cardsPlayed >= minCardsRequired) {
+                endTurnButton.style.backgroundColor = '#2ecc71'; // Verde
+            } else {
+                endTurnButton.style.backgroundColor = '#e74c3c'; // Rojo
+            }
         }
     }
 

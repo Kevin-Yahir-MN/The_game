@@ -397,12 +397,7 @@ async function handlePlayCard(room, player, msg) {
         cardsPlayedThisTurn: player.cardsPlayedThisTurn // Enviar el contador actualizado
     });
 
-    if (room.gameState.deck.length === 0) {
-        broadcastToRoom(room, {
-            type: 'deck_emptied',
-            minCardsRequired: 1
-        });
-    }
+
 
     await saveGameState(reverseRoomMap.get(room));
     checkGameStatus(room);
