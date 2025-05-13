@@ -72,7 +72,7 @@ async function initializeDatabase() {
 
 async function saveGameState(roomId) {
     const room = rooms.get(roomId);
-    if (!room) return;
+    if (!room) return false;
 
     try {
         const gameData = {
@@ -82,7 +82,7 @@ async function saveGameState(roomId) {
                 cards: p.cards,
                 isHost: p.isHost,
                 connected: p.ws !== null,
-                cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0, // Asegurar número
+                cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0,
                 totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
                 lastActivity: p.lastActivity
             })),
@@ -96,18 +96,31 @@ async function saveGameState(roomId) {
             history: boardHistory.get(roomId)
         };
 
-        await pool.query(`
-            INSERT INTO game_states (room_id, game_data, last_activity)
-            VALUES ($1, $2, NOW())
-            ON CONFLICT (room_id) 
-            DO UPDATE SET
-                game_data = EXCLUDED.game_data,
-                last_activity = NOW()
-        `, [roomId, JSON.stringify(gameData)]);
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
 
-        return true;
+            const result = await client.query(`
+                INSERT INTO game_states (room_id, game_data, last_activity)
+                VALUES ($1, $2, NOW())
+                ON CONFLICT (room_id) 
+                DO UPDATE SET
+                    game_data = EXCLUDED.game_data,
+                    last_activity = NOW()
+                RETURNING room_id
+            `, [roomId, JSON.stringify(gameData)]);
+
+            await client.query('COMMIT');
+            return result.rowCount > 0;
+        } catch (error) {
+            await client.query('ROLLBACK');
+            console.error(`Error al guardar estado para sala ${roomId}:`, error);
+            throw error;
+        } finally {
+            client.release();
+        }
     } catch (error) {
-        console.error(`Error al guardar estado para sala ${roomId}:`, error);
+        console.error(`Error al obtener conexión para sala ${roomId}:`, error);
         throw error;
     }
 }
@@ -435,23 +448,12 @@ function handleUndoMove(room, player, msg) {
 }
 
 async function endTurn(room, player) {
-    const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+    const deckEmpty = room.gameState.deck.length === 0;
+    const minCardsRequired = deckEmpty ? 1 : 2;
     const cardsPlayed = Number(player.cardsPlayedThisTurn) || 0;
 
-    if (player.specialFlag === 'risky_first_move' && room.players.length === 1) {
-        if (cardsPlayed < minCardsRequired) {
-            broadcastToRoom(room, {
-                type: 'game_over',
-                result: 'lose',
-                message: `¡No jugaste el mínimo de ${minCardsRequired} cartas requeridas!`,
-                reason: 'failed_min_cards_after_risky_move'
-            });
-            return;
-        }
-        delete player.specialFlag;
-    }
-
-    if (cardsPlayed < minCardsRequired) {
+    // Verificar condiciones de derrota durante el turno (con cartas en mazo)
+    if (!deckEmpty && cardsPlayed < minCardsRequired) {
         return safeSend(player.ws, {
             type: 'notification',
             message: `Debes jugar al menos ${minCardsRequired} cartas este turno`,
@@ -459,43 +461,64 @@ async function endTurn(room, player) {
         });
     }
 
-    const targetCardCount = room.gameState.initialCards;
-    const cardsToDraw = Math.min(
-        targetCardCount - player.cards.length,
-        room.gameState.deck.length
-    );
+    // Repartir cartas solo si hay en el mazo
+    if (!deckEmpty) {
+        const targetCardCount = room.gameState.initialCards;
+        const cardsToDraw = Math.min(
+            targetCardCount - player.cards.length,
+            room.gameState.deck.length
+        );
 
-    for (let i = 0; i < cardsToDraw; i++) {
-        player.cards.push(room.gameState.deck.pop());
+        for (let i = 0; i < cardsToDraw; i++) {
+            player.cards.push(room.gameState.deck.pop());
+        }
     }
 
-    if (room.gameState.deck.length === 0) {
+    // Buscar siguiente jugador que pueda jugar (si no hay cartas en mazo)
+    let nextIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
+    let nextPlayer;
+    let attempts = 0;
+
+    do {
+        nextIndex = (nextIndex + 1) % room.players.length;
+        nextPlayer = room.players[nextIndex];
+        attempts++;
+
+        // Si hemos dado la vuelta completa y nadie puede jugar
+        if (attempts > room.players.length) {
+            // Esto activará checkGameStatus automáticamente
+            break;
+        }
+
+        // Si hay cartas en mazo o el jugador puede mover, lo seleccionamos
+        if (!deckEmpty || getPlayableCards(nextPlayer.cards, room.gameState.board).length > 0) {
+            break;
+        }
+
+        // Notificar que se salta el turno de este jugador
         broadcastToRoom(room, {
-            type: 'deck_updated',
-            remaining: 0,
-            minCardsRequired: 1
+            type: 'notification',
+            message: `${nextPlayer.name} no puede jugar - turno saltado`,
+            isError: false
         });
-    }
 
-    const currentIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
-    const nextIndex = getNextActivePlayerIndex(currentIndex, room.players);
-    const nextPlayer = room.players[nextIndex];
+    } while (true);
+
     room.gameState.currentTurn = nextPlayer.id;
-
-    // Reiniciar contador de cartas jugadas
     player.cardsPlayedThisTurn = 0;
 
-    const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-    const requiredCards = room.gameState.deck.length > 0 ? 2 : 1;
-
-    if (playableCards.length < requiredCards && nextPlayer.cards.length > 0) {
-        await saveGameState(reverseRoomMap.get(room));
-        return broadcastToRoom(room, {
-            type: 'game_over',
-            result: 'lose',
-            message: `¡${nextPlayer.name} no puede jugar el mínimo de ${requiredCards} carta(s) requerida(s)!`,
-            reason: 'min_cards_not_met'
-        });
+    // Verificar condiciones de derrota al inicio del turno (con cartas en mazo)
+    if (!deckEmpty) {
+        const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
+        if (playableCards.length < minCardsRequired && nextPlayer.cards.length > 0) {
+            await saveGameState(reverseRoomMap.get(room));
+            return broadcastToRoom(room, {
+                type: 'game_over',
+                result: 'lose',
+                message: `¡${nextPlayer.name} no puede jugar el mínimo de ${minCardsRequired} carta(s) requerida(s)!`,
+                reason: 'min_cards_not_met'
+            });
+        }
     }
 
     await saveGameState(reverseRoomMap.get(room));
@@ -505,9 +528,10 @@ async function endTurn(room, player) {
         newTurn: nextPlayer.id,
         previousPlayer: player.id,
         playerName: nextPlayer.name,
-        cardsPlayedThisTurn: 0, // Enviar 0 ya que es nuevo turno
-        minCardsRequired: requiredCards,
-        remainingDeck: room.gameState.deck.length
+        cardsPlayedThisTurn: 0,
+        minCardsRequired: minCardsRequired,
+        remainingDeck: room.gameState.deck.length,
+        skippedPlayers: attempts - 1 // Número de jugadores saltados
     }, { includeGameState: true });
 
     checkGameStatus(room);
@@ -515,14 +539,50 @@ async function endTurn(room, player) {
 
 function checkGameStatus(room) {
     const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
-    if (allPlayersEmpty && room.gameState.deck.length === 0) {
+    const deckEmpty = room.gameState.deck.length === 0;
+
+    // Condición de victoria a: Sin cartas en mazo y en manos de jugadores
+    if (allPlayersEmpty && deckEmpty) {
         broadcastToRoom(room, {
             type: 'game_over',
             result: 'win',
             message: '¡Todos ganan! Todas las cartas jugadas.',
             reason: 'all_cards_played'
         });
+        return;
     }
+
+    // Calcular suma total de cartas en manos de jugadores
+    const totalCardsInHand = room.players.reduce((sum, player) => sum + player.cards.length, 0);
+
+    // Condición de victoria b: Sin cartas en mazo y suma <= 10
+    if (deckEmpty && totalCardsInHand <= 10 && !canAnyPlayerPlay(room)) {
+        broadcastToRoom(room, {
+            type: 'game_over',
+            result: 'win',
+            message: '¡Victoria! Sin movimientos posibles y solo ' + totalCardsInHand + ' cartas restantes.',
+            reason: 'low_remaining_cards'
+        });
+        return;
+    }
+
+    // Condición de derrota cuando no hay cartas en mazo
+    if (deckEmpty && totalCardsInHand > 10 && !canAnyPlayerPlay(room)) {
+        broadcastToRoom(room, {
+            type: 'game_over',
+            result: 'lose',
+            message: '¡Derrota! Sin movimientos posibles y ' + totalCardsInHand + ' cartas restantes (más de 10).',
+            reason: 'too_many_remaining_cards'
+        });
+        return;
+    }
+}
+
+// Función auxiliar para verificar si algún jugador puede hacer un movimiento
+function canAnyPlayerPlay(room) {
+    return room.players.some(player => {
+        return getPlayableCards(player.cards, room.gameState.board).length > 0;
+    });
 }
 
 function initializeDeck() {
@@ -540,6 +600,37 @@ function shuffleArray(array) {
     //Solo para pruebas unitarias
     //array.length = 20;
     return array;
+}
+
+function validateCardPlayMessage(msg) {
+    const requiredFields = ['cardValue', 'position', 'playerId', 'roomId'];
+    const missingFields = requiredFields.filter(field => !msg[field]);
+
+    if (missingFields.length > 0) {
+        return {
+            isValid: false,
+            message: `Faltan campos requeridos: ${missingFields.join(', ')}`,
+            errorCode: 'MISSING_REQUIRED_FIELDS'
+        };
+    }
+
+    if (!Number.isInteger(msg.cardValue) || msg.cardValue < 2 || msg.cardValue > 99) {
+        return {
+            isValid: false,
+            message: 'El valor de la carta debe ser un número entre 2 y 99',
+            errorCode: 'INVALID_CARD_VALUE'
+        };
+    }
+
+    if (!validPositions.includes(msg.position)) {
+        return {
+            isValid: false,
+            message: `Posición inválida. Debe ser una de: ${validPositions.join(', ')}`,
+            errorCode: 'INVALID_POSITION'
+        };
+    }
+
+    return { isValid: true };
 }
 
 app.post('/create-room', async (req, res) => {
@@ -1075,6 +1166,16 @@ wss.on('connection', async (ws, req) => {
                     break;
                 case 'play_card':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                        const validation = validateCardPlayMessage(msg);
+                        if (!validation.isValid) {
+                            return safeSend(player.ws, {
+                                type: 'notification',
+                                message: validation.message,
+                                isError: true,
+                                errorCode: validation.errorCode
+                            });
+                        }
+
                         const enhancedMsg = {
                             ...msg,
                             playerId: player.id,

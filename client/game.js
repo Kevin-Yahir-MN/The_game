@@ -311,7 +311,25 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateGameInfo();
                         break;
                     case 'game_over':
-                        handleGameOver(message.message);
+                        let customMessage = message.message;
+
+                        // Personalizar mensajes según la razón
+                        switch (message.reason) {
+                            case 'all_cards_played':
+                                customMessage = '¡Victoria perfecta! Todas las cartas fueron jugadas.';
+                                break;
+                            case 'low_remaining_cards':
+                                customMessage = '¡Victoria! Lograron mantener menos de 10 cartas sin poder jugar.';
+                                break;
+                            case 'too_many_remaining_cards':
+                                customMessage = '¡Derrota! Demasiadas cartas (' + (message.totalCards || '?') + ') quedaron sin poder jugar.';
+                                break;
+                            case 'min_cards_not_met':
+                                customMessage = '¡Derrota! ' + message.message;
+                                break;
+                        }
+
+                        handleGameOver(customMessage);
                         break;
                     case 'notification':
                         showNotification(message.message, message.isError);
@@ -356,6 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'deck_updated':
                         handleDeckUpdated(message);
                         break;
+                    // En el switch de mensajes del frontend
                     case 'turn_changed':
                         gameState.cardsPlayedThisTurn = [];
                         gameState.currentTurn = message.newTurn;
@@ -365,12 +384,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             message.minCardsRequired :
                             (gameState.remainingDeck > 0 ? 2 : 1);
 
-                        // Actualizar el progreso para todos los jugadores
                         if (message.players) {
                             gameState.players = message.players;
                         }
 
                         updateGameInfo();
+
+                        if (message.skippedPlayers > 0) {
+                            showNotification(`${message.skippedPlayers} jugador(es) fueron saltados por no tener movimientos`);
+                        }
 
                         if (message.playerName) {
                             const notificationMsg = message.newTurn === currentPlayer.id ?
@@ -636,22 +658,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function handleGameOver(message) {
+    function handleGameOver(message, isError = false) {
         canvas.style.pointerEvents = 'none';
         endTurnButton.disabled = true;
 
         const backdrop = document.createElement('div');
         backdrop.className = 'game-over-backdrop';
 
+        // Determinar si es victoria o derrota
+        const isVictory = message.includes('Victoria') || message.includes('ganan');
+        const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
+        const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
+
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
         gameOverDiv.innerHTML = `
-            <h2>¡GAME OVER!</h2>
-            <p>${message}</p>
-            <div class="game-over-buttons">
-                <button id="returnToRoom" class="game-over-btn">Volver a la Sala</button>
-            </div>
-        `;
+        <h2 style="color: ${titleColor}">${title}</h2>
+        <p>${message}</p>
+        <div class="game-over-buttons">
+            <button id="returnToRoom" class="game-over-btn">Volver a la Sala</button>
+        </div>
+    `;
 
         document.body.appendChild(backdrop);
         backdrop.appendChild(gameOverDiv);
@@ -1205,13 +1232,23 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Resetear el estado de las cartas jugadas en este turno
+        gameState.yourCards.forEach(card => {
+            card.isPlayedThisTurn = false;
+            card.updateColor();
+        });
+
         socket.send(JSON.stringify({
             type: 'end_turn',
             playerId: currentPlayer.id,
             roomId: roomId
         }));
 
+        // Deseleccionar cualquier carta seleccionada
+        selectedCard = null;
 
+        // Actualizar UI inmediatamente
+        updateGameInfo();
     }
 
     function drawBoard() {
@@ -1440,10 +1477,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function cleanup() {
+        // Limpiar intervalos y timeouts
         clearInterval(historyIconsAnimation.interval);
-        historyIconsAnimation.interval = null;
-        historyIconsAnimation.isAnimating = false;
+        clearTimeout(reconnectTimeout);
+        cancelAnimationFrame(animationFrameId);
 
+        // Limpiar WebSocket
         if (socket) {
             socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null;
             if (socket.readyState === WebSocket.OPEN) {
@@ -1452,9 +1491,7 @@ document.addEventListener('DOMContentLoaded', () => {
             socket = null;
         }
 
-        clearTimeout(reconnectTimeout);
-        cancelAnimationFrame(animationFrameId);
-
+        // Limpiar event listeners
         const events = {
             click: handleCanvasClick,
             mousedown: handleMouseDown,
@@ -1470,14 +1507,23 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.removeEventListener(event, handler);
         });
 
+        // Limpiar botones y modales
         document.getElementById('endTurnBtn')?.removeEventListener('click', endTurn);
         document.getElementById('modalBackdrop')?.removeEventListener('click', closeHistoryModal);
 
+        // Limpiar notificaciones y overlays
         document.querySelectorAll('.notification, .game-over-backdrop').forEach(el => el.remove());
 
+        // Limpiar canvas y estado
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         gameState.animatingCards = [];
         assetCache.clear();
+
+        // Limpiar cualquier otro intervalo o timeout adicional
+        const highestTimeoutId = setTimeout(() => { }, 0);
+        for (let i = 0; i < highestTimeoutId; i++) {
+            clearTimeout(i);
+        }
     }
 
     function initGame() {
