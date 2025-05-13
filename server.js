@@ -1164,15 +1164,29 @@ wss.on('connection', async (ws, req) => {
                         }
                     }
                     break;
+                // En el manejador de mensajes WebSocket
                 case 'play_card':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        const validation = validateCardPlayMessage(msg);
-                        if (!validation.isValid) {
+                        // Validar campos requeridos
+                        const requiredFields = ['cardValue', 'position', 'playerId', 'roomId'];
+                        const missingFields = requiredFields.filter(field => !msg[field]);
+
+                        if (missingFields.length > 0) {
                             return safeSend(player.ws, {
                                 type: 'notification',
-                                message: validation.message,
+                                message: `Faltan campos requeridos: ${missingFields.join(', ')}`,
                                 isError: true,
-                                errorCode: validation.errorCode
+                                errorCode: 'MISSING_REQUIRED_FIELDS'
+                            });
+                        }
+
+                        // Verificar que roomId coincida
+                        if (msg.roomId !== reverseRoomMap.get(room)) {
+                            return safeSend(player.ws, {
+                                type: 'notification',
+                                message: 'Sala no válida',
+                                isError: true,
+                                errorCode: 'INVALID_ROOM'
                             });
                         }
 

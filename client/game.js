@@ -54,8 +54,14 @@ document.addEventListener('DOMContentLoaded', () => {
         name: sessionStorage.getItem('playerName'),
         isHost: sessionStorage.getItem('isHost') === 'true'
     };
-    const roomId = sessionStorage.getItem('roomId');
 
+    const roomId = sessionStorage.getItem('roomId');
+    if (!roomId) {
+        console.error('No se encontró roomId en sessionStorage');
+        // Redirigir a la sala o manejar el error adecuadamente
+        window.location.href = 'sala.html';
+        return;
+    }
     // Estado del juego
     let gameState = {
         players: [],
@@ -246,6 +252,12 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const now = Date.now();
                 const message = JSON.parse(event.data);
+
+                if (message.errorCode === 'MISSING_REQUIRED_FIELDS') {
+                    showNotification(`Error: ${message.message}`, true);
+                    console.error('Error de validación:', message);
+                    return;
+                }
 
                 if (message.type === 'player_state_update') {
                     const progressText = `${message.cardsPlayedThisTurn}/${message.minCardsRequired} carta(s) jugada(s)`;
@@ -1158,22 +1170,27 @@ document.addEventListener('DOMContentLoaded', () => {
             ? gameState.board.ascending[position === 'asc1' ? 0 : 1]
             : gameState.board.descending[position === 'desc1' ? 0 : 1];
 
-        if (position.includes('asc')) {
-            const idx = position === 'asc1' ? 0 : 1;
-            gameState.board.ascending[idx] = cardValue;
-        } else {
-            const idx = position === 'desc1' ? 0 : 1;
-            gameState.board.descending[idx] = cardValue;
-        }
-
-        socket.send(JSON.stringify({
+        // Asegurarse de incluir roomId en el mensaje
+        const playCardMessage = {
             type: 'play_card',
             playerId: currentPlayer.id,
+            roomId: roomId,  // Añadir roomId desde la variable global
             cardValue: cardValue,
             position: position,
             previousValue: previousValue,
             isFirstMove: gameState.cardsPlayedThisTurn.length === 0
-        }));
+        };
+
+        // Verificar que todos los campos requeridos estén presentes
+        const requiredFields = ['type', 'playerId', 'roomId', 'cardValue', 'position', 'previousValue'];
+        const missingFields = requiredFields.filter(field => !playCardMessage[field]);
+
+        if (missingFields.length > 0) {
+            console.error('Faltan campos requeridos:', missingFields);
+            return;
+        }
+
+        socket.send(JSON.stringify(playCardMessage));
 
         const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
         if (cardIndex !== -1) {
@@ -1186,8 +1203,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 (currentPlayerObj.cardsPlayedThisTurn || 0) + 1;
         }
 
-        updateGameInfo(); // Actualizar UI inmediatamente
-
+        updateGameInfo();
         selectedCard = null;
         updateCardsPlayedUI();
     }
