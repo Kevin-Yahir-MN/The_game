@@ -1309,3 +1309,86 @@ body {
     white-space: nowrap;
     z-index: 100;
 }
+
+/* Estilos para jugadores sin cartas */
+.players-panel li.no-cards {
+    opacity: 0.7;
+}
+
+.players-panel li.no-cards .card-count {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+/* Indicador de turno actual */
+.turn-indicator {
+    color: #2ecc71;
+    margin-left: 8px;
+    font-weight: bold;
+    animation: pulse 1.5s infinite;
+}
+
+/* Estilos para el jugador actual */
+.players-panel li.you .player-name {
+    font-weight: bold;
+    color: #3498db;
+}
+
+/* Animación de pulso */
+@keyframes pulse {
+    0% {
+        opacity: 0.6;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0.6;
+    }
+}
+
+/* Estilos para jugadores sin movimientos */
+.players-panel li.no-moves {
+    opacity: 0.7;
+    border-left: 3px solid #f39c12;
+}
+
+.no-moves-tag {
+    color: #f39c12;
+    font-size: 0.8em;
+    margin-left: 5px;
+}
+
+/* Estilos para jugadores sin cartas */
+.players-panel li.no-cards {
+    opacity: 0.6;
+}
+
+.players-panel li.no-cards .card-count {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+/* Indicador de turno actual */
+.turn-indicator {
+    color: #2ecc71;
+    margin-left: 8px;
+    font-weight: bold;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 0.6;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0.6;
+    }
+}

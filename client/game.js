@@ -346,6 +346,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 previousValue: message.previousValue
                             });
                         }
+
+                        // Nueva línea para re-evaluar cartas después de cada jugada
+                        updatePlayerCards(gameState.yourCards.map(c => c.value));
+
                         handleAnimatedCardPlay(message);
                         break;
                     case 'invalid_move':
@@ -361,22 +365,42 @@ document.addEventListener('DOMContentLoaded', () => {
                         gameState.currentTurn = message.newTurn;
                         gameState.remainingDeck = message.remainingDeck || gameState.remainingDeck;
 
-                        const minCards = message.minCardsRequired !== undefined ?
-                            message.minCardsRequired :
-                            (gameState.remainingDeck > 0 ? 2 : 1);
-
-                        // Actualizar el progreso para todos los jugadores
+                        // Actualizar lista de jugadores si viene en el mensaje
                         if (message.players) {
-                            gameState.players = message.players;
+                            gameState.players = message.players.map(p => ({
+                                id: p.id,
+                                name: p.name,
+                                isHost: p.isHost,
+                                cardCount: p.cardCount,
+                                cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0,
+                                totalCardsPlayed: Number(p.totalCardsPlayed) || 0
+                            }));
                         }
 
-                        updateGameInfo();
+                        // Mostrar notificación especial si se saltaron jugadores
+                        if (message.skippedPlayers && message.skippedPlayers.length > 0) {
+                            const playersList = message.skippedPlayers.join(', ');
+                            const reason = message.skipReason === 'no_valid_moves'
+                                ? 'sin movimientos posibles'
+                                : 'sin cartas';
 
-                        if (message.playerName) {
-                            const notificationMsg = message.newTurn === currentPlayer.id ?
-                                '¡Es tu turno!' :
-                                `Turno de ${message.playerName}`;
-                            showNotification(notificationMsg);
+                            showNotification(
+                                `Se saltó a ${playersList} (${reason})`,
+                                message.skipReason === 'no_valid_moves'
+                            );
+                        }
+
+                        // Actualizar UI
+                        updateGameInfo();
+                        updatePlayersPanel();
+
+                        // Notificar turno actual
+                        if (message.newTurn === currentPlayer.id) {
+                            showNotification('¡Es tu turno!');
+                            // Forzar actualización de cartas jugables
+                            updatePlayerCards(gameState.yourCards.map(c => c.value));
+                        } else {
+                            showNotification(`Turno de ${message.playerName}`);
                         }
                         break;
                     case 'move_undone':
@@ -852,26 +876,10 @@ document.addEventListener('DOMContentLoaded', () => {
             let playable = false;
 
             if (isYourTurn) {
-                // Verificación más estricta cuando el mazo está vacío
-                if (deckEmpty) {
-                    playable = (
-                        (value === gameState.board.ascending[0] - 10) ||
-                        (value === gameState.board.ascending[1] - 10) ||
-                        (value === gameState.board.descending[0] + 10) ||
-                        (value === gameState.board.descending[1] + 10) ||
-                        (value > gameState.board.ascending[0]) ||
-                        (value > gameState.board.ascending[1]) ||
-                        (value < gameState.board.descending[0]) ||
-                        (value < gameState.board.descending[1])
-                    );
-                } else {
-                    playable = (
-                        isValidMove(value, 'asc1') ||
-                        isValidMove(value, 'asc2') ||
-                        isValidMove(value, 'desc1') ||
-                        isValidMove(value, 'desc2')
-                    );
-                }
+                // Verificación más completa que incluye reglas especiales
+                playable = ['asc1', 'asc2', 'desc1', 'desc2'].some(position => {
+                    return isValidMove(value, position);
+                });
             }
 
             const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
@@ -1205,6 +1213,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        updatePlayerCards(gameState.yourCards.map(c => c.value));
+
         socket.send(JSON.stringify({
             type: 'end_turn',
             playerId: currentPlayer.id,
@@ -1323,23 +1333,59 @@ document.addEventListener('DOMContentLoaded', () => {
         const panel = document.getElementById('playersPanel') || createPlayersPanel();
 
         panel.innerHTML = `
-            <h3>Jugadores (${gameState.players.length})</h3>
-            <ul>
-                ${gameState.players.map(player => {
+        <h3>Jugadores (${gameState.players.length})</h3>
+        <ul>
+            ${gameState.players.map(player => {
             const displayName = player.name || `Jugador_${player.id.slice(0, 4)}`;
-            const cardCount = player.cardCount || (player.cards ? player.cards.length : 0);
+            const cardCount = player.cardCount || 0;
+            const isCurrentTurn = player.id === gameState.currentTurn;
+            const isYou = player.id === currentPlayer.id;
+            const canMove = cardCount > 0 && gameState.remainingDeck === 0
+                ? canPlayerMakeMoveFrontend(player, gameState.board)
+                : true;
+
+            // Determinar clases CSS
+            let liClasses = [];
+            if (isYou) liClasses.push('you');
+            if (isCurrentTurn) liClasses.push('current-turn');
+            if (cardCount === 0) liClasses.push('no-cards');
+            if (!canMove && gameState.remainingDeck === 0) liClasses.push('no-moves');
 
             return `
-                        <li class="${player.id === currentPlayer.id ? 'you' : ''} 
-                                   ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
-                            <span class="player-name">${displayName}</span>
-                            <span class="card-count">🃏 ${cardCount}</span>
-                            ${player.isHost ? ' <span class="host-tag">(Host)</span>' : ''}
-                        </li>
-                    `;
+                    <li class="${liClasses.join(' ')}">
+                        <span class="player-name">${displayName}</span>
+                        <span class="card-count">🃏 ${cardCount}</span>
+                        ${player.isHost ? '<span class="host-tag">(Host)</span>' : ''}
+                        ${isCurrentTurn ? '<span class="turn-indicator">⇨</span>' : ''}
+                        ${!canMove && gameState.remainingDeck === 0 ? '<span class="no-moves-tag">(bloqueado)</span>' : ''}
+                    </li>
+                `;
         }).join('')}
-            </ul>
-        `;
+        </ul>
+    `;
+    }
+
+    function canPlayerMakeMoveFrontend(player, board) {
+        if (!player || !player.cardCount || player.cardCount === 0) {
+            return false;
+        }
+
+        // Asumimos que tenemos acceso a las cartas del jugador
+        const playerCards = gameState.yourCards || [];
+
+        return playerCards.some(card => {
+            const cardValue = card.value || card;
+            return (
+                // Asc1
+                cardValue === board.ascending[0] - 10 || cardValue > board.ascending[0] ||
+                // Asc2
+                cardValue === board.ascending[1] - 10 || cardValue > board.ascending[1] ||
+                // Desc1
+                cardValue === board.descending[0] + 10 || cardValue < board.descending[0] ||
+                // Desc2
+                cardValue === board.descending[1] + 10 || cardValue < board.descending[1]
+            );
+        });
     }
 
     function handleCardAnimations() {
