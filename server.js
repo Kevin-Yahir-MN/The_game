@@ -386,6 +386,8 @@ async function handlePlayCard(room, player, msg) {
 
     updateBoardHistory(room, msg.position, msg.cardValue);
 
+    const deckEmpty = room.gameState.deck.length === 0;
+
     broadcastToRoom(room, {
         type: 'card_played_animated',
         playerId: player.id,
@@ -394,8 +396,10 @@ async function handlePlayCard(room, player, msg) {
         position: msg.position,
         previousValue: targetValue,
         persistColor: true,
-        cardsPlayedThisTurn: player.cardsPlayedThisTurn // Enviar el contador actualizado
-    });
+        cardsPlayedThisTurn: player.cardsPlayedThisTurn,
+        remainingDeck: room.gameState.deck.length, // Asegurar que se envía
+        deckEmpty: deckEmpty // Nueva propiedad
+    }, { includeGameState: true });
 
 
 

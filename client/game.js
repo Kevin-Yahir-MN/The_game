@@ -368,6 +368,16 @@ document.addEventListener('DOMContentLoaded', () => {
                             gameState.board.descending[idx] = message.cardValue;
                         }
 
+                        if (message.remainingDeck !== undefined) {
+                            gameState.remainingDeck = message.remainingDeck;
+                            document.getElementById('remainingDeck').textContent = message.remainingDeck;
+
+                            // Forzar actualización de cartas jugables
+                            if (message.remainingDeck === 0) {
+                                updatePlayerCards(gameState.yourCards.map(c => c.value));
+                            }
+                        }
+
                         if (message.playerId !== currentPlayer.id) {
                             gameState.cardsPlayedThisTurn.push({
                                 value: message.cardValue,
@@ -397,6 +407,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         if (message.players) {
                             gameState.players = message.players;
+                        }
+
+                        // Forzar actualización cuando el mazo está vacío
+                        if (gameState.remainingDeck === 0) {
+                            updatePlayerCards(gameState.yourCards.map(c => c.value));
                         }
 
                         updateGameInfo();
