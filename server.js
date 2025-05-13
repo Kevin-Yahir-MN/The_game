@@ -539,6 +539,7 @@ async function endTurn(room, player) {
         cardsPlayedThisTurn: 0,
         minCardsRequired: minCardsRequired,
         remainingDeck: room.gameState.deck.length,
+        deckEmpty: deckEmpty,
         skippedPlayers: attempts - 1 // Número de jugadores saltados
     }, { includeGameState: true });
 
@@ -1122,11 +1123,11 @@ wss.on('connection', async (ws, req) => {
                             await pool.query('BEGIN');
 
                             await pool.query(`
-                UPDATE game_states SET 
-                game_data = $1,
-                last_activity = NOW()
-                WHERE room_id = $2
-            `, [JSON.stringify({
+                            UPDATE game_states SET 
+                            game_data = $1,
+                            last_activity = NOW()
+                            WHERE room_id = $2
+                            `, [JSON.stringify({
                                 players: room.players,
                                 gameState: {
                                     ...room.gameState,

@@ -423,29 +423,46 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'turn_changed':
                         gameState.cardsPlayedThisTurn = [];
                         gameState.currentTurn = message.newTurn;
-                        gameState.remainingDeck = message.remainingDeck || gameState.remainingDeck;
 
-                        const minCards = message.minCardsRequired !== undefined ?
-                            message.minCardsRequired :
-                            (gameState.remainingDeck > 0 ? 2 : 1);
+                        // Actualización crítica del estado del mazo
+                        if (message.deckEmpty !== undefined) {
+                            gameState.remainingDeck = message.remainingDeck || gameState.remainingDeck;
+                            document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
 
-                        if (message.players) {
-                            gameState.players = message.players;
+                            // Forzar actualización de las reglas
+                            const minCardsRequired = message.deckEmpty ? 1 : 2;
+                            document.getElementById('progressText').textContent =
+                                `0/${minCardsRequired} carta(s) jugada(s)`;
+                            document.getElementById('progressBar').style.width = '0%';
                         }
 
-                        // Forzar actualización cuando el mazo está vacío
-                        if (gameState.remainingDeck === 0) {
-                            updatePlayerCards(gameState.yourCards.map(c => c.value));
-                        }
+                        // Actualizar cartas jugables
+                        updatePlayerCards(gameState.yourCards.map(c => c.value));
 
-                        updateGameInfo();
-
+                        // Notificación
                         if (message.playerName) {
                             const notificationMsg = message.newTurn === currentPlayer.id ?
-                                '¡Es tu turno!' :
+                                '¡Es tu turno!' + (message.deckEmpty ? ' (Mazo vacío)' : '') :
                                 `Turno de ${message.playerName}`;
                             showNotification(notificationMsg);
                         }
+                        break;
+                    case 'deck_empty_state':
+                        gameState.remainingDeck = message.remaining;
+                        document.getElementById('remainingDeck').textContent = message.remaining;
+
+                        // Actualizar UI inmediatamente
+                        const minCardsRequired = message.minCardsRequired || 1;
+                        document.getElementById('progressText').textContent =
+                            `0/${minCardsRequired} carta(s) jugada(s)`;
+                        document.getElementById('progressBar').style.width = '0%';
+
+                        updatePlayerCards(gameState.yourCards.map(c => c.value));
+                        updateGameInfo();
+                        break;
+
+                    case 'deck_empty_notification':
+                        showNotification(message.message, message.isError);
                         break;
                     case 'move_undone':
                         handleMoveUndone(message);
