@@ -594,7 +594,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         [...history].forEach((card, index) => {
             const cardElement = document.createElement('div');
-            cardElement.className = `history-card ${index === 0 ? 'recent' : ''}`;
+            cardElement.className = `history-card ${index === history.length - 1 ? 'recent' : ''}`;
             cardElement.textContent = card;
             container.appendChild(cardElement);
         });
