@@ -616,6 +616,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const shakeAmount = 8;
         const shakeDuration = 200;
         const startTime = Date.now();
+        const originalX = card.x;
+        const originalY = card.y;
 
         function shake() {
             const elapsed = Date.now() - startTime;
@@ -623,10 +625,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (progress >= 1) {
                 card.shakeOffset = 0;
+                card.x = originalX;
+                card.y = originalY;
+                markDirty(card.x, card.y, card.width, card.height);
                 return;
             }
 
             card.shakeOffset = Math.sin(progress * Math.PI * 8) * shakeAmount * (1 - progress);
+            card.x = originalX + Math.sin(progress * Math.PI * 16) * shakeAmount * (1 - progress);
+            markDirty(card.x, card.y, card.width, card.height);
             requestAnimationFrame(shake);
         }
 
@@ -973,9 +980,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const y = clientY - rect.top;
 
         const targetColumn = getClickedColumn(x, y);
-        if (targetColumn) {
+        if (targetColumn && isValidMove(dragStartCard.value, targetColumn)) {
             playCard(dragStartCard.value, targetColumn);
         } else {
+            if (targetColumn) {
+                animateInvalidCard(dragStartCard);
+                showNotification('Movimiento no válido', true);
+            }
             resetCardPosition();
         }
 
@@ -985,14 +996,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetCardPosition() {
-        if (dragStartCard) {
-            const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
-            if (cardIndex !== -1) {
-                const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 + cardIndex * (CARD_WIDTH + CARD_SPACING);
+        if (!dragStartCard) return;
+
+        const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
+        if (cardIndex === -1) return;
+
+        const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 + cardIndex * (CARD_WIDTH + CARD_SPACING);
+
+        // Animación de regreso
+        gameState.animatingCards.push({
+            card: dragStartCard,
+            startTime: Date.now(),
+            duration: 300,
+            targetX: startX,
+            targetY: PLAYER_CARDS_Y,
+            fromX: dragStartCard.x,
+            fromY: dragStartCard.y,
+            onComplete: () => {
                 dragStartCard.x = startX;
                 dragStartCard.y = PLAYER_CARDS_Y;
             }
-        }
+        });
+
+        markDirty(dragStartCard.x, dragStartCard.y, dragStartCard.width, dragStartCard.height);
     }
 
     function getClickedColumn(x, y) {
@@ -1023,9 +1049,32 @@ document.addEventListener('DOMContentLoaded', () => {
             isFirstMove: gameState.cardsPlayedThisTurn.length === 0
         };
 
+        // Guardar referencia temporal a la carta
+        const tempCard = dragStartCard;
+        const cardIndex = gameState.yourCards.findIndex(c => c === tempCard);
+
         socket.send(JSON.stringify(playCardMessage));
 
-        const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
+        // Manejar posible rechazo del servidor
+        const originalOnMessage = socket.onmessage;
+        socket.onmessage = function (event) {
+            originalOnMessage.call(socket, event);
+
+            try {
+                const message = JSON.parse(event.data);
+                if (message.type === 'invalid_move' && message.cardValue === cardValue) {
+                    // Si el servidor rechaza el movimiento, devolver la carta
+                    if (cardIndex !== -1) {
+                        gameState.yourCards.splice(cardIndex, 0, tempCard);
+                        resetCardPosition();
+                        showNotification(message.reason || 'Movimiento no válido', true);
+                    }
+                }
+            } catch (error) {
+                log('Error parsing message', error);
+            }
+        };
+
         if (cardIndex !== -1) {
             gameState.yourCards.splice(cardIndex, 1);
         }
@@ -1094,6 +1143,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawBoard() {
+        // Fondo del tablero con sombra
         ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
         ctx.beginPath();
         ctx.roundRect(
@@ -1104,15 +1154,17 @@ document.addEventListener('DOMContentLoaded', () => {
             15
         );
         ctx.fill();
-        markDirty(BOARD_POSITION.x - 25, BOARD_POSITION.y - 50, CARD_WIDTH * 4 + COLUMN_SPACING * 3 + 50, CARD_HEIGHT + 110);
+        markDirty(BOARD_POSITION.x - 25, BOARD_POSITION.y - 50,
+            CARD_WIDTH * 4 + COLUMN_SPACING * 3 + 50, CARD_HEIGHT + 110);
 
+        // Resaltado de columnas durante el arrastre
         if (isDragging && dragStartCard) {
             ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
                 const isValid = isValidMove(dragStartCard.value, col);
                 const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i;
 
-                ctx.fillStyle = isValid ? VALID_HIGHLIGHT_COLOR :
-                    (isDragging ? INVALID_HIGHLIGHT_COLOR : HIGHLIGHT_COLOR);
+                ctx.fillStyle = isValid ? VALID_HIGHLIGHT_COLOR : INVALID_HIGHLIGHT_COLOR;
+                ctx.globalAlpha = 0.5;
                 ctx.beginPath();
                 ctx.roundRect(
                     x - 5,
@@ -1122,10 +1174,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     15
                 );
                 ctx.fill();
+                ctx.globalAlpha = 1.0;
                 markDirty(x - 5, BOARD_POSITION.y - 10, CARD_WIDTH + 10, CARD_HEIGHT + 20);
             });
         }
 
+        // Flechas indicadoras de dirección
         ctx.fillStyle = 'white';
         ctx.font = 'bold 36px Arial';
         ctx.textAlign = 'center';
@@ -1142,23 +1196,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ctx.shadowColor = 'transparent';
 
+        // Actualizar y dibujar las cartas del tablero
         gameState.boardCards = ['asc1', 'asc2', 'desc1', 'desc2'].map((col, i) => {
             const value = i < 2 ? gameState.board.ascending[i % 2] : gameState.board.descending[i % 2];
             const wasPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
                 move => move.value === value && move.position === col
             );
 
-            return new Card(
+            const card = new Card(
                 value,
                 BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i,
                 BOARD_POSITION.y,
                 false,
                 wasPlayedThisTurn
             );
+
+            // Resaltar si fue jugada este turno
+            if (wasPlayedThisTurn) {
+                ctx.save();
+                ctx.shadowColor = 'rgba(0, 100, 255, 0.7)';
+                ctx.shadowBlur = 15;
+                ctx.shadowOffsetY = 5;
+                card.draw();
+                ctx.restore();
+            } else {
+                card.draw();
+            }
+
+            return card;
         });
 
-        gameState.boardCards.forEach(card => card.draw());
+        // Dibujar iconos de historial
+        drawHistoryIcons();
+
+        // Manejar animaciones de cartas
         handleCardAnimations();
+
+        // Dibujar cartas especiales (si existen)
+        if (gameState.specialCards) {
+            gameState.specialCards.forEach(card => {
+                card.draw();
+            });
+        }
     }
 
     function drawPlayerCards() {
