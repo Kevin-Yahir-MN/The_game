@@ -592,8 +592,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const history = gameState.columnHistory[columnId] || (columnId.includes('asc') ? [1] : [100]);
 
-        [...history].forEach((card, index) => {
+        // Mostrar en orden cronológico (primera -> última) y destacar la última
+        history.forEach((card, index) => {
             const cardElement = document.createElement('div');
+            // Usar history.length - 1 para identificar el último elemento
             cardElement.className = `history-card ${index === history.length - 1 ? 'recent' : ''}`;
             cardElement.textContent = card;
             container.appendChild(cardElement);
