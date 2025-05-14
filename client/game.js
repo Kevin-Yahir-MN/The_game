@@ -1597,4 +1597,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         initGame();
-    });
+    }
+});
