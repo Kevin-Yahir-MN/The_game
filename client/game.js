@@ -1182,7 +1182,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawBoard() {
-        // Fondo del tablero
+        // Limpiar el área del tablero
+        ctx.clearRect(
+            BOARD_POSITION.x - 30,
+            BOARD_POSITION.y - 55,
+            CARD_WIDTH * 4 + COLUMN_SPACING * 3 + 60,
+            CARD_HEIGHT + 120
+        );
+
+        // Fondo del tablero con sombra
         ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
         ctx.beginPath();
         ctx.roundRect(
@@ -1229,37 +1237,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ctx.shadowColor = 'transparent';
 
-        // Dibujar cartas del tablero
+        // Dibujar cartas del tablero (solo las que no están siendo animadas)
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const value = i < 2 ? gameState.board.ascending[i % 2] : gameState.board.descending[i % 2];
             const wasPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
                 move => move.value === value && move.position === col
             );
 
-            const card = new Card(
-                value,
-                BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i,
-                BOARD_POSITION.y,
-                false,
-                wasPlayedThisTurn
+            // Verificar si esta carta está siendo animada actualmente
+            const isAnimating = gameState.animatingCards.some(anim =>
+                anim.card.value === value &&
+                anim.targetX === BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i
             );
 
-            // Mantener referencia a las cartas del tablero
-            if (!gameState.boardCards[i]) {
-                gameState.boardCards[i] = card;
-            } else {
-                gameState.boardCards[i].value = value;
-                gameState.boardCards[i].isPlayedThisTurn = wasPlayedThisTurn;
+            if (!isAnimating) {
+                const card = new Card(
+                    value,
+                    BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i,
+                    BOARD_POSITION.y,
+                    false,
+                    wasPlayedThisTurn
+                );
+                card.draw();
             }
-
-            card.draw();
         });
 
         // Dibujar iconos de historial
         drawHistoryIcons();
 
-        // Manejar animaciones de cartas
+        // Manejar animaciones de cartas (incluyendo las que caen)
         handleCardAnimations();
+
+        // Dibujar cartas especiales si existen
+        if (gameState.specialCards) {
+            gameState.specialCards.forEach(card => {
+                if (!card.isAnimating) {
+                    card.draw();
+                }
+            });
+        }
     }
 
     function drawPlayerCards() {
@@ -1321,11 +1337,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleCardAnimations() {
         const now = Date.now();
 
-        // Iterar en reversa para poder eliminar elementos
         for (let i = gameState.animatingCards.length - 1; i >= 0; i--) {
             const anim = gameState.animatingCards[i];
-
-            // Verificar si la carta aún existe
             if (!anim.card) {
                 gameState.animatingCards.splice(i, 1);
                 continue;
@@ -1334,21 +1347,43 @@ document.addEventListener('DOMContentLoaded', () => {
             const elapsed = now - anim.startTime;
             const progress = Math.min(elapsed / anim.duration, 1);
 
-            // Actualizar posición con verificación
-            if (anim.card) {
-                anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * progress;
-                anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * progress;
-            }
+            // Aplicar easing cuadrático para efecto de caída
+            const easedProgress = progress * progress;
 
+            // Calcular posición actual con easing
+            anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * easedProgress;
+            anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * easedProgress;
+
+            // Dibujar con efectos especiales durante la animación
+            ctx.save();
+
+            // Sombra más pronunciada durante la caída
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 10 + 5 * Math.sin(progress * Math.PI);
+            ctx.shadowOffsetY = 5 * (1 - easedProgress);
+
+            // Ligero escalado durante la caída
+            const scale = 0.95 + 0.05 * (1 - easedProgress);
+            ctx.translate(anim.card.x + CARD_WIDTH / 2, anim.card.y + CARD_HEIGHT / 2);
+            ctx.scale(scale, scale);
+            ctx.translate(-(anim.card.x + CARD_WIDTH / 2), -(anim.card.y + CARD_HEIGHT / 2));
+
+            anim.card.draw();
+            ctx.restore();
+
+            // Cuando la animación termina
             if (progress === 1) {
-                try {
-                    if (anim.onComplete && anim.card) {
+                if (anim.onComplete) {
+                    try {
                         anim.onComplete();
+                    } catch (e) {
+                        console.error("Error en animación:", e);
                     }
-                } catch (e) {
-                    console.error("Error en animación:", e);
                 }
                 gameState.animatingCards.splice(i, 1);
+
+                // Forzar redibujado del tablero
+                updateGameInfo();
             }
         }
     }
@@ -1356,34 +1391,46 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleAnimatedCardPlay(message) {
         const position = message.position;
         const value = message.cardValue;
+        const playerName = message.playerName || 'Un jugador';
 
         updateStack(position, value);
 
+        // Solo animar si no soy yo quien jugó la carta
         if (message.playerId !== currentPlayer.id) {
             const card = new Card(value, 0, 0, false, true);
             card.playedThisRound = true;
 
             const targetPos = getColumnPosition(position);
+            const startY = -CARD_HEIGHT * 2; // Comienza más arriba para mejor efecto
+            const startX = targetPos.x;
 
-            gameState.animatingCards.push({
+            // Configurar la animación de caída con rebote final
+            const animation = {
                 card: card,
                 startTime: Date.now(),
-                duration: 250,
+                duration: 800, // Duración más larga para mejor efecto visual
                 targetX: targetPos.x,
                 targetY: targetPos.y,
-                fromX: targetPos.x,
-                fromY: -CARD_HEIGHT * 2,
-                isOpponentCard: true
-            });
+                fromX: startX,
+                fromY: startY,
+                easing: function (t) {
+                    // Easing con pequeño rebote al final
+                    if (t < 0.9) return t * t;
+                    return 0.9 + 0.1 * Math.sin((t - 0.9) * 10 * Math.PI) * Math.exp(-(t - 0.9) * 5);
+                },
+                onComplete: () => {
+                    // Efecto visual al llegar
+                    showNotification(`${playerName} jugó un ${value}`);
+                    // Actualizar el tablero
+                    updateGameInfo();
+                }
+            };
+
+            gameState.animatingCards.push(animation);
         }
 
         recordCardPlayed(value, position, message.playerId, message.previousValue);
-
-        if (message.playerId !== currentPlayer.id) {
-            showNotification(`${message.playerName || 'Un jugador'} jugó un ${value}`);
-        }
     }
-
     function gameLoop(timestamp) {
         if (timestamp - lastRenderTime < 1000 / TARGET_FPS) {
             requestAnimationFrame(gameLoop);
