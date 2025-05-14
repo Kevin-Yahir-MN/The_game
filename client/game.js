@@ -570,41 +570,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showColumnHistory(columnId) {
-        // Solo permitir abrir un historial a la vez
-        if (document.getElementById('historyModal').style.display === 'block') {
-            return;
-        }
-
         const modal = document.getElementById('historyModal');
         const backdrop = document.getElementById('modalBackdrop');
         const title = document.getElementById('historyColumnTitle');
         const container = document.getElementById('historyCardsContainer');
 
         const columnNames = {
-            asc1: 'Pila Ascendente 1 (↑)',
-            asc2: 'Pila Ascendente 2 (↑)',
-            desc1: 'Pila Descendente 1 (↓)',
-            desc2: 'Pila Descendente 2 (↓)'
+            asc1: 'Pila Ascendente 1 (↑) - Historial',
+            asc2: 'Pila Ascendente 2 (↑) - Historial',
+            desc1: 'Pila Descendente 1 (↓) - Historial',
+            desc2: 'Pila Descendente 2 (↓) - Historial'
         };
 
         title.textContent = columnNames[columnId];
         container.innerHTML = '';
 
+        // Obtener el historial y revertir el orden
         const history = gameState.columnHistory[columnId] || (columnId.includes('asc') ? [1] : [100]);
+        const reversedHistory = [...history].reverse(); // Crear copia invertida
 
-        // Ordenar de más reciente a más antiguo
-        [...history].reverse().forEach((card, index) => {
+        reversedHistory.forEach((cardValue, index) => {
             const cardElement = document.createElement('div');
-            cardElement.className = `history-card ${index === 0 ? 'recent' : ''}`;
-            cardElement.textContent = card;
+            cardElement.className = `history-card ${index === 0 ? 'most-recent' : ''}`;
+
+            // Crear elemento para el valor de la carta
+            const valueElement = document.createElement('span');
+            valueElement.className = 'card-value';
+            valueElement.textContent = cardValue;
+
+            // Crear elemento para la posición (si es necesario)
+            const positionElement = document.createElement('span');
+            positionElement.className = 'card-position';
+            positionElement.textContent = `Posición ${reversedHistory.length - index}`;
+
+            cardElement.appendChild(valueElement);
+            cardElement.appendChild(positionElement);
+
+            // Resaltar la más reciente
+            if (index === 0) {
+                const recentBadge = document.createElement('span');
+                recentBadge.className = 'recent-badge';
+                recentBadge.textContent = 'Última';
+                cardElement.appendChild(recentBadge);
+            }
+
             container.appendChild(cardElement);
         });
 
         modal.style.display = 'block';
         backdrop.style.display = 'block';
-
-        // Deshabilitar interacción con el juego mientras el modal está abierto
-        canvas.style.pointerEvents = 'none';
     }
 
     function closeHistoryModal() {
