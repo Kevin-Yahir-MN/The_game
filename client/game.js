@@ -64,7 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
         cardsPlayedThisTurn: [],
         animatingCards: [],
         columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
-        boardCards: []
+        boardCards: [],
+        historyIconAreas: []
     };
 
     function sanitizeInput(input) {
@@ -936,6 +937,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleCanvasClick(e) {
+        if (document.getElementById('historyModal').style.display === 'block') {
+            return; // Ignorar clics si el modal está abierto
+        }
+
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
@@ -946,12 +951,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (x >= area.x && x <= area.x + area.width &&
                     y >= area.y && y <= area.y + area.height) {
                     showColumnHistory(area.column);
-                    return; // Salir si encontramos un clic válido
+                    return;
                 }
             }
         }
     }
 
+    function handleTouchAsClick(e) {
+        e.preventDefault();
+        if (e.touches && e.touches.length > 0) {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+
+            // Simular evento de clic
+            const fakeClick = new MouseEvent('click', {
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                bubbles: true,
+                cancelable: true,
+                view: window
+            });
+
+            // Verificar si el toque fue en un icono de historial
+            if (gameState.historyIconAreas) {
+                for (const area of gameState.historyIconAreas) {
+                    if (x >= area.x && x <= area.x + area.width &&
+                        y >= area.y && y <= area.y + area.height) {
+                        showColumnHistory(area.column);
+                        return;
+                    }
+                }
+            }
+
+            // Si no fue en un icono, manejar como toque normal
+            handleTouchStart(e);
+        }
+    }
 
     function calculatePulseProgress() {
         const now = Date.now();
@@ -1562,24 +1599,30 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.width = 800;
             canvas.height = 700;
 
+            // Event listeners para mouse
             canvas.addEventListener('click', handleCanvasClick);
-            canvas.addEventListener('touchstart', handleTouchAsClick, { passive: false });
-            endTurnButton.addEventListener('click', endTurn);
             canvas.addEventListener('mousedown', handleMouseDown);
             canvas.addEventListener('mousemove', handleMouseMove);
             canvas.addEventListener('mouseup', handleMouseUp);
             canvas.addEventListener('mouseleave', handleMouseUp);
-            canvas.addEventListener('touchstart', handleTouchStart);
+
+            // Event listeners para touch (usando la nueva función)
+            canvas.addEventListener('touchstart', handleTouchAsClick, { passive: false });
             canvas.addEventListener('touchmove', handleTouchMove);
             canvas.addEventListener('touchend', handleTouchEnd);
+
+            // Otros event listeners
+            endTurnButton.addEventListener('click', endTurn);
             document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
             window.addEventListener('beforeunload', cleanup);
 
+            // Ajustar posición de controles
             const controlsDiv = document.querySelector('.game-controls');
             if (controlsDiv) {
                 controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
             }
 
+            // Inicializar animación de iconos
             historyIconsAnimation = {
                 interval: null,
                 lastPulseTime: Date.now(),
@@ -1587,6 +1630,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 pulseInterval: 20000
             };
 
+            // Conectar WebSocket y comenzar el juego
             connectWebSocket();
             setTimeout(() => {
                 updatePlayersPanel();
