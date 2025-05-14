@@ -992,7 +992,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e instanceof MouseEvent) {
             clientX = e.clientX;
             clientY = e.clientY;
-        } else if (e instanceof TouchEvent && e.changedTouches.length > 0) {
+        } else if (e.changedTouches?.length > 0) {
             clientX = e.changedTouches[0].clientX;
             clientY = e.changedTouches[0].clientY;
         } else {
@@ -1014,7 +1014,10 @@ document.addEventListener('DOMContentLoaded', () => {
             resetCardPosition();
         }
 
-        dragStartCard.endDrag();
+        // Limpiar estado de arrastre
+        if (dragStartCard) {
+            dragStartCard.endDrag();
+        }
         dragStartCard = null;
         isDragging = false;
     }
@@ -1024,16 +1027,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
         if (cardIndex === -1) {
-            // Si la carta no está en el array, la agregamos nuevamente
+            // Asegurarnos que la carta esté en el array
             gameState.yourCards.push(dragStartCard);
-            updatePlayerCards(gameState.yourCards.map(c => c.value));
-            return;
+            cardIndex = gameState.yourCards.length - 1;
         }
 
         const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 + cardIndex * (CARD_WIDTH + CARD_SPACING);
 
-        // Animación de regreso
-        gameState.animatingCards.push({
+        // Verificar que la carta aún existe antes de animar
+        if (!dragStartCard) return;
+
+        // Animación de regreso con verificación de existencia
+        const animation = {
             card: dragStartCard,
             startTime: Date.now(),
             duration: 300,
@@ -1042,12 +1047,17 @@ document.addEventListener('DOMContentLoaded', () => {
             fromX: dragStartCard.x,
             fromY: dragStartCard.y,
             onComplete: () => {
-                dragStartCard.x = startX;
-                dragStartCard.y = PLAYER_CARDS_Y;
-                // Forzar redibujado de todas las cartas
+                if (dragStartCard) { // Verificación crucial
+                    dragStartCard.x = startX;
+                    dragStartCard.y = PLAYER_CARDS_Y;
+                    dragStartCard.isDragging = false;
+                }
+                // Forzar redibujado
                 updatePlayerCards(gameState.yourCards.map(c => c.value));
             }
-        });
+        };
+
+        gameState.animatingCards.push(animation);
     }
 
     function getClickedColumn(x, y) {
@@ -1310,23 +1320,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleCardAnimations() {
         const now = Date.now();
+
+        // Iterar en reversa para poder eliminar elementos
         for (let i = gameState.animatingCards.length - 1; i >= 0; i--) {
             const anim = gameState.animatingCards[i];
+
+            // Verificar si la carta aún existe
+            if (!anim.card) {
+                gameState.animatingCards.splice(i, 1);
+                continue;
+            }
+
             const elapsed = now - anim.startTime;
             const progress = Math.min(elapsed / anim.duration, 1);
 
-            anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * progress;
-            anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * progress;
-
-            ctx.save();
-            ctx.shadowColor = 'rgba(0, 100, 255, 0.7)';
-            ctx.shadowBlur = 8;
-            ctx.shadowOffsetY = 3;
-            anim.card.draw();
-            ctx.restore();
+            // Actualizar posición con verificación
+            if (anim.card) {
+                anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * progress;
+                anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * progress;
+            }
 
             if (progress === 1) {
-                if (anim.onComplete) anim.onComplete();
+                try {
+                    if (anim.onComplete && anim.card) {
+                        anim.onComplete();
+                    }
+                } catch (e) {
+                    console.error("Error en animación:", e);
+                }
                 gameState.animatingCards.splice(i, 1);
             }
         }
@@ -1391,6 +1412,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function cleanup() {
+        // Limpiar animaciones
+        gameState.animatingCards = [];
+
+        // Limpiar estado de arrastre
+        if (dragStartCard) {
+            dragStartCard.endDrag();
+            dragStartCard = null;
+        }
+        isDragging = false;
         clearInterval(historyIconsAnimation.interval);
         clearTimeout(reconnectTimeout);
         cancelAnimationFrame(animationFrameId);
