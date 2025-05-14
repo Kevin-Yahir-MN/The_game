@@ -38,7 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragStartX = 0;
     let dragStartY = 0;
     let isDragging = false;
-    let selectedCard = null;
     let socket;
 
     const currentPlayer = {
@@ -87,7 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         determineColor() {
-            if (this === selectedCard) return '#FFFF99';
             const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(move =>
                 move.value === this.value &&
                 ((move.position === 'asc1' && gameState.board.ascending[0] === this.value) ||
@@ -384,11 +382,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.getElementById('remainingDeck').textContent = '0';
                         updatePlayerCards(gameState.yourCards.map(c => c.value));
                         updateGameInfo();
-                        break;
-                    case 'invalid_move':
-                        if (message.playerId === currentPlayer.id && selectedCard) {
-                            animateInvalidCard(selectedCard);
-                        }
                         break;
                     case 'deck_updated':
                         handleDeckUpdated(message);
@@ -735,9 +728,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePlayersPanel();
         updateGameInfo();
 
-        if (gameState.currentTurn !== currentPlayer.id) {
-            selectedCard = null;
-        }
     }
 
     function updateGameInfo() {
@@ -899,7 +889,6 @@ document.addEventListener('DOMContentLoaded', () => {
             dragStartY = y;
             isDragging = true;
             dragStartCard.startDrag(x - dragStartCard.x, y - dragStartCard.y);
-            selectedCard = dragStartCard;
         }
     }
 
@@ -952,9 +941,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 clientX = e.changedTouches[0].clientX;
                 clientY = e.changedTouches[0].clientY;
             } else {
-                dragStartCard.endDrag();
-                dragStartCard = null;
-                isDragging = false;
+                resetCardPosition();
                 return;
             }
 
@@ -965,18 +952,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetColumn) {
                 playCard(dragStartCard.value, targetColumn);
             } else {
-                const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
-                if (cardIndex !== -1) {
-                    const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 + cardIndex * (CARD_WIDTH + CARD_SPACING);
-                    dragStartCard.x = startX;
-                    dragStartCard.y = PLAYER_CARDS_Y;
-                }
+                resetCardPosition();
             }
 
             dragStartCard.endDrag();
             dragStartCard = null;
             isDragging = false;
-            selectedCard = null;
+        }
+    }
+
+    function resetCardPosition() {
+        if (dragStartCard) {
+            const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
+            if (cardIndex !== -1) {
+                const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 + cardIndex * (CARD_WIDTH + CARD_SPACING);
+                dragStartCard.x = startX;
+                dragStartCard.y = PLAYER_CARDS_Y;
+            }
         }
     }
 
@@ -994,70 +986,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return column ? column.id : null;
     }
 
-    function handleCanvasClick(e) {
-        if (isDragging) return;
-
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
-            const iconX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
-            const iconY = HISTORY_ICON_Y;
-
-            if (x >= iconX && x <= iconX + 40 && y >= iconY && y <= iconY + 40) {
-                return showColumnHistory(col);
-            }
-        });
-
-        if (!isMyTurn()) {
-            return showNotification('No es tu turno', true);
-        }
-
-        const clickedColumn = getClickedColumn(x, y);
-        if (clickedColumn && selectedCard) {
-            const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-            const isSoloGame = gameState.players.length === 1;
-
-            const tempBoard = JSON.parse(JSON.stringify(gameState.board));
-            updateStack(clickedColumn, selectedCard.value);
-
-            const remainingCards = gameState.yourCards.filter(c => c !== selectedCard);
-            const hasOtherMoves = hasValidMoves(remainingCards, tempBoard);
-
-            playCard(selectedCard.value, clickedColumn);
-
-            if (isSoloGame && !hasOtherMoves) {
-                socket.send(JSON.stringify({
-                    type: 'check_solo_block',
-                    playerId: currentPlayer.id,
-                    roomId: roomId,
-                    cardsRemaining: remainingCards.length
-                }));
-            }
-            return;
-        }
-
-        const clickedCard = gameState.yourCards.find(card => card.contains(x, y));
-        if (clickedCard) {
-            selectedCard = clickedCard.isPlayable ? clickedCard : null;
-            if (!clickedCard.isPlayable) {
-                showNotification('No puedes jugar esta carta ahora', true);
-                animateInvalidCard(clickedCard);
-            }
-        } else {
-            selectedCard = null;
-        }
-    }
-
     function playCard(cardValue, position) {
-        if (!selectedCard) return;
-
-        if (!isValidMove(cardValue, position)) {
-            showNotification('Movimiento inválido', true);
-            animateInvalidCard(selectedCard);
-            return;
-        }
+        if (!dragStartCard) return;
 
         const previousValue = getStackValue(position);
         const playCardMessage = {
@@ -1070,17 +1000,9 @@ document.addEventListener('DOMContentLoaded', () => {
             isFirstMove: gameState.cardsPlayedThisTurn.length === 0
         };
 
-        const requiredFields = ['type', 'playerId', 'roomId', 'cardValue', 'position', 'previousValue'];
-        const missingFields = requiredFields.filter(field => !playCardMessage[field]);
-
-        if (missingFields.length > 0) {
-            console.error('Faltan campos requeridos:', missingFields);
-            return;
-        }
-
         socket.send(JSON.stringify(playCardMessage));
 
-        const cardIndex = gameState.yourCards.findIndex(c => c === selectedCard);
+        const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
         if (cardIndex !== -1) {
             gameState.yourCards.splice(cardIndex, 1);
         }
@@ -1091,7 +1013,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         updateGameInfo();
-        selectedCard = null;
         updateCardsPlayedUI();
     }
 
@@ -1146,7 +1067,6 @@ document.addEventListener('DOMContentLoaded', () => {
             roomId: roomId
         }));
 
-        selectedCard = null;
         updateGameInfo();
     }
 
@@ -1162,10 +1082,9 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         ctx.fill();
 
-        if (selectedCard || isDragging) {
-            const currentCard = selectedCard || dragStartCard;
+        if (isDragging && dragStartCard) {
             ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
-                const isValid = isValidMove(currentCard.value, col);
+                const isValid = isValidMove(dragStartCard.value, col);
                 const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i;
 
                 ctx.fillStyle = isValid ? VALID_HIGHLIGHT_COLOR :
@@ -1239,7 +1158,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (card && card !== dragStartCard) {
                 card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 + index * (CARD_WIDTH + CARD_SPACING);
                 card.y = PLAYER_CARDS_Y;
-                card.hoverOffset = card === selectedCard ? 10 : 0;
                 card.draw();
             }
         });
@@ -1411,7 +1329,6 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.height = 700;
 
             endTurnButton.addEventListener('click', endTurn);
-            canvas.addEventListener('click', handleCanvasClick);
             canvas.addEventListener('mousedown', handleMouseDown);
             canvas.addEventListener('mousemove', handleMouseMove);
             canvas.addEventListener('mouseup', handleMouseUp);
