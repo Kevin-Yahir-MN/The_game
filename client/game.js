@@ -601,8 +601,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         modal.style.display = 'block';
         backdrop.style.display = 'block';
-
-        // Deshabilitar interacción con el juego mientras el modal está abierto
         canvas.style.pointerEvents = 'none';
     }
 
