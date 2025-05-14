@@ -345,6 +345,18 @@ document.addEventListener('DOMContentLoaded', () => {
                             window.location.href = 'game.html';
                         }
                         break;
+                    case 'invalid_move':
+                        const card = gameState.yourCards.find(c => c.value === message.cardValue);
+                        if (card) {
+                            const cardIndex = gameState.yourCards.indexOf(card);
+                            const originalPosition = {
+                                x: (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 + cardIndex * (CARD_WIDTH + CARD_SPACING),
+                                y: PLAYER_CARDS_Y
+                            };
+                            animateCardReturn(card, originalPosition);
+                        }
+                        showNotification(message.message || 'Movimiento inválido', true);
+                        break;
                     case 'your_cards':
                         updatePlayerCards(message.cards);
                         updateGameInfo();
@@ -366,6 +378,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         updateGameInfo();
                         break;
                     case 'card_played_animated':
+                        const cardIndex = gameState.yourCards.findIndex(c => c.value === message.cardValue);
+                        if (cardIndex !== -1) {
+                            gameState.yourCards.splice(cardIndex, 1);
+                        }
                         updateStack(message.position, message.cardValue);
                         if (message.remainingDeck !== undefined) {
                             gameState.remainingDeck = message.remainingDeck;
@@ -940,9 +956,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (e instanceof TouchEvent && e.changedTouches.length > 0) {
                 clientX = e.changedTouches[0].clientX;
                 clientY = e.changedTouches[0].clientY;
-            } else {
-                resetCardPosition();
-                return;
             }
 
             const x = clientX - rect.left;
@@ -952,10 +965,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetColumn) {
                 playCard(dragStartCard.value, targetColumn);
             } else {
-                resetCardPosition();
+                const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
+                if (cardIndex !== -1) {
+                    const originalPosition = {
+                        x: (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 + cardIndex * (CARD_WIDTH + CARD_SPACING),
+                        y: PLAYER_CARDS_Y
+                    };
+                    animateCardReturn(dragStartCard, originalPosition);
+                }
             }
 
-            dragStartCard.endDrag();
             dragStartCard = null;
             isDragging = false;
         }
@@ -990,6 +1009,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dragStartCard) return;
 
         const previousValue = getStackValue(position);
+        const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
+
+        if (cardIndex === -1) return;
+
+        // Guardar referencia local de la carta
+        const movingCard = dragStartCard;
+        const originalPosition = {
+            x: (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 + cardIndex * (CARD_WIDTH + CARD_SPACING),
+            y: PLAYER_CARDS_Y
+        };
+
+        // Validación local primero
+        if (!isValidMove(cardValue, position)) {
+            animateCardReturn(movingCard, originalPosition);
+            showNotification('Movimiento inválido', true);
+            return;
+        }
+
         const playCardMessage = {
             type: 'play_card',
             playerId: currentPlayer.id,
@@ -1000,20 +1037,38 @@ document.addEventListener('DOMContentLoaded', () => {
             isFirstMove: gameState.cardsPlayedThisTurn.length === 0
         };
 
-        socket.send(JSON.stringify(playCardMessage));
+        // Animación temporal (se revertirá si el servidor rechaza)
+        animateCardToColumn(movingCard, position, () => {
+            socket.send(JSON.stringify(playCardMessage));
+        });
 
-        const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
-        if (cardIndex !== -1) {
-            gameState.yourCards.splice(cardIndex, 1);
+        // NO eliminar la carta todavía - esperar confirmación del servidor
+    }
+
+    function animateCardReturn(card, originalPosition) {
+        const duration = 300;
+        const startTime = Date.now();
+
+        const startX = card.x;
+        const startY = card.y;
+
+        function animate() {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            card.x = startX + (originalPosition.x - startX) * progress;
+            card.y = startY + (originalPosition.y - startY) * progress;
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Asegurar posición exacta al final
+                card.x = originalPosition.x;
+                card.y = originalPosition.y;
+            }
         }
 
-        const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
-        if (currentPlayerObj) {
-            currentPlayerObj.cardsPlayedThisTurn = (currentPlayerObj.cardsPlayedThisTurn || 0) + 1;
-        }
-
-        updateGameInfo();
-        updateCardsPlayedUI();
+        animate();
     }
 
     function updateCardsPlayedUI() {

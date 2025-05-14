@@ -1218,6 +1218,16 @@ wss.on('connection', async (ws, req) => {
                         };
                         handlePlayCard(room, player, enhancedMsg);
                     }
+
+                    if (!isValid) {
+                        safeSend(player.ws, {
+                            type: 'invalid_move',
+                            cardValue: msg.cardValue,
+                            position: msg.position,
+                            message: `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'} que ${targetValue} o igual a ${msg.position.includes('asc') ? targetValue - 10 : targetValue + 10}`,
+                            isError: true
+                        });
+                    }
                     break;
                 case 'end_turn':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
