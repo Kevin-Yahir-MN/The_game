@@ -456,13 +456,6 @@ document.addEventListener('DOMContentLoaded', () => {
             progressTextElement.textContent = '0/1 carta(s) jugada(s)';
         }
 
-        // Actualizar el texto del turno para reflejar el cambio
-        if (currentTurnElement) {
-            currentTurnElement.textContent = gameState.currentTurn === currentPlayer.id
-                ? 'Tu turno (Mazo vacío)'
-                : `Turno de ${gameState.players.find(p => p.id === gameState.currentTurn)?.name || '...'} (Mazo vacío)`;
-        }
-
         // Forzar actualización completa del panel de información
         updateGameInfo(true); // Pasamos true para indicar que el mazo está vacío
     }
