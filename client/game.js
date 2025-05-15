@@ -13,9 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const CARD_SPACING = 15;
     const HISTORY_ICON_PULSE_INTERVAL = 20000;
     const HISTORY_ICON_PULSE_DURATION = 500;
-    const HIGHLIGHT_COLOR = 'rgb(248, 51, 51)';
-    const VALID_HIGHLIGHT_COLOR = 'rgb(67, 64, 250)';
-    const INVALID_HIGHLIGHT_COLOR = 'rgb(248, 51, 51)';
 
     const BOARD_POSITION = {
         x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
@@ -1277,7 +1274,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isValid = isValidMove(dragStartCard.value, col);
                 const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i;
 
-                ctx.fillStyle = isValid ? 'rgba(67, 64, 250, 0.3)' : 'rgba(248, 51, 51, 0.3)';
+                ctx.fillStyle = isValid ? 'rgb(67, 64, 250)' : 'rgb(248, 51, 51)';
                 ctx.beginPath();
                 ctx.roundRect(
                     x - 5,
