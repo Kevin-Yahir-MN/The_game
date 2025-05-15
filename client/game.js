@@ -445,6 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Actualizar elementos de la UI inmediatamente
         const remainingDeckElement = document.getElementById('remainingDeck');
         const progressTextElement = document.getElementById('progressText');
+        const currentTurnElement = document.getElementById('currentTurn');
 
         if (remainingDeckElement) {
             remainingDeckElement.textContent = '0';
@@ -455,11 +456,15 @@ document.addEventListener('DOMContentLoaded', () => {
             progressTextElement.textContent = '0/1 carta(s) jugada(s)';
         }
 
-        // Actualizar el progreso
-        updateGameInfo();
+        // Actualizar el texto del turno para reflejar el cambio
+        if (currentTurnElement) {
+            currentTurnElement.textContent = gameState.currentTurn === currentPlayer.id
+                ? 'Tu turno (Mazo vacío)'
+                : `Turno de ${gameState.players.find(p => p.id === gameState.currentTurn)?.name || '...'} (Mazo vacío)`;
+        }
 
-        // Actualizar las cartas del jugador para reflejar el nuevo estado
-        updatePlayerCards(gameState.yourCards.map(c => c.value));
+        // Forzar actualización completa del panel de información
+        updateGameInfo(true); // Pasamos true para indicar que el mazo está vacío
     }
 
     function handleTurnChanged(message) {
@@ -786,6 +791,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleDeckUpdated(message) {
         gameState.remainingDeck = message.remaining;
+        const isDeckEmpty = message.remaining === 0;
 
         // Actualizar UI inmediatamente
         const remainingDeckElement = document.getElementById('remainingDeck');
@@ -793,15 +799,13 @@ document.addEventListener('DOMContentLoaded', () => {
             remainingDeckElement.textContent = message.remaining;
         }
 
-        // Si el mazo se vació, actualizar el mínimo de cartas requeridas
-        if (message.remaining === 0) {
-            const progressTextElement = document.getElementById('progressText');
-            if (progressTextElement) {
-                progressTextElement.textContent = '0/1 carta(s) jugada(s)';
-            }
-        }
+        // Forzar actualización completa con el estado del mazo
+        updateGameInfo(isDeckEmpty);
 
-        updateGameInfo();
+        // Si el mazo se vació, mostrar notificación
+        if (isDeckEmpty) {
+            showNotification('¡El mazo se ha agotado! Ahora solo necesitas jugar 1 carta por turno');
+        }
     }
 
     function updateGameState(newState) {
@@ -831,14 +835,14 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGameInfo();
     }
 
-    function updateGameInfo() {
+    function updateGameInfo(deckEmpty = false) {
         const currentTurnElement = document.getElementById('currentTurn');
         const remainingDeckElement = document.getElementById('remainingDeck');
         const progressTextElement = document.getElementById('progressText');
         const progressBarElement = document.getElementById('progressBar');
 
         if (!currentTurnElement || !remainingDeckElement || !progressTextElement || !progressBarElement) {
-            setTimeout(updateGameInfo, 100);
+            setTimeout(() => updateGameInfo(deckEmpty), 100);
             return;
         }
 
@@ -849,13 +853,13 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         // Calcular cartas requeridas (2 si hay mazo, 1 si está vacío)
-        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        const minCardsRequired = deckEmpty || gameState.remainingDeck === 0 ? 1 : 2;
         const cardsPlayed = currentPlayerObj.cardsPlayedThisTurn || 0;
 
-        // Actualizar elementos del UI
+        // Actualizar elementos del UI con estado de mazo vacío
         currentTurnElement.textContent = gameState.currentTurn === currentPlayer.id
-            ? 'Tu turno'
-            : `Turno de ${gameState.players.find(p => p.id === gameState.currentTurn)?.name || '...'}`;
+            ? deckEmpty ? 'Tu turno (Mazo vacío)' : 'Tu turno'
+            : `Turno de ${gameState.players.find(p => p.id === gameState.currentTurn)?.name || '...'}${deckEmpty ? ' (Mazo vacío)' : ''}`;
 
         remainingDeckElement.textContent = gameState.remainingDeck;
         progressTextElement.textContent = `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
@@ -866,7 +870,7 @@ document.addEventListener('DOMContentLoaded', () => {
             endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
             const remainingCards = minCardsRequired - cardsPlayed;
             endTurnButton.title = remainingCards > 0
-                ? `Necesitas jugar ${remainingCards} carta(s) más`
+                ? `Necesitas jugar ${remainingCards} carta(s) más${deckEmpty ? ' (Mazo vacío)' : ''}`
                 : 'Puedes terminar tu turno';
             endTurnButton.style.backgroundColor = cardsPlayed >= minCardsRequired ? '#2ecc71' : '#e74c3c';
         }
