@@ -78,14 +78,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     class Card {
         constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
-            this.value = value;
-            this.x = x;
-            this.y = y;
+            // Validar que value sea un número
+            this.value = typeof value === 'number' ? value : 0;
+
+            // Validar coordenadas
+            this.x = typeof x === 'number' ? x : 0;
+            this.y = typeof y === 'number' ? y : 0;
+
             this.width = CARD_WIDTH;
             this.height = CARD_HEIGHT;
-            this.isPlayable = isPlayable;
-            this.isPlayedThisTurn = isPlayedThisTurn;
-            this.isFromCurrentTurn = isPlayedThisTurn;
+            this.isPlayable = !!isPlayable;
+            this.isPlayedThisTurn = !!isPlayedThisTurn;
+            this.isFromCurrentTurn = !!isPlayedThisTurn;
             this.playedThisRound = false;
             this.radius = 10;
             this.shakeOffset = 0;
@@ -98,16 +102,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         determineColor() {
-            const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(move =>
-                move.value === this.value &&
-                ((move.position === 'asc1' && gameState.board.ascending[0] === this.value) ||
-                    (move.position === 'asc2' && gameState.board.ascending[1] === this.value) ||
-                    (move.position === 'desc1' && gameState.board.descending[0] === this.value) ||
-                    (move.position === 'desc2' && gameState.board.descending[1] === this.value))
-            );
-            const isAnimatedCard = gameState.animatingCards.some(anim =>
-                anim.card.value === this.value && anim.card.position === this.position
-            );
+            // Verificar si gameState y sus propiedades existen
+            if (!gameState || !gameState.cardsPlayedThisTurn || !gameState.animatingCards) {
+                return '#FFFFFF'; // Color por defecto si no hay estado
+            }
+
+            const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(move => {
+                // Verificar que move y sus propiedades existan
+                return move && move.value === this.value &&
+                    ((move.position === 'asc1' && gameState.board.ascending[0] === this.value) ||
+                        (move.position === 'asc2' && gameState.board.ascending[1] === this.value) ||
+                        (move.position === 'desc1' && gameState.board.descending[0] === this.value) ||
+                        (move.position === 'desc2' && gameState.board.descending[1] === this.value));
+            });
+
+            const isAnimatedCard = gameState.animatingCards.some(anim => {
+                // Verificar que anim y anim.card existan
+                return anim && anim.card && anim.card.value === this.value &&
+                    (anim.card.position === this.position || anim.column === this.position);
+            });
+
             return (isPlayedThisTurn || isAnimatedCard || this.playedThisRound) ? '#99CCFF' : '#FFFFFF';
         }
 
