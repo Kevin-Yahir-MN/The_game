@@ -1171,16 +1171,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const previousValue = getStackValue(position);
 
-        // Actualizar el tablero inmediatamente para el jugador en turno
+        // Actualización inmediata para el jugador actual
         updateStack(position, cardValue);
 
-        // Eliminar la carta de la mano visualmente
+        // Eliminar carta de la mano visualmente
         const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
         if (cardIndex !== -1) {
             gameState.yourCards.splice(cardIndex, 1);
         }
 
-        // Enviar mensaje al servidor
+        // Enviar movimiento al servidor
         socket.send(JSON.stringify({
             type: 'play_card',
             playerId: currentPlayer.id,
@@ -1191,7 +1191,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isFirstMove: gameState.cardsPlayedThisTurn.length === 0
         }));
 
-        // Actualizar UI inmediatamente
+        // Actualizar UI
         updateGameInfo();
         updateCardsPlayedUI();
     }
@@ -1410,7 +1410,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         for (let i = gameState.animatingCards.length - 1; i >= 0; i--) {
             const anim = gameState.animatingCards[i];
-            if (!anim.card) {
+            if (!anim.newCard || !anim.currentCard) {
                 gameState.animatingCards.splice(i, 1);
                 continue;
             }
@@ -1418,18 +1418,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const elapsed = now - anim.startTime;
             const progress = Math.min(elapsed / anim.duration, 1);
 
-            // Easing cuadrático para aceleración
+            // Easing cuadrático para aceleración rápida
             const easedProgress = progress * progress;
 
-            anim.card.x = anim.fromX + (anim.targetX - anim.fromX) * easedProgress;
-            anim.card.y = anim.fromY + (anim.targetY - anim.fromY) * easedProgress;
+            // Mover solo la nueva carta
+            anim.newCard.y = anim.fromY + (anim.targetY - anim.fromY) * easedProgress;
 
-            // Dibujar con efecto especial
+            // Dibujar ambas cartas
             ctx.save();
-            ctx.shadowColor = 'rgba(0, 100, 255, 0.7)';
-            ctx.shadowBlur = 10;
-            ctx.shadowOffsetY = 5;
-            anim.card.draw();
+
+            // 1. Carta actual (fija en su posición)
+            anim.currentCard.draw();
+
+            // 2. Nueva carta (en movimiento)
+            ctx.shadowColor = 'rgba(0, 100, 255, 0.5)';
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetY = 4;
+            anim.newCard.draw();
+
             ctx.restore();
 
             if (progress === 1) {
@@ -1442,42 +1448,53 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleAnimatedCardPlay(message) {
         const position = message.position;
         const value = message.cardValue;
-        const playerName = message.playerName || 'Un jugador';
+        const previousValue = getStackValue(position);
 
-        updateStack(position, value);
-
-        // Solo mostrar animación si NO es mi turno Y NO soy yo quien jugó la carta
+        // Solo animar para otros jugadores (no para mí y no en mi turno)
         if (message.playerId !== currentPlayer.id && !isMyTurn()) {
-            const card = new Card(
+            const targetPos = getColumnPosition(position);
+
+            // Crear carta animada (nueva carta)
+            const newCard = new Card(
                 value,
-                0, // x se establecerá en la animación
-                -CARD_HEIGHT * 2, // Comienza arriba del tablero
+                targetPos.x,
+                -CARD_HEIGHT, // Comienza arriba
                 false,
                 true
             );
 
-            const targetPos = getColumnPosition(position);
+            // Crear representación de la carta actual (que se quedará)
+            const currentCard = new Card(
+                previousValue,
+                targetPos.x,
+                targetPos.y,
+                false,
+                false
+            );
 
-            const animation = {
-                card: card,
+            // Animación rápida (300ms)
+            gameState.animatingCards.push({
+                newCard: newCard,
+                currentCard: currentCard,
                 startTime: Date.now(),
-                duration: 500, // Duración media para la animación
+                duration: 300, // Animación más rápida
                 targetX: targetPos.x,
                 targetY: targetPos.y,
-                fromX: targetPos.x,
-                fromY: -CARD_HEIGHT * 2,
+                column: position,
                 onComplete: () => {
-                    showNotification(`${playerName} jugó un ${value}`);
+                    updateStack(position, value); // Actualizar estado al final
+                    showNotification(`${message.playerName} jugó un ${value}`);
                 }
-            };
-
-            gameState.animatingCards.push(animation);
-        } else if (message.playerId === currentPlayer.id) {
-            // Si soy yo quien jugó, solo mostrar notificación
-            showNotification(`Colocaste un ${value} en ${position.toUpperCase()}`);
+            });
+        } else {
+            // Para el jugador actual, actualización inmediata
+            updateStack(position, value);
+            if (message.playerId === currentPlayer.id) {
+                showNotification(`Colocaste un ${value}`);
+            }
         }
 
-        recordCardPlayed(value, position, message.playerId, message.previousValue);
+        recordCardPlayed(value, position, message.playerId, previousValue);
     }
 
     function gameLoop(timestamp) {
