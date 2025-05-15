@@ -675,7 +675,7 @@ body {
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     transform: translateY(-20px);
     transition: transform 0.3s ease;
-    border-top: 5px solid #e74c3c;
+    border-top: 5px solid;
 }
 
 .game-over-notification h2 {
@@ -1110,4 +1110,37 @@ body {
     #gameCanvas {
         margin-top: 80px;
     }
+}
+
+/* Fondo del backdrop */
+.game-over-backdrop {
+    background: rgba(0, 0, 0, 0.8);
+}
+
+/* Colores para victoria */
+.game-over-notification h2[style*="#2ecc71"] {
+    text-shadow: 0 2px 4px rgba(46, 204, 113, 0.4);
+}
+
+.game-over-notification [style*="#2ecc71"] {
+    transition: all 0.3s;
+}
+
+.game-over-notification [style*="#2ecc71"]:hover {
+    background-color: #27ae60 !important;
+    box-shadow: 0 5px 15px rgba(46, 204, 113, 0.4) !important;
+}
+
+/* Colores para derrota */
+.game-over-notification h2[style*="#e74c3c"] {
+    text-shadow: 0 2px 4px rgba(231, 76, 60, 0.4);
+}
+
+.game-over-notification [style*="#e74c3c"] {
+    transition: all 0.3s;
+}
+
+.game-over-notification [style*="#e74c3c"]:hover {
+    background-color: #c0392b !important;
+    box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4) !important;
 }

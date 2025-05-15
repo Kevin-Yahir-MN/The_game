@@ -733,19 +733,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const backdrop = document.createElement('div');
         backdrop.className = 'game-over-backdrop';
 
-        const isVictory = message.includes('Victoria') || message.includes('ganan');
+        const isVictory = !isError || message.includes('Victoria') || message.includes('ganan');
         const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
         const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
 
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
         gameOverDiv.innerHTML = `
-            <h2 style="color: ${titleColor}">${title}</h2>
-            <p>${message}</p>
-            <div class="game-over-buttons">
-                <button id="returnToRoom" class="game-over-btn">Volver a la Sala</button>
-            </div>
-        `;
+        <h2 style="color: ${titleColor}">${title}</h2>
+        <p>${message}</p>
+        <div class="game-over-buttons">
+            <button id="returnToRoom" class="game-over-btn" 
+                    style="background-color: ${titleColor}">
+                Volver a la Sala
+            </button>
+        </div>
+    `;
 
         document.body.appendChild(backdrop);
         backdrop.appendChild(gameOverDiv);
@@ -756,29 +759,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 10);
 
         document.getElementById('returnToRoom').addEventListener('click', async () => {
-            try {
-                const button = document.getElementById('returnToRoom');
-                button.disabled = true;
-                button.textContent = 'Cargando...';
+            const button = document.getElementById('returnToRoom');
+            button.disabled = true;
+            button.textContent = 'Cargando...';
 
-                resetGameState();
+            resetGameState();
 
-                socket.send(JSON.stringify({
-                    type: 'reset_room',
-                    roomId: roomId,
-                    playerId: currentPlayer.id,
-                    resetHistory: true
-                }));
+            socket.send(JSON.stringify({
+                type: 'reset_room',
+                roomId: roomId,
+                playerId: currentPlayer.id,
+                resetHistory: true
+            }));
 
-                await new Promise(resolve => setTimeout(resolve, 500));
-                window.location.href = 'sala.html';
-            } catch (error) {
-                log('Error al volver a la sala:', error);
-                showNotification('Error al reiniciar la sala', true);
-                const button = document.getElementById('returnToRoom');
-                button.disabled = false;
-                button.textContent = 'Volver a la Sala';
-            }
+            await new Promise(resolve => setTimeout(resolve, 500));
+            window.location.href = 'sala.html';
         });
     }
 
