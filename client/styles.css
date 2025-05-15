@@ -21,7 +21,6 @@ body {
     line-height: 1.6;
 }
 
-/* Lobby */
 .lobby-container {
     display: flex;
     flex-direction: column;
@@ -97,7 +96,6 @@ body {
     box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
 }
 
-/* Botones */
 .btn {
     padding: 1.5rem 1rem;
     border: none;
@@ -220,7 +218,6 @@ body {
     color: var(--gray);
 }
 
-/* Sala */
 .room-container {
     min-height: 100vh;
     padding: 2rem;
@@ -300,6 +297,8 @@ body {
     display: none;
     box-shadow: 0 6px 12px rgba(231, 76, 60, 0.3);
     min-height: 60px;
+    position: relative;
+    overflow: hidden;
 }
 
 #startGame.visible {
@@ -314,6 +313,21 @@ body {
     background: #c0392b;
     transform: translateY(-3px);
     box-shadow: 0 8px 16px rgba(192, 57, 43, 0.4);
+}
+
+#startGame.loading {
+    cursor: not-allowed;
+}
+
+#startGame.loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: loadingAnimation 1.5s infinite;
 }
 
 .game-settings {
@@ -337,7 +351,6 @@ body {
     border: none;
 }
 
-/* Juego */
 #gameContainer {
     position: relative;
     width: 800px;
@@ -357,6 +370,7 @@ body {
     position: relative;
     z-index: 1;
     height: 700px;
+    cursor: pointer;
 }
 
 .game-controls {
@@ -387,6 +401,7 @@ body {
     transition: all 0.3s;
     min-height: 50px;
     background-color: #e74c3c;
+    position: relative;
 }
 
 #endTurnBtn:hover:not(:disabled) {
@@ -400,6 +415,21 @@ body {
     transform: none;
     box-shadow: none;
     opacity: 0.7;
+}
+
+#endTurnBtn:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    white-space: nowrap;
+    z-index: 100;
 }
 
 .game-panel {
@@ -469,6 +499,19 @@ body {
     display: block;
 }
 
+.info-panel .connection-status {
+    color: var(--secondary);
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.info-panel .connection-error {
+    color: var(--danger);
+    font-weight: bold;
+    margin: 10px 0;
+    animation: pulseError 0.5s infinite alternate;
+}
+
 .instructions-panel {
     bottom: 25px;
     right: 25px;
@@ -497,7 +540,6 @@ body {
     line-height: 0;
 }
 
-/* Historial */
 .history-modal {
     position: fixed;
     top: 50%;
@@ -542,10 +584,19 @@ body {
     font-weight: bold;
     color: var(--dark);
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    margin: 5px;
+    transition: all 0.3s ease;
+}
+
+.history-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1;
 }
 
 .history-card.recent {
     border: 2px solid var(--secondary);
+    animation: pulse 1.5s infinite;
 }
 
 .modal-backdrop {
@@ -571,6 +622,7 @@ body {
     z-index: 1000;
     opacity: 1;
     transition: opacity 0.3s ease;
+    animation: slideIn 0.3s ease-out;
 }
 
 .notification.error {
@@ -579,30 +631,6 @@ body {
 
 .notification-fade-out {
     opacity: 0;
-}
-
-@keyframes notificationEnter {
-    from {
-        opacity: 0;
-        transform: translateX(-50%) translateY(-20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-    }
-}
-
-@keyframes notificationExit {
-    from {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-    }
-
-    to {
-        opacity: 0;
-        transform: translateX(-50%) translateY(-20px);
-    }
 }
 
 .notification.error.important {
@@ -622,7 +650,6 @@ body {
     background-color: var(--primary);
 }
 
-/* Game Over */
 .game-over-backdrop {
     position: fixed;
     top: 0;
@@ -630,60 +657,87 @@ body {
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.85);
-    z-index: 999;
+    z-index: 1000;
     display: flex;
     justify-content: center;
     align-items: center;
-    animation: fadeIn 0.3s ease-out;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 .game-over-notification {
-    background: rgba(42, 52, 65, 0.95);
-    border-radius: 16px;
+    background: linear-gradient(135deg, #2c3e50, #1a252f);
     padding: 2rem;
-    width: 90%;
-    max-width: 500px;
+    border-radius: 12px;
     text-align: center;
+    max-width: 500px;
+    width: 90%;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    border-top: 5px solid var(--accent);
-    animation: slideIn 0.4s ease-out;
+    transform: translateY(-20px);
+    transition: transform 0.3s ease;
+    border-top: 5px solid #e74c3c;
 }
 
 .game-over-notification h2 {
-    color: var(--accent);
+    color: #e74c3c;
     font-size: 2.2rem;
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-    text-transform: uppercase;
+    margin-bottom: 1rem;
 }
 
 .game-over-notification p {
-    color: var(--light);
+    color: #ecf0f1;
     font-size: 1.2rem;
     margin-bottom: 2rem;
     line-height: 1.5;
 }
 
-.game-over-notification button {
-    background-color: var(--accent);
+.game-over-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.game-over-btn {
+    background-color: #3498db;
     color: white;
     border: none;
-    padding: 1rem 2rem;
-    border-radius: 8px;
-    font-size: 1.1rem;
-    font-weight: 600;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 1rem;
     cursor: pointer;
     transition: all 0.3s;
-    margin: 0 auto;
+    min-width: 160px;
 }
 
-.game-over-notification button:hover {
-    background-color: #c0392b;
+.game-over-btn:hover {
     transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(192, 57, 43, 0.4);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
-/* Players Panel */
+.game-over-btn:disabled {
+    background-color: #95a5a6;
+    transform: none;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+#returnToRoom {
+    background-color: #e74c3c;
+}
+
+#returnToRoom:hover {
+    background-color: #c0392b;
+}
+
+#newGame {
+    background-color: #2ecc71;
+}
+
+#newGame:hover {
+    background-color: #27ae60;
+}
+
 .players-panel {
     position: fixed;
     top: 20px;
@@ -717,6 +771,10 @@ body {
     margin-bottom: 6px;
     border-radius: 6px;
     background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
 }
 
 .players-panel .you {
@@ -733,6 +791,7 @@ body {
     font-weight: bold;
     color: #fff;
     margin-right: 5px;
+    flex-grow: 1;
 }
 
 .host-tag {
@@ -748,7 +807,50 @@ body {
     animation: pulse 3.5s infinite;
 }
 
-/* Animaciones */
+.players-panel .card-count {
+    color: var(--primary);
+    font-weight: bold;
+    margin-left: 5px;
+}
+
+.players-panel .current-turn .card-count {
+    color: var(--secondary);
+    animation: pulse 1.5s infinite;
+}
+
+.history-icon {
+    transition: all 0.5s ease;
+    cursor: pointer;
+}
+
+.history-icon:hover {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.7));
+}
+
+.history-icon.pulse {
+    animation: iconPulse 2s infinite;
+}
+
+.turn-active .history-icon {
+    cursor: pointer;
+    animation: pulse-hint 20s infinite;
+}
+
+.loading-history {
+    text-align: center;
+    padding: 20px;
+    color: #ecf0f1;
+    font-style: italic;
+}
+
+.error-history {
+    text-align: center;
+    padding: 20px;
+    color: #e74c3c;
+    font-weight: bold;
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -838,7 +940,46 @@ body {
     }
 }
 
-/* Responsive */
+@keyframes loadingAnimation {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes iconPulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes pulse-hint {
+
+    0%,
+    95% {
+        transform: scale(1);
+    }
+
+    97.5% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
 @media (max-width: 1000px) {
     .game-panel {
         width: 320px;
@@ -969,343 +1110,4 @@ body {
     #gameCanvas {
         margin-top: 80px;
     }
-}
-
-/* Estilos para el botón de inicio */
-#startGame {
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-#startGame.loading {
-    cursor: not-allowed;
-}
-
-#startGame.loading::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg,
-            transparent,
-            rgba(255, 255, 255, 0.4),
-            transparent);
-    animation: loadingAnimation 1.5s infinite;
-}
-
-@keyframes loadingAnimation {
-    0% {
-        transform: translateX(-100%);
-    }
-
-    100% {
-        transform: translateX(100%);
-    }
-}
-
-/* Estilos para notificaciones */
-.notification {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 12px 24px;
-    border-radius: 8px;
-    background: #2ecc71;
-    color: white;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    z-index: 1000;
-    animation: slideIn 0.3s ease-out;
-}
-
-.notification.error {
-    background: #e74c3c;
-}
-
-@keyframes slideIn {
-    from {
-        top: -50px;
-        opacity: 0;
-    }
-
-    to {
-        top: 20px;
-        opacity: 1;
-    }
-}
-
-/* En el panel de información */
-.info-panel .connection-status {
-    color: var(--secondary);
-    font-weight: bold;
-    margin: 10px 0;
-}
-
-.info-panel .connection-error {
-    color: var(--danger);
-    font-weight: bold;
-    margin: 10px 0;
-    animation: pulseError 0.5s infinite alternate;
-}
-
-/* Agregar estos estilos */
-.loading-history {
-    text-align: center;
-    padding: 20px;
-    color: #ecf0f1;
-    font-style: italic;
-}
-
-.error-history {
-    text-align: center;
-    padding: 20px;
-    color: #e74c3c;
-    font-weight: bold;
-}
-
-.history-card {
-    /* Estilos existentes... */
-    transition: all 0.3s ease;
-}
-
-.history-card:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    z-index: 1;
-}
-
-.history-card.recent {
-    animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-    0% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.05);
-    }
-
-    100% {
-        transform: scale(1);
-    }
-}
-
-/* styles.css */
-.game-over-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.85);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.game-over-notification {
-    background: linear-gradient(135deg, #2c3e50, #1a252f);
-    padding: 2rem;
-    border-radius: 12px;
-    text-align: center;
-    max-width: 500px;
-    width: 90%;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    transform: translateY(-20px);
-    transition: transform 0.3s ease;
-    border-top: 5px solid #e74c3c;
-}
-
-.game-over-notification h2 {
-    color: #e74c3c;
-    font-size: 2.2rem;
-    margin-bottom: 1rem;
-}
-
-.game-over-notification p {
-    color: #ecf0f1;
-    font-size: 1.2rem;
-    margin-bottom: 2rem;
-    line-height: 1.5;
-}
-
-.game-over-buttons {
-    display: flex;
-    gap: 15px;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-.game-over-btn {
-    background-color: #3498db;
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 6px;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.3s;
-    min-width: 160px;
-}
-
-.game-over-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-}
-
-.game-over-btn:disabled {
-    background-color: #95a5a6;
-    transform: none;
-    box-shadow: none;
-    cursor: not-allowed;
-}
-
-#returnToRoom {
-    background-color: #e74c3c;
-}
-
-#returnToRoom:hover {
-    background-color: #c0392b;
-}
-
-#newGame {
-    background-color: #2ecc71;
-}
-
-#newGame:hover {
-    background-color: #27ae60;
-}
-
-/* Añadir estos estilos para los iconos */
-.history-icon {
-    transition: all 0.5s ease;
-    cursor: pointer;
-}
-
-.history-icon:hover {
-    transform: scale(1.1);
-    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.7));
-}
-
-/* Animación para el efecto de latido */
-@keyframes iconPulse {
-    0% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.1);
-    }
-
-    100% {
-        transform: scale(1);
-    }
-}
-
-.history-icon.pulse {
-    animation: iconPulse 2s infinite;
-}
-
-.history-card {
-    width: 60px;
-    height: 90px;
-    background-color: white;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    color: #2c3e50;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    margin: 5px;
-}
-
-.history-card.recent {
-    border: 2px solid #3498db;
-}
-
-#gameCanvas {
-    cursor: pointer;
-}
-
-.history-icon {
-    transition: transform 0.3s ease;
-}
-
-.history-icon:hover {
-    transform: scale(1.1);
-}
-
-/* Estilo para cuando es el turno del jugador */
-.turn-active .history-icon {
-    cursor: pointer;
-    animation: pulse-hint 20s infinite;
-}
-
-@keyframes pulse-hint {
-
-    0%,
-    95% {
-        transform: scale(1);
-    }
-
-    97.5% {
-        transform: scale(1.2);
-    }
-
-    100% {
-        transform: scale(1);
-    }
-}
-
-/* Estilo para el contador de cartas */
-.players-panel .card-count {
-    color: var(--primary);
-    font-weight: bold;
-    margin-left: 5px;
-}
-
-/* Estilo adicional para resaltar al jugador actual */
-.players-panel .current-turn .card-count {
-    color: var(--secondary);
-    animation: pulse 1.5s infinite;
-}
-
-/* Ajustar espaciado entre elementos */
-.players-panel li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.players-panel .player-name {
-    flex-grow: 1;
-}
-
-#endTurnBtn {
-    position: relative;
-}
-
-#endTurnBtn:hover::after {
-    content: attr(title);
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #333;
-    color: white;
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 14px;
-    white-space: nowrap;
-    z-index: 100;
 }
