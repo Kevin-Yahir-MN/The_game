@@ -414,8 +414,17 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.remainingDeck = message.remainingDeck;
         gameState.initialCards = message.initialCards;
         gameState.gameStarted = true;
-        updateGameInfo();
+
+        // Reiniciar contadores de cartas jugadas
+        if (gameState.players) {
+            gameState.players.forEach(player => {
+                player.cardsPlayedThisTurn = 0;
+            });
+        }
+
+        updateGameInfo(); // Actualizar UI inmediatamente
         updatePlayersPanel();
+
         if (window.location.pathname.endsWith('sala.html')) {
             window.location.href = 'game.html';
         }
@@ -476,16 +485,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetGameState() {
         gameState = {
             players: [],
+            yourCards: [],
             board: { ascending: [1, 1], descending: [100, 100] },
             currentTurn: null,
-            yourCards: [],
             remainingDeck: 98,
             initialCards: 6,
             cardsPlayedThisTurn: [],
             animatingCards: [],
-            columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
-            boardCards: []
+            columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] }
         };
+
+        // Actualizar UI para mostrar estado inicial
+        updateGameInfo();
     }
 
     function restoreGameState() {
@@ -551,6 +562,13 @@ document.addEventListener('DOMContentLoaded', () => {
             desc1: message.history?.descending1 || [100],
             desc2: message.history?.descending2 || [100]
         };
+
+        // Inicializar contador de cartas jugadas
+        if (gameState.players) {
+            gameState.players.forEach(player => {
+                player.cardsPlayedThisTurn = 0;
+            });
+        }
 
         if (message.gameState.gameStarted && message.yourCards) {
             updatePlayerCards(message.yourCards);
@@ -793,10 +811,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
-        const cardsPlayed = currentPlayerObj?.cardsPlayedThisTurn || 0;
-        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        // Obtener el jugador actual o usar valores por defecto
+        const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id) || {
+            cardsPlayedThisTurn: 0,
+            totalCardsPlayed: 0
+        };
 
+        // Calcular cartas requeridas (2 si hay mazo, 1 si está vacío)
+        const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+        const cardsPlayed = currentPlayerObj.cardsPlayedThisTurn || 0;
+
+        // Actualizar elementos del UI
         currentTurnElement.textContent = gameState.currentTurn === currentPlayer.id
             ? 'Tu turno'
             : `Turno de ${gameState.players.find(p => p.id === gameState.currentTurn)?.name || '...'}`;
@@ -805,13 +830,13 @@ document.addEventListener('DOMContentLoaded', () => {
         progressTextElement.textContent = `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
         progressBarElement.style.width = `${Math.min((cardsPlayed / minCardsRequired) * 100, 100)}%`;
 
+        // Actualizar botón de terminar turno
         if (endTurnButton) {
             endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
             const remainingCards = minCardsRequired - cardsPlayed;
             endTurnButton.title = remainingCards > 0
                 ? `Necesitas jugar ${remainingCards} carta(s) más`
                 : 'Puedes terminar tu turno';
-
             endTurnButton.style.backgroundColor = cardsPlayed >= minCardsRequired ? '#2ecc71' : '#e74c3c';
         }
     }
