@@ -441,9 +441,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleDeckEmpty() {
         gameState.remainingDeck = 0;
-        document.getElementById('remainingDeck').textContent = '0';
-        updatePlayerCards(gameState.yourCards.map(c => c.value));
+
+        // Actualizar elementos de la UI inmediatamente
+        const remainingDeckElement = document.getElementById('remainingDeck');
+        const progressTextElement = document.getElementById('progressText');
+
+        if (remainingDeckElement) {
+            remainingDeckElement.textContent = '0';
+        }
+
+        // Cambiar a "0/1 carta(s) jugada(s)" cuando el mazo está vacío
+        if (progressTextElement) {
+            progressTextElement.textContent = '0/1 carta(s) jugada(s)';
+        }
+
+        // Actualizar el progreso
         updateGameInfo();
+
+        // Actualizar las cartas del jugador para reflejar el nuevo estado
+        updatePlayerCards(gameState.yourCards.map(c => c.value));
     }
 
     function handleTurnChanged(message) {
@@ -488,14 +504,14 @@ document.addEventListener('DOMContentLoaded', () => {
             yourCards: [],
             board: { ascending: [1, 1], descending: [100, 100] },
             currentTurn: null,
-            remainingDeck: 98,
+            remainingDeck: 98, // Valor inicial
             initialCards: 6,
             cardsPlayedThisTurn: [],
             animatingCards: [],
             columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] }
         };
 
-        // Actualizar UI para mostrar estado inicial
+        // Forzar actualización de la UI
         updateGameInfo();
     }
 
@@ -770,6 +786,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleDeckUpdated(message) {
         gameState.remainingDeck = message.remaining;
+
+        // Actualizar UI inmediatamente
+        const remainingDeckElement = document.getElementById('remainingDeck');
+        if (remainingDeckElement) {
+            remainingDeckElement.textContent = message.remaining;
+        }
+
+        // Si el mazo se vació, actualizar el mínimo de cartas requeridas
+        if (message.remaining === 0) {
+            const progressTextElement = document.getElementById('progressText');
+            if (progressTextElement) {
+                progressTextElement.textContent = '0/1 carta(s) jugada(s)';
+            }
+        }
+
         updateGameInfo();
     }
 
