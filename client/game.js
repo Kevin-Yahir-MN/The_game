@@ -849,10 +849,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const minCardsRequired = deckEmpty || gameState.remainingDeck === 0 ? 1 : 2;
         const cardsPlayed = currentPlayerObj.cardsPlayedThisTurn || 0;
 
-        // Actualizar elementos del UI con estado de mazo vacío
         currentTurnElement.textContent = gameState.currentTurn === currentPlayer.id
-            ? deckEmpty ? 'Tu turno (Mazo vacío)' : 'Tu turno'
-            : `Turno de ${gameState.players.find(p => p.id === gameState.currentTurn)?.name || '...'}${deckEmpty ? ' (Mazo vacío)' : ''}`;
+            ? 'Tu turno'
+            : `Turno de ${gameState.players.find(p => p.id === gameState.currentTurn)?.name || '...'}`;
+
 
         remainingDeckElement.textContent = gameState.remainingDeck;
         progressTextElement.textContent = `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
