@@ -450,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePlayerCards(gameState.yourCards.map(c => c.value));
         if (message.playerName) {
             const notificationMsg = message.newTurn === currentPlayer.id
-                ? '¡Es tu turno!' + (message.deckEmpty ? ' (Mazo vacío)' : '')
+                ? '¡Es tu turno!'
                 : `Turno de ${message.playerName}`;
             showNotification(notificationMsg);
         }
