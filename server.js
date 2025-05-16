@@ -26,7 +26,6 @@ const pool = new Pool({
 const rooms = new Map();
 const reverseRoomMap = new Map();
 const boardHistory = new Map();
-const ROOM_CLEANUP_INTERVAL = 30 * 60 * 1000;
 
 app.use(compression());
 app.use(express.json());
@@ -289,16 +288,6 @@ function updateBoardHistory(room, position, newValue) {
             console.error('Error al guardar historial:', err)
         );
     }
-}
-
-function getNextActivePlayerIndex(currentIndex, players) {
-    for (let offset = 1; offset < players.length; offset++) {
-        const nextIndex = (currentIndex + offset) % players.length;
-        if (players[nextIndex].ws?.readyState === WebSocket.OPEN) {
-            return nextIndex;
-        }
-    }
-    return currentIndex;
 }
 
 function getPlayableCards(playerCards, board) {
@@ -609,37 +598,6 @@ function shuffleArray(array) {
     //Solo para pruebas unitarias
     array.length = 20;
     return array;
-}
-
-function validateCardPlayMessage(msg) {
-    const requiredFields = ['cardValue', 'position', 'playerId', 'roomId'];
-    const missingFields = requiredFields.filter(field => !msg[field]);
-
-    if (missingFields.length > 0) {
-        return {
-            isValid: false,
-            message: `Faltan campos requeridos: ${missingFields.join(', ')}`,
-            errorCode: 'MISSING_REQUIRED_FIELDS'
-        };
-    }
-
-    if (!Number.isInteger(msg.cardValue) || msg.cardValue < 2 || msg.cardValue > 99) {
-        return {
-            isValid: false,
-            message: 'El valor de la carta debe ser un número entre 2 y 99',
-            errorCode: 'INVALID_CARD_VALUE'
-        };
-    }
-
-    if (!validPositions.includes(msg.position)) {
-        return {
-            isValid: false,
-            message: `Posición inválida. Debe ser una de: ${validPositions.join(', ')}`,
-            errorCode: 'INVALID_POSITION'
-        };
-    }
-
-    return { isValid: true };
 }
 
 app.post('/create-room', async (req, res) => {
