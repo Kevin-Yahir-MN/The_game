@@ -743,10 +743,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
 
-        // Solo mostramos la imagen en caso de victoria perfecta
         if (isPerfectVictory) {
             gameOverDiv.innerHTML = `
-            <img id="victoryImage" class="victory-image">
+            <div class="victory-container">
+                <img id="victoryImage" class="victory-image">
+            </div>
             <div class="game-over-buttons">
                 <button id="returnToRoom" class="game-over-btn">
                     Volver a la Sala
@@ -754,7 +755,6 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         } else {
-            // Mantenemos el mensaje normal para otros tipos de fin de juego
             const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
             const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
 
@@ -773,24 +773,26 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.appendChild(backdrop);
         backdrop.appendChild(gameOverDiv);
 
-        // Si es victoria perfecta, cargar y mostrar imagen y reproducir sonido
         if (isPerfectVictory) {
-            victoryImage.src = 'victory-royale.png'; // Cambia esta ruta
+            victoryImage.src = 'victory-royale.png';
             victoryImage.onload = () => {
                 const imgElement = document.getElementById('victoryImage');
                 imgElement.src = victoryImage.src;
 
-                // Ajustamos el tamaño después de cargar
+                // Ajustar el tamaño manteniendo la relación de aspecto
                 const maxWidth = window.innerWidth * 0.8;
-                const maxHeight = window.innerHeight * 0.7;
+                const maxHeight = window.innerHeight * 0.6;
                 const ratio = Math.min(maxWidth / victoryImage.width, maxHeight / victoryImage.height);
 
                 imgElement.style.width = `${victoryImage.width * ratio}px`;
-                imgElement.style.height = `${victoryImage.height * ratio}px`;
+                imgElement.style.height = 'auto'; // Mantener relación de aspecto
+                imgElement.style.maxWidth = '90%';
+                imgElement.style.maxHeight = '70vh';
+                imgElement.style.objectFit = 'contain';
             };
 
             victorySound.src = 'victory-royale.mp3';
-            victorySound.volume = 0.6;
+            victorySound.volume = 0.3;
             victorySound.play().catch(e => console.log('No se pudo reproducir el audio:', e));
         }
 
