@@ -1144,3 +1144,34 @@ body {
     background-color: #c0392b !important;
     box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4) !important;
 }
+
+.game-over-notification {
+    max-width: 500px;
+    text-align: center;
+}
+
+.game-over-notification img {
+    max-width: 200px;
+    margin: 10px auto;
+    display: block;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.victory-pulse {
+    animation: pulse 2s infinite;
+}

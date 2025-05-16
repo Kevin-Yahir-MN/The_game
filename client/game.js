@@ -40,6 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let dirtyAreas = [];
     let needsRedraw = true;
 
+    let victoryImage = new Image();
+    let victorySound = new Audio();
+
     const currentPlayer = {
         id: sanitizeInput(sessionStorage.getItem('playerId')),
         name: sanitizeInput(sessionStorage.getItem('playerName')),
@@ -735,24 +738,39 @@ document.addEventListener('DOMContentLoaded', () => {
         backdrop.className = 'game-over-backdrop';
 
         const isVictory = !isError || message.includes('Victoria') || message.includes('ganan');
+        const isPerfectVictory = isVictory && gameState.remainingDeck === 0 && gameState.yourCards.length === 0;
         const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
         const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
 
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
+
+        // Contenido HTML modificado
         gameOverDiv.innerHTML = `
-            <h2 style="color: ${titleColor}">${title}</h2>
-            <p>${message}</p>
-            <div class="game-over-buttons">
-                <button id="returnToRoom" class="game-over-btn" 
-                        style="background-color: ${titleColor}">
-                    Volver a la Sala
-                </button>
-            </div>
-        `;
+        <h2 style="color: ${titleColor}">${title}</h2>
+        ${isPerfectVictory ? '<img id="victoryImage" style="max-width: 200px; margin: 10px auto; display: block;">' : ''}
+        <p>${message}</p>
+        <div class="game-over-buttons">
+            <button id="returnToRoom" class="game-over-btn" 
+                    style="background-color: ${titleColor}">
+                Volver a la Sala
+            </button>
+        </div>
+    `;
 
         document.body.appendChild(backdrop);
         backdrop.appendChild(gameOverDiv);
+
+        // Si es victoria perfecta, cargar y mostrar imagen y reproducir sonido
+        if (isPerfectVictory) {
+            victoryImage.src = 'victory-royale.png'; // Cambia esta ruta
+            victoryImage.onload = () => {
+                document.getElementById('victoryImage').src = victoryImage.src;
+            };
+
+            victorySound.src = 'victory-royale.mp3'; // Cambia esta ruta
+            victorySound.play().catch(e => console.log('No se pudo reproducir el audio:', e));
+        }
 
         setTimeout(() => {
             backdrop.style.opacity = '1';
@@ -760,6 +778,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 10);
 
         document.getElementById('returnToRoom').addEventListener('click', async () => {
+            // Detener la música al salir
+            if (isPerfectVictory) {
+                victorySound.pause();
+                victorySound.currentTime = 0;
+            }
+
             const button = document.getElementById('returnToRoom');
             button.disabled = true;
             button.textContent = 'Cargando...';
