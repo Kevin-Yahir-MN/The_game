@@ -739,36 +739,58 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const isVictory = !isError || message.includes('Victoria') || message.includes('ganan');
         const isPerfectVictory = isVictory && gameState.remainingDeck === 0 && gameState.yourCards.length === 0;
-        const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
-        const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
 
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
 
-        // Contenido HTML modificado
-        gameOverDiv.innerHTML = `
-        <h2 style="color: ${titleColor}">${title}</h2>
-        ${isPerfectVictory ? '<img id="victoryImage" style="max-width: 200px; margin: 10px auto; display: block;">' : ''}
-        <p>${message}</p>
-        <div class="game-over-buttons">
-            <button id="returnToRoom" class="game-over-btn" 
-                    style="background-color: ${titleColor}">
-                Volver a la Sala
-            </button>
-        </div>
-    `;
+        // Solo mostramos la imagen en caso de victoria perfecta
+        if (isPerfectVictory) {
+            gameOverDiv.innerHTML = `
+            <img id="victoryImage" class="victory-image">
+            <div class="game-over-buttons">
+                <button id="returnToRoom" class="game-over-btn">
+                    Volver a la Sala
+                </button>
+            </div>
+        `;
+        } else {
+            // Mantenemos el mensaje normal para otros tipos de fin de juego
+            const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
+            const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
+
+            gameOverDiv.innerHTML = `
+            <h2 style="color: ${titleColor}">${title}</h2>
+            <p>${message}</p>
+            <div class="game-over-buttons">
+                <button id="returnToRoom" class="game-over-btn" 
+                        style="background-color: ${titleColor}">
+                    Volver a la Sala
+                </button>
+            </div>
+        `;
+        }
 
         document.body.appendChild(backdrop);
         backdrop.appendChild(gameOverDiv);
 
         // Si es victoria perfecta, cargar y mostrar imagen y reproducir sonido
         if (isPerfectVictory) {
-            victoryImage.src = 'victory-royale.png'; // Cambia esta ruta
+            victoryImage.src = 'ruta/a/tu/imagen-de-victoria.png'; // Cambia esta ruta
             victoryImage.onload = () => {
-                document.getElementById('victoryImage').src = victoryImage.src;
+                const imgElement = document.getElementById('victoryImage');
+                imgElement.src = victoryImage.src;
+
+                // Ajustamos el tamaño después de cargar
+                const maxWidth = window.innerWidth * 0.8;
+                const maxHeight = window.innerHeight * 0.7;
+                const ratio = Math.min(maxWidth / victoryImage.width, maxHeight / victoryImage.height);
+
+                imgElement.style.width = `${victoryImage.width * ratio}px`;
+                imgElement.style.height = `${victoryImage.height * ratio}px`;
             };
 
-            victorySound.src = 'victory-royale.mp3'; // Cambia esta ruta
+            victorySound.src = 'ruta/a/tu/cancion-de-victoria.mp3';
+            victorySound.volume = 0.6;
             victorySound.play().catch(e => console.log('No se pudo reproducir el audio:', e));
         }
 
@@ -778,7 +800,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 10);
 
         document.getElementById('returnToRoom').addEventListener('click', async () => {
-            // Detener la música al salir
             if (isPerfectVictory) {
                 victorySound.pause();
                 victorySound.currentTime = 0;
