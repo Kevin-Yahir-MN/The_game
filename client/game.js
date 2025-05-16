@@ -726,163 +726,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /**
-   * Muestra la pantalla de victoria épica
-   * @param {string} message - El mensaje de victoria
-   */
-    function showEpicVictory(message) {
-        // Limpiar cualquier pantalla de fin de juego existente
-        document.querySelectorAll('.game-over-backdrop, .victory-screen').forEach(el => el.remove());
-
-        // Crear el elemento principal
-        const victoryScreen = document.createElement('div');
-        victoryScreen.className = 'victory-screen';
-
-        // Contenido de la pantalla de victoria
-        victoryScreen.innerHTML = `
-        <div class="victory-content">
-            <div class="victory-image-container">
-                <div class="victory-image"></div>
-                <div class="victory-overlay"></div>
-            </div>
-            <div class="victory-message">${message}</div>
-            <button id="returnToRoom" class="victory-button">Volver a la Sala</button>
-        </div>
-    `;
-
-        document.body.appendChild(victoryScreen);
-
-        // Crear partículas
-        createGoldenParticles(victoryScreen);
-
-        // Reproducir sonido de victoria (opcional)
-        playVictorySound();
-
-        // Configurar el botón de retorno
-        setupVictoryButton();
-    }
-
-    /**
-     * Crea partículas doradas para el efecto
-     * @param {HTMLElement} container - Contenedor donde se añadirán las partículas
-     */
-    function createGoldenParticles(container) {
-        const particleCount = 80;
-        const colors = ['#FFD700', '#FFA500', '#FFEE58', '#FFF176'];
-
-        for (let i = 0; i < particleCount; i++) {
-            const particle = document.createElement('div');
-            particle.className = 'gold-particle';
-
-            // Tamaño aleatorio entre 3px y 8px
-            const size = Math.random() * 5 + 3;
-
-            // Posición inicial aleatoria
-            const startX = Math.random() * 100;
-            const startY = Math.random() * 100;
-
-            // Movimiento aleatorio
-            const tx = (Math.random() - 0.5) * 300;
-            const ty = (Math.random() - 0.5) * 300;
-
-            // Configurar estilos
-            particle.style.width = `${size}px`;
-            particle.style.height = `${size}px`;
-            particle.style.left = `${startX}%`;
-            particle.style.top = `${startY}%`;
-            particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-            particle.style.setProperty('--tx', `${tx}px`);
-            particle.style.setProperty('--ty', `${ty}px`);
-
-            // Retraso y duración aleatorios
-            particle.style.animationDelay = `${Math.random() * 2}s`;
-            particle.style.animationDuration = `${2 + Math.random() * 3}s`;
-
-            container.appendChild(particle);
-        }
-    }
-
-    /**
-     * Reproduce el sonido de victoria (opcional)
-     */
-    function playVictorySound() {
-        // Solo intentar reproducir si el Audio está disponible
-        if (typeof Audio !== 'undefined') {
-            try {
-                // Usar un sonido de victoria genérico (reemplaza con tu propio archivo si lo tienes)
-                const sound = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3');
-                sound.volume = 0.3; // Volumen moderado
-                sound.play().catch(e => console.log('Autoplay bloqueado:', e));
-            } catch (e) {
-                console.log('Error al reproducir sonido:', e);
-            }
-        }
-    }
-
-    /**
-     * Configura el botón de retorno a la sala
-     */
-    function setupVictoryButton() {
-        const returnButton = document.getElementById('returnToRoom');
-
-        if (returnButton) {
-            returnButton.addEventListener('click', async () => {
-                // Deshabilitar el botón para evitar múltiples clics
-                returnButton.disabled = true;
-                returnButton.textContent = 'Cargando...';
-
-                // Resetear el estado del juego
-                resetGameState();
-
-                // Notificar al servidor
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({
-                        type: 'reset_room',
-                        roomId: roomId,
-                        playerId: currentPlayer.id,
-                        resetHistory: true
-                    }));
-                }
-
-                // Pequeño retraso antes de redirigir
-                await new Promise(resolve => setTimeout(resolve, 500));
-                window.location.href = 'sala.html';
-            });
-        }
-    }
-
-    /**
-     * Maneja el fin del juego (victoria o derrota)
-     * @param {string} message - Mensaje a mostrar
-     * @param {boolean} isError - Si es true, muestra pantalla de derrota
-     */
     function handleGameOver(message, isError = false) {
-        // Detener cualquier animación del juego
-        cancelAnimationFrame(animationFrameId);
+        canvas.style.pointerEvents = 'none';
+        endTurnButton.disabled = true;
 
-        if (isError) {
-            showRegularGameOver(message);
-        } else {
-            showEpicVictory(message);
-        }
-    }
-
-    /**
-     * Muestra la pantalla normal de game over (para derrotas)
-     * @param {string} message - Mensaje a mostrar
-     */
-    function showRegularGameOver(message) {
         const backdrop = document.createElement('div');
         backdrop.className = 'game-over-backdrop';
+
+        const isVictory = !isError || message.includes('Victoria') || message.includes('ganan');
+        const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
+        const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
 
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
         gameOverDiv.innerHTML = `
-        <h2 style="color: #e74c3c">¡GAME OVER!</h2>
+        <h2 style="color: ${titleColor}">${title}</h2>
         <p>${message}</p>
         <div class="game-over-buttons">
             <button id="returnToRoom" class="game-over-btn" 
-                    style="background-color: #e74c3c">
+                    style="background-color: ${titleColor}">
                 Volver a la Sala
             </button>
         </div>
@@ -891,28 +753,28 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.appendChild(backdrop);
         backdrop.appendChild(gameOverDiv);
 
-        // Configurar el botón de retorno
-        const returnButton = document.getElementById('returnToRoom');
-        if (returnButton) {
-            returnButton.addEventListener('click', async () => {
-                returnButton.disabled = true;
-                returnButton.textContent = 'Cargando...';
+        setTimeout(() => {
+            backdrop.style.opacity = '1';
+            gameOverDiv.style.transform = 'translateY(0)';
+        }, 10);
 
-                resetGameState();
+        document.getElementById('returnToRoom').addEventListener('click', async () => {
+            const button = document.getElementById('returnToRoom');
+            button.disabled = true;
+            button.textContent = 'Cargando...';
 
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({
-                        type: 'reset_room',
-                        roomId: roomId,
-                        playerId: currentPlayer.id,
-                        resetHistory: true
-                    }));
-                }
+            resetGameState();
 
-                await new Promise(resolve => setTimeout(resolve, 500));
-                window.location.href = 'sala.html';
-            });
-        }
+            socket.send(JSON.stringify({
+                type: 'reset_room',
+                roomId: roomId,
+                playerId: currentPlayer.id,
+                resetHistory: true
+            }));
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+            window.location.href = 'sala.html';
+        });
     }
 
     function handleDeckUpdated(message) {
