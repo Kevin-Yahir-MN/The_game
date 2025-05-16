@@ -13,6 +13,7 @@ const PORT = process.env.PORT || 3000;
 const allowedOrigins = ['https://the-game-2xks.onrender.com'];
 
 const pool = new Pool({
+
     connectionString: process.env.DATABASE_URL,
     ssl: {
         require: true,
