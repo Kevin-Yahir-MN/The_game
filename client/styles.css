@@ -1172,30 +1172,25 @@ body {
     }
 }
 
-/* Contenedor de la imagen - sin fondos ni bordes */
-.victory-image-container {
-    position: relative;
-    margin: 10px 0;
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: transparent;
+/* Elimina TODOS los bordes y efectos visuales alrededor de la imagen */
+.victory-image {
+    border: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: none !important;
+    -webkit-tap-highlight-color: transparent;
+    display: block;
+    margin: 0 auto;
     padding: 0;
-    border: none;
 }
 
-/* Imagen de victoria - completamente libre */
-.victory-image {
-    max-width: 85vw;
-    max-height: 60vh;
-    opacity: 0;
-    transform: scale(0.9);
-    transition: all 0.7s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    object-fit: contain;
+/* Contenedor completamente transparente */
+.victory-image-container {
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
 }
 
 /* Animación de entrada */
