@@ -1172,85 +1172,127 @@ body {
     }
 }
 
-.victory-pulse {
-    animation: pulse 2s infinite;
-}
-
-.game-over-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
+/* Contenedor de victoria */
+.victory-container {
+    position: relative;
+    margin: 20px 0;
+    perspective: 1000px;
     width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.3s ease;
+    min-height: 300px;
 }
 
-.game-over-notification {
-    background-color: #2c3e50;
-    padding: 30px;
-    border-radius: 15px;
-    text-align: center;
-    transform: translateY(-50px);
-    transition: transform 0.3s ease;
-    max-width: 90%;
-    max-height: 90vh;
-    overflow: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
+/* Imagen de victoria */
 .victory-image {
-    max-width: 100%;
-    max-height: 70vh;
+    max-width: 80vw;
+    max-height: 60vh;
     object-fit: contain;
-    margin-bottom: 20px;
-    border-radius: 10px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-    animation: pulse 2s infinite;
+    border-radius: 15px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    transform-style: preserve-3d;
+    opacity: 0;
+    transform: scale(0.5) rotateY(90deg);
+    transition: all 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.7));
+    z-index: 2;
+    position: relative;
 }
 
-.game-over-buttons {
-    margin-top: 20px;
+/* Animación de entrada */
+.victory-image.animate-in {
+    opacity: 1;
+    transform: scale(1) rotateY(0deg);
 }
 
-.game-over-btn {
-    padding: 12px 24px;
-    border: none;
-    border-radius: 5px;
-    background-color: #27ae60;
-    color: white;
-    font-size: 16px;
-    cursor: pointer;
-    transition: all 0.3s ease;
+/* Animación de pulso */
+.victory-image.pulse-animation {
+    animation: victoryPulse 3s infinite ease-in-out;
 }
 
-.game-over-btn:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+/* Efecto de brillo */
+.victory-image::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.8) 0%, transparent 70%);
+    border-radius: 15px;
+    opacity: 0;
+    animation: victoryGlow 3s infinite 1s;
+    z-index: -1;
 }
 
-.game-over-btn:disabled {
-    background-color: #7f8c8d;
-    cursor: not-allowed;
+/* Partículas de confeti */
+.victory-particle {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: floatUp 2s ease-out forwards;
+    z-index: 1;
 }
 
-@keyframes pulse {
+/* Keyframes para animaciones */
+@keyframes victoryPulse {
     0% {
         transform: scale(1);
+        box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
     }
 
     50% {
-        transform: scale(1.03);
+        transform: scale(1.05);
+        box-shadow: 0 0 60px rgba(255, 215, 0, 0.8);
     }
 
     100% {
         transform: scale(1);
+        box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
     }
+}
+
+@keyframes victoryGlow {
+
+    0%,
+    100% {
+        opacity: 0;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
+}
+
+@keyframes floatUp {
+    0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(-100px) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+/* Mensaje de victoria */
+.game-over-message {
+    color: #fff;
+    font-size: 1.5rem;
+    margin: 20px 0;
+    text-align: center;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    padding: 0 20px;
+}
+
+/* Efecto para triángulos en el confeti */
+.victory-particle[style*="triangle"] {
+    width: 0 !important;
+    height: 0 !important;
+    background-color: transparent !important;
+    border-left: solid transparent;
+    border-right: solid transparent;
+    border-bottom: solid;
 }

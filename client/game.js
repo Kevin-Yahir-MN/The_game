@@ -743,10 +743,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
 
-        // Solo mostramos la imagen en caso de victoria perfecta
         if (isPerfectVictory) {
             gameOverDiv.innerHTML = `
-            <img id="victoryImage" class="victory-image">
+            <div class="victory-container">
+                <img id="victoryImage" class="victory-image">
+            </div>
+            <div class="game-over-message">${message}</div>
             <div class="game-over-buttons">
                 <button id="returnToRoom" class="game-over-btn">
                     Volver a la Sala
@@ -754,7 +756,6 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         } else {
-            // Mantenemos el mensaje normal para otros tipos de fin de juego
             const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
             const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
 
@@ -773,30 +774,98 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.appendChild(backdrop);
         backdrop.appendChild(gameOverDiv);
 
-        // Si es victoria perfecta, cargar y mostrar imagen y reproducir sonido
         if (isPerfectVictory) {
-            victoryImage.src = 'victory-royale.png'; // Cambia esta ruta
+            victoryImage.src = 'victory-royale.png';
             victoryImage.onload = () => {
                 const imgElement = document.getElementById('victoryImage');
                 imgElement.src = victoryImage.src;
 
-                // Ajustamos el tamaño después de cargar
+                // Ajustar tamaño responsivo
                 const maxWidth = window.innerWidth * 0.8;
                 const maxHeight = window.innerHeight * 0.7;
                 const ratio = Math.min(maxWidth / victoryImage.width, maxHeight / victoryImage.height);
 
                 imgElement.style.width = `${victoryImage.width * ratio}px`;
                 imgElement.style.height = `${victoryImage.height * ratio}px`;
+
+                // Animación de entrada
+                setTimeout(() => {
+                    imgElement.classList.add('animate-in');
+
+                    // Iniciar pulso después de la entrada
+                    setTimeout(() => {
+                        imgElement.classList.add('pulse-animation');
+                        createConfetti(); // Efecto de confeti
+                    }, 1000);
+                }, 100);
             };
 
             victorySound.src = 'victory-royale.mp3';
             victorySound.play().catch(e => console.log('No se pudo reproducir el audio:', e));
         }
 
+        // Mostrar backdrop con transición
         setTimeout(() => {
             backdrop.style.opacity = '1';
             gameOverDiv.style.transform = 'translateY(0)';
         }, 10);
+
+        // Función para crear partículas de confeti
+        function createConfetti() {
+            const container = document.querySelector('.victory-container');
+            if (!container) return;
+
+            const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffffff'];
+            const shapes = ['circle', 'square', 'triangle'];
+
+            for (let i = 0; i < 150; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('victory-particle');
+
+                // Configuración aleatoria
+                const left = Math.random() * 100;
+                const size = Math.random() * 12 + 5;
+                const shape = shapes[Math.floor(Math.random() * shapes.length)];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                const duration = Math.random() * 3 + 2;
+                const delay = Math.random() * 3;
+
+                // Estilo de la partícula
+                particle.style.left = `${left}%`;
+                particle.style.bottom = '-10px';
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                particle.style.backgroundColor = color;
+                particle.style.animationDuration = `${duration}s`;
+                particle.style.animationDelay = `${delay}s`;
+
+                // Forma de la partícula
+                if (shape === 'circle') {
+                    particle.style.borderRadius = '50%';
+                } else if (shape === 'triangle') {
+                    particle.style.width = '0';
+                    particle.style.height = '0';
+                    particle.style.backgroundColor = 'transparent';
+                    particle.style.borderLeft = `${size / 2}px solid transparent`;
+                    particle.style.borderRight = `${size / 2}px solid transparent`;
+                    particle.style.borderBottom = `${size}px solid ${color}`;
+                }
+
+                container.appendChild(particle);
+
+                // Eliminar la partícula después de la animación
+                setTimeout(() => {
+                    if (particle.parentNode) {
+                        particle.remove();
+                    }
+                }, (duration + delay) * 1000);
+            }
+
+            // Repetir el efecto cada 3 segundos
+            if (isPerfectVictory) {
+                setTimeout(createConfetti, 3000);
+            }
+        }
 
         document.getElementById('returnToRoom').addEventListener('click', async () => {
             if (isPerfectVictory) {
