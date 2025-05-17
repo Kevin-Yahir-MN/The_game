@@ -745,7 +745,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isPerfectVictory) {
             gameOverDiv.innerHTML = `
-            <div class="victory-container">
+            <div class="victory-image-container">
                 <img id="victoryImage" class="victory-image">
             </div>
             <div class="game-over-message">${message}</div>
@@ -781,23 +781,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 imgElement.src = victoryImage.src;
 
                 // Escalado responsivo mejorado
-                const container = document.querySelector('.victory-container');
-                const containerWidth = container.offsetWidth;
-                const containerHeight = container.offsetHeight;
+                const maxWidth = window.innerWidth * 0.85;  // 85% del ancho de la ventana
+                const maxHeight = window.innerHeight * 0.6; // 60% del alto de la ventana
+                const ratio = Math.min(
+                    maxWidth / victoryImage.naturalWidth,
+                    maxHeight / victoryImage.naturalHeight
+                );
 
-                const widthRatio = containerWidth / victoryImage.width;
-                const heightRatio = containerHeight / victoryImage.height;
-                const scaleRatio = Math.min(widthRatio, heightRatio) * 0.9; // 90% del espacio disponible
-
-                imgElement.style.width = `${victoryImage.width * scaleRatio}px`;
-                imgElement.style.height = `${victoryImage.height * scaleRatio}px`;
-                imgElement.style.objectFit = 'contain';
+                imgElement.style.width = `${victoryImage.naturalWidth * ratio}px`;
+                imgElement.style.height = 'auto'; // Mantener proporción
+                imgElement.style.display = 'block';
+                imgElement.style.margin = '0 auto';
 
                 // Animación de entrada
                 setTimeout(() => {
                     imgElement.classList.add('animate-in');
 
-                    // Iniciar pulso después de la entrada
+                    // Animación de pulso después de 1 segundo
                     setTimeout(() => {
                         imgElement.classList.add('pulse-animation');
                     }, 1000);
@@ -808,12 +808,13 @@ document.addEventListener('DOMContentLoaded', () => {
             victorySound.play().catch(e => console.log('No se pudo reproducir el audio:', e));
         }
 
-        // Mostrar backdrop con transición
+        // Mostrar el backdrop con transición suave
         setTimeout(() => {
             backdrop.style.opacity = '1';
             gameOverDiv.style.transform = 'translateY(0)';
         }, 10);
 
+        // Botón de retorno
         document.getElementById('returnToRoom').addEventListener('click', async () => {
             if (isPerfectVictory) {
                 victorySound.pause();

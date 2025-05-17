@@ -1172,45 +1172,44 @@ body {
     }
 }
 
-.victory-container {
+/* Contenedor de la imagen - sin fondos ni bordes */
+.victory-image-container {
     position: relative;
-    margin: 20px 0;
-    perspective: 1000px;
+    margin: 10px 0;
     width: 100%;
-    height: 50vh;
-    /* Altura fija para mejor escalado */
     display: flex;
     justify-content: center;
     align-items: center;
-    overflow: hidden;
+    background: transparent;
+    padding: 0;
+    border: none;
 }
 
-/* Imagen de victoria */
+/* Imagen de victoria - completamente libre */
 .victory-image {
-    max-width: 90%;
-    max-height: 90%;
-    object-fit: contain;
-    transform-style: preserve-3d;
+    max-width: 85vw;
+    max-height: 60vh;
     opacity: 0;
-    transform: scale(0.5) rotateY(90deg);
-    transition: all 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.5));
-    will-change: transform, opacity;
+    transform: scale(0.9);
+    transition: all 0.7s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    object-fit: contain;
 }
 
 /* Animación de entrada */
 .victory-image.animate-in {
     opacity: 1;
-    transform: scale(1) rotateY(0deg);
+    transform: scale(1);
 }
 
-/* Animación de pulso */
+/* Animación de pulso sutil */
 .victory-image.pulse-animation {
-    animation: victoryPulse 3s infinite ease-in-out;
+    animation: subtlePulse 3s infinite ease-in-out;
 }
 
-/* Keyframes para animación de pulso */
-@keyframes victoryPulse {
+@keyframes subtlePulse {
 
     0%,
     100% {
@@ -1218,32 +1217,65 @@ body {
     }
 
     50% {
-        transform: scale(1.05);
+        transform: scale(1.03);
     }
 }
 
-/* Mensaje de victoria */
-.game-over-message {
-    color: #fff;
-    font-size: 1.5rem;
-    margin: 20px 0;
+/* Fondo del modal */
+.game-over-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* Contenedor del contenido */
+.game-over-notification {
+    background: linear-gradient(135deg, #2c3e50, #1a252f);
+    border-radius: 12px;
+    padding: 30px;
+    max-width: 90%;
+    width: 600px;
     text-align: center;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-    padding: 0 20px;
+    transform: translateY(-20px);
+    transition: transform 0.3s ease;
 }
 
-/* Ajustes para pantallas pequeñas */
-@media (max-width: 768px) {
-    .victory-container {
-        height: 40vh;
-    }
+/* Mensaje de texto */
+.game-over-message {
+    color: #ecf0f1;
+    font-size: 1.3rem;
+    margin: 20px 0;
+    line-height: 1.5;
+}
 
-    .victory-image {
-        max-width: 95%;
-        max-height: 95%;
-    }
+/* Botones */
+.game-over-buttons {
+    display: flex;
+    justify-content: center;
+    margin-top: 25px;
+}
 
-    .game-over-message {
-        font-size: 1.2rem;
-    }
+.game-over-btn {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.game-over-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
