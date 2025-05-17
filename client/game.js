@@ -731,125 +731,141 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleGameOver(message, isError = false) {
+        // 1. Deshabilitar interacciones
         canvas.style.pointerEvents = 'none';
         endTurnButton.disabled = true;
 
+        // 2. Crear elementos del DOM
         const backdrop = document.createElement('div');
         backdrop.className = 'game-over-backdrop';
-
-        const isVictory = !isError || message.includes('Victoria') || message.includes('ganan');
-        const isPerfectVictory = isVictory && gameState.remainingDeck === 0 && gameState.yourCards.length === 0;
+        backdrop.style.opacity = '0';
+        backdrop.style.display = 'flex';
+        backdrop.style.justifyContent = 'center';
+        backdrop.style.alignItems = 'center';
 
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
+        gameOverDiv.style.textAlign = 'center';
+
+        // 3. Determinar si es victoria perfecta
+        const isPerfectVictory = !isError && gameState.remainingDeck === 0 && gameState.yourCards.length === 0;
 
         if (isPerfectVictory) {
             gameOverDiv.innerHTML = `
             <div class="victory-container">
-                <img id="victoryImage" class="victory-image">
+                <img id="victoryImage" class="victory-image" 
+                     style="opacity:0; transform:scale(0.5); max-width:80vw; max-height:70vh;">
             </div>
-            <div class="game-over-buttons">
-                <button id="returnToRoom" class="game-over-btn">
+            <div class="game-over-buttons" style="margin-top:30px;">
+                <button id="returnToRoom" class="game-over-btn" 
+                        style="padding:12px 24px; background:#3498db; color:white; border:none; border-radius:5px;">
                     Volver a la Sala
                 </button>
             </div>
         `;
         } else {
-            const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
-            const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
-
+            // Código para otros casos de fin de juego
+            const title = isError ? '¡GAME OVER!' : '¡VICTORIA!';
             gameOverDiv.innerHTML = `
-            <h2 style="color: ${titleColor}">${title}</h2>
+            <h2 style="color:${isError ? '#e74c3c' : '#2ecc71'}">${title}</h2>
             <p>${message}</p>
-            <div class="game-over-buttons">
-                <button id="returnToRoom" class="game-over-btn" 
-                        style="background-color: ${titleColor}">
+            <div class="game-over-buttons" style="margin-top:20px;">
+                <button id="returnToRoom" class="game-over-btn"
+                        style="padding:12px 24px; background:${isError ? '#e74c3c' : '#2ecc71'}; color:white; border:none; border-radius:5px;">
                     Volver a la Sala
                 </button>
             </div>
         `;
         }
 
+        // 4. Añadir elementos al DOM
         document.body.appendChild(backdrop);
         backdrop.appendChild(gameOverDiv);
 
-        // Animación de aparición del modal
+        // 5. Animación de aparición
         setTimeout(() => {
+            backdrop.style.transition = 'opacity 0.5s ease';
             backdrop.style.opacity = '1';
-            gameOverDiv.style.transform = 'translateY(0)';
         }, 10);
 
+        // 6. Manejar victoria perfecta
         if (isPerfectVictory) {
-            victoryImage.src = 'victory-royale.png';
-            victoryImage.onload = () => {
-                const imgElement = document.getElementById('victoryImage');
+            const imgElement = document.getElementById('victoryImage');
 
-                // Configuración inicial de tamaños
-                const maxWidth = window.innerWidth * 0.8;
-                const maxHeight = window.innerHeight * 0.7;
-                const ratio = Math.min(maxWidth / victoryImage.width, maxHeight / victoryImage.height);
+            // Configurar imagen
+            victoryImage.onload = function () {
+                // Asegurar relación de aspecto
+                const ratio = Math.min(
+                    (window.innerWidth * 0.8) / this.width,
+                    (window.innerHeight * 0.7) / this.height
+                );
 
-                imgElement.style.width = `${victoryImage.width * ratio}px`;
-                imgElement.style.height = 'auto';
+                imgElement.src = this.src;
+                imgElement.style.width = `${this.width * ratio}px`;
 
-                // Estado inicial para la animación
-                imgElement.style.opacity = '0';
-                imgElement.style.transform = 'scale(0.5)';
-
-                // Animación de entrada de la imagen
+                // Animación de entrada
                 setTimeout(() => {
-                    imgElement.style.transition = 'all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                    imgElement.style.transition = 'all 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
                     imgElement.style.opacity = '1';
                     imgElement.style.transform = 'scale(1)';
 
-                    // Animación de pulso continuo después de la entrada
+                    // Animación de pulso continuo
                     setTimeout(() => {
-                        imgElement.style.transition = 'transform 1.5s ease-in-out infinite';
-
-                        // Definimos la animación con keyframes
-                        const pulseKeyframes = [
-                            { transform: 'scale(1)', offset: 0 },
-                            { transform: 'scale(1.1)', offset: 0.5 },
-                            { transform: 'scale(1)', offset: 1 }
+                        const pulseAnimation = [
+                            { transform: 'scale(1)' },
+                            { transform: 'scale(1.1)' },
+                            { transform: 'scale(1)' }
                         ];
 
-                        imgElement.animate(pulseKeyframes, {
+                        imgElement.animate(pulseAnimation, {
                             duration: 1500,
                             iterations: Infinity,
                             easing: 'ease-in-out'
                         });
-                    }, 600);
+                    }, 700);
                 }, 50);
             };
 
-            // Cargar y reproducir sonido de victoria
-            victorySound.src = 'victory-royale.mp3';
+            victoryImage.onerror = function () {
+                console.error('Error al cargar la imagen de victoria');
+                imgElement.style.display = 'none';
+            };
+
+            victoryImage.src = 'images/victory-royale.png'; // Asegurar ruta correcta
+
+            // Sonido de victoria
+            victorySound.src = 'sounds/victory.mp3';
             victorySound.volume = 0.3;
-            victorySound.play().catch(e => console.log('No se pudo reproducir el audio:', e));
+            victorySound.play().catch(e => console.error('Error de audio:', e));
         }
 
-        // Manejar el botón de retorno
-        document.getElementById('returnToRoom').addEventListener('click', async () => {
+        // 7. Configurar botón de regreso
+        document.getElementById('returnToRoom').addEventListener('click', async function () {
+            this.disabled = true;
+            this.textContent = 'Cargando...';
+
             if (isPerfectVictory) {
                 victorySound.pause();
-                victorySound.currentTime = 0;
             }
 
-            const button = document.getElementById('returnToRoom');
-            button.disabled = true;
-            button.textContent = 'Cargando...';
-
+            // Resetear estado del juego
             resetGameState();
 
-            socket.send(JSON.stringify({
-                type: 'reset_room',
-                roomId: roomId,
-                playerId: currentPlayer.id,
-                resetHistory: true
-            }));
+            try {
+                await socket.send(JSON.stringify({
+                    type: 'reset_room',
+                    roomId: roomId,
+                    playerId: currentPlayer.id,
+                    resetHistory: true
+                }));
 
-            await new Promise(resolve => setTimeout(resolve, 500));
-            window.location.href = 'sala.html';
+                setTimeout(() => {
+                    window.location.href = 'sala.html';
+                }, 500);
+            } catch (error) {
+                console.error('Error al resetear sala:', error);
+                window.location.href = 'sala.html';
+            }
         });
     }
 

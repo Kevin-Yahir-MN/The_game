@@ -1172,10 +1172,6 @@ body {
     }
 }
 
-.victory-pulse {
-    animation: pulse 2s infinite;
-}
-
 .game-over-backdrop {
     position: fixed;
     top: 0;
@@ -1187,70 +1183,26 @@ body {
     justify-content: center;
     align-items: center;
     z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.3s;
 }
 
 .game-over-notification {
-    background-color: #2c3e50;
-    padding: 30px;
-    border-radius: 15px;
-    max-width: 90%;
-    max-height: 90vh;
-    overflow-y: auto;
-    text-align: center;
-    transform: translateY(-50px);
-    transition: transform 0.3s;
-    color: white;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
-}
-
-.victory-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    margin-bottom: 20px;
 }
 
 .victory-image {
-    max-width: 70vw;
-    max-height: 60vh;
-    margin-bottom: 20px;
-    border-radius: 10px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-    transform-origin: center;
-    will-change: transform;
-    /* Optimización para animaciones */
-    opacity: 0;
-    /* Inicialmente invisible */
-    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+    max-width: 80vw;
+    max-height: 70vh;
+    margin-bottom: 30px;
 }
 
-.victory-message {
-    font-size: 2.5rem;
-    font-weight: bold;
-    color: #f1c40f;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    margin-top: 20px;
-    animation: textPulse 2s ease-in-out infinite;
-}
-
-@keyframes textPulse {
-    0% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.05);
-    }
-
-    100% {
-        transform: scale(1);
-    }
-}
-
-.game-over-notification {
-    /* Añade esto para que las animaciones funcionen mejor */
-    perspective: 1000px;
+.game-over-btn {
+    padding: 12px 24px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
 }
