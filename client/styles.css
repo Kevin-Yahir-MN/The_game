@@ -1172,35 +1172,22 @@ body {
     }
 }
 
-/* Elimina TODOS los bordes y efectos visuales alrededor de la imagen */
+/* Transición de aparición */
 .victory-image {
-    border: 0 !important;
-    outline: none !important;
-    box-shadow: none !important;
-    background: none !important;
-    -webkit-tap-highlight-color: transparent;
-    display: block;
-    margin: 0 auto;
-    padding: 0;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 1.2s ease-out, transform 1.2s ease-out;
+    will-change: opacity, transform;
 }
 
-/* Contenedor completamente transparente */
-.victory-image-container {
-    background: none !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-}
-
-/* Animación de entrada */
-.victory-image.animate-in {
+/* Estado final visible */
+.victory-image.visible {
     opacity: 1;
     transform: scale(1);
 }
 
-/* Animación de pulso sutil */
-.victory-image.pulse-animation {
+/* Animación de pulso continuo */
+.victory-image.pulse {
     animation: subtlePulse 3s infinite ease-in-out;
 }
 
@@ -1212,11 +1199,19 @@ body {
     }
 
     50% {
-        transform: scale(1.03);
+        transform: scale(1.05);
     }
 }
 
-/* Fondo del modal */
+/* Contenedor de imagen sin estilos */
+.victory-image-container {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 10px 0 !important;
+}
+
+/* Estilos base del modal */
 .game-over-backdrop {
     position: fixed;
     top: 0;
@@ -1232,7 +1227,6 @@ body {
     transition: opacity 0.3s ease;
 }
 
-/* Contenedor del contenido */
 .game-over-notification {
     background: linear-gradient(135deg, #2c3e50, #1a252f);
     border-radius: 12px;
@@ -1242,35 +1236,4 @@ body {
     text-align: center;
     transform: translateY(-20px);
     transition: transform 0.3s ease;
-}
-
-/* Mensaje de texto */
-.game-over-message {
-    color: #ecf0f1;
-    font-size: 1.3rem;
-    margin: 20px 0;
-    line-height: 1.5;
-}
-
-/* Botones */
-.game-over-buttons {
-    display: flex;
-    justify-content: center;
-    margin-top: 25px;
-}
-
-.game-over-btn {
-    background: #3498db;
-    color: white;
-    border: none;
-    padding: 12px 25px;
-    border-radius: 6px;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-.game-over-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }

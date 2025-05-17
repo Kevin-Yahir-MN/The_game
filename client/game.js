@@ -731,22 +731,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleGameOver(message, isError = false) {
+        // Deshabilitar interacciones
         canvas.style.pointerEvents = 'none';
         endTurnButton.disabled = true;
 
+        // Crear elementos del modal
         const backdrop = document.createElement('div');
         backdrop.className = 'game-over-backdrop';
-
-        const isVictory = !isError || message.includes('Victoria') || message.includes('ganan');
-        const isPerfectVictory = isVictory && gameState.remainingDeck === 0 && gameState.yourCards.length === 0;
 
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
 
+        // Determinar tipo de fin de juego
+        const isVictory = !isError || message.includes('Victoria') || message.includes('ganan');
+        const isPerfectVictory = isVictory && gameState.remainingDeck === 0 && gameState.yourCards.length === 0;
+
         if (isPerfectVictory) {
+            // Contenido para victoria perfecta
             gameOverDiv.innerHTML = `
             <div class="victory-image-container">
-                <img id="victoryImage" class="victory-image">
+                <img id="victoryImage" class="victory-image" 
+                     style="border:none; outline:none; background:transparent;">
             </div>
             <div class="game-over-message">${message}</div>
             <div class="game-over-buttons">
@@ -756,6 +761,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
         } else {
+            // Contenido para otros casos
             const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
             const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
 
@@ -771,50 +777,51 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         }
 
+        // Añadir elementos al DOM
         document.body.appendChild(backdrop);
         backdrop.appendChild(gameOverDiv);
 
-        if (isPerfectVictory) {
-            victoryImage.src = 'victory-royale.png';
-            victoryImage.onload = () => {
-                const imgElement = document.getElementById('victoryImage');
-                imgElement.src = victoryImage.src;
-
-                // Escalado responsivo mejorado
-                const maxWidth = window.innerWidth * 0.85;  // 85% del ancho de la ventana
-                const maxHeight = window.innerHeight * 0.6; // 60% del alto de la ventana
-                const ratio = Math.min(
-                    maxWidth / victoryImage.naturalWidth,
-                    maxHeight / victoryImage.naturalHeight
-                );
-
-                imgElement.style.width = `${victoryImage.naturalWidth * ratio}px`;
-                imgElement.style.height = 'auto'; // Mantener proporción
-                imgElement.style.display = 'block';
-                imgElement.style.margin = '0 auto';
-
-                // Animación de entrada
-                setTimeout(() => {
-                    imgElement.classList.add('animate-in');
-
-                    // Animación de pulso después de 1 segundo
-                    setTimeout(() => {
-                        imgElement.classList.add('pulse-animation');
-                    }, 1000);
-                }, 100);
-            };
-
-            victorySound.src = 'victory-royale.mp3';
-            victorySound.play().catch(e => console.log('No se pudo reproducir el audio:', e));
-        }
-
-        // Mostrar el backdrop con transición suave
+        // Mostrar el modal con transición
         setTimeout(() => {
             backdrop.style.opacity = '1';
             gameOverDiv.style.transform = 'translateY(0)';
         }, 10);
 
-        // Botón de retorno
+        // Manejar la imagen de victoria perfecta
+        if (isPerfectVictory) {
+            victoryImage.src = 'victory-royale.png';
+            victoryImage.onload = function () {
+                const imgElement = document.getElementById('victoryImage');
+
+                // Ajuste responsivo de tamaño
+                const maxWidth = window.innerWidth * 0.85;
+                const maxHeight = window.innerHeight * 0.6;
+                const ratio = Math.min(
+                    maxWidth / this.naturalWidth,
+                    maxHeight / this.naturalHeight
+                );
+
+                imgElement.style.width = `${this.naturalWidth * ratio}px`;
+                imgElement.style.height = 'auto';
+
+                // Secuencia de animaciones
+                setTimeout(() => {
+                    // 1. Transición de aparición
+                    imgElement.classList.add('visible');
+
+                    // 2. Animación de pulso (después de 1.2s)
+                    setTimeout(() => {
+                        imgElement.classList.add('pulse');
+                    }, 1200);
+                }, 100);
+            };
+
+            // Sonido de victoria
+            victorySound.src = 'victory-royale.mp3';
+            victorySound.play().catch(e => console.error('Error de audio:', e));
+        }
+
+        // Manejar el botón de retorno
         document.getElementById('returnToRoom').addEventListener('click', async () => {
             if (isPerfectVictory) {
                 victorySound.pause();
@@ -825,8 +832,10 @@ document.addEventListener('DOMContentLoaded', () => {
             button.disabled = true;
             button.textContent = 'Cargando...';
 
+            // Resetear estado del juego
             resetGameState();
 
+            // Enviar mensaje al servidor
             socket.send(JSON.stringify({
                 type: 'reset_room',
                 roomId: roomId,
@@ -834,6 +843,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 resetHistory: true
             }));
 
+            // Pequeño delay antes de redireccionar
             await new Promise(resolve => setTimeout(resolve, 500));
             window.location.href = 'sala.html';
         });
