@@ -780,13 +780,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const imgElement = document.getElementById('victoryImage');
                 imgElement.src = victoryImage.src;
 
-                // Ajustar tamaño responsivo
-                const maxWidth = window.innerWidth * 0.8;
-                const maxHeight = window.innerHeight * 0.7;
-                const ratio = Math.min(maxWidth / victoryImage.width, maxHeight / victoryImage.height);
+                // Escalado responsivo mejorado
+                const container = document.querySelector('.victory-container');
+                const containerWidth = container.offsetWidth;
+                const containerHeight = container.offsetHeight;
 
-                imgElement.style.width = `${victoryImage.width * ratio}px`;
-                imgElement.style.height = `${victoryImage.height * ratio}px`;
+                const widthRatio = containerWidth / victoryImage.width;
+                const heightRatio = containerHeight / victoryImage.height;
+                const scaleRatio = Math.min(widthRatio, heightRatio) * 0.9; // 90% del espacio disponible
+
+                imgElement.style.width = `${victoryImage.width * scaleRatio}px`;
+                imgElement.style.height = `${victoryImage.height * scaleRatio}px`;
+                imgElement.style.objectFit = 'contain';
 
                 // Animación de entrada
                 setTimeout(() => {
@@ -795,7 +800,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Iniciar pulso después de la entrada
                     setTimeout(() => {
                         imgElement.classList.add('pulse-animation');
-                        createConfetti(); // Efecto de confeti
                     }, 1000);
                 }, 100);
             };
@@ -809,63 +813,6 @@ document.addEventListener('DOMContentLoaded', () => {
             backdrop.style.opacity = '1';
             gameOverDiv.style.transform = 'translateY(0)';
         }, 10);
-
-        // Función para crear partículas de confeti
-        function createConfetti() {
-            const container = document.querySelector('.victory-container');
-            if (!container) return;
-
-            const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffffff'];
-            const shapes = ['circle', 'square', 'triangle'];
-
-            for (let i = 0; i < 150; i++) {
-                const particle = document.createElement('div');
-                particle.classList.add('victory-particle');
-
-                // Configuración aleatoria
-                const left = Math.random() * 100;
-                const size = Math.random() * 12 + 5;
-                const shape = shapes[Math.floor(Math.random() * shapes.length)];
-                const color = colors[Math.floor(Math.random() * colors.length)];
-                const duration = Math.random() * 3 + 2;
-                const delay = Math.random() * 3;
-
-                // Estilo de la partícula
-                particle.style.left = `${left}%`;
-                particle.style.bottom = '-10px';
-                particle.style.width = `${size}px`;
-                particle.style.height = `${size}px`;
-                particle.style.backgroundColor = color;
-                particle.style.animationDuration = `${duration}s`;
-                particle.style.animationDelay = `${delay}s`;
-
-                // Forma de la partícula
-                if (shape === 'circle') {
-                    particle.style.borderRadius = '50%';
-                } else if (shape === 'triangle') {
-                    particle.style.width = '0';
-                    particle.style.height = '0';
-                    particle.style.backgroundColor = 'transparent';
-                    particle.style.borderLeft = `${size / 2}px solid transparent`;
-                    particle.style.borderRight = `${size / 2}px solid transparent`;
-                    particle.style.borderBottom = `${size}px solid ${color}`;
-                }
-
-                container.appendChild(particle);
-
-                // Eliminar la partícula después de la animación
-                setTimeout(() => {
-                    if (particle.parentNode) {
-                        particle.remove();
-                    }
-                }, (duration + delay) * 1000);
-            }
-
-            // Repetir el efecto cada 3 segundos
-            if (isPerfectVictory) {
-                setTimeout(createConfetti, 3000);
-            }
-        }
 
         document.getElementById('returnToRoom').addEventListener('click', async () => {
             if (isPerfectVictory) {
