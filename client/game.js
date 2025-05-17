@@ -775,7 +775,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Si es victoria perfecta, cargar y mostrar imagen y reproducir sonido
         if (isPerfectVictory) {
-            victoryImage.src = 'ruta/a/tu/imagen-de-victoria.png'; // Cambia esta ruta
+            victoryImage.src = 'victory-royale.png'; // Cambia esta ruta
             victoryImage.onload = () => {
                 const imgElement = document.getElementById('victoryImage');
                 imgElement.src = victoryImage.src;
@@ -789,7 +789,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 imgElement.style.height = `${victoryImage.height * ratio}px`;
             };
 
-            victorySound.src = 'ruta/a/tu/cancion-de-victoria.mp3';
+            victorySound.src = 'victory-royale.mp3';
             victorySound.play().catch(e => console.log('No se pudo reproducir el audio:', e));
         }
 
