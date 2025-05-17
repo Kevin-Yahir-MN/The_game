@@ -731,141 +731,94 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleGameOver(message, isError = false) {
-        // 1. Deshabilitar interacciones
         canvas.style.pointerEvents = 'none';
         endTurnButton.disabled = true;
 
-        // 2. Crear elementos del DOM
         const backdrop = document.createElement('div');
         backdrop.className = 'game-over-backdrop';
-        backdrop.style.opacity = '0';
-        backdrop.style.display = 'flex';
-        backdrop.style.justifyContent = 'center';
-        backdrop.style.alignItems = 'center';
+
+        const isVictory = !isError || message.includes('Victoria') || message.includes('ganan');
+        const isPerfectVictory = isVictory && gameState.remainingDeck === 0 && gameState.yourCards.length === 0;
 
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
-        gameOverDiv.style.textAlign = 'center';
 
-        // 3. Determinar si es victoria perfecta
-        const isPerfectVictory = !isError && gameState.remainingDeck === 0 && gameState.yourCards.length === 0;
-
+        // Solo mostramos la imagen en caso de victoria perfecta
         if (isPerfectVictory) {
             gameOverDiv.innerHTML = `
-            <div class="victory-container">
-                <img id="victoryImage" class="victory-image" 
-                     style="opacity:0; transform:scale(0.5); max-width:80vw; max-height:70vh;">
-            </div>
-            <div class="game-over-buttons" style="margin-top:30px;">
-                <button id="returnToRoom" class="game-over-btn" 
-                        style="padding:12px 24px; background:#3498db; color:white; border:none; border-radius:5px;">
+            <img id="victoryImage" class="victory-image">
+            <div class="game-over-buttons">
+                <button id="returnToRoom" class="game-over-btn">
                     Volver a la Sala
                 </button>
             </div>
         `;
         } else {
-            // Código para otros casos de fin de juego
-            const title = isError ? '¡GAME OVER!' : '¡VICTORIA!';
+            // Mantenemos el mensaje normal para otros tipos de fin de juego
+            const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
+            const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
+
             gameOverDiv.innerHTML = `
-            <h2 style="color:${isError ? '#e74c3c' : '#2ecc71'}">${title}</h2>
+            <h2 style="color: ${titleColor}">${title}</h2>
             <p>${message}</p>
-            <div class="game-over-buttons" style="margin-top:20px;">
-                <button id="returnToRoom" class="game-over-btn"
-                        style="padding:12px 24px; background:${isError ? '#e74c3c' : '#2ecc71'}; color:white; border:none; border-radius:5px;">
+            <div class="game-over-buttons">
+                <button id="returnToRoom" class="game-over-btn" 
+                        style="background-color: ${titleColor}">
                     Volver a la Sala
                 </button>
             </div>
         `;
         }
 
-        // 4. Añadir elementos al DOM
         document.body.appendChild(backdrop);
         backdrop.appendChild(gameOverDiv);
 
-        // 5. Animación de aparición
-        setTimeout(() => {
-            backdrop.style.transition = 'opacity 0.5s ease';
-            backdrop.style.opacity = '1';
-        }, 10);
-
-        // 6. Manejar victoria perfecta
+        // Si es victoria perfecta, cargar y mostrar imagen y reproducir sonido
         if (isPerfectVictory) {
-            const imgElement = document.getElementById('victoryImage');
+            victoryImage.src = 'ruta/a/tu/imagen-de-victoria.png'; // Cambia esta ruta
+            victoryImage.onload = () => {
+                const imgElement = document.getElementById('victoryImage');
+                imgElement.src = victoryImage.src;
 
-            // Configurar imagen
-            victoryImage.onload = function () {
-                // Asegurar relación de aspecto
-                const ratio = Math.min(
-                    (window.innerWidth * 0.8) / this.width,
-                    (window.innerHeight * 0.7) / this.height
-                );
+                // Ajustamos el tamaño después de cargar
+                const maxWidth = window.innerWidth * 0.8;
+                const maxHeight = window.innerHeight * 0.7;
+                const ratio = Math.min(maxWidth / victoryImage.width, maxHeight / victoryImage.height);
 
-                imgElement.src = this.src;
-                imgElement.style.width = `${this.width * ratio}px`;
-
-                // Animación de entrada
-                setTimeout(() => {
-                    imgElement.style.transition = 'all 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
-                    imgElement.style.opacity = '1';
-                    imgElement.style.transform = 'scale(1)';
-
-                    // Animación de pulso continuo
-                    setTimeout(() => {
-                        const pulseAnimation = [
-                            { transform: 'scale(1)' },
-                            { transform: 'scale(1.1)' },
-                            { transform: 'scale(1)' }
-                        ];
-
-                        imgElement.animate(pulseAnimation, {
-                            duration: 1500,
-                            iterations: Infinity,
-                            easing: 'ease-in-out'
-                        });
-                    }, 700);
-                }, 50);
+                imgElement.style.width = `${victoryImage.width * ratio}px`;
+                imgElement.style.height = `${victoryImage.height * ratio}px`;
             };
 
-            victoryImage.onerror = function () {
-                console.error('Error al cargar la imagen de victoria');
-                imgElement.style.display = 'none';
-            };
-
-            victoryImage.src = 'images/victory-royale.png'; // Asegurar ruta correcta
-
-            // Sonido de victoria
-            victorySound.src = 'sounds/victory.mp3';
-            victorySound.volume = 0.3;
-            victorySound.play().catch(e => console.error('Error de audio:', e));
+            victorySound.src = 'ruta/a/tu/cancion-de-victoria.mp3';
+            victorySound.play().catch(e => console.log('No se pudo reproducir el audio:', e));
         }
 
-        // 7. Configurar botón de regreso
-        document.getElementById('returnToRoom').addEventListener('click', async function () {
-            this.disabled = true;
-            this.textContent = 'Cargando...';
+        setTimeout(() => {
+            backdrop.style.opacity = '1';
+            gameOverDiv.style.transform = 'translateY(0)';
+        }, 10);
 
+        document.getElementById('returnToRoom').addEventListener('click', async () => {
             if (isPerfectVictory) {
                 victorySound.pause();
+                victorySound.currentTime = 0;
             }
 
-            // Resetear estado del juego
+            const button = document.getElementById('returnToRoom');
+            button.disabled = true;
+            button.textContent = 'Cargando...';
+
             resetGameState();
 
-            try {
-                await socket.send(JSON.stringify({
-                    type: 'reset_room',
-                    roomId: roomId,
-                    playerId: currentPlayer.id,
-                    resetHistory: true
-                }));
+            socket.send(JSON.stringify({
+                type: 'reset_room',
+                roomId: roomId,
+                playerId: currentPlayer.id,
+                resetHistory: true
+            }));
 
-                setTimeout(() => {
-                    window.location.href = 'sala.html';
-                }, 500);
-            } catch (error) {
-                console.error('Error al resetear sala:', error);
-                window.location.href = 'sala.html';
-            }
+            await new Promise(resolve => setTimeout(resolve, 500));
+            window.location.href = 'sala.html';
         });
     }
 
