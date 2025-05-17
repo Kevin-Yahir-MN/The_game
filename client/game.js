@@ -747,7 +747,6 @@ document.addEventListener('DOMContentLoaded', () => {
             gameOverDiv.innerHTML = `
             <div class="victory-container">
                 <img id="victoryImage" class="victory-image">
-                <p class="victory-message">¡VICTORIA PERFECTA!</p>
             </div>
             <div class="game-over-buttons">
                 <button id="returnToRoom" class="game-over-btn">
@@ -784,11 +783,10 @@ document.addEventListener('DOMContentLoaded', () => {
             victoryImage.src = 'victory-royale.png';
             victoryImage.onload = () => {
                 const imgElement = document.getElementById('victoryImage');
-                const messageElement = document.querySelector('.victory-message');
 
                 // Configuración inicial de tamaños
-                const maxWidth = window.innerWidth * 0.7;
-                const maxHeight = window.innerHeight * 0.6;
+                const maxWidth = window.innerWidth * 0.8;
+                const maxHeight = window.innerHeight * 0.7;
                 const ratio = Math.min(maxWidth / victoryImage.width, maxHeight / victoryImage.height);
 
                 imgElement.style.width = `${victoryImage.width * ratio}px`;
@@ -796,55 +794,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Estado inicial para la animación
                 imgElement.style.opacity = '0';
-                imgElement.style.transform = 'scale(0.7) translateY(20px)';
-                messageElement.style.opacity = '0';
-                messageElement.style.transform = 'translateY(20px)';
+                imgElement.style.transform = 'scale(0.5)';
 
                 // Animación de entrada de la imagen
                 setTimeout(() => {
                     imgElement.style.transition = 'all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
                     imgElement.style.opacity = '1';
-                    imgElement.style.transform = 'scale(1) translateY(0)';
+                    imgElement.style.transform = 'scale(1)';
 
-                    // Animación de entrada del texto
+                    // Animación de pulso continuo después de la entrada
                     setTimeout(() => {
-                        messageElement.style.transition = 'all 0.5s ease-out 0.2s';
-                        messageElement.style.opacity = '1';
-                        messageElement.style.transform = 'translateY(0)';
+                        imgElement.style.transition = 'transform 1.5s ease-in-out infinite';
 
-                        // Animación de pulso continuo
-                        setTimeout(() => {
-                            imgElement.style.transition = 'transform 1.8s ease-in-out infinite';
+                        // Definimos la animación con keyframes
+                        const pulseKeyframes = [
+                            { transform: 'scale(1)', offset: 0 },
+                            { transform: 'scale(1.1)', offset: 0.5 },
+                            { transform: 'scale(1)', offset: 1 }
+                        ];
 
-                            // Definimos la animación con keyframes para mejor control
-                            const pulseKeyframes = [
-                                { transform: 'scale(1)', offset: 0 },
-                                { transform: 'scale(1.08)', offset: 0.5 },
-                                { transform: 'scale(1)', offset: 1 }
-                            ];
-
-                            const pulseOptions = {
-                                duration: 1800,
-                                iterations: Infinity,
-                                easing: 'ease-in-out'
-                            };
-
-                            imgElement.animate(pulseKeyframes, pulseOptions);
-
-                            // Animación sutil para el texto
-                            const textKeyframes = [
-                                { transform: 'scale(1)', textShadow: '0 0 10px rgba(241, 196, 15, 0.5)', offset: 0 },
-                                { transform: 'scale(1.03)', textShadow: '0 0 15px rgba(241, 196, 15, 0.8)', offset: 0.5 },
-                                { transform: 'scale(1)', textShadow: '0 0 10px rgba(241, 196, 15, 0.5)', offset: 1 }
-                            ];
-
-                            messageElement.animate(textKeyframes, {
-                                duration: 2000,
-                                iterations: Infinity
-                            });
-
-                        }, 300);
-                    }, 200);
+                        imgElement.animate(pulseKeyframes, {
+                            duration: 1500,
+                            iterations: Infinity,
+                            easing: 'ease-in-out'
+                        });
+                    }, 600);
                 }, 50);
             };
 
