@@ -1214,41 +1214,43 @@ body {
 }
 
 .victory-image {
-    max-width: 100%;
+    max-width: 70vw;
     max-height: 60vh;
     margin-bottom: 20px;
     border-radius: 10px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    transform-origin: center;
+    will-change: transform;
+    /* Optimización para animaciones */
+    opacity: 0;
+    /* Inicialmente invisible */
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
 }
 
 .victory-message {
-    font-size: 2rem;
+    font-size: 2.5rem;
     font-weight: bold;
     color: #f1c40f;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    margin-top: 10px;
-}
-
-.game-over-buttons {
     margin-top: 20px;
+    animation: textPulse 2s ease-in-out infinite;
 }
 
-.game-over-btn {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 5px;
-    background-color: #3498db;
-    color: white;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: background-color 0.3s;
+@keyframes textPulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
 }
 
-.game-over-btn:hover {
-    background-color: #2980b9;
-}
-
-.game-over-btn:disabled {
-    background-color: #7f8c8d;
-    cursor: not-allowed;
+.game-over-notification {
+    /* Añade esto para que las animaciones funcionen mejor */
+    perspective: 1000px;
 }
