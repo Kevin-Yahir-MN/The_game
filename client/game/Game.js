@@ -29,6 +29,7 @@ export class Game {
             return;
         }
 
+        this.cardPool = new CardPool();
         this.gameState = new GameState();
         this.gameState.currentPlayer = this.currentPlayer;
         this.gameState.canvas = this.canvas;
