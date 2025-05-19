@@ -4,9 +4,6 @@ import { PlayersPanel } from './PlayersPanel.js';
 
 export class Renderer {
     constructor({ canvas, gameState }) {
-        if (!canvas || !(canvas instanceof HTMLCanvasElement)) throw new Error('Invalid canvas');
-        if (!gameState) throw new Error('GameState required');
-
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.gameState = gameState;
@@ -37,21 +34,20 @@ export class Renderer {
     }
 
     render(timestamp) {
-        if (this.dirtyAreas.length > 0) {
-            this.dirtyAreas.forEach(area => {
-                this.ctx.clearRect(area.x - 1, area.y - 1, area.width + 2, area.height + 2);
-            });
-            this.clearDirtyAreas();
-        } else if (this.needsRedraw) {
+        if (this.dirtyAreas.length > 0 || this.needsRedraw) {
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
             this.ctx.fillStyle = '#1a6b1a';
             this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
             this.clearDirtyAreas();
+            this.needsRedraw = false;
         }
 
         this.boardRenderer.draw(this.ctx);
         this.playerCardsRenderer.draw(this.ctx);
-        if (this.gameState.dragStartCard) this.gameState.dragStartCard.draw(this.ctx);
+
+        if (this.gameState.isDragging && this.gameState.dragStartCard) {
+            this.gameState.dragStartCard.draw(this.ctx);
+        }
     }
 
     updateGameInfo(deckEmpty = false) {
@@ -60,9 +56,15 @@ export class Renderer {
         const progressTextElement = document.getElementById('progressText');
         const progressBarElement = document.getElementById('progressBar');
 
-        if (!currentTurnElement || !remainingDeckElement || !progressTextElement || !progressBarElement) return;
+        if (!currentTurnElement || !remainingDeckElement || !progressTextElement || !progressBarElement) {
+            return;
+        }
 
-        const currentPlayerObj = this.gameState.players.find(p => p.id === this.gameState.currentPlayer.id) || { cardsPlayedThisTurn: 0 };
+        const currentPlayerObj = this.gameState.players.find(p => p.id === this.gameState.currentPlayer.id) || {
+            cardsPlayedThisTurn: 0,
+            totalCardsPlayed: 0
+        };
+
         const minCardsRequired = deckEmpty || this.gameState.remainingDeck === 0 ? 1 : 2;
         const cardsPlayed = currentPlayerObj.cardsPlayedThisTurn || 0;
 

@@ -2,9 +2,6 @@ import { CARD_WIDTH, CARD_HEIGHT, COLUMN_SPACING } from '../core/Constants.js';
 
 export class BoardRenderer {
     constructor({ canvas, gameState }) {
-        if (!canvas) throw new Error('Canvas required');
-        if (!gameState) throw new Error('GameState required');
-
         this.canvas = canvas;
         this.gameState = gameState;
         this.cardPool = gameState.cardPool;
@@ -13,6 +10,7 @@ export class BoardRenderer {
             x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
             y: canvas.height * 0.3
         };
+        this.historyIconY = this.boardPosition.y + CARD_HEIGHT + 15;
     }
 
     draw(ctx) {
@@ -69,6 +67,7 @@ export class BoardRenderer {
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const isColumnAnimating = this.gameState.animatingCards.some(anim => anim.column === col);
+
             if (!isColumnAnimating) {
                 const value = i < 2 ? this.gameState.board.ascending[i % 2] : this.gameState.board.descending[i % 2];
                 const wasPlayedThisTurn = this.gameState.cardsPlayedThisTurn.some(
@@ -85,5 +84,48 @@ export class BoardRenderer {
                 card.draw(ctx);
             }
         });
+
+        this.drawHistoryIcons(ctx);
+    }
+
+    drawHistoryIcons(ctx) {
+        if (!this.gameState.historyIcon?.complete) return;
+
+        const shouldAnimate = this.gameState.currentTurn === this.gameState.currentPlayer.id;
+        const pulseProgress = shouldAnimate ? this.calculatePulseProgress() : 0;
+
+        this.gameState.historyIconAreas = [];
+
+        ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
+            const baseX = this.boardPosition.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
+            const baseY = this.historyIconY;
+
+            this.gameState.historyIconAreas.push({
+                x: baseX,
+                y: baseY,
+                width: 40,
+                height: 40,
+                column: col
+            });
+
+            const scale = shouldAnimate ? (1 + 0.2 * pulseProgress) : 1;
+
+            ctx.save();
+            ctx.translate(baseX + 20, baseY + 20);
+            ctx.scale(scale, scale);
+            ctx.translate(-20, -20);
+            ctx.drawImage(this.gameState.historyIcon, 0, 0, 40, 40);
+            ctx.restore();
+        });
+    }
+
+    calculatePulseProgress() {
+        const now = Date.now();
+        const timeSinceLastPulse = (now - this.gameState.historyIconsAnimation.lastPulseTime) %
+            this.gameState.historyIconsAnimation.pulseInterval;
+        return (this.gameState.currentTurn === this.gameState.currentPlayer.id &&
+            timeSinceLastPulse < this.gameState.historyIconsAnimation.pulseDuration)
+            ? Math.sin((timeSinceLastPulse / this.gameState.historyIconsAnimation.pulseDuration) * Math.PI)
+            : 0;
     }
 }
