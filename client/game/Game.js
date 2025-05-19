@@ -12,23 +12,19 @@ import { CARD_WIDTH, CARD_HEIGHT, COLUMN_SPACING, TARGET_FPS } from './core/Cons
 
 export class Game {
     constructor() {
-        // 1. Verificar elementos del DOM
+        // 1. Inicialización del canvas
         this.canvas = document.getElementById('gameCanvas');
         if (!(this.canvas instanceof HTMLCanvasElement)) {
             throw new Error('Canvas element not found or invalid');
         }
+        this.ctx = this.canvas.getContext('2d');
 
-        this.endTurnButton = document.getElementById('endTurnBtn');
-        if (!this.endTurnButton) {
-            console.warn('End turn button not found');
-        }
-
-        // 2. Inicializar propiedades del juego
+        // 2. Inicializar componentes básicos
         this.cardPool = new CardPool();
         this.gameState = new GameState();
-        this.gameState.cardPool = this.cardPool;
+        this.gameState.setCardPool(this.cardPool);
 
-        // 3. Configurar jugador actual
+        // 3. Configuración del jugador
         this.currentPlayer = {
             id: sanitizeInput(sessionStorage.getItem('playerId')),
             name: sanitizeInput(sessionStorage.getItem('playerName')),
@@ -36,23 +32,15 @@ export class Game {
         };
         this.gameState.currentPlayer = this.currentPlayer;
         this.gameState.canvas = this.canvas;
-        this.gameState.endTurnButton = this.endTurnButton;
 
-        // 4. Configurar sala
-        this.roomId = sanitizeInput(sessionStorage.getItem('roomId'));
-        if (!this.roomId) {
-            window.location.href = 'sala.html';
-            return;
-        }
-
-        // 5. Posiciones del tablero
+        // 4. Configuración del tablero
         this.gameState.BOARD_POSITION = {
             x: this.canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
             y: this.canvas.height * 0.3
         };
         this.gameState.PLAYER_CARDS_Y = this.canvas.height * 0.6;
 
-        // 6. Inicializar componentes
+        // 5. Inicialización de subsistemas
         this.notificationManager = new NotificationManager();
         this.historyManager = new HistoryManager(this.gameState);
         this.renderer = new Renderer({
@@ -73,13 +61,13 @@ export class Game {
             this.webSocketManager
         );
 
-        this.webSocketManager.messageHandler = this.messageHandler;
         this.dragManager = new DragManager(
             this.canvas,
             this.gameState,
             this.renderer,
             this.messageHandler
         );
+
         this.touchManager = new TouchManager(
             this.canvas,
             this.historyManager

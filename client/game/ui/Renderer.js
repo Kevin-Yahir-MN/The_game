@@ -4,22 +4,17 @@ import { PlayersPanel } from './PlayersPanel.js';
 
 export class Renderer {
     constructor({ canvas, gameState }) {
-        // Validaciones de entrada
         if (!canvas || !(canvas instanceof HTMLCanvasElement)) {
-            throw new Error('Renderer: Se requiere un elemento canvas válido');
+            throw new Error('Invalid canvas element provided to Renderer');
         }
-
         if (!gameState || !gameState.cardPool) {
-            throw new Error('Renderer: Se requiere gameState con cardPool');
+            throw new Error('Invalid gameState provided to Renderer');
         }
 
-        // Propiedades principales
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.gameState = gameState;
-        this.cardPool = gameState.cardPool;
 
-        // Sub-renderers
         this.boardRenderer = new BoardRenderer({
             canvas: this.canvas,
             gameState: this.gameState
@@ -31,8 +26,6 @@ export class Renderer {
         });
 
         this.playersPanel = new PlayersPanel(this.gameState);
-
-        // Estado de renderizado
         this.dirtyAreas = [];
         this.needsRedraw = true;
     }

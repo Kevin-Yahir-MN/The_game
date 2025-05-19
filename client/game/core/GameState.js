@@ -3,18 +3,21 @@ export class GameState {
         this.players = [];
         this.yourCards = [];
         this.board = { ascending: [1, 1], descending: [100, 100] };
-        this.cardPool = null;
         this.currentTurn = null;
         this.remainingDeck = 98;
         this.initialCards = 6;
         this.cardsPlayedThisTurn = [];
         this.animatingCards = [];
         this.columnHistory = { asc1: [1], asc2: [1], desc1: [100], desc2: [100] };
-        this.boardCards = [];
-        this.historyIconAreas = [];
+        this.cardPool = null;
+        this.currentPlayer = null;
+        this.canvas = null;
+        this.BOARD_POSITION = null;
+        this.PLAYER_CARDS_Y = null;
     }
 
     setCardPool(cardPool) {
+        if (!cardPool) throw new Error('CardPool is required');
         this.cardPool = cardPool;
     }
 

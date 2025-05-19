@@ -2,6 +2,10 @@ import { CARD_WIDTH, CARD_HEIGHT, COLUMN_SPACING } from '../core/Constants.js';
 
 export class BoardRenderer {
     constructor(canvas, gameState) {
+        if (!gameState?.cardPool) {
+            throw new Error('BoardRenderer: gameState.cardPool is required');
+        }
+
         this.canvas = canvas;
         this.gameState = gameState;
         this.cardPool = gameState.cardPool;
