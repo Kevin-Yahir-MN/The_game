@@ -7,7 +7,7 @@ export class Renderer {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.gameState = gameState;
-        this.boardRenderer = new BoardRenderer(canvas, gameState);
+        this.boardRenderer = new BoardRenderer(canvas, gameState, cardPool);
         this.playerCardsRenderer = new PlayerCardsRenderer(canvas, gameState);
         this.playersPanel = new PlayersPanel(gameState);
         this.dirtyAreas = [];

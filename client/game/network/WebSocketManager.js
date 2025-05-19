@@ -1,10 +1,10 @@
 import { WS_URL, MAX_RECONNECT_ATTEMPTS, RECONNECT_BASE_DELAY } from '../core/Constants.js';
 
 export class WebSocketManager {
-    constructor(roomId, playerId, messageHandler) {
+    constructor(roomId, playerId, notificationManager) {
         this.roomId = roomId;
         this.playerId = playerId;
-        this.messageHandler = messageHandler;
+        this.notificationManager = notificationManager;
         this.reconnectAttempts = 0;
         this.reconnectTimeout = null;
         this.socket = null;
@@ -33,7 +33,7 @@ export class WebSocketManager {
             clearTimeout(this.reconnectTimeout);
             this.reconnectAttempts = 0;
             this.updateConnectionStatus('Conectado');
-            this.messageHandler.showNotification('Conectado al servidor');
+            this.notificationManager.showNotification('Conectado al servidor');
 
             this.sendMessage({
                 type: 'get_full_state',

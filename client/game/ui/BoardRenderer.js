@@ -4,6 +4,7 @@ export class BoardRenderer {
     constructor(canvas, gameState) {
         this.canvas = canvas;
         this.gameState = gameState;
+        this.cardPool = cardPool;
         this.boardPosition = {
             x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
             y: canvas.height * 0.3
@@ -72,7 +73,7 @@ export class BoardRenderer {
                     move => move.value === value && move.position === col
                 );
 
-                const card = this.gameState.cardPool.get(
+                const card = this.cardPool.get(  // Usamos this.cardPool
                     value,
                     this.boardPosition.x + (CARD_WIDTH + COLUMN_SPACING) * i,
                     this.boardPosition.y,
