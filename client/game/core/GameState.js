@@ -3,6 +3,7 @@ export class GameState {
         this.players = [];
         this.yourCards = [];
         this.board = { ascending: [1, 1], descending: [100, 100] };
+        this.cardPool = null;
         this.currentTurn = null;
         this.remainingDeck = 98;
         this.initialCards = 6;
@@ -11,6 +12,10 @@ export class GameState {
         this.columnHistory = { asc1: [1], asc2: [1], desc1: [100], desc2: [100] };
         this.boardCards = [];
         this.historyIconAreas = [];
+    }
+
+    setCardPool(cardPool) {
+        this.cardPool = cardPool;
     }
 
     getStackValue(position) {

@@ -29,8 +29,8 @@ export class Game {
             return;
         }
 
-        this.cardPool = new CardPool();
         this.gameState = new GameState();
+        this.gameState.cardPool = this.cardPool;
         this.gameState.currentPlayer = this.currentPlayer;
         this.gameState.canvas = this.canvas;
         this.gameState.endTurnButton = this.endTurnButton;
@@ -39,7 +39,10 @@ export class Game {
 
         this.notificationManager = new NotificationManager();
         this.historyManager = new HistoryManager(this.gameState);
-        this.renderer = new Renderer(this.canvas, this.gameState, this.cardPool);
+        this.renderer = new Renderer({
+            canvas: this.canvas,
+            gameState: this.gameState
+        });
         this.webSocketManager = new WebSocketManager(this.roomId, this.currentPlayer.id);
         this.messageHandler = new MessageHandler(this.gameState, this.renderer, this.notificationManager, this.webSocketManager);
 

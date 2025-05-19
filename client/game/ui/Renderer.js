@@ -8,8 +8,16 @@ export class Renderer {
         this.ctx = canvas.getContext('2d');
         this.gameState = gameState;
         this.cardPool = cardPool;
-        this.boardRenderer = new BoardRenderer(canvas, gameState, cardPool);
-        this.playerCardsRenderer = new PlayerCardsRenderer(canvas, gameState, cardPool);
+        this.boardRenderer = new BoardRenderer({
+            canvas,
+            gameState // cardPool está dentro de gameState
+        });
+
+        this.playerCardsRenderer = new PlayerCardsRenderer({
+            canvas,
+            gameState
+        });
+
         this.playersPanel = new PlayersPanel(gameState);
         this.dirtyAreas = [];
         this.needsRedraw = true;
