@@ -12,19 +12,13 @@ import { CARD_WIDTH, CARD_HEIGHT, COLUMN_SPACING, TARGET_FPS } from './core/Cons
 
 export class Game {
     constructor() {
-        // 1. Inicialización del canvas
         this.canvas = document.getElementById('gameCanvas');
-        if (!(this.canvas instanceof HTMLCanvasElement)) {
-            throw new Error('Canvas element not found or invalid');
-        }
-        this.ctx = this.canvas.getContext('2d');
+        if (!(this.canvas instanceof HTMLCanvasElement)) throw new Error('Canvas invalid');
 
-        // 2. Inicializar componentes básicos
         this.cardPool = new CardPool();
         this.gameState = new GameState();
-        this.gameState.setCardPool(this.cardPool);
+        this.gameState.cardPool = this.cardPool;
 
-        // 3. Configuración del jugador
         this.currentPlayer = {
             id: sanitizeInput(sessionStorage.getItem('playerId')),
             name: sanitizeInput(sessionStorage.getItem('playerName')),
@@ -33,14 +27,12 @@ export class Game {
         this.gameState.currentPlayer = this.currentPlayer;
         this.gameState.canvas = this.canvas;
 
-        // 4. Configuración del tablero
         this.gameState.BOARD_POSITION = {
             x: this.canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
             y: this.canvas.height * 0.3
         };
         this.gameState.PLAYER_CARDS_Y = this.canvas.height * 0.6;
 
-        // 5. Inicialización de subsistemas
         this.notificationManager = new NotificationManager();
         this.historyManager = new HistoryManager(this.gameState);
         this.renderer = new Renderer({
@@ -78,15 +70,10 @@ export class Game {
     }
 
     init() {
-        try {
-            this.setupCanvas();
-            this.setupEventListeners();
-            this.webSocketManager.connect();
-            this.gameLoop();
-        } catch (error) {
-            console.error('Game initialization failed:', error);
-            alert('Error al iniciar el juego. Por favor recarga la página.');
-        }
+        this.setupCanvas();
+        this.setupEventListeners();
+        this.webSocketManager.connect();
+        this.gameLoop();
     }
 
     setupCanvas() {
@@ -95,42 +82,30 @@ export class Game {
     }
 
     setupEventListeners() {
-        // Mouse events
         this.canvas.addEventListener('mousedown', (e) => this.dragManager.handleMouseDown(e));
         this.canvas.addEventListener('mousemove', (e) => this.dragManager.handleMouseMove(e));
         this.canvas.addEventListener('mouseup', (e) => this.dragManager.handleMouseUp(e));
         this.canvas.addEventListener('mouseleave', (e) => this.dragManager.handleMouseUp(e));
-
-        // Touch events
         this.canvas.addEventListener('touchstart', (e) => {
             this.touchManager.handleTouchAsClick(e);
             this.dragManager.handleTouchStart(e);
         }, { passive: false });
         this.canvas.addEventListener('touchmove', (e) => this.dragManager.handleTouchMove(e));
         this.canvas.addEventListener('touchend', (e) => this.dragManager.handleTouchEnd(e));
-
-        // UI events
         this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
         this.endTurnButton?.addEventListener('click', () => this.endTurn());
-        document.getElementById('modalBackdrop')?.addEventListener('click', () =>
-            this.historyManager.closeHistoryModal()
-        );
+        document.getElementById('modalBackdrop')?.addEventListener('click', () => this.historyManager.closeHistoryModal());
         window.addEventListener('beforeunload', () => this.cleanup());
     }
 
     handleCanvasClick(e) {
-        if (document.getElementById('historyModal').style.display === 'block') {
-            return;
-        }
-
+        if (document.getElementById('historyModal').style.display === 'block') return;
         const rect = this.canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-
         if (this.gameState.historyIconAreas) {
             for (const area of this.gameState.historyIconAreas) {
-                if (x >= area.x && x <= area.x + area.width &&
-                    y >= area.y && y <= area.y + area.height) {
+                if (x >= area.x && x <= area.x + area.width && y >= area.y && y <= area.y + area.height) {
                     this.historyManager.showColumnHistory(area.column);
                     return;
                 }
@@ -142,16 +117,11 @@ export class Game {
         const currentPlayerObj = this.gameState.players.find(p => p.id === this.currentPlayer.id);
         const cardsPlayed = currentPlayerObj?.cardsPlayedThisTurn || 0;
         const minCardsRequired = this.gameState.remainingDeck > 0 ? 2 : 1;
-
         if (cardsPlayed < minCardsRequired) {
             const remainingCards = minCardsRequired - cardsPlayed;
-            this.notificationManager.showNotification(
-                `Necesitas jugar ${remainingCards} carta(s) más para terminar tu turno`,
-                true
-            );
+            this.notificationManager.showNotification(`Necesitas jugar ${remainingCards} carta(s) más`, true);
             return;
         }
-
         this.webSocketManager.sendMessage({
             type: 'end_turn',
             playerId: this.currentPlayer.id,
@@ -160,55 +130,28 @@ export class Game {
     }
 
     gameLoop(timestamp) {
-        try {
-            if (timestamp - this.lastRenderTime < 1000 / TARGET_FPS) {
-                this.animationFrameId = requestAnimationFrame((t) => this.gameLoop(t));
-                return;
-            }
-
-            this.lastRenderTime = timestamp;
-            this.renderer.render(timestamp);
+        if (timestamp - this.lastRenderTime < 1000 / TARGET_FPS) {
             this.animationFrameId = requestAnimationFrame((t) => this.gameLoop(t));
-        } catch (error) {
-            console.error('Error in game loop:', error);
+            return;
         }
+        this.lastRenderTime = timestamp;
+        this.renderer.render(timestamp);
+        this.animationFrameId = requestAnimationFrame((t) => this.gameLoop(t));
     }
 
     cleanup() {
         cancelAnimationFrame(this.animationFrameId);
-
-        if (this.dragManager.dragStartCard) {
-            this.dragManager.dragStartCard.endDrag();
-        }
-
+        if (this.dragManager.dragStartCard) this.dragManager.dragStartCard.endDrag();
         this.webSocketManager.close();
-
-        // Limpiar event listeners
-        const events = [
-            'mousedown', 'mousemove', 'mouseup', 'mouseleave',
-            'touchstart', 'touchmove', 'touchend', 'click'
-        ];
-
-        events.forEach(event => {
-            this.canvas.removeEventListener(event, this.handleCanvasClick);
-        });
-
-        this.endTurnButton?.removeEventListener('click', this.endTurn);
-        document.getElementById('modalBackdrop')?.removeEventListener(
-            'click',
-            this.historyManager.closeHistoryModal
-        );
         window.removeEventListener('beforeunload', this.cleanup);
     }
 }
 
-// Inicialización del juego
 document.addEventListener('DOMContentLoaded', () => {
     try {
-        const game = new Game();
-        game.init();
+        new Game().init();
     } catch (error) {
-        console.error('Failed to initialize game:', error);
-        alert('Error crítico al iniciar el juego. Por favor recarga la página.');
+        console.error('Game initialization failed:', error);
+        alert('Error al iniciar el juego. Por favor recarga la página.');
     }
 });
