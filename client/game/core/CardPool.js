@@ -1,5 +1,3 @@
-import { Card } from './Card.js';
-
 export class CardPool {
     constructor() {
         this.pool = [];

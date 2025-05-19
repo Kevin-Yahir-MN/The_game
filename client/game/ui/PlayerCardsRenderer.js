@@ -4,6 +4,7 @@ export class PlayerCardsRenderer {
     constructor(canvas, gameState) {
         this.canvas = canvas;
         this.gameState = gameState;
+        this.cardPool = cardPool;
         this.playerCardsY = canvas.height * 0.6;
     }
 

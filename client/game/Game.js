@@ -39,7 +39,7 @@ export class Game {
 
         this.notificationManager = new NotificationManager();
         this.historyManager = new HistoryManager(this.gameState);
-        this.renderer = new Renderer(this.canvas, this.gameState);
+        this.renderer = new Renderer(this.canvas, this.gameState, this.cardPool);
         this.webSocketManager = new WebSocketManager(this.roomId, this.currentPlayer.id);
         this.messageHandler = new MessageHandler(this.gameState, this.renderer, this.notificationManager, this.webSocketManager);
 

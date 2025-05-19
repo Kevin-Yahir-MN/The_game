@@ -3,13 +3,13 @@ import { PlayerCardsRenderer } from './PlayerCardsRenderer.js';
 import { PlayersPanel } from './PlayersPanel.js';
 
 export class Renderer {
-    constructor(canvas, gameState) {
+    constructor(canvas, gameState, cardPool) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.gameState = gameState;
         this.cardPool = cardPool;
         this.boardRenderer = new BoardRenderer(canvas, gameState, cardPool);
-        this.playerCardsRenderer = new PlayerCardsRenderer(canvas, gameState);
+        this.playerCardsRenderer = new PlayerCardsRenderer(canvas, gameState, cardPool);
         this.playersPanel = new PlayersPanel(gameState);
         this.dirtyAreas = [];
         this.needsRedraw = true;
