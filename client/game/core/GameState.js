@@ -12,7 +12,6 @@ export class GameState {
         this.boardCards = [];
         this.historyIconAreas = [];
         this.cardPool = null;
-        this.canvas = null;
         this.currentPlayer = null;
         this.endTurnButton = null;
         this.BOARD_POSITION = null;

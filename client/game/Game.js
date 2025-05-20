@@ -13,6 +13,7 @@ import { CARD_WIDTH, CARD_HEIGHT, COLUMN_SPACING, TARGET_FPS } from './core/Cons
 export class Game {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
+        this.gameState.canvas = this.canvas;
         this.ctx = this.canvas.getContext('2d');
         this.endTurnButton = document.getElementById('endTurnBtn');
 

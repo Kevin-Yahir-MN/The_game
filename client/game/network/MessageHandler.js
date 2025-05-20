@@ -29,7 +29,7 @@ export class MessageHandler {
             case 'init_game': this.handleInitGame(message); break;
             case 'gs': this.handleGameStateUpdate(message); break;
             case 'game_started': this.handleGameStarted(message); break;
-            case 'your_cards': this.updatePlayerCards(message.cards); break;
+            case 'your_cards': this.updatePlayerCards(message.cards, this.renderer.canvas); break;
             case 'game_over': this.handleGameOver(message.message, true); break;
             case 'notification': this.notificationManager.showNotification(message.message, message.isError); break;
             case 'column_history': this.updateColumnHistory(message); break;
@@ -85,6 +85,10 @@ export class MessageHandler {
     }
 
     handleInitGame(message) {
+        if (!this.gameState.canvas) {
+            setTimeout(() => this.handleInitGame(message), 100);
+            return;
+        }
         this.gameState.currentTurn = message.gameState.currentTurn;
         this.gameState.board = message.gameState.board;
         this.gameState.remainingDeck = message.gameState.remainingDeck;
@@ -160,7 +164,7 @@ export class MessageHandler {
             document.getElementById('progressText').textContent = `0/${minCardsRequired} carta(s) jugada(s)`;
             document.getElementById('progressBar').style.width = '0%';
         }
-        this.updatePlayerCards(this.gameState.yourCards.map(c => c.value));
+        this.updatePlayerCards(this.gameState.yourCards.map(c => c.value), this.renderer.canvas);
         if (message.playerName) {
             const notificationMsg = message.newTurn === this.gameState.currentPlayer.id
                 ? '¡Es tu turno!'
@@ -175,7 +179,7 @@ export class MessageHandler {
         const minCardsRequired = message.minCardsRequired || 1;
         document.getElementById('progressText').textContent = `0/${minCardsRequired} carta(s) jugada(s)`;
         document.getElementById('progressBar').style.width = '0%';
-        this.updatePlayerCards(this.gameState.yourCards.map(c => c.value));
+        this.updatePlayerCards(this.gameState.yourCards.map(c => c.value), this.renderer.canvas);
         this.renderer.updateGameInfo();
     }
 
@@ -211,7 +215,7 @@ export class MessageHandler {
         this.gameState.initialCards = newState.i || this.gameState.initialCards;
 
         if (newState.y) {
-            this.updatePlayerCards(newState.y);
+            this.updatePlayerCards(newState.y, this.renderer.canvas);
         }
 
         this.renderer.updatePlayersPanel();
@@ -235,10 +239,15 @@ export class MessageHandler {
         }
     }
 
-    updatePlayerCards(cards) {
+    updatePlayerCards(cards, canvas) {
+        if (!this.gameState.canvas) {
+            console.error("Canvas no está definido en gameState");
+            return;
+        }
+
         const isYourTurn = this.gameState.currentTurn === this.gameState.currentPlayer.id;
         const deckEmpty = this.gameState.remainingDeck === 0;
-        const startX = (this.gameState.canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
+        const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
         const startY = this.gameState.PLAYER_CARDS_Y;
 
         const newCards = cards.map((cardValue, index) => {
@@ -375,7 +384,7 @@ export class MessageHandler {
 
             const card = this.gameState.cardPool.get(message.cardValue, 0, 0, true, false);
             this.gameState.yourCards.push(card);
-            this.updatePlayerCards(this.gameState.yourCards.map(c => c.value));
+            this.updatePlayerCards(this.gameState.yourCards.map(c => c.value), this.renderer.canvas);
         }
     }
 
