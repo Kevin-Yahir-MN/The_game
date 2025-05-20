@@ -13,11 +13,12 @@ export class Renderer {
             gameState: this.gameState
         });
 
-        this.playerCardsRenderer = new PlayerCardsRenderer({
-            canvas: this.canvas,
-            gameState: this.gameState,
-            cardPool: this.gameState.cardPool
-        });
+        // Renderer.js (cambia esto)
+        this.playerCardsRenderer = new PlayerCardsRenderer(
+            this.canvas,
+            this.gameState,
+            this.gameState.cardPool
+        );
 
         this.playersPanel = new PlayersPanel(this.gameState);
         this.dirtyAreas = [];
