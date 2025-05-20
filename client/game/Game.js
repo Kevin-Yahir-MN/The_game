@@ -13,13 +13,12 @@ import { CARD_WIDTH, CARD_HEIGHT, COLUMN_SPACING, TARGET_FPS } from './core/Cons
 export class Game {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
-        this.gameState.canvas = this.canvas;
         this.ctx = this.canvas.getContext('2d');
         this.endTurnButton = document.getElementById('endTurnBtn');
 
         this.cardPool = new CardPool();
-        this.gameState = new GameState();
-        this.gameState.cardPool = this.cardPool;
+        this.gameState = new GameState(); // Primero crea gameState
+        // this.gameState.canvas = this.canvas; // ← ELIMINA esta línea (canvas no debe estar en GameState)
 
         this.currentPlayer = {
             id: sanitizeInput(sessionStorage.getItem('playerId')),
@@ -43,14 +42,14 @@ export class Game {
         this.notificationManager = new NotificationManager();
         this.historyManager = new HistoryManager(this.gameState);
         this.renderer = new Renderer({
-            canvas: this.canvas,
+            canvas: this.canvas, // Pasa canvas al Renderer
             gameState: this.gameState,
             cardPool: this.cardPool
         });
 
         this.messageHandler = new MessageHandler(
             this.gameState,
-            this.renderer,
+            this.renderer, // Renderer ya tiene acceso a canvas
             this.notificationManager,
             this.webSocketManager
         );
