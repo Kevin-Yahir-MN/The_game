@@ -17,8 +17,8 @@ export class Game {
         this.endTurnButton = document.getElementById('endTurnBtn');
 
         this.cardPool = new CardPool();
-        this.gameState = new GameState(); // Primero crea gameState
-        // this.gameState.canvas = this.canvas; // ← ELIMINA esta línea (canvas no debe estar en GameState)
+        this.gameState = new GameState();
+        this.gameState.cardPool = this.cardPool;
 
         this.currentPlayer = {
             id: sanitizeInput(sessionStorage.getItem('playerId')),
@@ -42,7 +42,7 @@ export class Game {
         this.notificationManager = new NotificationManager();
         this.historyManager = new HistoryManager(this.gameState);
         this.renderer = new Renderer({
-            canvas: this.canvas, // Pasa canvas al Renderer
+            canvas: this.canvas,
             gameState: this.gameState,
             cardPool: this.cardPool
         });
