@@ -2,6 +2,7 @@ import { CARD_WIDTH, CARD_HEIGHT, CARD_SPACING } from '../core/Constants.js';
 
 export class PlayerCardsRenderer {
     constructor(canvas, gameState, cardPool) {
+        console.log("GameState recibido:", gameState); // ¿Tiene yourCards?
         this.canvas = canvas;
         this.gameState = gameState;
         this.cardPool = cardPool;
