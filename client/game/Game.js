@@ -47,17 +47,18 @@ export class Game {
             cardPool: this.cardPool
         });
 
-        this.webSocketManager = new WebSocketManager(
-            this.roomId,
-            this.currentPlayer.id,
-            this.notificationManager
-        );
-
         this.messageHandler = new MessageHandler(
             this.gameState,
             this.renderer,
             this.notificationManager,
             this.webSocketManager
+        );
+
+        this.webSocketManager = new WebSocketManager(
+            this.roomId,
+            this.currentPlayer.id,
+            this.messageHandler,
+            this.notificationManager
         );
 
         this.dragManager = new DragManager(
