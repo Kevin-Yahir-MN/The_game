@@ -15,7 +15,8 @@ export class Renderer {
 
         this.playerCardsRenderer = new PlayerCardsRenderer({
             canvas: this.canvas,
-            gameState: this.gameState
+            gameState: this.gameState,
+            cardPool: this.gameState.cardPool
         });
 
         this.playersPanel = new PlayersPanel(this.gameState);

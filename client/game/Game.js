@@ -43,7 +43,8 @@ export class Game {
         this.historyManager = new HistoryManager(this.gameState);
         this.renderer = new Renderer({
             canvas: this.canvas,
-            gameState: this.gameState
+            gameState: this.gameState,
+            cardPool: this.cardPool
         });
 
         this.webSocketManager = new WebSocketManager(
