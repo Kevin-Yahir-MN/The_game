@@ -240,11 +240,6 @@ export class MessageHandler {
     }
 
     updatePlayerCards(cards, canvas) {
-        if (!this.gameState.canvas) {
-            console.error("Canvas no está definido en gameState");
-            return;
-        }
-
         const isYourTurn = this.gameState.currentTurn === this.gameState.currentPlayer.id;
         const deckEmpty = this.gameState.remainingDeck === 0;
         const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;

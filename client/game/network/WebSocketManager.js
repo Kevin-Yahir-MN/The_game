@@ -14,7 +14,7 @@ export class WebSocketManager {
 
     connect() {
         if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            this.messageHandler.showNotification('No se puede conectar al servidor. Recarga la página.', true);
+            this.notificationManager.showNotification('No se puede conectar al servidor. Recarga la página.', true);
             this.updateConnectionStatus('Desconectado', true);
             return;
         }
