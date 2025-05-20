@@ -1,7 +1,7 @@
 import { CARD_WIDTH, CARD_HEIGHT, CARD_SPACING } from '../core/Constants.js';
 
 export class PlayerCardsRenderer {
-    constructor(canvas, gameState) {
+    constructor(canvas, gameState, cardPool) {
         this.canvas = canvas;
         this.gameState = gameState;
         this.cardPool = cardPool;
