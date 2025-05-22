@@ -40,9 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let dirtyAreas = [];
     let needsRedraw = true;
 
-    let victoryImage = new Image();
-    let victorySound = new Audio();
-
     const currentPlayer = {
         id: sanitizeInput(sessionStorage.getItem('playerId')),
         name: sanitizeInput(sessionStorage.getItem('playerName')),
@@ -738,75 +735,26 @@ document.addEventListener('DOMContentLoaded', () => {
         backdrop.className = 'game-over-backdrop';
 
         const isVictory = !isError || message.includes('Victoria') || message.includes('ganan');
-        const isPerfectVictory = isVictory && gameState.remainingDeck === 0 && gameState.yourCards.length === 0;
 
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
 
-        if (isPerfectVictory) {
-            gameOverDiv.innerHTML = `
-            <div class="victory-image-container">
-                <img id="victoryImage" class="victory-image">
-            </div>
-            <div class="game-over-message">${message}</div>
-            <div class="game-over-buttons">
-                <button id="returnToRoom" class="game-over-btn">
-                    Volver a la Sala
-                </button>
-            </div>
-        `;
-        } else {
-            const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
-            const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
+        const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
+        const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
 
-            gameOverDiv.innerHTML = `
-            <h2 style="color: ${titleColor}">${title}</h2>
-            <p>${message}</p>
-            <div class="game-over-buttons">
-                <button id="returnToRoom" class="game-over-btn" 
-                        style="background-color: ${titleColor}">
-                    Volver a la Sala
-                </button>
-            </div>
-        `;
-        }
+        gameOverDiv.innerHTML = `
+        <h2 style="color: ${titleColor}">${title}</h2>
+        <p>${message}</p>
+        <div class="game-over-buttons">
+            <button id="returnToRoom" class="game-over-btn" 
+                    style="background-color: ${titleColor}">
+                Volver a la Sala
+            </button>
+        </div>
+    `;
 
         document.body.appendChild(backdrop);
         backdrop.appendChild(gameOverDiv);
-
-        if (isPerfectVictory) {
-            victoryImage.src = 'victory-royale.png';
-            victoryImage.onload = () => {
-                const imgElement = document.getElementById('victoryImage');
-                imgElement.src = victoryImage.src;
-
-                // Escalado responsivo mejorado
-                const maxWidth = window.innerWidth * 0.85;  // 85% del ancho de la ventana
-                const maxHeight = window.innerHeight * 0.6; // 60% del alto de la ventana
-                const ratio = Math.min(
-                    maxWidth / victoryImage.naturalWidth,
-                    maxHeight / victoryImage.naturalHeight
-                );
-
-                imgElement.style.width = `${victoryImage.naturalWidth * ratio}px`;
-                imgElement.style.height = 'auto'; // Mantener proporción
-                imgElement.style.display = 'block';
-                imgElement.style.margin = '0 auto';
-
-                // Animación de entrada
-                setTimeout(() => {
-                    imgElement.classList.add('animate-in');
-
-                    // Animación de pulso después de 1 segundo
-                    setTimeout(() => {
-                        imgElement.classList.add('pulse-animation');
-                    }, 1000);
-                }, 100);
-            };
-
-            victorySound.src = 'victory-royale.mp3';
-            victorySound.play().catch(e => console.log('No se pudo reproducir el audio:', e));
-        }
 
         // Mostrar el backdrop con transición suave
         setTimeout(() => {
@@ -816,11 +764,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Botón de retorno
         document.getElementById('returnToRoom').addEventListener('click', async () => {
-            if (isPerfectVictory) {
-                victorySound.pause();
-                victorySound.currentTime = 0;
-            }
-
             const button = document.getElementById('returnToRoom');
             button.disabled = true;
             button.textContent = 'Cargando...';
