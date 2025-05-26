@@ -1,55 +1,44 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const gameConfig = {
-        canvas: document.getElementById('gameCanvas'),
-        ctx: null,
-        WS_URL: 'wss://the-game-2xks.onrender.com',
-        endTurnButton: document.getElementById('endTurnBtn'),
-        STATE_UPDATE_THROTTLE: 200,
-        TARGET_FPS: 60,
-        MAX_RECONNECT_ATTEMPTS: 5,
-        RECONNECT_BASE_DELAY: 2000,
-        CARD_WIDTH: 80,
-        CARD_HEIGHT: 120,
-        COLUMN_SPACING: 60,
-        CARD_SPACING: 15,
-        HISTORY_ICON_PULSE_INTERVAL: 20000,
-        HISTORY_ICON_PULSE_DURATION: 500
-    };
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const WS_URL = 'wss://the-game-2xks.onrender.com';
+    const endTurnButton = document.getElementById('endTurnBtn');
+    const STATE_UPDATE_THROTTLE = 200;
+    const TARGET_FPS = 60;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    const RECONNECT_BASE_DELAY = 2000;
+    const CARD_WIDTH = 80;
+    const CARD_HEIGHT = 120;
+    const COLUMN_SPACING = 60;
+    const CARD_SPACING = 15;
+    const HISTORY_ICON_PULSE_INTERVAL = 20000;
+    const HISTORY_ICON_PULSE_DURATION = 500;
 
-    const positions = {
-        BOARD_POSITION: { x: 0, y: 0 },
-        PLAYER_CARDS_Y: 0,
-        BUTTONS_Y: 0,
-        HISTORY_ICON_Y: 0
+    const BOARD_POSITION = {
+        x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
+        y: canvas.height * 0.3
     };
+    const PLAYER_CARDS_Y = canvas.height * 0.6;
+    const BUTTONS_Y = canvas.height * 0.85;
+    const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
 
-    const assets = {
-        cache: new Map(),
-        historyIcon: new Image(),
-        historyIconsAnimation: { interval: null, lastPulseTime: Date.now(), isAnimating: false }
-    };
-
-    const animationState = {
-        frameId: null,
-        lastRenderTime: 0,
-        queue: [],
-        dirtyAreas: [],
-        needsRedraw: true
-    };
-
-    const connectionState = {
-        socket: null,
-        reconnectAttempts: 0,
-        reconnectTimeout: null,
-        status: 'disconnected'
-    };
-
-    const dragState = {
-        startCard: null,
-        startX: 0,
-        startY: 0,
-        isDragging: false
-    };
+    const assetCache = new Map();
+    let historyIcon = new Image();
+    let historyIconsAnimation = { interval: null, lastPulseTime: Date.now(), isAnimating: false };
+    let animationFrameId;
+    let lastStateUpdate = 0;
+    let lastRenderTime = 0;
+    let reconnectAttempts = 0;
+    let reconnectTimeout;
+    let connectionStatus = 'disconnected';
+    let dragStartCard = null;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let isDragging = false;
+    let socket;
+    let animationQueue = [];
+    let dirtyAreas = [];
+    let needsRedraw = true;
 
     const currentPlayer = {
         id: sanitizeInput(sessionStorage.getItem('playerId')),
@@ -63,46 +52,38 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    let gameState = initializeGameState();
+    let gameState = {
+        players: [],
+        yourCards: [],
+        board: { ascending: [1, 1], descending: [100, 100] },
+        currentTurn: null,
+        remainingDeck: 98,
+        initialCards: 6,
+        cardsPlayedThisTurn: [],
+        animatingCards: [],
+        columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
+        boardCards: [],
+        historyIconAreas: []
+    };
 
-    const cardPool = createCardPool();
-
-    function initializeGameState() {
-        return {
-            players: [],
-            yourCards: [],
-            board: { ascending: [1, 1], descending: [100, 100] },
-            currentTurn: null,
-            remainingDeck: 98,
-            initialCards: 6,
-            cardsPlayedThisTurn: [],
-            animatingCards: [],
-            columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
-            boardCards: [],
-            historyIconAreas: []
-        };
-    }
-
-    function createCardPool() {
-        return {
-            pool: [],
-            get(value, x, y, isPlayable, isPlayedThisTurn) {
-                if (this.pool.length > 0) {
-                    const card = this.pool.pop();
-                    card.value = value;
-                    card.x = x;
-                    card.y = y;
-                    card.isPlayable = isPlayable;
-                    card.isPlayedThisTurn = isPlayedThisTurn;
-                    return card;
-                }
-                return new Card(value, x, y, isPlayable, isPlayedThisTurn);
-            },
-            release(card) {
-                this.pool.push(card);
+    const cardPool = {
+        pool: [],
+        get(value, x, y, isPlayable, isPlayedThisTurn) {
+            if (this.pool.length > 0) {
+                const card = this.pool.pop();
+                card.value = value;
+                card.x = x;
+                card.y = y;
+                card.isPlayable = isPlayable;
+                card.isPlayedThisTurn = isPlayedThisTurn;
+                return card;
             }
-        };
-    }
+            return new Card(value, x, y, isPlayable, isPlayedThisTurn);
+        },
+        release(card) {
+            this.pool.push(card);
+        }
+    };
 
     function sanitizeInput(input) {
         return input ? input.replace(/[^a-zA-Z0-9-_]/g, '') : '';
@@ -117,8 +98,8 @@ document.addEventListener('DOMContentLoaded', () => {
             this.value = typeof value === 'number' ? value : 0;
             this.x = typeof x === 'number' ? x : 0;
             this.y = typeof y === 'number' ? y : 0;
-            this.width = gameConfig.CARD_WIDTH;
-            this.height = gameConfig.CARD_HEIGHT;
+            this.width = CARD_WIDTH;
+            this.height = CARD_HEIGHT;
             this.isPlayable = !!isPlayable;
             this.isPlayedThisTurn = !!isPlayedThisTurn;
             this.isFromCurrentTurn = !!isPlayedThisTurn;
@@ -159,30 +140,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         draw() {
-            gameConfig.ctx.save();
-            if (!this.isDragging) gameConfig.ctx.translate(this.shakeOffset, 0);
+            ctx.save();
+            if (!this.isDragging) ctx.translate(this.shakeOffset, 0);
 
-            gameConfig.ctx.shadowColor = this.isPlayedThisTurn || this.playedThisRound ? 'rgba(0, 100, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)';
-            gameConfig.ctx.shadowBlur = 8;
-            gameConfig.ctx.shadowOffsetY = 4;
+            ctx.shadowColor = this.isPlayedThisTurn || this.playedThisRound ? 'rgba(0, 100, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)';
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetY = 4;
 
-            gameConfig.ctx.beginPath();
-            gameConfig.ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
-            gameConfig.ctx.fillStyle = this.backgroundColor;
-            gameConfig.ctx.fill();
+            ctx.beginPath();
+            ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
+            ctx.fillStyle = this.backgroundColor;
+            ctx.fill();
 
-            gameConfig.ctx.strokeStyle = this.isPlayable ? '#27ae60' : '#34495e';
-            gameConfig.ctx.lineWidth = this.isPlayable ? 3 : 2;
-            gameConfig.ctx.stroke();
+            ctx.strokeStyle = this.isPlayable ? '#27ae60' : '#34495e';
+            ctx.lineWidth = this.isPlayable ? 3 : 2;
+            ctx.stroke();
 
-            gameConfig.ctx.fillStyle = '#2c3e50';
-            gameConfig.ctx.font = 'bold 28px Arial';
-            gameConfig.ctx.textAlign = 'center';
-            gameConfig.ctx.textBaseline = 'middle';
-            gameConfig.ctx.shadowColor = 'transparent';
-            gameConfig.ctx.fillText(this.value.toString(), this.x + this.width / 2, this.y + this.height / 2 - this.hoverOffset);
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = 'bold 28px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = 'transparent';
+            ctx.fillText(this.value.toString(), this.x + this.width / 2, this.y + this.height / 2 - this.hoverOffset);
 
-            gameConfig.ctx.restore();
+            ctx.restore();
             markDirty(this.x, this.y, this.width, this.height);
         }
 
@@ -218,12 +199,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function markDirty(x, y, width, height) {
-        animationState.dirtyAreas.push({ x, y, width, height });
-        animationState.needsRedraw = true;
+        dirtyAreas.push({ x, y, width, height });
+        needsRedraw = true;
     }
 
     function clearDirtyAreas() {
-        animationState.dirtyAreas = [];
+        dirtyAreas = [];
     }
 
     function getStackValue(position) {
@@ -284,14 +265,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function loadAsset(url) {
-        if (assets.cache.has(url)) {
-            return Promise.resolve(assets.cache.get(url));
+        if (assetCache.has(url)) {
+            return Promise.resolve(assetCache.get(url));
         }
 
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
-                assets.cache.set(url, img);
+                assetCache.set(url, img);
                 resolve(img);
             };
             img.onerror = (err) => {
@@ -303,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function connectWebSocket() {
-        if (connectionState.reconnectAttempts >= gameConfig.MAX_RECONNECT_ATTEMPTS) {
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             showNotification('No se puede conectar al servidor. Recarga la página.', true);
             updateConnectionStatus('Desconectado', true);
             return;
@@ -311,109 +292,106 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateConnectionStatus('Conectando...');
 
-        if (connectionState.socket) {
-            connectionState.socket.onopen = connectionState.socket.onmessage =
-                connectionState.socket.onclose = connectionState.socket.onerror = null;
-            if ([WebSocket.OPEN, WebSocket.CONNECTING].includes(connectionState.socket.readyState)) {
-                connectionState.socket.close();
+        if (socket) {
+            socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null;
+            if ([WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
+                socket.close();
             }
         }
 
-        connectionState.socket = new WebSocket(`${gameConfig.WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
+        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
 
-        connectionState.socket.onopen = () => {
-            clearTimeout(connectionState.reconnectTimeout);
-            connectionState.reconnectAttempts = 0;
+        socket.onopen = () => {
+            clearTimeout(reconnectTimeout);
+            reconnectAttempts = 0;
             updateConnectionStatus('Conectado');
             showNotification('Conectado al servidor');
             restoreGameState();
 
-            connectionState.socket.send(JSON.stringify({
+            socket.send(JSON.stringify({
                 type: 'get_full_state',
                 playerId: currentPlayer.id,
                 roomId: roomId,
                 requireCurrentState: true
             }));
 
-            connectionState.socket.send(JSON.stringify({
+            socket.send(JSON.stringify({
                 type: 'get_player_state',
                 playerId: currentPlayer.id,
                 roomId: roomId
             }));
         };
 
-        connectionState.socket.onclose = (event) => {
-            if (!event.wasClean && connectionState.reconnectAttempts < gameConfig.MAX_RECONNECT_ATTEMPTS) {
-                connectionState.reconnectAttempts++;
-                const delay = Math.min(gameConfig.RECONNECT_BASE_DELAY * Math.pow(2, connectionState.reconnectAttempts - 1), 30000);
-                connectionState.reconnectTimeout = setTimeout(connectWebSocket, delay);
-                updateConnectionStatus(`Reconectando (${connectionState.reconnectAttempts}/${gameConfig.MAX_RECONNECT_ATTEMPTS})...`);
-                connectionState.status = 'reconnecting';
+        socket.onclose = (event) => {
+            if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                reconnectAttempts++;
+                const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1), 30000);
+                reconnectTimeout = setTimeout(connectWebSocket, delay);
+                updateConnectionStatus(`Reconectando (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+                connectionStatus = 'reconnecting';
             } else {
                 updateConnectionStatus('Desconectado', true);
-                connectionState.status = 'disconnected';
+                connectionStatus = 'disconnected';
             }
         };
 
-        connectionState.socket.onerror = (error) => {
+        socket.onerror = (error) => {
             log('Error en WebSocket', error);
             updateConnectionStatus('Error de conexión', true);
-            connectionState.status = 'error';
+            connectionStatus = 'error';
         };
 
-        connectionState.socket.onmessage = handleWebSocketMessage;
-    }
+        socket.onmessage = (event) => {
+            try {
+                const now = Date.now();
+                const message = validateMessage(JSON.parse(event.data));
 
-    function handleWebSocketMessage(event) {
-        try {
-            const now = Date.now();
-            const message = validateMessage(JSON.parse(event.data));
+                if (!message) return;
 
-            if (!message) return;
+                if (message.errorCode === 'MISSING_REQUIRED_FIELDS') {
+                    showNotification(`Error: ${message.message}`, true);
+                    return;
+                }
 
-            if (message.errorCode === 'MISSING_REQUIRED_FIELDS') {
-                showNotification(`Error: ${message.message}`, true);
-                return;
+                if (message.type === 'player_state_update') {
+                    handlePlayerStateUpdate(message);
+                }
+
+                if (message.type === 'pong') {
+                    updateConnectionStatus('Conectado');
+                    return;
+                }
+
+                if (message.type === 'gs' && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
+                    return;
+                }
+
+                switch (message.type) {
+                    case 'full_state_update': handleFullStateUpdate(message); break;
+                    case 'init_game': handleInitGame(message); break;
+                    case 'gs': handleGameStateUpdate(message); break;
+                    case 'game_started': handleGameStarted(message); break;
+                    case 'your_cards': updatePlayerCards(message.cards); break;
+                    case 'game_over': handleGameOver(message.message, true); break;
+                    case 'notification': showNotification(message.message, message.isError); break;
+                    case 'column_history': updateColumnHistory(message); break;
+                    case 'column_history_update': updateColumnHistoryUI(message.column, message.history); break;
+                    case 'card_played': handleOpponentCardPlayed(message); break;
+                    case 'card_played_animated': handleAnimatedCardPlay(message); break;
+                    case 'deck_empty': handleDeckEmpty(); break;
+                    case 'deck_updated': handleDeckUpdated(message); break;
+                    case 'turn_changed': handleTurnChanged(message); break;
+                    case 'deck_empty_state': handleDeckEmptyState(message); break;
+                    case 'deck_empty_notification': showNotification(message.message, message.isError); break;
+                    case 'move_undone': handleMoveUndone(message); break;
+                    case 'room_reset': resetGameState(); break;
+                    case 'player_update': handlePlayerUpdate(message); break;
+                    default: log('Mensaje no reconocido:', message);
+                }
+            } catch (error) {
+                log('Error procesando mensaje:', { error, data: event.data });
             }
-
-            if (message.type === 'player_state_update') {
-                handlePlayerStateUpdate(message);
-            }
-
-            if (message.type === 'pong') {
-                updateConnectionStatus('Conectado');
-                return;
-            }
-
-            if (message.type === 'gs' && now - animationState.lastRenderTime < gameConfig.STATE_UPDATE_THROTTLE) {
-                return;
-            }
-
-            switch (message.type) {
-                case 'full_state_update': handleFullStateUpdate(message); break;
-                case 'init_game': handleInitGame(message); break;
-                case 'gs': handleGameStateUpdate(message); break;
-                case 'game_started': handleGameStarted(message); break;
-                case 'your_cards': updatePlayerCards(message.cards); break;
-                case 'game_over': handleGameOver(message.message, true); break;
-                case 'notification': showNotification(message.message, message.isError); break;
-                case 'column_history': updateColumnHistory(message); break;
-                case 'column_history_update': updateColumnHistoryUI(message.column, message.history); break;
-                case 'card_played': handleOpponentCardPlayed(message); break;
-                case 'card_played_animated': handleAnimatedCardPlay(message); break;
-                case 'deck_empty': handleDeckEmpty(); break;
-                case 'deck_updated': handleDeckUpdated(message); break;
-                case 'turn_changed': handleTurnChanged(message); break;
-                case 'deck_empty_state': handleDeckEmptyState(message); break;
-                case 'deck_empty_notification': showNotification(message.message, message.isError); break;
-                case 'move_undone': handleMoveUndone(message); break;
-                case 'room_reset': resetGameState(); break;
-                case 'player_update': handlePlayerUpdate(message); break;
-                default: log('Mensaje no reconocido:', message);
-            }
-        } catch (error) {
-            log('Error procesando mensaje:', { error, data: event.data });
-        }
+        };
     }
 
     function validateMessage(message) {
@@ -438,7 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleGameStateUpdate(message) {
-        animationState.lastRenderTime = Date.now();
+        lastStateUpdate = Date.now();
         updateGameState(message.s);
         updateGameInfo();
     }
@@ -527,17 +505,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetGameState() {
-        gameState = initializeGameState();
+        gameState = {
+            players: [],
+            yourCards: [],
+            board: { ascending: [1, 1], descending: [100, 100] },
+            currentTurn: null,
+            remainingDeck: 98,
+            initialCards: 6,
+            cardsPlayedThisTurn: [],
+            animatingCards: [],
+            columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] }
+        };
+
         updateGameInfo();
     }
 
     function restoreGameState() {
-        if (!connectionState.socket || connectionState.socket.readyState !== WebSocket.OPEN) {
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
             setTimeout(restoreGameState, 500);
             return;
         }
 
-        connectionState.socket.send(JSON.stringify({
+        socket.send(JSON.stringify({
             type: 'get_player_state',
             playerId: currentPlayer.id,
             roomId: roomId
@@ -545,7 +534,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateConnectionStatus(status, isError = false) {
-        connectionState.status = status;
+        connectionStatus = status;
         const statusElement = document.getElementById('connectionStatus') || createConnectionStatusElement();
         statusElement.textContent = `Estado: ${status}`;
         statusElement.className = isError ? 'connection-error' : 'connection-status';
@@ -660,20 +649,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         modal.style.display = 'block';
         backdrop.style.display = 'block';
-        gameConfig.canvas.style.pointerEvents = 'none';
+        canvas.style.pointerEvents = 'none';
     }
 
     function closeHistoryModal() {
         document.getElementById('historyModal').style.display = 'none';
         document.getElementById('modalBackdrop').style.display = 'none';
-        gameConfig.canvas.style.pointerEvents = 'auto';
+        canvas.style.pointerEvents = 'auto';
     }
 
     function getColumnPosition(position) {
         const index = ['asc1', 'asc2', 'desc1', 'desc2'].indexOf(position);
         return {
-            x: positions.BOARD_POSITION.x + (gameConfig.CARD_WIDTH + gameConfig.COLUMN_SPACING) * index,
-            y: positions.BOARD_POSITION.y
+            x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * index,
+            y: BOARD_POSITION.y
         };
     }
 
@@ -739,8 +728,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleGameOver(message, isError = false) {
-        gameConfig.canvas.style.pointerEvents = 'none';
-        gameConfig.endTurnButton.disabled = true;
+        canvas.style.pointerEvents = 'none';
+        endTurnButton.disabled = true;
 
         const backdrop = document.createElement('div');
         backdrop.className = 'game-over-backdrop';
@@ -754,24 +743,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
 
         gameOverDiv.innerHTML = `
-            <h2 style="color: ${titleColor}">${title}</h2>
-            <p>${message}</p>
-            <div class="game-over-buttons">
-                <button id="returnToRoom" class="game-over-btn" 
-                        style="background-color: ${titleColor}">
-                    Volver a la Sala
-                </button>
-            </div>
-        `;
+        <h2 style="color: ${titleColor}">${title}</h2>
+        <p>${message}</p>
+        <div class="game-over-buttons">
+            <button id="returnToRoom" class="game-over-btn" 
+                    style="background-color: ${titleColor}">
+                Volver a la Sala
+            </button>
+        </div>
+    `;
 
         document.body.appendChild(backdrop);
         backdrop.appendChild(gameOverDiv);
 
+        // Mostrar el backdrop con transición suave
         setTimeout(() => {
             backdrop.style.opacity = '1';
             gameOverDiv.style.transform = 'translateY(0)';
         }, 10);
 
+        // Botón de retorno
         document.getElementById('returnToRoom').addEventListener('click', async () => {
             const button = document.getElementById('returnToRoom');
             button.disabled = true;
@@ -779,7 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             resetGameState();
 
-            connectionState.socket.send(JSON.stringify({
+            socket.send(JSON.stringify({
                 type: 'reset_room',
                 roomId: roomId,
                 playerId: currentPlayer.id,
@@ -861,13 +852,13 @@ document.addEventListener('DOMContentLoaded', () => {
         progressTextElement.textContent = `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
         progressBarElement.style.width = `${Math.min((cardsPlayed / minCardsRequired) * 100, 100)}%`;
 
-        if (gameConfig.endTurnButton) {
-            gameConfig.endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
+        if (endTurnButton) {
+            endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
             const remainingCards = minCardsRequired - cardsPlayed;
-            gameConfig.endTurnButton.title = remainingCards > 0
+            endTurnButton.title = remainingCards > 0
                 ? `Necesitas jugar ${remainingCards} carta(s) más${deckEmpty ? ' (Mazo vacío)' : ''}`
                 : 'Puedes terminar tu turno';
-            gameConfig.endTurnButton.style.backgroundColor = cardsPlayed >= minCardsRequired ? '#2ecc71' : '#e74c3c';
+            endTurnButton.style.backgroundColor = cardsPlayed >= minCardsRequired ? '#2ecc71' : '#e74c3c';
         }
     }
 
@@ -891,8 +882,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function updatePlayerCards(cards) {
         const isYourTurn = isMyTurn();
         const deckEmpty = gameState.remainingDeck === 0;
-        const startX = (gameConfig.canvas.width - (cards.length * (gameConfig.CARD_WIDTH + gameConfig.CARD_SPACING))) / 2;
-        const startY = positions.PLAYER_CARDS_Y;
+        const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
+        const startY = PLAYER_CARDS_Y;
 
         const newCards = cards.map((cardValue, index) => {
             const existingCard = gameState.yourCards.find(c =>
@@ -900,7 +891,7 @@ document.addEventListener('DOMContentLoaded', () => {
             );
 
             if (existingCard) {
-                existingCard.x = startX + index * (gameConfig.CARD_WIDTH + gameConfig.CARD_SPACING);
+                existingCard.x = startX + index * (CARD_WIDTH + CARD_SPACING);
                 existingCard.y = startY;
                 existingCard.isPlayable = isYourTurn && (
                     deckEmpty
@@ -924,7 +915,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 return cardPool.get(
                     cardValue,
-                    startX + index * (gameConfig.CARD_WIDTH + gameConfig.CARD_SPACING),
+                    startX + index * (CARD_WIDTH + CARD_SPACING),
                     startY,
                     isYourTurn && (
                         deckEmpty
@@ -950,10 +941,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         gameState.yourCards = newCards;
 
-        if (dragState.startCard) {
-            const dragCardIndex = gameState.yourCards.findIndex(c => c === dragState.startCard);
+        if (dragStartCard) {
+            const dragCardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
             if (dragCardIndex === -1) {
-                gameState.yourCards.push(dragState.startCard);
+                gameState.yourCards.push(dragStartCard);
             }
         }
     }
@@ -966,7 +957,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawHistoryIcons() {
-        if (!assets.historyIcon.complete || assets.historyIcon.naturalWidth === 0) return;
+        if (!historyIcon.complete || historyIcon.naturalWidth === 0) return;
 
         const shouldAnimate = isMyTurn();
         const pulseProgress = shouldAnimate ? calculatePulseProgress() : 0;
@@ -974,8 +965,8 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.historyIconAreas = [];
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
-            const baseX = positions.BOARD_POSITION.x + (gameConfig.CARD_WIDTH + gameConfig.COLUMN_SPACING) * i + gameConfig.CARD_WIDTH / 2 - 20;
-            const baseY = positions.HISTORY_ICON_Y;
+            const baseX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
+            const baseY = HISTORY_ICON_Y;
 
             gameState.historyIconAreas.push({
                 x: baseX,
@@ -987,12 +978,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const scale = shouldAnimate ? (1 + 0.2 * pulseProgress) : 1;
 
-            gameConfig.ctx.save();
-            gameConfig.ctx.translate(baseX + 20, baseY + 20);
-            gameConfig.ctx.scale(scale, scale);
-            gameConfig.ctx.translate(-20, -20);
-            gameConfig.ctx.drawImage(assets.historyIcon, 0, 0, 40, 40);
-            gameConfig.ctx.restore();
+            ctx.save();
+            ctx.translate(baseX + 20, baseY + 20);
+            ctx.scale(scale, scale);
+            ctx.translate(-20, -20);
+            ctx.drawImage(historyIcon, 0, 0, 40, 40);
+            ctx.restore();
         });
     }
 
@@ -1001,7 +992,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const rect = gameConfig.canvas.getBoundingClientRect();
+        const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
@@ -1019,7 +1010,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleTouchAsClick(e) {
         e.preventDefault();
         if (e.touches && e.touches.length > 0) {
-            const rect = gameConfig.canvas.getBoundingClientRect();
+            const rect = canvas.getBoundingClientRect();
             const touch = e.touches[0];
             const x = touch.clientX - rect.left;
             const y = touch.clientY - rect.top;
@@ -1048,14 +1039,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function calculatePulseProgress() {
         const now = Date.now();
-        const timeSinceLastPulse = (now - assets.historyIconsAnimation.lastPulseTime) % gameConfig.HISTORY_ICON_PULSE_INTERVAL;
-        return (isMyTurn() && timeSinceLastPulse < gameConfig.HISTORY_ICON_PULSE_DURATION)
-            ? Math.sin((timeSinceLastPulse / gameConfig.HISTORY_ICON_PULSE_DURATION) * Math.PI)
+        const timeSinceLastPulse = (now - historyIconsAnimation.lastPulseTime) % HISTORY_ICON_PULSE_INTERVAL;
+        return (isMyTurn() && timeSinceLastPulse < HISTORY_ICON_PULSE_DURATION)
+            ? Math.sin((timeSinceLastPulse / HISTORY_ICON_PULSE_DURATION) * Math.PI)
             : 0;
     }
 
     function handleMouseDown(e) {
-        const rect = gameConfig.canvas.getBoundingClientRect();
+        const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         startDrag(x, y);
@@ -1063,7 +1054,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleTouchStart(e) {
         e.preventDefault();
-        const rect = gameConfig.canvas.getBoundingClientRect();
+        const rect = canvas.getBoundingClientRect();
         const touch = e.touches[0];
         const x = touch.clientX - rect.left;
         const y = touch.clientY - rect.top;
@@ -1073,16 +1064,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function startDrag(x, y) {
         const clickedCard = gameState.yourCards.find(card => card.contains(x, y));
         if (clickedCard && clickedCard.isPlayable && isMyTurn()) {
-            dragState.startCard = clickedCard;
-            dragState.startX = x;
-            dragState.startY = y;
-            dragState.isDragging = true;
-            dragState.startCard.startDrag(x - dragState.startCard.x, y - dragState.startCard.y);
+            dragStartCard = clickedCard;
+            dragStartX = x;
+            dragStartY = y;
+            isDragging = true;
+            dragStartCard.startDrag(x - dragStartCard.x, y - dragStartCard.y);
         }
     }
 
     function handleMouseMove(e) {
-        const rect = gameConfig.canvas.getBoundingClientRect();
+        const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         updateDrag(x, y);
@@ -1090,7 +1081,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleTouchMove(e) {
         e.preventDefault();
-        const rect = gameConfig.canvas.getBoundingClientRect();
+        const rect = canvas.getBoundingClientRect();
         const touch = e.touches[0];
         const x = touch.clientX - rect.left;
         const y = touch.clientY - rect.top;
@@ -1098,8 +1089,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateDrag(x, y) {
-        if (dragState.isDragging && dragState.startCard) {
-            dragState.startCard.updateDragPosition(x, y);
+        if (isDragging && dragStartCard) {
+            dragStartCard.updateDragPosition(x, y);
         }
     }
 
@@ -1119,9 +1110,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function endDrag(e) {
-        if (!dragState.isDragging || !dragState.startCard) return;
+        if (!isDragging || !dragStartCard) return;
 
-        const rect = gameConfig.canvas.getBoundingClientRect();
+        const rect = canvas.getBoundingClientRect();
         let clientX, clientY;
 
         if (e instanceof MouseEvent) {
@@ -1139,49 +1130,49 @@ document.addEventListener('DOMContentLoaded', () => {
         const y = clientY - rect.top;
 
         const targetColumn = getClickedColumn(x, y);
-        if (targetColumn && isValidMove(dragState.startCard.value, targetColumn)) {
-            playCard(dragState.startCard.value, targetColumn);
+        if (targetColumn && isValidMove(dragStartCard.value, targetColumn)) {
+            playCard(dragStartCard.value, targetColumn);
         } else {
             if (targetColumn) {
-                animateInvalidCard(dragState.startCard);
+                animateInvalidCard(dragStartCard);
                 showNotification('Movimiento no válido', true);
             }
             resetCardPosition();
         }
 
-        if (dragState.startCard) {
-            dragState.startCard.endDrag();
+        if (dragStartCard) {
+            dragStartCard.endDrag();
         }
-        dragState.startCard = null;
-        dragState.isDragging = false;
+        dragStartCard = null;
+        isDragging = false;
     }
 
     function resetCardPosition() {
-        if (!dragState.startCard) return;
+        if (!dragStartCard) return;
 
-        let cardIndex = gameState.yourCards.findIndex(c => c === dragState.startCard);
+        let cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
         if (cardIndex === -1) {
-            gameState.yourCards.push(dragState.startCard);
+            gameState.yourCards.push(dragStartCard);
             cardIndex = gameState.yourCards.length - 1;
         }
 
-        const startX = (gameConfig.canvas.width - (gameState.yourCards.length * (gameConfig.CARD_WIDTH + gameConfig.CARD_SPACING))) / 2 + cardIndex * (gameConfig.CARD_WIDTH + gameConfig.CARD_SPACING);
+        const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 + cardIndex * (CARD_WIDTH + CARD_SPACING);
 
-        if (!dragState.startCard) return;
+        if (!dragStartCard) return;
 
         const animation = {
-            card: dragState.startCard,
+            card: dragStartCard,
             startTime: Date.now(),
             duration: 300,
             targetX: startX,
-            targetY: positions.PLAYER_CARDS_Y,
-            fromX: dragState.startCard.x,
-            fromY: dragState.startCard.y,
+            targetY: PLAYER_CARDS_Y,
+            fromX: dragStartCard.x,
+            fromY: dragStartCard.y,
             onComplete: () => {
-                if (dragState.startCard) {
-                    dragState.startCard.x = startX;
-                    dragState.startCard.y = positions.PLAYER_CARDS_Y;
-                    dragState.startCard.isDragging = false;
+                if (dragStartCard) {
+                    dragStartCard.x = startX;
+                    dragStartCard.y = PLAYER_CARDS_Y;
+                    dragStartCard.isDragging = false;
                 }
                 updatePlayerCards(gameState.yourCards.map(c => c.value));
             }
@@ -1191,32 +1182,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getClickedColumn(x, y) {
-        if (y < positions.BOARD_POSITION.y || y > positions.BOARD_POSITION.y + gameConfig.CARD_HEIGHT) return null;
+        if (y < BOARD_POSITION.y || y > BOARD_POSITION.y + CARD_HEIGHT) return null;
 
         const columns = [
-            { x: positions.BOARD_POSITION.x, id: 'asc1' },
-            { x: positions.BOARD_POSITION.x + gameConfig.CARD_WIDTH + gameConfig.COLUMN_SPACING, id: 'asc2' },
-            { x: positions.BOARD_POSITION.x + (gameConfig.CARD_WIDTH + gameConfig.COLUMN_SPACING) * 2, id: 'desc1' },
-            { x: positions.BOARD_POSITION.x + (gameConfig.CARD_WIDTH + gameConfig.COLUMN_SPACING) * 3, id: 'desc2' }
+            { x: BOARD_POSITION.x, id: 'asc1' },
+            { x: BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, id: 'asc2' },
+            { x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, id: 'desc1' },
+            { x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, id: 'desc2' }
         ];
 
-        const column = columns.find(col => x >= col.x && x <= col.x + gameConfig.CARD_WIDTH);
+        const column = columns.find(col => x >= col.x && x <= col.x + CARD_WIDTH);
         return column ? column.id : null;
     }
 
     function playCard(cardValue, position) {
-        if (!dragState.startCard) return;
+        if (!dragStartCard) return;
 
         const previousValue = getStackValue(position);
 
         updateStack(position, cardValue);
 
-        const cardIndex = gameState.yourCards.findIndex(c => c === dragState.startCard);
+        const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
         if (cardIndex !== -1) {
             gameState.yourCards.splice(cardIndex, 1);
         }
 
-        connectionState.socket.send(JSON.stringify({
+        socket.send(JSON.stringify({
             type: 'play_card',
             playerId: currentPlayer.id,
             roomId: roomId,
@@ -1275,7 +1266,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.updateColor();
         });
 
-        connectionState.socket.send(JSON.stringify({
+        socket.send(JSON.stringify({
             type: 'end_turn',
             playerId: currentPlayer.id,
             roomId: roomId
@@ -1285,56 +1276,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawBoard() {
-        gameConfig.ctx.clearRect(
-            positions.BOARD_POSITION.x - 30,
-            positions.BOARD_POSITION.y - 55,
-            gameConfig.CARD_WIDTH * 4 + gameConfig.COLUMN_SPACING * 3 + 60,
-            gameConfig.CARD_HEIGHT + 120
+        ctx.clearRect(
+            BOARD_POSITION.x - 30,
+            BOARD_POSITION.y - 55,
+            CARD_WIDTH * 4 + COLUMN_SPACING * 3 + 60,
+            CARD_HEIGHT + 120
         );
 
-        gameConfig.ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-        gameConfig.ctx.beginPath();
-        gameConfig.ctx.roundRect(
-            positions.BOARD_POSITION.x - 25,
-            positions.BOARD_POSITION.y - 50,
-            gameConfig.CARD_WIDTH * 4 + gameConfig.COLUMN_SPACING * 3 + 50,
-            gameConfig.CARD_HEIGHT + 110,
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.beginPath();
+        ctx.roundRect(
+            BOARD_POSITION.x - 25,
+            BOARD_POSITION.y - 50,
+            CARD_WIDTH * 4 + COLUMN_SPACING * 3 + 50,
+            CARD_HEIGHT + 110,
             15
         );
-        gameConfig.ctx.fill();
+        ctx.fill();
 
-        if (dragState.isDragging && dragState.startCard) {
+        if (isDragging && dragStartCard) {
             ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
-                const isValid = isValidMove(dragState.startCard.value, col);
-                const x = positions.BOARD_POSITION.x + (gameConfig.CARD_WIDTH + gameConfig.COLUMN_SPACING) * i;
+                const isValid = isValidMove(dragStartCard.value, col);
+                const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i;
 
-                gameConfig.ctx.fillStyle = isValid ? 'rgb(67, 64, 250)' : 'rgb(248, 51, 51)';
-                gameConfig.ctx.beginPath();
-                gameConfig.ctx.roundRect(
+                ctx.fillStyle = isValid ? 'rgb(67, 64, 250)' : 'rgb(248, 51, 51)';
+                ctx.beginPath();
+                ctx.roundRect(
                     x - 5,
-                    positions.BOARD_POSITION.y - 10,
-                    gameConfig.CARD_WIDTH + 10,
-                    gameConfig.CARD_HEIGHT + 20,
+                    BOARD_POSITION.y - 10,
+                    CARD_WIDTH + 10,
+                    CARD_HEIGHT + 20,
                     15
                 );
-                gameConfig.ctx.fill();
+                ctx.fill();
             });
         }
 
-        gameConfig.ctx.fillStyle = 'white';
-        gameConfig.ctx.font = 'bold 36px Arial';
-        gameConfig.ctx.textAlign = 'center';
-        gameConfig.ctx.textBaseline = 'middle';
-        gameConfig.ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        gameConfig.ctx.shadowBlur = 5;
-        gameConfig.ctx.shadowOffsetY = 2;
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 36px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetY = 2;
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
-            const x = positions.BOARD_POSITION.x + (gameConfig.CARD_WIDTH + gameConfig.COLUMN_SPACING) * i + gameConfig.CARD_WIDTH / 2;
-            gameConfig.ctx.fillText(i < 2 ? '↑' : '↓', x, positions.BOARD_POSITION.y - 25);
+            const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2;
+            ctx.fillText(i < 2 ? '↑' : '↓', x, BOARD_POSITION.y - 25);
         });
 
-        gameConfig.ctx.shadowColor = 'transparent';
+        ctx.shadowColor = 'transparent';
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const isColumnAnimating = gameState.animatingCards.some(anim => anim.column === col);
@@ -1347,8 +1338,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const card = cardPool.get(
                     value,
-                    positions.BOARD_POSITION.x + (gameConfig.CARD_WIDTH + gameConfig.COLUMN_SPACING) * i,
-                    positions.BOARD_POSITION.y,
+                    BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i,
+                    BOARD_POSITION.y,
                     false,
                     wasPlayedThisTurn
                 );
@@ -1369,25 +1360,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawPlayerCards() {
-        const backgroundHeight = gameConfig.CARD_HEIGHT + 30;
-        const backgroundWidth = gameState.yourCards.length * (gameConfig.CARD_WIDTH + gameConfig.CARD_SPACING) + 40;
+        const backgroundHeight = CARD_HEIGHT + 30;
+        const backgroundWidth = gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 40;
 
-        gameConfig.ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-        gameConfig.ctx.beginPath();
-        gameConfig.ctx.roundRect(
-            (gameConfig.canvas.width - backgroundWidth) / 2,
-            positions.PLAYER_CARDS_Y - 15,
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.beginPath();
+        ctx.roundRect(
+            (canvas.width - backgroundWidth) / 2,
+            PLAYER_CARDS_Y - 15,
             backgroundWidth,
             backgroundHeight,
             15
         );
-        gameConfig.ctx.fill();
-        markDirty((gameConfig.canvas.width - backgroundWidth) / 2, positions.PLAYER_CARDS_Y - 15, backgroundWidth, backgroundHeight);
+        ctx.fill();
+        markDirty((canvas.width - backgroundWidth) / 2, PLAYER_CARDS_Y - 15, backgroundWidth, backgroundHeight);
 
         gameState.yourCards.forEach((card, index) => {
-            if (card && card !== dragState.startCard) {
-                card.x = (gameConfig.canvas.width - (gameState.yourCards.length * (gameConfig.CARD_WIDTH + gameConfig.CARD_SPACING))) / 2 + index * (gameConfig.CARD_WIDTH + gameConfig.CARD_SPACING);
-                card.y = positions.PLAYER_CARDS_Y;
+            if (card && card !== dragStartCard) {
+                card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 + index * (CARD_WIDTH + CARD_SPACING);
+                card.y = PLAYER_CARDS_Y;
                 card.draw();
             }
         });
@@ -1439,18 +1430,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const easedProgress = progress * progress;
 
-            anim.newCard.y = -gameConfig.CARD_HEIGHT + (anim.targetY - (-gameConfig.CARD_HEIGHT)) * easedProgress;
+            anim.newCard.y = -CARD_HEIGHT + (anim.targetY - (-CARD_HEIGHT)) * easedProgress;
 
-            gameConfig.ctx.save();
+            ctx.save();
 
             anim.currentCard.draw();
 
-            gameConfig.ctx.shadowColor = 'rgba(0, 100, 255, 0.7)';
-            gameConfig.ctx.shadowBlur = 10;
-            gameConfig.ctx.shadowOffsetY = 5;
+            ctx.shadowColor = 'rgba(0, 100, 255, 0.7)';
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetY = 5;
             anim.newCard.draw();
 
-            gameConfig.ctx.restore();
+            ctx.restore();
 
             if (progress === 1) {
                 if (anim.onComplete) anim.onComplete();
@@ -1469,13 +1460,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const targetPos = getColumnPosition(position);
 
             const animation = {
-                newCard: cardPool.get(value, targetPos.x, -gameConfig.CARD_HEIGHT, false, true),
+                newCard: cardPool.get(value, targetPos.x, -CARD_HEIGHT, false, true),
                 currentCard: cardPool.get(previousValue, targetPos.x, targetPos.y, false, false),
                 startTime: Date.now(),
                 duration: 300,
                 targetX: targetPos.x,
                 targetY: targetPos.y,
-                fromY: -gameConfig.CARD_HEIGHT,
+                fromY: -CARD_HEIGHT,
                 column: position,
                 onComplete: () => {
                     updateStack(position, value);
@@ -1492,19 +1483,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function gameLoop(timestamp) {
-        if (timestamp - animationState.lastRenderTime < 1000 / gameConfig.TARGET_FPS) {
-            animationState.frameId = requestAnimationFrame(gameLoop);
+        if (timestamp - lastRenderTime < 1000 / TARGET_FPS) {
+            animationFrameId = requestAnimationFrame(gameLoop);
             return;
         }
 
-        animationState.lastRenderTime = timestamp;
+        lastRenderTime = timestamp;
 
-        if (animationState.dirtyAreas.length > 0 || animationState.needsRedraw) {
-            gameConfig.ctx.clearRect(0, 0, gameConfig.canvas.width, gameConfig.canvas.height);
-            gameConfig.ctx.fillStyle = '#1a6b1a';
-            gameConfig.ctx.fillRect(0, 0, gameConfig.canvas.width, gameConfig.canvas.height);
+        if (dirtyAreas.length > 0 || needsRedraw) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#1a6b1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             clearDirtyAreas();
-            animationState.needsRedraw = false;
+            needsRedraw = false;
         }
 
         drawBoard();
@@ -1512,32 +1503,31 @@ document.addEventListener('DOMContentLoaded', () => {
         handleCardAnimations();
         drawPlayerCards();
 
-        if (dragState.isDragging && dragState.startCard) {
-            dragState.startCard.draw();
+        if (isDragging && dragStartCard) {
+            dragStartCard.draw();
         }
 
-        animationState.frameId = requestAnimationFrame(gameLoop);
+        animationFrameId = requestAnimationFrame(gameLoop);
     }
 
     function cleanup() {
         gameState.animatingCards = [];
 
-        if (dragState.startCard) {
-            dragState.startCard.endDrag();
-            dragState.startCard = null;
+        if (dragStartCard) {
+            dragStartCard.endDrag();
+            dragStartCard = null;
         }
-        dragState.isDragging = false;
-        clearInterval(assets.historyIconsAnimation.interval);
-        clearTimeout(connectionState.reconnectTimeout);
-        cancelAnimationFrame(animationState.frameId);
+        isDragging = false;
+        clearInterval(historyIconsAnimation.interval);
+        clearTimeout(reconnectTimeout);
+        cancelAnimationFrame(animationFrameId);
 
-        if (connectionState.socket) {
-            connectionState.socket.onopen = connectionState.socket.onmessage =
-                connectionState.socket.onclose = connectionState.socket.onerror = null;
-            if (connectionState.socket.readyState === WebSocket.OPEN) {
-                connectionState.socket.close(1000, 'Juego terminado');
+        if (socket) {
+            socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null;
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.close(1000, 'Juego terminado');
             }
-            connectionState.socket = null;
+            socket = null;
         }
 
         const events = {
@@ -1552,63 +1542,53 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         Object.entries(events).forEach(([event, handler]) => {
-            gameConfig.canvas.removeEventListener(event, handler);
+            canvas.removeEventListener(event, handler);
         });
 
-        gameConfig.endTurnButton?.removeEventListener('click', endTurn);
+        document.getElementById('endTurnBtn')?.removeEventListener('click', endTurn);
         document.getElementById('modalBackdrop')?.removeEventListener('click', closeHistoryModal);
 
         document.querySelectorAll('.notification, .game-over-backdrop').forEach(el => el.remove());
 
-        gameConfig.ctx.clearRect(0, 0, gameConfig.canvas.width, gameConfig.canvas.height);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         gameState.animatingCards = [];
-        assets.cache.clear();
+        assetCache.clear();
     }
 
     function initGame() {
-        gameConfig.ctx = gameConfig.canvas.getContext('2d');
-
-        if (!gameConfig.canvas || !gameConfig.ctx || !currentPlayer.id || !roomId) {
+        if (!canvas || !ctx || !currentPlayer.id || !roomId) {
             alert('Error: No se pudo inicializar el juego. Vuelve a la sala.');
             return;
         }
 
-        positions.BOARD_POSITION = {
-            x: gameConfig.canvas.width / 2 - (gameConfig.CARD_WIDTH * 4 + gameConfig.COLUMN_SPACING * 3) / 2,
-            y: gameConfig.canvas.height * 0.3
-        };
-        positions.PLAYER_CARDS_Y = gameConfig.canvas.height * 0.6;
-        positions.BUTTONS_Y = gameConfig.canvas.height * 0.85;
-        positions.HISTORY_ICON_Y = positions.BOARD_POSITION.y + gameConfig.CARD_HEIGHT + 15;
-
         Promise.all([
-            loadAsset('cards-icon.png').then(img => { if (img) assets.historyIcon = img; }).catch(err => {
+            loadAsset('cards-icon.png').then(img => { if (img) historyIcon = img; }).catch(err => {
                 log('Error loading history icon', err);
             })
         ]).then(() => {
-            gameConfig.canvas.width = 800;
-            gameConfig.canvas.height = 700;
+            canvas.width = 800;
+            canvas.height = 700;
 
-            gameConfig.canvas.addEventListener('click', handleCanvasClick);
-            gameConfig.canvas.addEventListener('mousedown', handleMouseDown);
-            gameConfig.canvas.addEventListener('mousemove', handleMouseMove);
-            gameConfig.canvas.addEventListener('mouseup', handleMouseUp);
-            gameConfig.canvas.addEventListener('mouseleave', handleMouseUp);
+            canvas.addEventListener('click', handleCanvasClick);
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('mouseleave', handleMouseUp);
 
-            gameConfig.canvas.addEventListener('touchstart', handleTouchAsClick, { passive: false });
-            gameConfig.canvas.addEventListener('touchmove', handleTouchMove);
-            gameConfig.canvas.addEventListener('touchend', handleTouchEnd);
+            canvas.addEventListener('touchstart', handleTouchAsClick, { passive: false });
+            canvas.addEventListener('touchmove', handleTouchMove);
+            canvas.addEventListener('touchend', handleTouchEnd);
 
-            gameConfig.endTurnButton.addEventListener('click', endTurn);
+            endTurnButton.addEventListener('click', endTurn);
             document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
             window.addEventListener('beforeunload', cleanup);
 
             const controlsDiv = document.querySelector('.game-controls');
             if (controlsDiv) {
-                controlsDiv.style.bottom = `${gameConfig.canvas.height - positions.BUTTONS_Y}px`;
+                controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
             }
 
-            assets.historyIconsAnimation = {
+            historyIconsAnimation = {
                 interval: null,
                 lastPulseTime: Date.now(),
                 pulseDuration: 500,
