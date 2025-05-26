@@ -233,6 +233,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return exactDifference || normalMove;
     }
 
+    function canPlayerMakeValidMoves() {
+        return hasValidMoves(gameState.yourCards, gameState.board);
+    }
+
     function addToHistory(position, value) {
         const history = gameState.columnHistory[position] ||
             (position.includes('asc') ? [1] : [100]);
@@ -1199,7 +1203,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dragStartCard) return;
 
         const previousValue = getStackValue(position);
-
         updateStack(position, cardValue);
 
         const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
@@ -1216,6 +1219,21 @@ document.addEventListener('DOMContentLoaded', () => {
             previousValue: previousValue,
             isFirstMove: gameState.cardsPlayedThisTurn.length === 0
         }));
+
+        // Verificar condición de derrota después del primer movimiento
+        if (gameState.cardsPlayedThisTurn.length === 0 &&
+            gameState.remainingDeck > 0 &&
+            !canPlayerMakeValidMoves()) {
+
+            const message = `¡${currentPlayer.name} no puede colocar el mínimo requerido de cartas!`;
+            socket.send(JSON.stringify({
+                type: 'game_over',
+                playerId: currentPlayer.id,
+                roomId: roomId,
+                message: message,
+                isError: true
+            }));
+        }
 
         updateGameInfo();
         updateCardsPlayedUI();
