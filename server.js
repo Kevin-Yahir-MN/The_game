@@ -391,6 +391,20 @@ async function handlePlayCard(room, player, msg) {
         deckEmpty: deckEmpty // Nueva propiedad
     }, { includeGameState: true });
 
+    // Verificar condición de derrota después del primer movimiento
+    if (msg.isFirstMove && !deckEmpty) {
+        const playableCards = getPlayableCards(player.cards, room.gameState.board);
+        if (playableCards.length === 0) {
+            await saveGameState(reverseRoomMap.get(room));
+            return broadcastToRoom(room, {
+                type: 'game_over',
+                result: 'lose',
+                message: `¡${player.name} no puede jugar el mínimo de 2 cartas requeridas!`,
+                reason: 'min_cards_not_met'
+            });
+        }
+    }
+
     // Si el mazo acaba de vaciarse, enviar actualización especial
     if (deckEmpty && room.gameState.deck.length === 0) {
         setTimeout(() => {

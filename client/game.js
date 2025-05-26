@@ -233,10 +233,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return exactDifference || normalMove;
     }
 
-    function canPlayerMakeValidMoves() {
-        return hasValidMoves(gameState.yourCards, gameState.board);
-    }
-
     function addToHistory(position, value) {
         const history = gameState.columnHistory[position] ||
             (position.includes('asc') ? [1] : [100]);
