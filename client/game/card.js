@@ -3,6 +3,7 @@ export class Card {
         this.value = typeof value === 'number' ? value : 0;
         this.x = typeof x === 'number' ? x : 0;
         this.y = typeof y === 'number' ? y : 0;
+        this.ctx = ctx;
         this.width = 80;
         this.height = 120;
         this.isPlayable = !!isPlayable;
@@ -45,7 +46,7 @@ export class Card {
     }
 
     draw() {
-        const ctx = window.gameCore.ctx;
+        this.ctx.save();
         ctx.save();
         if (!this.isDragging) ctx.translate(this.shakeOffset, 0);
 

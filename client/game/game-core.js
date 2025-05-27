@@ -79,7 +79,7 @@ export class GameCore {
                     return card;
                 }
                 // La clase Card se inyectará desde game-main.js
-                return new this.Card(value, x, y, isPlayable, isPlayedThisTurn);
+                return new this.Card(value, x, y, isPlayable, isPlayedThisTurn, this.ctx);
             },
             release: (card) => {
                 this.cardPool.pool.push(card);

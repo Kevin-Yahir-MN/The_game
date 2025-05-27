@@ -7,6 +7,7 @@ import { Card } from './card.js';
 document.addEventListener('DOMContentLoaded', () => {
     const gameCore = new GameCore();
     gameCore.Card = Card;
+    gameCore.ctx = ctx;
 
     if (!gameCore.gameState.yourCards) {
         gameCore.gameState.yourCards = [];
