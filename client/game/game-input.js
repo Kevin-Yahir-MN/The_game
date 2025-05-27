@@ -1,4 +1,6 @@
-class GameInput {
+import { GameCore } from './game-core.js';
+
+export class GameInput {
     constructor(gameCore) {
         this.gameCore = gameCore;
     }

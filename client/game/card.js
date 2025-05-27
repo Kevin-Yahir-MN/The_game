@@ -1,4 +1,4 @@
-class Card {
+export class Card {
     constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
         this.value = typeof value === 'number' ? value : 0;
         this.x = typeof x === 'number' ? x : 0;

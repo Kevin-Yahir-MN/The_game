@@ -1,3 +1,10 @@
+import { GameCore } from './game-core.js';
+import { GameNetwork } from './game-network.js';
+import { GameUI } from './game-ui.js';
+import { GameInput } from './game-input.js';
+import { Card } from './card.js';
+
+
 document.addEventListener('DOMContentLoaded', () => {
     window.gameCore = new GameCore();
     window.gameCore.network = new GameNetwork(window.gameCore);

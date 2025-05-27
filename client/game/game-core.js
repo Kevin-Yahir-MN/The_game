@@ -1,4 +1,4 @@
-class GameCore {
+export class GameCore {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
