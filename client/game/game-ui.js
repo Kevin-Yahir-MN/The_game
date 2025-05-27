@@ -218,7 +218,7 @@ export class GameUI {
                     false,
                     wasPlayedThisTurn
                 );
-                card.draw(ctx);
+                card.draw(this.gameCore.ctx);
             }
         });
 
@@ -257,7 +257,7 @@ export class GameUI {
             if (card && card !== this.gameCore.dragStartCard) {
                 card.x = (this.gameCore.canvas.width - (this.gameCore.gameState.yourCards.length * (this.gameCore.CARD_WIDTH + this.gameCore.CARD_SPACING))) / 2 + index * (this.gameCore.CARD_WIDTH + this.gameCore.CARD_SPACING);
                 card.y = this.gameCore.PLAYER_CARDS_Y;
-                card.draw(ctx);
+                card.draw(this.gameCore.ctx);
             }
         });
     }
