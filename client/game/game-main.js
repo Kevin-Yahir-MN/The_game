@@ -5,11 +5,16 @@ import { GameInput } from './game-input.js';
 import { Card } from './card.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Inicialización del juego
+    // Inicialización del core del juego
     const gameCore = new GameCore();
+
+    // Inyectar dependencias
     gameCore.network = new GameNetwork(gameCore);
     gameCore.ui = new GameUI(gameCore);
     gameCore.input = new GameInput(gameCore);
+
+    // Hacer disponible para depuración (opcional)
+    window.game = gameCore;
 
     // Configuración del canvas
     const canvas = document.getElementById('gameCanvas');
@@ -17,24 +22,24 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas.width = 800;
     canvas.height = 700;
 
-    // Variables de estado del juego
+    // Variables de estado
     let animationFrameId;
     let lastRenderTime = 0;
 
-    // Elementos de la UI
+    // Elementos UI
     const endTurnButton = document.getElementById('endTurnBtn');
 
-    // Función para inicializar el juego
+    // Función de inicialización
     const initGame = async () => {
         try {
-            // Cargar assets (opcional, si usas la imagen)
+            // Cargar assets
             await gameCore.ui.loadAsset('./game/cards-icon.png').then(img => {
-                if (img) gameCore.historyIcon = img;
+                gameCore.historyIcon = img;
             }).catch(err => {
-                console.warn('Error loading history icon:', err);
+                console.warn('No se pudo cargar el icono de historial:', err);
             });
 
-            // Configurar controles
+            // Configurar eventos
             endTurnButton.addEventListener('click', () => gameCore.input.endTurn());
             document.getElementById('modalBackdrop').addEventListener('click', () => gameCore.ui.closeHistoryModal());
 
@@ -42,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gameLoop();
 
         } catch (error) {
-            console.error('Error initializing game:', error);
+            console.error('Error al inicializar el juego:', error);
             gameCore.network.showNotification('Error al iniciar el juego', true);
         }
     };
@@ -57,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         lastRenderTime = timestamp;
 
-        // Limpiar y redibujar
+        // Limpiar canvas si es necesario
         if (gameCore.dirtyAreas.length > 0 || gameCore.needsRedraw) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#1a6b1a';
@@ -66,13 +71,13 @@ document.addEventListener('DOMContentLoaded', () => {
             gameCore.needsRedraw = false;
         }
 
-        // Dibujar elementos del juego
+        // Dibujar elementos
         gameCore.ui.drawBoard();
         gameCore.ui.drawHistoryIcons();
         gameCore.ui.handleCardAnimations();
         gameCore.ui.drawPlayerCards();
 
-        // Dibujar carta arrastrada si existe
+        // Dibujar carta arrastrada
         if (gameCore.isDragging && gameCore.dragStartCard) {
             gameCore.dragStartCard.draw();
         }
@@ -80,31 +85,16 @@ document.addEventListener('DOMContentLoaded', () => {
         animationFrameId = requestAnimationFrame(gameLoop);
     };
 
-    // Limpieza al salir
+    // Limpieza
     const cleanup = () => {
-        gameCore.gameState.animatingCards = [];
-
-        if (gameCore.dragStartCard) {
-            gameCore.dragStartCard.endDrag();
-            gameCore.dragStartCard = null;
-        }
-
-        gameCore.isDragging = false;
-        clearInterval(gameCore.historyIconsAnimation.interval);
-        clearTimeout(gameCore.reconnectTimeout);
         cancelAnimationFrame(animationFrameId);
-
         if (gameCore.socket) {
-            gameCore.socket.close(1000, 'Juego terminado');
-            gameCore.socket = null;
+            gameCore.socket.close();
         }
-
-        // Eliminar event listeners
+        // Limpiar event listeners
         endTurnButton.removeEventListener('click', gameCore.input.endTurn);
-        document.getElementById('modalBackdrop').removeEventListener('click', gameCore.ui.closeHistoryModal);
     };
 
-    // Configurar evento antes de salir
     window.addEventListener('beforeunload', cleanup);
 
     // Iniciar el juego
