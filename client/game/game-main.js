@@ -5,6 +5,11 @@ import { GameInput } from './game-input.js';
 import { Card } from './card.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 800;
+    canvas.height = 700;
+
     const gameCore = new GameCore();
     gameCore.Card = Card;
     gameCore.ctx = ctx;
@@ -13,17 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
         gameCore.gameState.yourCards = [];
     }
 
-    // Inyectar la clase Card en gameCore
-    gameCore.Card = Card;
-
     gameCore.network = new GameNetwork(gameCore);
     gameCore.ui = new GameUI(gameCore);
     gameCore.input = new GameInput(gameCore);
-
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = 800;
-    canvas.height = 700;
 
     let animationFrameId;
     let lastRenderTime = 0;
