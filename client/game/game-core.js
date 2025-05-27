@@ -69,8 +69,8 @@ export class GameCore {
         this.cardPool = {
             pool: [],
             get: (value, x, y, isPlayable, isPlayedThisTurn) => {
-                if (this.pool.length > 0) {
-                    const card = this.pool.pop();
+                if (this.cardPool.pool.length > 0) {
+                    const card = this.cardPool.pool.pop();
                     card.value = value;
                     card.x = x;
                     card.y = y;
@@ -82,7 +82,7 @@ export class GameCore {
                 return new this.Card(value, x, y, isPlayable, isPlayedThisTurn);
             },
             release: (card) => {
-                this.pool.push(card);
+                this.cardPool.pool.push(card);
             }
         };
     }
