@@ -68,7 +68,7 @@ export class GameCore {
 
         this.cardPool = {
             pool: [],
-            get(value, x, y, isPlayable, isPlayedThisTurn) {
+            get: (value, x, y, isPlayable, isPlayedThisTurn) => {
                 if (this.pool.length > 0) {
                     const card = this.pool.pop();
                     card.value = value;
@@ -78,9 +78,10 @@ export class GameCore {
                     card.isPlayedThisTurn = isPlayedThisTurn;
                     return card;
                 }
-                return new Card(value, x, y, isPlayable, isPlayedThisTurn);
+                // La clase Card se inyectará desde game-main.js
+                return new this.Card(value, x, y, isPlayable, isPlayedThisTurn);
             },
-            release(card) {
+            release: (card) => {
                 this.pool.push(card);
             }
         };
