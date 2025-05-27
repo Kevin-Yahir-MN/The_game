@@ -1,12 +1,10 @@
-import { CARD_WIDTH, CARD_HEIGHT } from './Constants.js';
-
-export class Card {
+class Card {
     constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
         this.value = typeof value === 'number' ? value : 0;
         this.x = typeof x === 'number' ? x : 0;
         this.y = typeof y === 'number' ? y : 0;
-        this.width = CARD_WIDTH;
-        this.height = CARD_HEIGHT;
+        this.width = 80;
+        this.height = 120;
         this.isPlayable = !!isPlayable;
         this.isPlayedThisTurn = !!isPlayedThisTurn;
         this.isFromCurrentTurn = !!isPlayedThisTurn;
@@ -14,27 +12,27 @@ export class Card {
         this.radius = 10;
         this.shakeOffset = 0;
         this.hoverOffset = 0;
-        this.backgroundColor = '#FFFFFF';
+        this.backgroundColor = this.determineColor();
         this.shadowColor = 'rgba(0, 0, 0, 0.3)';
         this.isDragging = false;
         this.dragOffsetX = 0;
         this.dragOffsetY = 0;
     }
 
-    determineColor(gameState) {
-        if (!gameState || !gameState.cardsPlayedThisTurn || !gameState.animatingCards) {
+    determineColor() {
+        if (!window.gameCore || !window.gameCore.gameState || !window.gameCore.gameState.cardsPlayedThisTurn || !window.gameCore.gameState.animatingCards) {
             return '#FFFFFF';
         }
 
-        const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(move => {
+        const isPlayedThisTurn = window.gameCore.gameState.cardsPlayedThisTurn.some(move => {
             return move && move.value === this.value &&
-                ((move.position === 'asc1' && gameState.board.ascending[0] === this.value) ||
-                    (move.position === 'asc2' && gameState.board.ascending[1] === this.value) ||
-                    (move.position === 'desc1' && gameState.board.descending[0] === this.value) ||
-                    (move.position === 'desc2' && gameState.board.descending[1] === this.value));
+                ((move.position === 'asc1' && window.gameCore.gameState.board.ascending[0] === this.value) ||
+                    (move.position === 'asc2' && window.gameCore.gameState.board.ascending[1] === this.value) ||
+                    (move.position === 'desc1' && window.gameCore.gameState.board.descending[0] === this.value) ||
+                    (move.position === 'desc2' && window.gameCore.gameState.board.descending[1] === this.value));
         });
 
-        const isAnimatedCard = gameState.animatingCards.some(anim => {
+        const isAnimatedCard = window.gameCore.gameState.animatingCards.some(anim => {
             return anim && anim.card && anim.card.value === this.value &&
                 (anim.card.position === this.position || anim.column === this.position);
         });
@@ -42,11 +40,12 @@ export class Card {
         return (isPlayedThisTurn || isAnimatedCard || this.playedThisRound) ? '#99CCFF' : '#FFFFFF';
     }
 
-    updateColor(gameState) {
-        this.backgroundColor = this.determineColor(gameState);
+    updateColor() {
+        this.backgroundColor = this.determineColor();
     }
 
-    draw(ctx) {
+    draw() {
+        const ctx = window.gameCore.ctx;
         ctx.save();
         if (!this.isDragging) ctx.translate(this.shakeOffset, 0);
 
@@ -71,6 +70,7 @@ export class Card {
         ctx.fillText(this.value.toString(), this.x + this.width / 2, this.y + this.height / 2 - this.hoverOffset);
 
         ctx.restore();
+        window.gameCore.markDirty(this.x, this.y, this.width, this.height);
     }
 
     contains(x, y) {
@@ -84,18 +84,22 @@ export class Card {
         this.dragOffsetY = offsetY;
         this.shadowColor = 'rgba(0, 0, 0, 0.5)';
         this.hoverOffset = 15;
+        window.gameCore.markDirty(this.x, this.y, this.width, this.height);
     }
 
     endDrag() {
         this.isDragging = false;
         this.shadowColor = 'rgba(0, 0, 0, 0.3)';
         this.hoverOffset = 0;
+        window.gameCore.markDirty(this.x, this.y, this.width, this.height);
     }
 
     updateDragPosition(x, y) {
         if (this.isDragging) {
+            window.gameCore.markDirty(this.x, this.y, this.width, this.height);
             this.x = x - this.dragOffsetX;
             this.y = y - this.dragOffsetY;
+            window.gameCore.markDirty(this.x, this.y, this.width, this.height);
         }
     }
 }
