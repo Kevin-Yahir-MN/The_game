@@ -101,7 +101,6 @@ export class GameUI {
 
         this.gameCore.gameState.yourCards.forEach(card => {
             card.isPlayedThisTurn = false;
-            card.updateColor();
         });
 
         this.gameCore.gameState.cardsPlayedThisTurn = [];
@@ -109,6 +108,7 @@ export class GameUI {
 
     drawHistoryIcons() {
         if (!this.gameCore.historyIcon.complete || this.gameCore.historyIcon.naturalWidth === 0) return;
+        const ctx = this.gameCore.ctx;
 
         const shouldAnimate = this.gameCore.isMyTurn();
         const pulseProgress = shouldAnimate ? this.calculatePulseProgress() : 0;
@@ -129,12 +129,12 @@ export class GameUI {
 
             const scale = shouldAnimate ? (1 + 0.2 * pulseProgress) : 1;
 
-            this.gameCore.ctx.save();
-            this.gameCore.ctx.translate(baseX + 20, baseY + 20);
-            this.gameCore.ctx.scale(scale, scale);
-            this.gameCore.ctx.translate(-20, -20);
-            this.gameCore.ctx.drawImage(this.gameCore.historyIcon, 0, 0, 40, 40);
-            this.gameCore.ctx.restore();
+            ctx.save();
+            ctx.translate(baseX + 20, baseY + 20);
+            ctx.scale(scale, scale);
+            ctx.translate(-20, -20);
+            ctx.drawImage(this.gameCore.historyIcon, 0, 0, 40, 40);
+            ctx.restore();
         });
     }
 
@@ -147,58 +147,60 @@ export class GameUI {
     }
 
     drawBoard() {
+        const ctx = this.gameCore.ctx;
         const yourCards = this.gameCore.gameState.yourCards || [];
         const animatingCards = this.gameCore.gameState.animatingCards || [];
-        this.gameCore.ctx.clearRect(
+
+        ctx.clearRect(
             this.gameCore.BOARD_POSITION.x - 30,
             this.gameCore.BOARD_POSITION.y - 55,
             this.gameCore.CARD_WIDTH * 4 + this.gameCore.COLUMN_SPACING * 3 + 60,
             this.gameCore.CARD_HEIGHT + 120
         );
 
-        this.gameCore.ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-        this.gameCore.ctx.beginPath();
-        this.gameCore.ctx.roundRect(
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.beginPath();
+        ctx.roundRect(
             this.gameCore.BOARD_POSITION.x - 25,
             this.gameCore.BOARD_POSITION.y - 50,
             this.gameCore.CARD_WIDTH * 4 + this.gameCore.COLUMN_SPACING * 3 + 50,
             this.gameCore.CARD_HEIGHT + 110,
             15
         );
-        this.gameCore.ctx.fill();
+        ctx.fill();
 
         if (this.gameCore.isDragging && this.gameCore.dragStartCard) {
             ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
                 const isValid = this.gameCore.isValidMove(this.gameCore.dragStartCard.value, col);
                 const x = this.gameCore.BOARD_POSITION.x + (this.gameCore.CARD_WIDTH + this.gameCore.COLUMN_SPACING) * i;
 
-                this.gameCore.ctx.fillStyle = isValid ? 'rgb(67, 64, 250)' : 'rgb(248, 51, 51)';
-                this.gameCore.ctx.beginPath();
-                this.gameCore.ctx.roundRect(
+                ctx.fillStyle = isValid ? 'rgb(67, 64, 250)' : 'rgb(248, 51, 51)';
+                ctx.beginPath();
+                ctx.roundRect(
                     x - 5,
                     this.gameCore.BOARD_POSITION.y - 10,
                     this.gameCore.CARD_WIDTH + 10,
                     this.gameCore.CARD_HEIGHT + 20,
                     15
                 );
-                this.gameCore.ctx.fill();
+                ctx.fill();
             });
         }
 
-        this.gameCore.ctx.fillStyle = 'white';
-        this.gameCore.ctx.font = 'bold 36px Arial';
-        this.gameCore.ctx.textAlign = 'center';
-        this.gameCore.ctx.textBaseline = 'middle';
-        this.gameCore.ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        this.gameCore.ctx.shadowBlur = 5;
-        this.gameCore.ctx.shadowOffsetY = 2;
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 36px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetY = 2;
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const x = this.gameCore.BOARD_POSITION.x + (this.gameCore.CARD_WIDTH + this.gameCore.COLUMN_SPACING) * i + this.gameCore.CARD_WIDTH / 2;
-            this.gameCore.ctx.fillText(i < 2 ? '↑' : '↓', x, this.gameCore.BOARD_POSITION.y - 25);
+            ctx.fillText(i < 2 ? '↑' : '↓', x, this.gameCore.BOARD_POSITION.y - 25);
         });
 
-        this.gameCore.ctx.shadowColor = 'transparent';
+        ctx.shadowColor = 'transparent';
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
             const isColumnAnimating = this.gameCore.gameState.animatingCards.some(anim => anim.column === col);
@@ -216,47 +218,46 @@ export class GameUI {
                     false,
                     wasPlayedThisTurn
                 );
-                card.draw();
+                card.draw(ctx);
             }
         });
 
         this.handleCardAnimations();
         this.drawHistoryIcons();
-
-        if (this.gameCore.gameState.specialCards) {
-            this.gameCore.gameState.specialCards.forEach(card => {
-                if (!card.isAnimating) {
-                    card.draw();
-                }
-            });
-        }
     }
 
     drawPlayerCards() {
+        const ctx = this.gameCore.ctx;
         if (!this.gameCore.gameState.yourCards) {
             this.gameCore.gameState.yourCards = [];
             return;
         }
+
         const backgroundHeight = this.gameCore.CARD_HEIGHT + 30;
         const backgroundWidth = this.gameCore.gameState.yourCards.length * (this.gameCore.CARD_WIDTH + this.gameCore.CARD_SPACING) + 40;
 
-        this.gameCore.ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-        this.gameCore.ctx.beginPath();
-        this.gameCore.ctx.roundRect(
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.beginPath();
+        ctx.roundRect(
             (this.gameCore.canvas.width - backgroundWidth) / 2,
             this.gameCore.PLAYER_CARDS_Y - 15,
             backgroundWidth,
             backgroundHeight,
             15
         );
-        this.gameCore.ctx.fill();
-        this.gameCore.markDirty((this.gameCore.canvas.width - backgroundWidth) / 2, this.gameCore.PLAYER_CARDS_Y - 15, backgroundWidth, backgroundHeight);
+        ctx.fill();
+        this.gameCore.markDirty(
+            (this.gameCore.canvas.width - backgroundWidth) / 2,
+            this.gameCore.PLAYER_CARDS_Y - 15,
+            backgroundWidth,
+            backgroundHeight
+        );
 
         this.gameCore.gameState.yourCards.forEach((card, index) => {
             if (card && card !== this.gameCore.dragStartCard) {
                 card.x = (this.gameCore.canvas.width - (this.gameCore.gameState.yourCards.length * (this.gameCore.CARD_WIDTH + this.gameCore.CARD_SPACING))) / 2 + index * (this.gameCore.CARD_WIDTH + this.gameCore.CARD_SPACING);
                 card.y = this.gameCore.PLAYER_CARDS_Y;
-                card.draw();
+                card.draw(ctx);
             }
         });
     }
@@ -293,6 +294,7 @@ export class GameUI {
     }
 
     handleCardAnimations() {
+        const ctx = this.gameCore.ctx;
         const now = Date.now();
 
         for (let i = this.gameCore.gameState.animatingCards.length - 1; i >= 0; i--) {
@@ -304,21 +306,17 @@ export class GameUI {
 
             const elapsed = now - anim.startTime;
             const progress = Math.min(elapsed / anim.duration, 1);
-
             const easedProgress = progress * progress;
 
             anim.newCard.y = -this.gameCore.CARD_HEIGHT + (anim.targetY - (-this.gameCore.CARD_HEIGHT)) * easedProgress;
 
-            this.gameCore.ctx.save();
-
-            anim.currentCard.draw();
-
-            this.gameCore.ctx.shadowColor = 'rgba(0, 100, 255, 0.7)';
-            this.gameCore.ctx.shadowBlur = 10;
-            this.gameCore.ctx.shadowOffsetY = 5;
-            anim.newCard.draw();
-
-            this.gameCore.ctx.restore();
+            ctx.save();
+            anim.currentCard.draw(ctx);
+            ctx.shadowColor = 'rgba(0, 100, 255, 0.7)';
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetY = 5;
+            anim.newCard.draw(ctx);
+            ctx.restore();
 
             if (progress === 1) {
                 if (anim.onComplete) anim.onComplete();
