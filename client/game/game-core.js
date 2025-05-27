@@ -78,7 +78,7 @@ export class GameCore {
                     card.isPlayedThisTurn = isPlayedThisTurn;
                     return card;
                 }
-                return new Card(value, x, y, isPlayable, isPlayedThisTurn);
+                return new window.Card(value, x, y, isPlayable, isPlayedThisTurn);
             },
             release(card) {
                 this.pool.push(card);
