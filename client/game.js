@@ -1199,6 +1199,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dragStartCard) return;
 
         const previousValue = getStackValue(position);
+
         updateStack(position, cardValue);
 
         const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
@@ -1215,21 +1216,6 @@ document.addEventListener('DOMContentLoaded', () => {
             previousValue: previousValue,
             isFirstMove: gameState.cardsPlayedThisTurn.length === 0
         }));
-
-        // Verificar condición de derrota después del primer movimiento
-        if (gameState.cardsPlayedThisTurn.length === 0 &&
-            gameState.remainingDeck > 0 &&
-            !canPlayerMakeValidMoves()) {
-
-            const message = `¡${currentPlayer.name} no puede colocar el mínimo requerido de cartas!`;
-            socket.send(JSON.stringify({
-                type: 'game_over',
-                playerId: currentPlayer.id,
-                roomId: roomId,
-                message: message,
-                isError: true
-            }));
-        }
 
         updateGameInfo();
         updateCardsPlayedUI();
@@ -1491,9 +1477,34 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.animatingCards.push(animation);
         } else {
             updateStack(position, value);
+
+            // Nueva verificación de condición de derrota local
+            const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
+            if (minCardsRequired === 2 && message.cardsPlayedThisTurn === 1) {
+                const playableCards = gameState.yourCards.filter(card => {
+                    return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+                        const posValue = pos.includes('asc')
+                            ? (pos === 'asc1' ? gameState.board.ascending[0] : gameState.board.ascending[1])
+                            : (pos === 'desc1' ? gameState.board.descending[0] : gameState.board.descending[1]);
+
+                        return pos.includes('asc')
+                            ? (card.value > posValue || card.value === posValue - 10)
+                            : (card.value < posValue || card.value === posValue + 10);
+                    });
+                });
+
+                if (playableCards.length === 0) {
+                    // Mostrar mensaje de advertencia mientras el servidor procesa la condición
+                    showNotification('¡No puedes jugar la segunda carta requerida!', true);
+                }
+            }
         }
 
         recordCardPlayed(value, position, message.playerId, previousValue);
+
+        // Actualizar UI después de jugar carta
+        updateGameInfo();
+        updateCardsPlayedUI();
     }
 
     function gameLoop(timestamp) {

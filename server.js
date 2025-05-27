@@ -374,6 +374,20 @@ async function handlePlayCard(room, player, msg) {
     player.totalCardsPlayed = (Number(player.totalCardsPlayed) || 0) + 1;
     player.cards = player.cards.filter(c => c !== msg.cardValue);
 
+    // Nueva verificación de condición de derrota
+    if (room.gameState.deck.length > 0 && player.cardsPlayedThisTurn === 1) {
+        const playableCards = getPlayableCards(player.cards, room.gameState.board);
+        if (playableCards.length === 0) {
+            await saveGameState(reverseRoomMap.get(room));
+            return broadcastToRoom(room, {
+                type: 'game_over',
+                result: 'lose',
+                message: `¡${player.name} no puede seguir jugando cartas!`,
+                reason: 'min_cards_not_met'
+            });
+        }
+    }
+
     updateBoardHistory(room, msg.position, msg.cardValue);
 
     const deckEmpty = room.gameState.deck.length === 0;
@@ -390,20 +404,6 @@ async function handlePlayCard(room, player, msg) {
         remainingDeck: room.gameState.deck.length, // Asegurar que se envía
         deckEmpty: deckEmpty // Nueva propiedad
     }, { includeGameState: true });
-
-    // Verificar condición de derrota después del primer movimiento
-    if (msg.isFirstMove && !deckEmpty) {
-        const playableCards = getPlayableCards(player.cards, room.gameState.board);
-        if (playableCards.length === 0) {
-            await saveGameState(reverseRoomMap.get(room));
-            return broadcastToRoom(room, {
-                type: 'game_over',
-                result: 'lose',
-                message: `¡${player.name} no puede jugar el mínimo de 2 cartas requeridas!`,
-                reason: 'min_cards_not_met'
-            });
-        }
-    }
 
     // Si el mazo acaba de vaciarse, enviar actualización especial
     if (deckEmpty && room.gameState.deck.length === 0) {
