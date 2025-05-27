@@ -147,6 +147,8 @@ export class GameUI {
     }
 
     drawBoard() {
+        const yourCards = this.gameCore.gameState.yourCards || [];
+        const animatingCards = this.gameCore.gameState.animatingCards || [];
         this.gameCore.ctx.clearRect(
             this.gameCore.BOARD_POSITION.x - 30,
             this.gameCore.BOARD_POSITION.y - 55,
@@ -231,6 +233,10 @@ export class GameUI {
     }
 
     drawPlayerCards() {
+        if (!this.gameCore.gameState.yourCards) {
+            this.gameCore.gameState.yourCards = [];
+            return;
+        }
         const backgroundHeight = this.gameCore.CARD_HEIGHT + 30;
         const backgroundWidth = this.gameCore.gameState.yourCards.length * (this.gameCore.CARD_WIDTH + this.gameCore.CARD_SPACING) + 40;
 

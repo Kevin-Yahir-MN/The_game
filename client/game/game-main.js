@@ -6,6 +6,11 @@ import { Card } from './card.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const gameCore = new GameCore();
+    gameCore.Card = Card;
+
+    if (!gameCore.gameState.yourCards) {
+        gameCore.gameState.yourCards = [];
+    }
 
     // Inyectar la clase Card en gameCore
     gameCore.Card = Card;
@@ -25,6 +30,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initGame = async () => {
         try {
+            if (!gameCore.gameState.yourCards) {
+                gameCore.gameState.yourCards = [];
+            }
             // Cargar assets
             await gameCore.ui.loadAsset('./game/cards-icon.png').then(img => {
                 gameCore.historyIcon = img;
