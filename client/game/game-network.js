@@ -522,31 +522,26 @@ export class GameNetwork {
     }
 
     updateGameInfo(deckEmpty = false) {
-        const elements = {
-            currentTurn: document.getElementById('currentTurn'),
-            remainingDeck: document.getElementById('remainingDeck'),
-            progressText: document.getElementById('progressText'),
-            progressBar: document.getElementById('progressBar')
-        };
+        // Safely get all elements with null checks
+        const currentTurnElement = document.getElementById('currentTurn');
+        const remainingDeckElement = document.getElementById('remainingDeck');
+        const progressTextElement = document.getElementById('progressText');
+        const progressBarElement = document.getElementById('progressBar');
 
-        if (!Object.values(elements).every(el => el)) {
-            console.error('Elementos del DOM no encontrados');
-            return;
-        }
-
-        // Verificar si gameState y players están definidos
-        if (!this.gameState || !this.gameState.players) {
-            console.error('gameState no está inicializado correctamente');
-            return;
-        }
-
-
-        if (!currentTurnElement || !remainingDeckElement || !progressTextElement || !progressBarElement) {
+        // If any element is missing, try again later
+        if (!currentTurnElement || !remainingDeckElement ||
+            !progressTextElement || !progressBarElement) {
             setTimeout(() => this.updateGameInfo(deckEmpty), 100);
             return;
         }
 
-        const currentPlayerObj = this.gameState.players.find(p => p.id === this.currentPlayer.id) || {
+        // Verify gameState and players are defined
+        if (!this.gameState || !this.gameState.players) {
+            console.error('gameState not initialized correctly');
+            return;
+        }
+
+        const currentPlayerObj = this.gameState.players.find(p => p.id === this.gameCore.currentPlayer.id) || {
             cardsPlayedThisTurn: 0,
             totalCardsPlayed: 0
         };
@@ -554,7 +549,7 @@ export class GameNetwork {
         const minCardsRequired = deckEmpty || this.gameState.remainingDeck === 0 ? 1 : 2;
         const cardsPlayed = currentPlayerObj.cardsPlayedThisTurn || 0;
 
-        currentTurnElement.textContent = this.gameState.currentTurn === this.currentPlayer.id
+        currentTurnElement.textContent = this.gameState.currentTurn === this.gameCore.currentPlayer.id
             ? 'Tu turno'
             : `Turno de ${this.gameState.players.find(p => p.id === this.gameState.currentTurn)?.name || '...'}`;
 

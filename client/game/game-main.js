@@ -23,6 +23,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initGame = async () => {
         try {
+            // Wait for DOM to be fully ready
+            await new Promise(resolve => {
+                if (document.readyState === 'complete') {
+                    resolve();
+                } else {
+                    window.addEventListener('load', resolve);
+                }
+            });
+
+            // Then load assets and initialize
             await gameCore.ui.loadAsset('./game/cards-icon.png').then(img => {
                 gameCore.historyIcon = img;
             }).catch(console.warn);
@@ -33,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             gameLoop();
         } catch (error) {
-            console.error('Error de inicialización:', error);
+            console.error('Initialization error:', error);
         }
     };
 
