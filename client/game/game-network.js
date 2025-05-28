@@ -170,8 +170,9 @@ export class GameNetwork {
         }
 
         this.updateGameInfo();
-        this.gameCore.updatePlayersPanel();
-
+        if (this.gameCore.ui?.updatePlayersPanel) {
+            this.gameCore.ui.updatePlayersPanel();
+        }
         if (window.location.pathname.endsWith('sala.html')) {
             window.location.href = 'game.html';
         }
@@ -342,7 +343,9 @@ export class GameNetwork {
             this.updatePlayerCards(message.yourCards);
         }
 
-        this.gameCore.updatePlayersPanel();
+        if (this.gameCore.ui?.updatePlayersPanel) {
+            this.gameCore.ui.updatePlayersPanel();
+        }
         this.updateGameInfo();
     }
 
@@ -512,7 +515,9 @@ export class GameNetwork {
             this.updatePlayerCards(newState.y);
         }
 
-        this.gameCore.updatePlayersPanel();
+        if (this.gameCore.ui?.updatePlayersPanel) {
+            this.gameCore.ui.updatePlayersPanel();
+        }
         this.updateGameInfo();
     }
 
