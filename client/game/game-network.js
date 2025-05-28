@@ -137,7 +137,7 @@ export class GameNetwork {
 
         if (message.players) {
             this.gameState.players = message.players;
-            this.gamecore.updatePlayersPanel();
+            this.gameCore.ui.updatePlayersPanel();
         }
         this.gameState.currentTurn = message.currentTurn;
         this.updateGameInfo();
@@ -296,6 +296,7 @@ export class GameNetwork {
         this.gameState.initialCards = message.gameState.initialCards || this.gameState.initialCards;
         this.gameState.players = message.room.players || this.gameState.players;
 
+        this.gameCore.ui.updatePlayersPanel();
         this.updateGameInfo();
     }
 
