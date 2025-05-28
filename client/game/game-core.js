@@ -62,8 +62,7 @@ export class GameCore {
             cardsPlayedThisTurn: [],
             animatingCards: [],
             columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
-            boardCards: [],
-            historyIconAreas: []
+            gameStarted: false
         };
 
         this.cardPool = {

@@ -67,7 +67,8 @@ export class GameNetwork {
         this.gameCore.socket.onmessage = (event) => {
             try {
                 const now = Date.now();
-                const message = this.validateMessage(JSON.parse(event.data));
+                const message = JSON.parse(event.data);
+                if (!this.validateMessage(message)) return;
 
                 if (!message) return;
 
@@ -295,10 +296,25 @@ export class GameNetwork {
     }
 
     handleInitGame(message) {
-        this.gameState.currentTurn = message.gameState.currentTurn;
-        this.gameState.board = message.gameState.board;
-        this.gameState.remainingDeck = message.gameState.remainingDeck;
-        this.gameState.initialCards = message.gameState.initialCards || 6;
+        // Asegurar que gameState existe y tiene las propiedades necesarias
+        this.gameState = this.gameState || {
+            players: [],
+            yourCards: [],
+            board: { ascending: [1, 1], descending: [100, 100] },
+            currentTurn: null,
+            remainingDeck: 98,
+            initialCards: 6,
+            cardsPlayedThisTurn: [],
+            animatingCards: [],
+            columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] }
+        };
+
+        // Actualizar propiedades con valores por defecto si no existen
+        this.gameState.currentTurn = message.gameState?.currentTurn || null;
+        this.gameState.board = message.gameState?.board || this.gameState.board;
+        this.gameState.remainingDeck = message.gameState?.remainingDeck || 98;
+        this.gameState.initialCards = message.gameState?.initialCards || 6;
+        this.gameState.players = message.room?.players || [];
 
         this.gameState.columnHistory = {
             asc1: message.history?.ascending1 || [1],
@@ -307,17 +323,10 @@ export class GameNetwork {
             desc2: message.history?.descending2 || [100]
         };
 
-        if (this.gameState.players) {
-            this.gameState.players.forEach(player => {
-                player.cardsPlayedThisTurn = 0;
-            });
-        }
-
-        if (message.gameState.gameStarted && message.yourCards) {
+        if (message.gameState?.gameStarted && message.yourCards) {
             this.updatePlayerCards(message.yourCards);
         }
 
-        this.restoreGameState();
         this.updatePlayersPanel();
         this.updateGameInfo();
     }
@@ -531,10 +540,24 @@ export class GameNetwork {
     }
 
     updateGameInfo(deckEmpty = false) {
-        const currentTurnElement = document.getElementById('currentTurn');
-        const remainingDeckElement = document.getElementById('remainingDeck');
-        const progressTextElement = document.getElementById('progressText');
-        const progressBarElement = document.getElementById('progressBar');
+        const elements = {
+            currentTurn: document.getElementById('currentTurn'),
+            remainingDeck: document.getElementById('remainingDeck'),
+            progressText: document.getElementById('progressText'),
+            progressBar: document.getElementById('progressBar')
+        };
+
+        if (!Object.values(elements).every(el => el)) {
+            console.error('Elementos del DOM no encontrados');
+            return;
+        }
+
+        // Verificar si gameState y players están definidos
+        if (!this.gameState || !this.gameState.players) {
+            console.error('gameState no está inicializado correctamente');
+            return;
+        }
+
 
         if (!currentTurnElement || !remainingDeckElement || !progressTextElement || !progressBarElement) {
             setTimeout(() => this.updateGameInfo(deckEmpty), 100);
