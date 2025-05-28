@@ -13,9 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameCore = new GameCore();
     gameCore.ctx = ctx;
     gameCore.Card = Card;
-
-    gameCore.network = new GameNetwork(gameCore);
     gameCore.ui = new GameUI(gameCore);
+    gameCore.network = new GameNetwork(gameCore);
     gameCore.input = new GameInput(gameCore);
 
     let animationFrameId;

@@ -74,6 +74,11 @@ export class GameNetwork {
                 const message = JSON.parse(event.data);
                 if (!this.validateMessage(message)) return;
 
+                if (!this.gameCore.ui) {
+                    console.warn('UI not initialized yet, skipping message:', message.type);
+                    return;
+                }
+
                 if (!message) return;
 
                 if (message.errorCode === 'MISSING_REQUIRED_FIELDS') {
@@ -137,7 +142,9 @@ export class GameNetwork {
 
         if (message.players) {
             this.gameState.players = message.players;
-            this.gameCore.ui.updatePlayersPanel();
+            if (this.gameCore.ui?.updatePlayersPanel) {
+                this.gameCore.ui.updatePlayersPanel();
+            }
         }
         this.gameState.currentTurn = message.currentTurn;
         this.updateGameInfo();
@@ -295,6 +302,10 @@ export class GameNetwork {
         this.gameState.remainingDeck = message.gameState.remainingDeck || this.gameState.remainingDeck;
         this.gameState.initialCards = message.gameState.initialCards || this.gameState.initialCards;
         this.gameState.players = message.room.players || this.gameState.players;
+
+        if (this.gameCore.ui?.updatePlayersPanel) {
+            this.gameCore.ui.updatePlayersPanel();
+        }
 
         this.gameCore.ui.updatePlayersPanel();
         this.updateGameInfo();
