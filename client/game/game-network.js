@@ -398,8 +398,8 @@ export class GameNetwork {
                 cardValue === descending[0] + 10 || cardValue === descending[1] + 10 ||
                 cardValue > ascending[0] || cardValue > ascending[1] ||
                 cardValue < descending[0] || cardValue < descending[1]) :
-            (this.isValidMove(cardValue, 'asc1') || this.isValidMove(cardValue, 'asc2') ||
-                this.isValidMove(cardValue, 'desc1') || this.isValidMove(cardValue, 'desc2'));
+            (this.gameCore.isValidMove(cardValue, 'asc1') || this.gameCore.isValidMove(cardValue, 'asc2') ||
+                this.gameCore.isValidMove(cardValue, 'desc1') || this.gameCore.isValidMove(cardValue, 'desc2'));
     }
 
 
