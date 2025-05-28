@@ -2,8 +2,8 @@ import { GameCore } from './game-core.js';
 
 export class GameNetwork {
     constructor(gameCore) {
-        if (!gameCore || typeof gameCore.isMyTurn !== 'function' || typeof gameCore.isValidMove !== 'function') {
-            throw new Error('GameCore inválido: métodos requeridos faltantes');
+        if (!gameCore || typeof gameCore.isMyTurn !== 'function') {
+            throw new Error('GameCore inválido: falta método isMyTurn');
         }
         this.gameCore = gameCore;
         this.gameState = this.gameCore.gameState;
@@ -393,19 +393,15 @@ export class GameNetwork {
         if (!this.gameState.board) return false;
 
         const { ascending, descending } = this.gameState.board;
-
-        if (deckEmpty) {
-            return (cardValue === ascending[0] - 10 || cardValue === ascending[1] - 10 ||
+        return deckEmpty ?
+            (cardValue === ascending[0] - 10 || cardValue === ascending[1] - 10 ||
                 cardValue === descending[0] + 10 || cardValue === descending[1] + 10 ||
                 cardValue > ascending[0] || cardValue > ascending[1] ||
-                cardValue < descending[0] || cardValue < descending[1]);
-        } else {
-            return (this.gameCore.isValidMove(cardValue, 'asc1') ||
-                this.gameCore.isValidMove(cardValue, 'asc2') ||
-                this.gameCore.isValidMove(cardValue, 'desc1') ||
-                this.gameCore.isValidMove(cardValue, 'desc2'));
-        }
+                cardValue < descending[0] || cardValue < descending[1]) :
+            (this.isValidMove(cardValue, 'asc1') || this.isValidMove(cardValue, 'asc2') ||
+                this.isValidMove(cardValue, 'desc1') || this.isValidMove(cardValue, 'desc2'));
     }
+
 
     updateColumnHistoryUI(column, history) {
         if (!this.gameState.columnHistory[column]) {

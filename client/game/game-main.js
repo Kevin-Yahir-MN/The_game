@@ -14,8 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     gameCore.ctx = ctx;
     gameCore.Card = Card;
 
-    const gameNetwork = new GameNetwork(gameCore);
-    gameCore.network = new gameNetwork;
+    gameCore.network = new GameNetwork(gameCore);
     gameCore.ui = new GameUI(gameCore);
     gameCore.input = new GameInput(gameCore);
 
