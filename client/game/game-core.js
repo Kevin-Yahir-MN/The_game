@@ -84,6 +84,14 @@ export class GameCore {
                 this.cardPool.pool.push(card);
             }
         };
+
+        this.isValidMove = (cardValue, position) => {
+            const currentValue = this.getStackValue(position);
+            const isAscending = position.includes('asc');
+            return isAscending ?
+                (cardValue > currentValue || cardValue === currentValue - 10) :
+                (cardValue < currentValue || cardValue === currentValue + 10);
+        };
     }
 
     sanitizeInput(input) {

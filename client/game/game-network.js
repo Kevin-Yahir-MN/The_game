@@ -2,7 +2,11 @@ import { GameCore } from './game-core.js';
 
 export class GameNetwork {
     constructor(gameCore) {
+        if (!gameCore || typeof gameCore.isMyTurn !== 'function') {
+            throw new Error('GameCore inválido: falta método isMyTurn');
+        }
         this.gameCore = gameCore;
+        this.gameState = this.gameCore.gameState;
     }
 
     connectWebSocket() {
@@ -368,74 +372,36 @@ export class GameNetwork {
     }
 
     updatePlayerCards(cards) {
-        const isYourTurn = this.isMyTurn();
+        if (!cards || !Array.isArray(cards)) return;
+
+        const isYourTurn = this.gameCore.isMyTurn();
         const deckEmpty = this.gameState.remainingDeck === 0;
-        const startX = (this.canvas.width - (cards.length * (this.CARD_WIDTH + this.CARD_SPACING))) / 2;
-        const startY = this.PLAYER_CARDS_Y;
+        const startX = (this.gameCore.canvas.width - (cards.length * (this.gameCore.CARD_WIDTH + this.gameCore.CARD_SPACING))) / 2;
 
-        const newCards = cards.map((cardValue, index) => {
-            const existingCard = this.gameState.yourCards.find(c =>
-                c.value === cardValue && !c.isDragging
+        this.gameState.yourCards = cards.map((cardValue, index) => {
+            return this.gameCore.cardPool.get(
+                cardValue,
+                startX + index * (this.gameCore.CARD_WIDTH + this.gameCore.CARD_SPACING),
+                this.gameCore.PLAYER_CARDS_Y,
+                isYourTurn && this.canPlayCard(cardValue, deckEmpty),
+                false
             );
-
-            if (existingCard) {
-                existingCard.x = startX + index * (this.CARD_WIDTH + this.CARD_SPACING);
-                existingCard.y = startY;
-                existingCard.isPlayable = isYourTurn && (
-                    deckEmpty
-                        ? (cardValue === this.gameState.board.ascending[0] - 10 ||
-                            cardValue === this.gameState.board.ascending[1] - 10 ||
-                            cardValue === this.gameState.board.descending[0] + 10 ||
-                            cardValue === this.gameState.board.descending[1] + 10 ||
-                            cardValue > this.gameState.board.ascending[0] ||
-                            cardValue > this.gameState.board.ascending[1] ||
-                            cardValue < this.gameState.board.descending[0] ||
-                            cardValue < this.gameState.board.descending[1])
-                        : (this.isValidMove(cardValue, 'asc1') ||
-                            this.isValidMove(cardValue, 'asc2') ||
-                            this.isValidMove(cardValue, 'desc1') ||
-                            this.isValidMove(cardValue, 'desc2'))
-                );
-                existingCard.isPlayedThisTurn = this.gameState.cardsPlayedThisTurn.some(
-                    move => move.value === cardValue && move.playerId === this.currentPlayer.id
-                );
-                return existingCard;
-            } else {
-                return this.cardPool.get(
-                    cardValue,
-                    startX + index * (this.CARD_WIDTH + this.CARD_SPACING),
-                    startY,
-                    isYourTurn && (
-                        deckEmpty
-                            ? (cardValue === this.gameState.board.ascending[0] - 10 ||
-                                cardValue === this.gameState.board.ascending[1] - 10 ||
-                                cardValue === this.gameState.board.descending[0] + 10 ||
-                                cardValue === this.gameState.board.descending[1] + 10 ||
-                                cardValue > this.gameState.board.ascending[0] ||
-                                cardValue > this.gameState.board.ascending[1] ||
-                                cardValue < this.gameState.board.descending[0] ||
-                                cardValue < this.gameState.board.descending[1])
-                            : (this.isValidMove(cardValue, 'asc1') ||
-                                this.isValidMove(cardValue, 'asc2') ||
-                                this.isValidMove(cardValue, 'desc1') ||
-                                this.isValidMove(cardValue, 'desc2'))
-                    ),
-                    this.gameState.cardsPlayedThisTurn.some(
-                        move => move.value === cardValue && move.playerId === this.currentPlayer.id
-                    )
-                );
-            }
         });
-
-        this.gameState.yourCards = newCards;
-
-        if (this.dragStartCard) {
-            const dragCardIndex = this.gameState.yourCards.findIndex(c => c === this.dragStartCard);
-            if (dragCardIndex === -1) {
-                this.gameState.yourCards.push(this.dragStartCard);
-            }
-        }
     }
+
+    canPlayCard(cardValue, deckEmpty) {
+        if (!this.gameState.board) return false;
+
+        const { ascending, descending } = this.gameState.board;
+        return deckEmpty ?
+            (cardValue === ascending[0] - 10 || cardValue === ascending[1] - 10 ||
+                cardValue === descending[0] + 10 || cardValue === descending[1] + 10 ||
+                cardValue > ascending[0] || cardValue > ascending[1] ||
+                cardValue < descending[0] || cardValue < descending[1]) :
+            (this.isValidMove(cardValue, 'asc1') || this.isValidMove(cardValue, 'asc2') ||
+                this.isValidMove(cardValue, 'desc1') || this.isValidMove(cardValue, 'desc2'));
+    }
+
 
     updateColumnHistoryUI(column, history) {
         if (!this.gameState.columnHistory[column]) {
