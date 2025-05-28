@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initGame = async () => {
         try {
-            // Wait for DOM to be fully ready
+            // Esperar a que el DOM esté listo
             await new Promise(resolve => {
                 if (document.readyState === 'complete') {
                     resolve();
@@ -32,18 +32,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // Then load assets and initialize
-            await gameCore.ui.loadAsset('./game/cards-icon.png').then(img => {
-                gameCore.historyIcon = img;
-            }).catch(console.warn);
+            // Cargar assets
+            await gameCore.ui.loadAsset('./game/cards-icon.png')
+                .then(img => gameCore.historyIcon = img)
+                .catch(console.warn);
 
+            // Conectar WebSocket
             gameCore.network.connectWebSocket();
+
+            // Configurar eventos
             endTurnButton.addEventListener('click', () => gameCore.input.endTurn());
-            document.getElementById('modalBackdrop').addEventListener('click', () => gameCore.ui.closeHistoryModal());
+            document.getElementById('modalBackdrop').addEventListener('click',
+                () => gameCore.ui.closeHistoryModal());
+
+            // Forzar una actualización inicial del estado
+            setTimeout(() => {
+                if (gameCore.socket && gameCore.socket.readyState === WebSocket.OPEN) {
+                    gameCore.socket.send(JSON.stringify({
+                        type: 'get_full_state',
+                        playerId: gameCore.currentPlayer.id,
+                        roomId: gameCore.roomId,
+                        requireCurrentState: true
+                    }));
+                }
+            }, 1000);
 
             gameLoop();
         } catch (error) {
             console.error('Initialization error:', error);
+            gameCore.network.showNotification('Error al inicializar el juego', true);
         }
     };
 

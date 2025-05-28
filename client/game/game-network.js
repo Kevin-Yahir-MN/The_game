@@ -27,14 +27,11 @@ export class GameNetwork {
         }
 
         this.gameCore.socket = new WebSocket(`${this.gameCore.WS_URL}?roomId=${this.gameCore.roomId}&playerId=${this.gameCore.currentPlayer.id}`);
-
         this.gameCore.socket.onopen = () => {
             clearTimeout(this.gameCore.reconnectTimeout);
             this.gameCore.reconnectAttempts = 0;
             this.updateConnectionStatus('Conectado');
             this.showNotification('Conectado al servidor');
-            this.restoreGameState();
-
             this.gameCore.socket.send(JSON.stringify({
                 type: 'get_full_state',
                 playerId: this.gameCore.currentPlayer.id,
@@ -43,7 +40,7 @@ export class GameNetwork {
             }));
 
             this.gameCore.socket.send(JSON.stringify({
-                type: 'get_player_state',
+                type: 'get_game_state',
                 playerId: this.gameCore.currentPlayer.id,
                 roomId: this.gameCore.roomId
             }));
@@ -313,6 +310,7 @@ export class GameNetwork {
     }
 
     handleInitGame(message) {
+        // Asegurarse de que gameState existe
         this.gameState = this.gameState || {
             players: [],
             yourCards: [],
@@ -325,13 +323,19 @@ export class GameNetwork {
             columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] }
         };
 
-        // Actualizar propiedades con valores por defecto si no existen
-        this.gameState.currentTurn = message.gameState?.currentTurn || null;
-        this.gameState.board = message.gameState?.board || this.gameState.board;
-        this.gameState.remainingDeck = message.gameState?.remainingDeck || 98;
-        this.gameState.initialCards = message.gameState?.initialCards || 6;
-        this.gameState.players = message.room?.players || [];
+        // Actualizar propiedades con valores del mensaje
+        if (message.gameState) {
+            this.gameState.currentTurn = message.gameState.currentTurn || null;
+            this.gameState.board = message.gameState.board || this.gameState.board;
+            this.gameState.remainingDeck = message.gameState.remainingDeck || 98;
+            this.gameState.initialCards = message.gameState.initialCards || 6;
+            this.gameState.gameStarted = message.gameState.gameStarted || false;
+        }
 
+        // Asegurar que players es un array
+        this.gameState.players = message.players || [];
+
+        // Historial de columnas
         this.gameState.columnHistory = {
             asc1: message.history?.ascending1 || [1],
             asc2: message.history?.ascending2 || [1],
@@ -339,10 +343,12 @@ export class GameNetwork {
             desc2: message.history?.descending2 || [100]
         };
 
+        // Actualizar cartas del jugador si el juego ha comenzado
         if (message.gameState?.gameStarted && message.yourCards) {
             this.updatePlayerCards(message.yourCards);
         }
 
+        // Forzar actualización de la UI
         if (this.gameCore.ui?.updatePlayersPanel) {
             this.gameCore.ui.updatePlayersPanel();
         }
