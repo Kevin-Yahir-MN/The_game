@@ -23,7 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initGame = async () => {
         try {
-            // Wait for DOM to be fully ready
             await new Promise(resolve => {
                 if (document.readyState === 'complete') {
                     resolve();
@@ -32,26 +31,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // Load assets
             await gameCore.ui.loadAsset('./game/cards-icon.png')
-                .then(img => {
-                    gameCore.historyIcon = img;
-                    console.log('Ícono de historial cargado correctamente');
-                })
-                .catch(error => {
-                    console.warn('Error cargando ícono de historial:', error);
-                });
+                .then(img => gameCore.historyIcon = img)
+                .catch(error => { });
 
-            // Initialize WebSocket connection
             gameCore.network.connectWebSocket();
 
-            // Set up input event listeners
             gameCore.canvas.addEventListener('click', (e) => gameCore.input.handleCanvasClick(e));
             gameCore.canvas.addEventListener('mousedown', (e) => gameCore.input.handleMouseDown(e));
             gameCore.canvas.addEventListener('mousemove', (e) => gameCore.input.handleMouseMove(e));
             gameCore.canvas.addEventListener('mouseup', (e) => gameCore.input.handleMouseUp(e));
 
-            // Touch events for mobile devices
             gameCore.canvas.addEventListener('touchstart', (e) => {
                 e.preventDefault();
                 gameCore.input.handleTouchStart(e);
@@ -67,20 +57,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 gameCore.input.handleTouchEnd(e);
             }, { passive: false });
 
-            // Set up UI events
-            endTurnButton.addEventListener('click', () => {
-                console.log('Botón Terminar Turno clickeado');
-                gameCore.input.endTurn();
-            });
+            endTurnButton.addEventListener('click', () => gameCore.input.endTurn());
 
             document.getElementById('modalBackdrop').addEventListener('click', () => {
                 gameCore.ui.closeHistoryModal();
             });
 
-            // Request initial game state after a short delay
             setTimeout(() => {
                 if (gameCore.socket && gameCore.socket.readyState === WebSocket.OPEN) {
-                    console.log('Solicitando estado inicial del juego...');
                     gameCore.socket.send(JSON.stringify({
                         type: 'get_full_state',
                         playerId: gameCore.currentPlayer.id,
@@ -90,11 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, 500);
 
-            // Start game loop
             gameLoop();
         } catch (error) {
-            console.error('Error en inicialización:', error);
-            gameCore.network.showNotification('Error al inicializar el juego: ' + error.message, true);
+            gameCore.network.showNotification('Error al inicializar el juego', true);
         }
     };
 

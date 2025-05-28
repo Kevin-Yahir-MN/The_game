@@ -14,32 +14,18 @@ export class GameInput {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        console.log('Click detectado en coordenadas:', x, y);
-        console.log('Es mi turno?:', this.gameCore.isMyTurn());
-
-        // Check history icons first
         if (this.gameCore.gameState.historyIconAreas) {
             for (const area of this.gameCore.gameState.historyIconAreas) {
                 if (x >= area.x && x <= area.x + area.width &&
                     y >= area.y && y <= area.y + area.height) {
-                    console.log('Ícono de historial clickeado:', area.column);
                     this.gameCore.ui.showColumnHistory(area.column);
                     return;
                 }
             }
         }
 
-        // Check if clicked on a playable card
-        const clickedCard = this.gameCore.gameState.yourCards.find(card => {
-            const contains = card.contains(x, y);
-            if (contains) {
-                console.log('Carta clickeada:', card.value, 'Jugable?:', card.isPlayable);
-            }
-            return contains;
-        });
-
+        const clickedCard = this.gameCore.gameState.yourCards.find(card => card.contains(x, y));
         if (clickedCard && clickedCard.isPlayable && this.gameCore.isMyTurn()) {
-            console.log('Carta jugable clickeada, iniciando arrastre...');
             this.startDrag(x, y);
         }
     }
@@ -91,27 +77,14 @@ export class GameInput {
     }
 
     startDrag(x, y) {
-        console.log('Iniciando arrastre en:', x, y);
-
         const clickedCard = this.gameCore.gameState.yourCards.find(card => card.contains(x, y));
-        if (!clickedCard) {
-            console.log('No se encontró carta en la posición clickeada');
+        if (!clickedCard || !clickedCard.isPlayable || !this.gameCore.isMyTurn()) {
+            if (!clickedCard?.isPlayable) {
+                this.gameCore.network.showNotification('Esta carta no se puede jugar ahora', true);
+            }
             return;
         }
 
-        if (!clickedCard.isPlayable) {
-            console.log('Carta no es jugable:', clickedCard.value);
-            this.gameCore.network.showNotification('Esta carta no se puede jugar ahora', true);
-            return;
-        }
-
-        if (!this.gameCore.isMyTurn()) {
-            console.log('Intento de jugar carta cuando no es mi turno');
-            this.gameCore.network.showNotification('No es tu turno', true);
-            return;
-        }
-
-        console.log('Iniciando arrastre de carta:', clickedCard.value);
         this.gameCore.dragStartCard = clickedCard;
         this.gameCore.dragStartX = x;
         this.gameCore.dragStartY = y;
@@ -159,11 +132,8 @@ export class GameInput {
 
     endDrag(e) {
         if (!this.gameCore.isDragging || !this.gameCore.dragStartCard) {
-            console.log('Fin de arrastre sin carta seleccionada');
             return;
         }
-
-        console.log('Finalizando arrastre...');
 
         const rect = this.gameCore.canvas.getBoundingClientRect();
         let clientX, clientY;
@@ -175,7 +145,6 @@ export class GameInput {
             clientX = e.changedTouches[0].clientX;
             clientY = e.changedTouches[0].clientY;
         } else {
-            console.log('Evento de fin de arrastre no reconocido');
             this.resetCardPosition();
             return;
         }
@@ -183,23 +152,16 @@ export class GameInput {
         const x = clientX - rect.left;
         const y = clientY - rect.top;
 
-        console.log('Posición final del arrastre:', x, y);
-
         const targetColumn = this.gameCore.getClickedColumn(x, y);
         if (targetColumn) {
-            console.log('Soltando en columna:', targetColumn);
-
             if (this.gameCore.isValidMove(this.gameCore.dragStartCard.value, targetColumn)) {
-                console.log('Movimiento válido, jugando carta...');
                 this.playCard(this.gameCore.dragStartCard.value, targetColumn);
             } else {
-                console.log('Movimiento no válido para columna:', targetColumn);
                 this.gameCore.ui.animateInvalidCard(this.gameCore.dragStartCard);
                 this.gameCore.network.showNotification('Movimiento no válido', true);
                 this.resetCardPosition();
             }
         } else {
-            console.log('No se soltó en una columna válida');
             this.resetCardPosition();
         }
 
@@ -246,11 +208,8 @@ export class GameInput {
 
     playCard(cardValue, position) {
         if (!this.gameCore.dragStartCard) {
-            console.log('Intento de jugar carta sin carta seleccionada');
             return;
         }
-
-        console.log('Jugando carta', cardValue, 'en posición', position);
 
         const previousValue = this.gameCore.getStackValue(position);
         this.gameCore.updateStack(position, cardValue);
@@ -261,7 +220,6 @@ export class GameInput {
         }
 
         if (this.gameCore.socket && this.gameCore.socket.readyState === WebSocket.OPEN) {
-            console.log('Enviando movimiento al servidor...');
             this.gameCore.socket.send(JSON.stringify({
                 type: 'play_card',
                 playerId: this.gameCore.currentPlayer.id,
@@ -272,7 +230,6 @@ export class GameInput {
                 isFirstMove: this.gameCore.gameState.cardsPlayedThisTurn.length === 0
             }));
         } else {
-            console.error('WebSocket no está conectado');
             this.gameCore.network.showNotification('Error de conexión', true);
         }
 

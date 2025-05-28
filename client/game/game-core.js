@@ -137,12 +137,7 @@ export class GameCore {
             ? cardValue > currentValue
             : cardValue < currentValue;
 
-        const isValid = exactDifference || normalMove;
-
-        console.log(`Validando movimiento: Carta ${cardValue} en ${position} (valor actual: ${currentValue}) - 
-                Diferencia exacta: ${exactDifference}, Movimiento normal: ${normalMove} - Válido: ${isValid}`);
-
-        return isValid;
+        return exactDifference || normalMove;
     }
 
     addToHistory(position, value) {
@@ -167,10 +162,8 @@ export class GameCore {
     }
 
     isMyTurn() {
-        const isTurn = this.gameState.currentTurn === this.currentPlayer.id;
-        const gameStarted = this.gameState.gameStarted;
-        console.log(`Verificando turno: Jugador ${this.currentPlayer.id}, Turno actual: ${this.gameState.currentTurn}, Juego iniciado: ${gameStarted}`);
-        return isTurn && gameStarted;
+        return this.gameState.currentTurn === this.currentPlayer.id &&
+            this.gameState.gameStarted;
     }
 
     setNextTurn() {
@@ -206,7 +199,6 @@ export class GameCore {
 
     getClickedColumn(x, y) {
         if (y < this.BOARD_POSITION.y || y > this.BOARD_POSITION.y + this.CARD_HEIGHT) {
-            console.log('Click fuera del área del tablero');
             return null;
         }
 
@@ -219,12 +211,10 @@ export class GameCore {
 
         for (const col of columns) {
             if (x >= col.x && x <= col.x + this.CARD_WIDTH) {
-                console.log('Columna clickeada:', col.id);
                 return col.id;
             }
         }
 
-        console.log('No se detectó columna en las coordenadas:', x, y);
         return null;
     }
 }
