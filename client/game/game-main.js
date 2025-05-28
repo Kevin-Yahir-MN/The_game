@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 gameCore.historyIcon = img;
             }).catch(console.warn);
 
+            gameCore.network.connectWebSocket(); // Añade esta línea
             endTurnButton.addEventListener('click', () => gameCore.input.endTurn());
             document.getElementById('modalBackdrop').addEventListener('click', () => gameCore.ui.closeHistoryModal());
 

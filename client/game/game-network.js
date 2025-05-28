@@ -556,15 +556,6 @@ export class GameNetwork {
         remainingDeckElement.textContent = this.gameState.remainingDeck;
         progressTextElement.textContent = `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
         progressBarElement.style.width = `${Math.min((cardsPlayed / minCardsRequired) * 100, 100)}%`;
-
-        if (this.endTurnButton) {
-            this.endTurnButton.disabled = this.gameState.currentTurn !== this.currentPlayer.id;
-            const remainingCards = minCardsRequired - cardsPlayed;
-            this.endTurnButton.title = remainingCards > 0
-                ? `Necesitas jugar ${remainingCards} carta(s) más${deckEmpty ? ' (Mazo vacío)' : ''}`
-                : 'Puedes terminar tu turno';
-            this.endTurnButton.style.backgroundColor = cardsPlayed >= minCardsRequired ? '#2ecc71' : '#e74c3c';
-        }
     }
 
     updateCardsPlayedUI() {
