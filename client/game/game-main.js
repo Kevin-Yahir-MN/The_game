@@ -11,12 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas.height = 700;
 
     const gameCore = new GameCore();
-    gameCore.Card = Card;
     gameCore.ctx = ctx;
-
-    if (!gameCore.gameState.yourCards) {
-        gameCore.gameState.yourCards = [];
-    }
+    gameCore.Card = Card;
 
     gameCore.network = new GameNetwork(gameCore);
     gameCore.ui = new GameUI(gameCore);
@@ -28,24 +24,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initGame = async () => {
         try {
-            if (!gameCore.gameState.yourCards) {
-                gameCore.gameState.yourCards = [];
-            }
-            // Cargar assets
             await gameCore.ui.loadAsset('./game/cards-icon.png').then(img => {
                 gameCore.historyIcon = img;
             }).catch(console.warn);
 
-            // Event listeners
             endTurnButton.addEventListener('click', () => gameCore.input.endTurn());
             document.getElementById('modalBackdrop').addEventListener('click', () => gameCore.ui.closeHistoryModal());
 
-            // Iniciar juego
             gameLoop();
-
         } catch (error) {
             console.error('Error de inicialización:', error);
-            gameCore.network.showNotification('Error al iniciar', true);
         }
     };
 
@@ -66,12 +54,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         gameCore.ui.drawBoard();
-        gameCore.ui.drawHistoryIcons();
-        gameCore.ui.handleCardAnimations();
         gameCore.ui.drawPlayerCards();
 
         if (gameCore.isDragging && gameCore.dragStartCard) {
-            gameCore.dragStartCard.draw();
+            gameCore.dragStartCard.draw(ctx);
         }
 
         animationFrameId = requestAnimationFrame(gameLoop);

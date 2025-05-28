@@ -25,9 +25,7 @@ export class GameUI {
     }
 
     showColumnHistory(columnId) {
-        if (document.getElementById('historyModal').style.display === 'block') {
-            return;
-        }
+        if (document.getElementById('historyModal').style.display === 'block') return;
 
         const modal = document.getElementById('historyModal');
         const backdrop = document.getElementById('modalBackdrop');
@@ -96,19 +94,15 @@ export class GameUI {
 
     resetCardsPlayedProgress() {
         const minCardsRequired = this.gameCore.gameState.remainingDeck > 0 ? 2 : 1;
-        document.getElementById('progressText').textContent = '0/' + minCardsRequired + ' carta(s) jugada(s)';
+        document.getElementById('progressText').textContent = `0/${minCardsRequired} carta(s) jugada(s)`;
         document.getElementById('progressBar').style.width = '0%';
-
-        this.gameCore.gameState.yourCards.forEach(card => {
-            card.isPlayedThisTurn = false;
-        });
-
         this.gameCore.gameState.cardsPlayedThisTurn = [];
     }
 
     drawHistoryIcons() {
         if (!this.gameCore.historyIcon.complete || this.gameCore.historyIcon.naturalWidth === 0) return;
         const ctx = this.gameCore.ctx;
+        if (!ctx) return;
 
         const shouldAnimate = this.gameCore.isMyTurn();
         const pulseProgress = shouldAnimate ? this.calculatePulseProgress() : 0;
@@ -148,8 +142,7 @@ export class GameUI {
 
     drawBoard() {
         const ctx = this.gameCore.ctx;
-        const yourCards = this.gameCore.gameState.yourCards || [];
-        const animatingCards = this.gameCore.gameState.animatingCards || [];
+        if (!ctx) return;
 
         ctx.clearRect(
             this.gameCore.BOARD_POSITION.x - 30,
@@ -218,7 +211,7 @@ export class GameUI {
                     false,
                     wasPlayedThisTurn
                 );
-                card.draw(this.gameCore.ctx);
+                card.draw(ctx);
             }
         });
 
@@ -228,7 +221,7 @@ export class GameUI {
 
     drawPlayerCards() {
         const ctx = this.gameCore.ctx;
-        if (!this.gameCore.gameState.yourCards) {
+        if (!ctx || !this.gameCore.gameState.yourCards) {
             this.gameCore.gameState.yourCards = [];
             return;
         }
@@ -257,7 +250,7 @@ export class GameUI {
             if (card && card !== this.gameCore.dragStartCard) {
                 card.x = (this.gameCore.canvas.width - (this.gameCore.gameState.yourCards.length * (this.gameCore.CARD_WIDTH + this.gameCore.CARD_SPACING))) / 2 + index * (this.gameCore.CARD_WIDTH + this.gameCore.CARD_SPACING);
                 card.y = this.gameCore.PLAYER_CARDS_Y;
-                card.draw(this.gameCore.ctx);
+                card.draw(ctx);
             }
         });
     }
@@ -295,8 +288,9 @@ export class GameUI {
 
     handleCardAnimations() {
         const ctx = this.gameCore.ctx;
-        const now = Date.now();
+        if (!ctx) return;
 
+        const now = Date.now();
         for (let i = this.gameCore.gameState.animatingCards.length - 1; i >= 0; i--) {
             const anim = this.gameCore.gameState.animatingCards[i];
             if (!anim.newCard || !anim.currentCard) {
@@ -321,7 +315,6 @@ export class GameUI {
             if (progress === 1) {
                 if (anim.onComplete) anim.onComplete();
                 this.gameCore.gameState.animatingCards.splice(i, 1);
-                this.gameCore.updateGameInfo();
             }
         }
     }
