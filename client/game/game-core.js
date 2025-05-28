@@ -39,7 +39,6 @@ export class GameCore {
         this.animationQueue = [];
         this.dirtyAreas = [];
         this.needsRedraw = true;
-        this.pendingUpdates = [];
 
         this.currentPlayer = {
             id: this.sanitizeInput(sessionStorage.getItem('playerId')),
@@ -65,11 +64,6 @@ export class GameCore {
             columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
             gameStarted: false
         };
-
-        // Initialize components
-        this.ui = new GameUI(this);
-        this.network = new GameNetwork(this);
-        this.input = new GameInput(this);
 
         this.cardPool = {
             pool: [],

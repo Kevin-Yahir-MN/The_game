@@ -13,9 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameCore = new GameCore();
     gameCore.ctx = ctx;
     gameCore.Card = Card;
-
-    // Notificar que la UI está lista
-    gameCore.network.setUIReady();
+    gameCore.ui = new GameUI(gameCore);
+    gameCore.network = new GameNetwork(gameCore);
+    gameCore.input = new GameInput(gameCore);
 
     let animationFrameId;
     let lastRenderTime = 0;
