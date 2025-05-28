@@ -170,7 +170,7 @@ export class GameNetwork {
         }
 
         this.updateGameInfo();
-        this.gamecore.updatePlayersPanel();
+        this.gameCore.updatePlayersPanel();
 
         if (window.location.pathname.endsWith('sala.html')) {
             window.location.href = 'game.html';
@@ -312,7 +312,6 @@ export class GameNetwork {
     }
 
     handleInitGame(message) {
-        // Asegurar que gameState existe y tiene las propiedades necesarias
         this.gameState = this.gameState || {
             players: [],
             yourCards: [],
@@ -343,7 +342,7 @@ export class GameNetwork {
             this.updatePlayerCards(message.yourCards);
         }
 
-        this.gamecore.updatePlayersPanel();
+        this.gameCore.updatePlayersPanel();
         this.updateGameInfo();
     }
 
@@ -513,7 +512,7 @@ export class GameNetwork {
             this.updatePlayerCards(newState.y);
         }
 
-        this.gamecore.updatePlayersPanel();
+        this.gameCore.updatePlayersPanel();
         this.updateGameInfo();
     }
 
