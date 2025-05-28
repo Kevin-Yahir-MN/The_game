@@ -137,7 +137,7 @@ export class GameNetwork {
 
         if (message.players) {
             this.gameState.players = message.players;
-            this.updatePlayersPanel();
+            this.gamecore.updatePlayersPanel();
         }
         this.gameState.currentTurn = message.currentTurn;
         this.updateGameInfo();
@@ -163,7 +163,7 @@ export class GameNetwork {
         }
 
         this.updateGameInfo();
-        this.updatePlayersPanel();
+        this.gamecore.updatePlayersPanel();
 
         if (window.location.pathname.endsWith('sala.html')) {
             window.location.href = 'game.html';
@@ -331,7 +331,7 @@ export class GameNetwork {
             this.updatePlayerCards(message.yourCards);
         }
 
-        this.updatePlayersPanel();
+        this.gamecore.updatePlayersPanel();
         this.updateGameInfo();
     }
 
@@ -501,7 +501,7 @@ export class GameNetwork {
             this.updatePlayerCards(newState.y);
         }
 
-        this.updatePlayersPanel();
+        this.gamecore.updatePlayersPanel();
         this.updateGameInfo();
     }
 
