@@ -1,5 +1,3 @@
-import { GameCore } from './game-core.js';
-
 export class GameNetwork {
     constructor(gameCore) {
         if (!gameCore || typeof gameCore.isMyTurn !== 'function') {
@@ -7,6 +5,33 @@ export class GameNetwork {
         }
         this.gameCore = gameCore;
         this.gameState = this.gameCore.gameState;
+        this.uiReady = false;
+        this.pendingUpdates = [];
+    }
+
+    setUIReady() {
+        this.uiReady = true;
+        this.processPendingUpdates();
+    }
+
+    safeUpdatePlayersPanel() {
+        if (this.uiReady && this.gameCore.ui?.updatePlayersPanel) {
+            this.gameCore.ui.updatePlayersPanel();
+            this.processPendingUpdates();
+        } else {
+            this.pendingUpdates.push({ type: 'updatePlayersPanel' });
+        }
+    }
+
+    processPendingUpdates() {
+        while (this.pendingUpdates.length > 0 && this.uiReady) {
+            const update = this.pendingUpdates.shift();
+            switch (update.type) {
+                case 'updatePlayersPanel':
+                    this.safeUpdatePlayersPanel();
+                    break;
+            }
+        }
     }
 
     connectWebSocket() {
@@ -74,11 +99,6 @@ export class GameNetwork {
                 const message = JSON.parse(event.data);
                 if (!this.validateMessage(message)) return;
 
-                if (!this.gameCore.ui) {
-                    console.warn('UI not initialized yet, skipping message:', message.type);
-                    return;
-                }
-
                 if (!message) return;
 
                 if (message.errorCode === 'MISSING_REQUIRED_FIELDS') {
@@ -142,9 +162,7 @@ export class GameNetwork {
 
         if (message.players) {
             this.gameState.players = message.players;
-            if (this.gameCore.ui?.updatePlayersPanel) {
-                this.gameCore.ui.updatePlayersPanel();
-            }
+            this.safeUpdatePlayersPanel();
         }
         this.gameState.currentTurn = message.currentTurn;
         this.updateGameInfo();
@@ -170,7 +188,7 @@ export class GameNetwork {
         }
 
         this.updateGameInfo();
-        this.gamecore.updatePlayersPanel();
+        this.safeUpdatePlayersPanel();
 
         if (window.location.pathname.endsWith('sala.html')) {
             window.location.href = 'game.html';
@@ -303,16 +321,11 @@ export class GameNetwork {
         this.gameState.initialCards = message.gameState.initialCards || this.gameState.initialCards;
         this.gameState.players = message.room.players || this.gameState.players;
 
-        if (this.gameCore.ui?.updatePlayersPanel) {
-            this.gameCore.ui.updatePlayersPanel();
-        }
-
-        this.gameCore.ui.updatePlayersPanel();
+        this.safeUpdatePlayersPanel();
         this.updateGameInfo();
     }
 
     handleInitGame(message) {
-        // Asegurar que gameState existe y tiene las propiedades necesarias
         this.gameState = this.gameState || {
             players: [],
             yourCards: [],
@@ -325,7 +338,6 @@ export class GameNetwork {
             columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] }
         };
 
-        // Actualizar propiedades con valores por defecto si no existen
         this.gameState.currentTurn = message.gameState?.currentTurn || null;
         this.gameState.board = message.gameState?.board || this.gameState.board;
         this.gameState.remainingDeck = message.gameState?.remainingDeck || 98;
@@ -343,7 +355,7 @@ export class GameNetwork {
             this.updatePlayerCards(message.yourCards);
         }
 
-        this.gamecore.updatePlayersPanel();
+        this.safeUpdatePlayersPanel();
         this.updateGameInfo();
     }
 
@@ -413,7 +425,6 @@ export class GameNetwork {
             (this.gameCore.isValidMove(cardValue, 'asc1') || this.gameCore.isValidMove(cardValue, 'asc2') ||
                 this.gameCore.isValidMove(cardValue, 'desc1') || this.gameCore.isValidMove(cardValue, 'desc2'));
     }
-
 
     updateColumnHistoryUI(column, history) {
         if (!this.gameState.columnHistory[column]) {
@@ -513,7 +524,7 @@ export class GameNetwork {
             this.updatePlayerCards(newState.y);
         }
 
-        this.gamecore.updatePlayersPanel();
+        this.safeUpdatePlayersPanel();
         this.updateGameInfo();
     }
 
@@ -530,15 +541,8 @@ export class GameNetwork {
             return;
         }
 
-        // Verificar si gameState y players están definidos
         if (!this.gameState || !this.gameState.players) {
             console.error('gameState no está inicializado correctamente');
-            return;
-        }
-
-
-        if (!currentTurnElement || !remainingDeckElement || !progressTextElement || !progressBarElement) {
-            setTimeout(() => this.updateGameInfo(deckEmpty), 100);
             return;
         }
 
@@ -550,13 +554,13 @@ export class GameNetwork {
         const minCardsRequired = deckEmpty || this.gameState.remainingDeck === 0 ? 1 : 2;
         const cardsPlayed = currentPlayerObj.cardsPlayedThisTurn || 0;
 
-        currentTurnElement.textContent = this.gameState.currentTurn === this.currentPlayer.id
+        elements.currentTurn.textContent = this.gameState.currentTurn === this.currentPlayer.id
             ? 'Tu turno'
             : `Turno de ${this.gameState.players.find(p => p.id === this.gameState.currentTurn)?.name || '...'}`;
 
-        remainingDeckElement.textContent = this.gameState.remainingDeck;
-        progressTextElement.textContent = `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
-        progressBarElement.style.width = `${Math.min((cardsPlayed / minCardsRequired) * 100, 100)}%`;
+        elements.remainingDeck.textContent = this.gameState.remainingDeck;
+        elements.progressText.textContent = `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
+        elements.progressBar.style.width = `${Math.min((cardsPlayed / minCardsRequired) * 100, 100)}%`;
     }
 
     updateCardsPlayedUI() {
