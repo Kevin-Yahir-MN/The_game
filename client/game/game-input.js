@@ -248,10 +248,17 @@ export class GameInput {
             return;
         }
 
-        this.gameCore.gameState.yourCards.forEach(card => {
-            card.isPlayedThisTurn = false;
-            card.updateColor();
-        });
+        // Safely update cards
+        if (this.gameCore.gameState.yourCards) {
+            this.gameCore.gameState.yourCards.forEach(card => {
+                if (card && typeof card.updateColor === 'function') {
+                    card.updateColor();
+                } else if (card) {
+                    // Fallback if updateColor doesn't exist
+                    card.isPlayedThisTurn = false;
+                }
+            });
+        }
 
         this.gameCore.socket.send(JSON.stringify({
             type: 'end_turn',

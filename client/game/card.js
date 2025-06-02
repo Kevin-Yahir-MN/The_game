@@ -69,4 +69,8 @@ export class Card {
             this.y = y - this.dragOffsetY;
         }
     }
+
+    updateColor() {
+        this.isPlayedThisTurn = false;
+    }
 }
