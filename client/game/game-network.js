@@ -8,6 +8,7 @@ export class GameNetwork {
         this.gameCore = gameCore;
         this.gameState = this.gameCore.gameState;
         this.handleTurnChanged = this.handleTurnChanged.bind(this);
+        this.updateGameInfo = this.updateGameInfo.bind(this);
         this.handleAnimatedCardPlay = this.handleAnimatedCardPlay.bind(this);
     }
 
@@ -480,12 +481,14 @@ export class GameNetwork {
                 onComplete: () => {
                     this.gameCore.updateStack(position, value);
                     this.showNotification(`${message.playerName} jugó un ${value}`);
+                    this.updateGameInfo();  // Moved UI update here
                 }
             };
 
             this.gameState.animatingCards.push(animation);
         } else {
             this.gameCore.updateStack(position, value);
+            this.updateGameInfo();  // Immediate UI update for current player
 
             const minCardsRequired = this.gameState.remainingDeck > 0 ? 2 : 1;
             if (minCardsRequired === 2 && message.cardsPlayedThisTurn === 1) {
@@ -508,7 +511,6 @@ export class GameNetwork {
         }
 
         this.gameCore.recordCardPlayed(value, position, message.playerId, previousValue);
-        this.updateGameInfo();
         this.updateCardsPlayedUI();
     }
 

@@ -158,7 +158,6 @@ export class GameCore {
                 previousValue
             });
         }
-        this.updateGameInfo();
     }
 
     isMyTurn() {
