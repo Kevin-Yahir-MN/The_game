@@ -8,6 +8,7 @@ export class GameNetwork {
         this.gameCore = gameCore;
         this.gameState = this.gameCore.gameState;
         this.handleTurnChanged = this.handleTurnChanged.bind(this);
+        this.handleAnimatedCardPlay = this.handleAnimatedCardPlay.bind(this);
 
     }
 
@@ -463,29 +464,29 @@ export class GameNetwork {
     handleAnimatedCardPlay(message) {
         const position = message.position;
         const value = message.cardValue;
-        const previousValue = this.getStackValue(position);
+        const previousValue = this.gameCore.getStackValue(position);  // Use gameCore's method
 
-        if (message.playerId !== this.currentPlayer.id && !this.isMyTurn()) {
-            const targetPos = this.getColumnPosition(position);
+        if (message.playerId !== this.gameCore.currentPlayer.id && !this.gameCore.isMyTurn()) {
+            const targetPos = this.gameCore.getColumnPosition(position);
 
             const animation = {
-                newCard: this.cardPool.get(value, targetPos.x, -this.CARD_HEIGHT, false, true),
-                currentCard: this.cardPool.get(previousValue, targetPos.x, targetPos.y, false, false),
+                newCard: this.gameCore.cardPool.get(value, targetPos.x, -this.gameCore.CARD_HEIGHT, false, true),
+                currentCard: this.gameCore.cardPool.get(previousValue, targetPos.x, targetPos.y, false, false),
                 startTime: Date.now(),
                 duration: 300,
                 targetX: targetPos.x,
                 targetY: targetPos.y,
-                fromY: -this.CARD_HEIGHT,
+                fromY: -this.gameCore.CARD_HEIGHT,
                 column: position,
                 onComplete: () => {
-                    this.updateStack(position, value);
+                    this.gameCore.updateStack(position, value);
                     this.showNotification(`${message.playerName} jugó un ${value}`);
                 }
             };
 
             this.gameState.animatingCards.push(animation);
         } else {
-            this.updateStack(position, value);
+            this.gameCore.updateStack(position, value);
 
             const minCardsRequired = this.gameState.remainingDeck > 0 ? 2 : 1;
             if (minCardsRequired === 2 && message.cardsPlayedThisTurn === 1) {
