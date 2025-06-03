@@ -41,8 +41,8 @@ export class GameCore {
         this.needsRedraw = true;
 
         this.currentPlayer = {
-            id: this.sanitizeInput(sessionStorage.getItem('playerId')),
-            name: this.sanitizeInput(sessionStorage.getItem('playerName')),
+            id: this.sanitizeInput(sessionStorage.getItem('playerId')) || '',
+            name: this.sanitizeInput(sessionStorage.getItem('playerName')) || '',
             isHost: sessionStorage.getItem('isHost') === 'true'
         };
 

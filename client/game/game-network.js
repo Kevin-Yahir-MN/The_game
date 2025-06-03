@@ -7,6 +7,8 @@ export class GameNetwork {
         }
         this.gameCore = gameCore;
         this.gameState = this.gameCore.gameState;
+        this.handleTurnChanged = this.handleTurnChanged.bind(this);
+
     }
 
     connectWebSocket() {
@@ -202,18 +204,46 @@ export class GameNetwork {
     }
 
     handleTurnChanged(message) {
+        // Ensure gameState exists
+        if (!this.gameState) {
+            console.error('Game state not initialized');
+            return;
+        }
+
+        // Reset cards played this turn
         this.gameState.cardsPlayedThisTurn = [];
         this.gameState.currentTurn = message.newTurn;
+
+        // Update deck status if provided
         if (message.deckEmpty !== undefined) {
             this.gameState.remainingDeck = message.remainingDeck || this.gameState.remainingDeck;
-            document.getElementById('remainingDeck').textContent = this.gameState.remainingDeck;
+            const remainingDeckElement = document.getElementById('remainingDeck');
+            if (remainingDeckElement) {
+                remainingDeckElement.textContent = this.gameState.remainingDeck;
+            }
+
             const minCardsRequired = message.deckEmpty ? 1 : 2;
-            document.getElementById('progressText').textContent = `0/${minCardsRequired} carta(s) jugada(s)`;
-            document.getElementById('progressBar').style.width = '0%';
+            const progressTextElement = document.getElementById('progressText');
+            const progressBarElement = document.getElementById('progressBar');
+
+            if (progressTextElement) {
+                progressTextElement.textContent = `0/${minCardsRequired} carta(s) jugada(s)`;
+            }
+            if (progressBarElement) {
+                progressBarElement.style.width = '0%';
+            }
         }
-        this.updatePlayerCards(this.gameState.yourCards.map(c => c.value));
+
+        // Update player cards if they exist
+        if (this.gameState.yourCards) {
+            this.updatePlayerCards(this.gameState.yourCards.map(c => c.value));
+        }
+
+        // Show notification if player name is provided
         if (message.playerName) {
-            const notificationMsg = message.newTurn === this.currentPlayer.id
+            // Safely check if it's the current player's turn
+            const isCurrentPlayerTurn = this.gameCore?.currentPlayer?.id === message.newTurn;
+            const notificationMsg = isCurrentPlayerTurn
                 ? '¡Es tu turno!'
                 : `Turno de ${message.playerName}`;
             this.showNotification(notificationMsg);
