@@ -9,7 +9,6 @@ export class GameNetwork {
         this.gameState = this.gameCore.gameState;
         this.handleTurnChanged = this.handleTurnChanged.bind(this);
         this.handleAnimatedCardPlay = this.handleAnimatedCardPlay.bind(this);
-
     }
 
     connectWebSocket() {
@@ -464,7 +463,7 @@ export class GameNetwork {
     handleAnimatedCardPlay(message) {
         const position = message.position;
         const value = message.cardValue;
-        const previousValue = this.gameCore.getStackValue(position);  // Use gameCore's method
+        const previousValue = this.gameCore.getStackValue(position);
 
         if (message.playerId !== this.gameCore.currentPlayer.id && !this.gameCore.isMyTurn()) {
             const targetPos = this.gameCore.getColumnPosition(position);
@@ -508,7 +507,7 @@ export class GameNetwork {
             }
         }
 
-        this.recordCardPlayed(value, position, message.playerId, previousValue);
+        this.gameCore.recordCardPlayed(value, position, message.playerId, previousValue);
         this.updateGameInfo();
         this.updateCardsPlayedUI();
     }
