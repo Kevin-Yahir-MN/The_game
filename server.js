@@ -6,18 +6,26 @@ const path = require('path');
 const { Pool } = require('pg');
 const compression = require('compression');
 
+require('dotenv').config();
+
 const app = express();
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3000;
-const allowedOrigins = ['https://the-game-2xks.onrender.com'];
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://the-game-2xks.onrender.com')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const ROOM_ID_REGEX = /^\d{4}$/;
+const PLAYER_NAME_REGEX = /^[\p{L}\p{N}_\- ]{2,24}$/u;
 
 const pool = new Pool({
 
     connectionString: process.env.DATABASE_URL,
     ssl: {
         require: true,
-        rejectUnauthorized: false
+        rejectUnauthorized: IS_PRODUCTION
     },
     max: 5,
     idleTimeoutMillis: 30000,
@@ -27,10 +35,120 @@ const pool = new Pool({
 const rooms = new Map();
 const reverseRoomMap = new Map();
 const boardHistory = new Map();
+const saveDebounceTimers = new Map();
+const wsRateLimit = new Map();
+const RATE_LIMIT_WINDOW_MS = 1000;
+const RATE_LIMIT_MAX_EVENTS = 30;
 
 app.use(compression());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client')));
+
+function sanitizePlayerName(input) {
+    if (typeof input !== 'string') return '';
+    const value = input.trim();
+    return PLAYER_NAME_REGEX.test(value) ? value : '';
+}
+
+function isValidRoomId(roomId) {
+    return typeof roomId === 'string' && ROOM_ID_REGEX.test(roomId);
+}
+
+async function withTransaction(callback) {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await callback(client);
+        await client.query('COMMIT');
+        return result;
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+function createTurnState() {
+    return { count: 0, moves: [] };
+}
+
+function getTurnState(player) {
+    if (!player.turnState || typeof player.turnState !== 'object') {
+        if (Array.isArray(player.cardsPlayedThisTurn)) {
+            player.turnState = {
+                count: player.cardsPlayedThisTurn.length,
+                moves: player.cardsPlayedThisTurn
+            };
+        } else {
+            player.turnState = {
+                count: Number(player.cardsPlayedThisTurn) || 0,
+                moves: []
+            };
+        }
+    }
+    if (!Array.isArray(player.turnState.moves)) player.turnState.moves = [];
+    player.turnState.count = Number(player.turnState.count) || 0;
+    return player.turnState;
+}
+
+function getPlayerTurnCount(player) {
+    return getTurnState(player).count;
+}
+
+function incrementPlayerTurnState(player, move) {
+    const turnState = getTurnState(player);
+    turnState.count += 1;
+    if (move) turnState.moves.push(move);
+}
+
+function resetPlayerTurnState(player) {
+    player.turnState = createTurnState();
+}
+
+function scheduleSaveGameState(roomId, delay = 300) {
+    clearTimeout(saveDebounceTimers.get(roomId));
+    const timer = setTimeout(() => {
+        saveDebounceTimers.delete(roomId);
+        saveGameState(roomId).catch(err => console.error('Error en save debounced:', err));
+    }, delay);
+    saveDebounceTimers.set(roomId, timer);
+}
+
+function flushSaveGameState(roomId) {
+    if (saveDebounceTimers.has(roomId)) {
+        clearTimeout(saveDebounceTimers.get(roomId));
+        saveDebounceTimers.delete(roomId);
+    }
+    return saveGameState(roomId);
+}
+
+function validatePlayCardPayload(msg) {
+    const requiredFields = ['cardValue', 'position', 'playerId', 'roomId'];
+    const missingFields = requiredFields.filter(field => msg[field] === undefined || msg[field] === null);
+    return { missingFields, isValid: missingFields.length === 0 };
+}
+
+function isWithinRateLimit(playerId) {
+    const now = Date.now();
+    const bucket = wsRateLimit.get(playerId) || { start: now, count: 0 };
+    if (now - bucket.start > RATE_LIMIT_WINDOW_MS) {
+        bucket.start = now;
+        bucket.count = 0;
+    }
+    bucket.count += 1;
+    wsRateLimit.set(playerId, bucket);
+    return bucket.count <= RATE_LIMIT_MAX_EVENTS;
+}
+
+async function generateUniqueRoomId(maxAttempts = 10) {
+    for (let i = 0; i < maxAttempts; i++) {
+        const roomId = Math.floor(1000 + Math.random() * 9000).toString();
+        const exists = await pool.query('SELECT 1 FROM game_states WHERE room_id = $1', [roomId]);
+        if (exists.rowCount === 0) return roomId;
+    }
+    throw new Error('No fue posible generar un roomId único');
+}
 
 app.use((req, res, next) => {
     const origin = req.headers.origin;
@@ -82,7 +200,8 @@ async function saveGameState(roomId) {
                 cards: p.cards,
                 isHost: p.isHost,
                 connected: p.ws !== null,
-                cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0,
+                cardsPlayedThisTurn: getPlayerTurnCount(p),
+                movesThisTurn: getTurnState(p).moves,
                 totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
                 lastActivity: p.lastActivity
             })),
@@ -98,8 +217,6 @@ async function saveGameState(roomId) {
 
         const client = await pool.connect();
         try {
-            await client.query('BEGIN');
-
             const result = await client.query(`
                 INSERT INTO game_states (room_id, game_data, last_activity)
                 VALUES ($1, $2, NOW())
@@ -110,10 +227,8 @@ async function saveGameState(roomId) {
                 RETURNING room_id
             `, [roomId, JSON.stringify(gameData)]);
 
-            await client.query('COMMIT');
             return result.rowCount > 0;
         } catch (error) {
-            await client.query('ROLLBACK');
             console.error(`Error al guardar estado para sala ${roomId}:`, error);
             throw error;
         } finally {
@@ -160,6 +275,10 @@ async function restoreActiveGames() {
                         ws: null,
                         cards: p.cards || [],
                         cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0,
+                        turnState: {
+                            count: Number(p.cardsPlayedThisTurn) || 0,
+                            moves: Array.isArray(p.movesThisTurn) ? p.movesThisTurn : []
+                        },
                         totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
                         lastActivity: Date.now()
                     })) || [],
@@ -213,7 +332,7 @@ function broadcastToRoom(room, message, options = {}) {
     const { includeGameState = false, skipPlayerId = null } = options;
 
     // Asegurarse de incluir el estado del deck en todos los mensajes relevantes
-    if (includeGameState && !message.remainingDeck) {
+    if (includeGameState && message.remainingDeck == null) {
         message.remainingDeck = room.gameState.deck.length;
     }
 
@@ -246,7 +365,7 @@ function sendGameState(room, player) {
             n: p.name,
             h: p.isHost,
             c: p.cards.length,
-            s: Number(p.cardsPlayedThisTurn) || 0, // Asegurar número
+            s: getPlayerTurnCount(p),
             pt: Number(p.totalCardsPlayed) || 0
         }))
     };
@@ -285,9 +404,7 @@ function updateBoardHistory(room, position, newValue) {
             history: history[historyKey]
         });
 
-        saveGameState(roomId).catch(err =>
-            console.error('Error al guardar historial:', err)
-        );
+        scheduleSaveGameState(roomId);
     }
 }
 
@@ -302,6 +419,15 @@ function getPlayableCards(playerCards, board) {
 
         return canPlayAsc1 || canPlayAsc2 || canPlayDesc1 || canPlayDesc2;
     });
+}
+
+function isValidMove(cardValue, position, board) {
+    const idx = position === 'asc1' || position === 'desc1' ? 0 : 1;
+    const isAsc = position.includes('asc');
+    const targetValue = isAsc ? board.ascending[idx] : board.descending[idx];
+    const exactDifference = isAsc ? cardValue === targetValue - 10 : cardValue === targetValue + 10;
+    const normalMove = isAsc ? cardValue > targetValue : cardValue < targetValue;
+    return { isValid: exactDifference || normalMove, targetValue, exactDifference, normalMove };
 }
 
 async function handlePlayCard(room, player, msg) {
@@ -322,41 +448,15 @@ async function handlePlayCard(room, player, msg) {
     }
 
     const board = room.gameState.board;
-    const targetIdx = msg.position.includes('asc')
-        ? (msg.position === 'asc1' ? 0 : 1)
-        : (msg.position === 'desc1' ? 0 : 1);
-    const targetValue = msg.position.includes('asc')
-        ? board.ascending[targetIdx]
-        : board.descending[targetIdx];
+    const targetIdx = msg.position.includes('asc') ? (msg.position === 'asc1' ? 0 : 1) : (msg.position === 'desc1' ? 0 : 1);
+    const { isValid, targetValue } = isValidMove(msg.cardValue, msg.position, board);
 
-    // Verificar primero la regla de diferencia exacta de 10
-    const isExactDifference = msg.position.includes('asc')
-        ? (msg.cardValue === targetValue - 10)
-        : (msg.cardValue === targetValue + 10);
-
-    // Luego verificar la regla normal
-    const isValidNormalMove = msg.position.includes('asc')
-        ? (msg.cardValue > targetValue)
-        : (msg.cardValue < targetValue);
-
-    if (!isExactDifference && !isValidNormalMove) {
+    if (!isValid) {
         return safeSend(player.ws, {
             type: 'invalid_move',
             message: `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'
                 } que ${targetValue} o igual a ${msg.position.includes('asc') ? targetValue - 10 : targetValue + 10
                 }`,
-            isError: true
-        });
-    }
-
-    const isValid = msg.position.includes('asc')
-        ? (msg.cardValue > targetValue || msg.cardValue === targetValue - 10)
-        : (msg.cardValue < targetValue || msg.cardValue === targetValue + 10);
-
-    if (!isValid) {
-        return safeSend(player.ws, {
-            type: 'notification',
-            message: `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'} que ${targetValue} o igual a ${msg.position.includes('asc') ? targetValue - 10 : targetValue + 10}`,
             isError: true
         });
     }
@@ -370,15 +470,20 @@ async function handlePlayCard(room, player, msg) {
     }
 
     // Incrementar contadores
-    player.cardsPlayedThisTurn = (Number(player.cardsPlayedThisTurn) || 0) + 1;
+    incrementPlayerTurnState(player, {
+        value: msg.cardValue,
+        position: msg.position,
+        previousValue
+    });
+    player.cardsPlayedThisTurn = getPlayerTurnCount(player);
     player.totalCardsPlayed = (Number(player.totalCardsPlayed) || 0) + 1;
     player.cards = player.cards.filter(c => c !== msg.cardValue);
 
     // Nueva verificación de condición de derrota
-    if (room.gameState.deck.length > 0 && player.cardsPlayedThisTurn === 1) {
+    if (room.gameState.deck.length > 0 && getPlayerTurnCount(player) === 1) {
         const playableCards = getPlayableCards(player.cards, room.gameState.board);
         if (playableCards.length === 0) {
-            await saveGameState(reverseRoomMap.get(room));
+            await flushSaveGameState(reverseRoomMap.get(room));
             return broadcastToRoom(room, {
                 type: 'game_over',
                 result: 'lose',
@@ -400,7 +505,7 @@ async function handlePlayCard(room, player, msg) {
         position: msg.position,
         previousValue: targetValue,
         persistColor: true,
-        cardsPlayedThisTurn: player.cardsPlayedThisTurn,
+        cardsPlayedThisTurn: getPlayerTurnCount(player),
         remainingDeck: room.gameState.deck.length, // Asegurar que se envía
         deckEmpty: deckEmpty // Nueva propiedad
     }, { includeGameState: true });
@@ -416,12 +521,13 @@ async function handlePlayCard(room, player, msg) {
         }, 500);
     }
 
-    await saveGameState(reverseRoomMap.get(room));
+    scheduleSaveGameState(reverseRoomMap.get(room));
     checkGameStatus(room);
 }
 
 function handleUndoMove(room, player, msg) {
-    if (player.cardsPlayedThisTurn.length === 0) {
+    const turnState = getTurnState(player);
+    if (turnState.moves.length === 0) {
         return safeSend(player.ws, {
             type: 'notification',
             message: 'No hay jugadas para deshacer',
@@ -429,7 +535,7 @@ function handleUndoMove(room, player, msg) {
         });
     }
 
-    const lastMoveIndex = player.cardsPlayedThisTurn.findIndex(
+    const lastMoveIndex = turnState.moves.findIndex(
         move => move.value === msg.cardValue &&
             move.position === msg.position
     );
@@ -442,7 +548,7 @@ function handleUndoMove(room, player, msg) {
         });
     }
 
-    const lastMove = player.cardsPlayedThisTurn[lastMoveIndex];
+    const lastMove = turnState.moves[lastMoveIndex];
 
     player.cards.push(msg.cardValue);
 
@@ -454,7 +560,9 @@ function handleUndoMove(room, player, msg) {
         room.gameState.board.descending[idx] = lastMove.previousValue;
     }
 
-    player.cardsPlayedThisTurn.splice(lastMoveIndex, 1);
+    turnState.moves.splice(lastMoveIndex, 1);
+    turnState.count = Math.max(0, turnState.count - 1);
+    player.cardsPlayedThisTurn = turnState.count;
 
     broadcastToRoom(room, {
         type: 'move_undone',
@@ -469,7 +577,7 @@ function handleUndoMove(room, player, msg) {
 async function endTurn(room, player) {
     const deckEmpty = room.gameState.deck.length === 0;
     const minCardsRequired = deckEmpty ? 1 : 2;
-    const cardsPlayed = Number(player.cardsPlayedThisTurn) || 0;
+    const cardsPlayed = getPlayerTurnCount(player);
 
     // Verificar condiciones de derrota durante el turno (con cartas en mazo)
     if (!deckEmpty && cardsPlayed < minCardsRequired) {
@@ -517,13 +625,14 @@ async function endTurn(room, player) {
     } while (true);
 
     room.gameState.currentTurn = nextPlayer.id;
+    resetPlayerTurnState(player);
     player.cardsPlayedThisTurn = 0;
 
     // Verificar condiciones de derrota al inicio del turno (con cartas en mazo)
     if (!deckEmpty) {
         const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
         if (playableCards.length < minCardsRequired && nextPlayer.cards.length > 0) {
-            await saveGameState(reverseRoomMap.get(room));
+            await flushSaveGameState(reverseRoomMap.get(room));
             return broadcastToRoom(room, {
                 type: 'game_over',
                 result: 'lose',
@@ -533,7 +642,7 @@ async function endTurn(room, player) {
         }
     }
 
-    await saveGameState(reverseRoomMap.get(room));
+    await flushSaveGameState(reverseRoomMap.get(room));
 
     broadcastToRoom(room, {
         type: 'turn_changed',
@@ -616,40 +725,41 @@ function shuffleArray(array) {
 }
 
 app.post('/create-room', async (req, res) => {
-    const { playerName } = req.body;
+    const playerName = sanitizePlayerName(req.body?.playerName);
+    if (!playerName) {
+        return res.status(400).json({ success: false, message: 'Nombre de jugador inválido' });
+    }
 
-    const roomId = Math.floor(1000 + Math.random() * 9000).toString();
     const playerId = uuidv4();
 
     try {
-        await pool.query('BEGIN');
+        const roomId = await generateUniqueRoomId();
+        await withTransaction(async (client) => {
+            await client.query(`
+                INSERT INTO game_states 
+                (room_id, game_data, last_activity)
+                VALUES ($1, $2, NOW())
+            `, [roomId, JSON.stringify({
+                players: [],
+                gameState: {
+                    deck: initializeDeck(),
+                    board: { ascending: [1, 1], descending: [100, 100] },
+                    currentTurn: playerId,
+                    gameStarted: false,
+                    initialCards: 6
+                },
+                history: {
+                    ascending1: [1], ascending2: [1],
+                    descending1: [100], descending2: [100]
+                }
+            })]);
 
-        await pool.query(`
-            INSERT INTO game_states 
-            (room_id, game_data, last_activity)
-            VALUES ($1, $2, NOW())
-        `, [roomId, JSON.stringify({
-            players: [],
-            gameState: {
-                deck: initializeDeck(),
-                board: { ascending: [1, 1], descending: [100, 100] },
-                currentTurn: playerId,
-                gameStarted: false,
-                initialCards: 6
-            },
-            history: {
-                ascending1: [1], ascending2: [1],
-                descending1: [100], descending2: [100]
-            }
-        })]);
-
-        await pool.query(`
-            INSERT INTO player_connections 
-            (player_id, room_id, last_ping, connection_status)
-            VALUES ($1, $2, NOW(), 'connected')
-        `, [playerId, roomId]);
-
-        await pool.query('COMMIT');
+            await client.query(`
+                INSERT INTO player_connections 
+                (player_id, room_id, last_ping, connection_status)
+                VALUES ($1, $2, NOW(), 'connected')
+            `, [playerId, roomId]);
+        });
 
         const room = {
             players: [{
@@ -658,7 +768,8 @@ app.post('/create-room', async (req, res) => {
                 isHost: true,
                 ws: null,
                 cards: [],
-                cardsPlayedThisTurn: [],
+                cardsPlayedThisTurn: 0,
+                turnState: createTurnState(),
                 lastActivity: Date.now()
             }],
             gameState: {
@@ -680,40 +791,29 @@ app.post('/create-room', async (req, res) => {
         res.json({ success: true, roomId, playerId, playerName });
 
     } catch (error) {
-        await pool.query('ROLLBACK');
         console.error('Error al crear sala:', error);
         res.status(500).json({ success: false, message: 'Error al crear sala' });
     }
 });
 
 app.post('/join-room', async (req, res) => {
-    const { playerName, roomId } = req.body;
+    const playerName = sanitizePlayerName(req.body?.playerName);
+    const roomId = req.body?.roomId;
 
-    if (!playerName || !roomId) {
+    if (!playerName || !isValidRoomId(roomId)) {
         return res.status(400).json({
             success: false,
-            message: 'Nombre de jugador y código de sala requeridos'
+            message: 'Nombre de jugador y código de sala válidos requeridos'
         });
     }
 
     try {
-        await pool.query('BEGIN');
-
-        const roomCheck = await pool.query(
-            'SELECT 1 FROM game_states WHERE room_id = $1',
-            [roomId]
-        );
-
+        const roomCheck = await pool.query('SELECT 1 FROM game_states WHERE room_id = $1', [roomId]);
         if (roomCheck.rowCount === 0) {
-            await pool.query('ROLLBACK');
-            return res.status(404).json({
-                success: false,
-                message: 'Sala no encontrada'
-            });
+            return res.status(404).json({ success: false, message: 'Sala no encontrada' });
         }
 
         if (!rooms.has(roomId)) {
-            await pool.query('ROLLBACK');
             return res.status(404).json({
                 success: false,
                 message: 'Sala no disponible'
@@ -723,16 +823,18 @@ app.post('/join-room', async (req, res) => {
         const room = rooms.get(roomId);
         const playerId = uuidv4();
 
-        await pool.query(`
-            INSERT INTO player_connections 
-            (player_id, room_id, last_ping, connection_status)
-            VALUES ($1, $2, NOW(), 'connected')
-            ON CONFLICT (player_id) 
-            DO UPDATE SET
-                room_id = $2,
-                last_ping = NOW(),
-                connection_status = 'connected'
-        `, [playerId, roomId]);
+        await withTransaction(async (client) => {
+            await client.query(`
+                INSERT INTO player_connections 
+                (player_id, room_id, last_ping, connection_status)
+                VALUES ($1, $2, NOW(), 'connected')
+                ON CONFLICT (player_id) 
+                DO UPDATE SET
+                    room_id = $2,
+                    last_ping = NOW(),
+                    connection_status = 'connected'
+            `, [playerId, roomId]);
+        });
 
         const newPlayer = {
             id: playerId,
@@ -740,14 +842,13 @@ app.post('/join-room', async (req, res) => {
             isHost: false,
             ws: null,
             cards: [],
-            cardsPlayedThisTurn: [],
+            cardsPlayedThisTurn: 0,
+            turnState: createTurnState(),
             lastActivity: Date.now()
         };
         room.players.push(newPlayer);
 
-        await saveGameState(roomId);
-
-        await pool.query('COMMIT');
+        await flushSaveGameState(roomId);
 
         broadcastToRoom(room, {
             type: 'player_joined',
@@ -771,7 +872,6 @@ app.post('/join-room', async (req, res) => {
         });
 
     } catch (error) {
-        await pool.query('ROLLBACK');
         console.error('Error al unirse a sala:', error);
 
         if (error.code === '23503') {
@@ -792,6 +892,9 @@ app.post('/join-room', async (req, res) => {
 app.post('/register-connection', async (req, res) => {
     try {
         const { playerId, roomId } = req.body;
+        if (!playerId || !isValidRoomId(roomId)) {
+            return res.status(400).json({ success: false, error: 'Datos de conexión inválidos' });
+        }
 
         await pool.query(`
             INSERT INTO player_connections 
@@ -814,7 +917,7 @@ app.post('/register-connection', async (req, res) => {
 app.get('/room-info/:roomId', async (req, res) => {
     res.set('Cache-Control', 'public, max-age=5');
     const roomId = req.params.roomId;
-    if (!rooms.has(roomId)) {
+    if (!isValidRoomId(roomId) || !rooms.has(roomId)) {
         return res.status(404).json({ success: false, message: 'Sala no encontrada' });
     }
 
@@ -837,6 +940,9 @@ app.get('/room-info/:roomId', async (req, res) => {
 app.get('/room-history/:roomId', async (req, res) => {
     try {
         const roomId = req.params.roomId;
+        if (!isValidRoomId(roomId)) {
+            return res.status(400).json({ success: false, error: 'roomId inválido' });
+        }
         const history = boardHistory.get(roomId) || {
             ascending1: [1],
             ascending2: [1],
@@ -859,53 +965,53 @@ async function startGame(room, initialCards = 6) {
     if (!roomId) throw new Error('Room ID no encontrado');
 
     try {
-        await pool.query('BEGIN');
+        await withTransaction(async (client) => {
+            await client.query(`
+                UPDATE game_states
+                SET game_data = $1,
+                    last_activity = NOW()
+                WHERE room_id = $2
+            `, [JSON.stringify({
+                players: room.players,
+                gameState: {
+                    ...room.gameState,
+                    gameStarted: true,
+                    initialCards
+                },
+                history: boardHistory.get(roomId)
+            }), roomId]);
 
-        await pool.query(`
-            UPDATE game_states
-            SET game_data = $1,
-                last_activity = NOW()
-            WHERE room_id = $2
-        `, [JSON.stringify({
-            players: room.players,
-            gameState: {
-                ...room.gameState,
-                gameStarted: true,
-                initialCards
-            },
-            history: boardHistory.get(roomId)
-        }), roomId]);
-
-        await Promise.all(room.players.map(player =>
-            pool.query(`
-                INSERT INTO player_connections 
-                (player_id, room_id, last_ping, connection_status)
-                VALUES ($1, $2, NOW(), $3)
-                ON CONFLICT (player_id) 
-                DO UPDATE SET
-                    room_id = $2,
-                    last_ping = NOW(),
-                    connection_status = $3
-            `, [
-                player.id,
-                roomId,
-                player.ws?.readyState === WebSocket.OPEN ? 'connected' : 'disconnected'
-            ])
-        ));
-
-        await pool.query('COMMIT');
+            await Promise.all(room.players.map(player =>
+                client.query(`
+                    INSERT INTO player_connections 
+                    (player_id, room_id, last_ping, connection_status)
+                    VALUES ($1, $2, NOW(), $3)
+                    ON CONFLICT (player_id) 
+                    DO UPDATE SET
+                        room_id = $2,
+                        last_ping = NOW(),
+                        connection_status = $3
+                `, [
+                    player.id,
+                    roomId,
+                    player.ws?.readyState === WebSocket.OPEN ? 'connected' : 'disconnected'
+                ])
+            ));
+        });
 
         room.gameState.gameStarted = true;
         room.gameState.initialCards = initialCards;
 
         room.players.forEach(player => {
             player.cards = [];
+            resetPlayerTurnState(player);
+            player.cardsPlayedThisTurn = 0;
             for (let i = 0; i < initialCards && room.gameState.deck.length > 0; i++) {
                 player.cards.push(room.gameState.deck.pop());
             }
         });
 
-        await saveGameState(roomId);
+        await flushSaveGameState(roomId);
         console.log(`💾 Estado guardado al iniciar nueva partida`);
 
         broadcastToRoom(room, {
@@ -920,7 +1026,7 @@ async function startGame(room, initialCards = 6) {
                     name: p.name,
                     isHost: p.isHost,
                     cardCount: p.cards.length,
-                    cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
+                    cardsPlayedThisTurn: getPlayerTurnCount(p)
                 }))
             }
         });
@@ -937,7 +1043,6 @@ async function startGame(room, initialCards = 6) {
         });
 
     } catch (error) {
-        await pool.query('ROLLBACK');
         console.error('Error al iniciar juego:', error);
         throw error;
     }
@@ -947,6 +1052,7 @@ const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
 
 const wss = new WebSocket.Server({
     server,
+    maxPayload: 8 * 1024,
     verifyClient: (info, done) => {
         if (!allowedOrigins.includes(info.origin)) {
             return done(false, 403, 'Origen no permitido');
@@ -961,12 +1067,12 @@ initializeDatabase().then(() => {
 });
 
 wss.on('connection', async (ws, req) => {
-    const params = new URLSearchParams(req.url.split('?')[1]);
+    const params = new URLSearchParams((req.url || '').split('?')[1] || '');
     const roomId = params.get('roomId');
     const playerId = params.get('playerId');
     const playerName = params.get('playerName');
 
-    if (!roomId || !playerId || !rooms.has(roomId)) {
+    if (!isValidRoomId(roomId) || !playerId || !rooms.has(roomId)) {
         return ws.close(1008, 'Datos inválidos');
     }
 
@@ -991,7 +1097,10 @@ wss.on('connection', async (ws, req) => {
 
     player.ws = ws;
     player.lastActivity = Date.now();
-    if (playerName) player.name = decodeURIComponent(playerName);
+    if (playerName) {
+        const decodedName = sanitizePlayerName(decodeURIComponent(playerName));
+        if (decodedName) player.name = decodedName;
+    }
 
     const response = {
         type: 'init_game',
@@ -1027,7 +1136,7 @@ wss.on('connection', async (ws, req) => {
             id: p.id,
             name: p.name,
             cardCount: p.cards.length,
-            cardsPlayedThisTurn: p.cardsPlayedThisTurn.length
+            cardsPlayedThisTurn: getPlayerTurnCount(p)
         }));
     }
 
@@ -1035,7 +1144,21 @@ wss.on('connection', async (ws, req) => {
 
     ws.on('message', async (message) => {
         try {
-            const msg = JSON.parse(message);
+            if (!isWithinRateLimit(playerId)) {
+                return safeSend(ws, {
+                    type: 'notification',
+                    message: 'Has excedido el límite de mensajes por segundo',
+                    isError: true,
+                    errorCode: 'RATE_LIMIT_EXCEEDED'
+                });
+            }
+
+            const rawMessage = typeof message === 'string' ? message : message.toString();
+            if (rawMessage.length > 8 * 1024) {
+                return ws.close(1009, 'Payload demasiado grande');
+            }
+
+            const msg = JSON.parse(rawMessage);
             player.lastActivity = Date.now();
 
             if (msg.type === 'ping') {
@@ -1067,7 +1190,7 @@ wss.on('connection', async (ws, req) => {
                         if (player) {
                             safeSend(player.ws, {
                                 type: 'player_state_update',
-                                cardsPlayedThisTurn: player.cardsPlayedThisTurn || 0,
+                                cardsPlayedThisTurn: getPlayerTurnCount(player),
                                 totalCardsPlayed: player.totalCardsPlayed || 0,
                                 minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
                                 currentTurn: room.gameState.currentTurn,
@@ -1076,7 +1199,7 @@ wss.on('connection', async (ws, req) => {
                                     name: p.name,
                                     isHost: p.isHost,
                                     cardCount: p.cards?.length || 0,
-                                    cardsPlayedThisTurn: p.cardsPlayedThisTurn || 0
+                                    cardsPlayedThisTurn: getPlayerTurnCount(p)
                                 }))
                             });
                         }
@@ -1093,61 +1216,12 @@ wss.on('connection', async (ws, req) => {
                                 throw new Error('Se necesita al menos 1 jugador conectado');
                             }
 
-                            await pool.query('BEGIN');
-
-                            await pool.query(`
-                            UPDATE game_states SET 
-                            game_data = $1,
-                            last_activity = NOW()
-                            WHERE room_id = $2
-                            `, [JSON.stringify({
-                                players: room.players,
-                                gameState: {
-                                    ...room.gameState,
-                                    gameStarted: true,
-                                    initialCards: msg.initialCards
-                                }
-                            }), roomId]);
-
-                            await pool.query('COMMIT');
-
-                            room.gameState.gameStarted = true;
-                            room.gameState.initialCards = msg.initialCards;
-
-                            room.players.forEach(player => {
-                                player.cards = [];
-                                for (let i = 0; i < msg.initialCards && room.gameState.deck.length > 0; i++) {
-                                    player.cards.push(room.gameState.deck.pop());
-                                }
-                            });
-
-                            broadcastToRoom(room, {
-                                type: 'game_started',
-                                board: room.gameState.board,
-                                currentTurn: room.players[0].id,
-                                remainingDeck: room.gameState.deck.length,
-                                initialCards: msg.initialCards,
-                                players: room.players.map(p => ({
-                                    id: p.id,
-                                    name: p.name,
-                                    isHost: p.isHost,
-                                    cardCount: p.cards.length,
-                                }))
-                            });
-
-                            // Enviar cartas individualmente a cada jugador
-                            room.players.forEach(player => {
-                                if (player.ws?.readyState === WebSocket.OPEN) {
-                                    safeSend(player.ws, {
-                                        type: 'your_cards',
-                                        cards: player.cards,
-                                        playerName: player.name,
-                                        currentPlayerId: player.id
-                                    });
-                                }
-                            });
+                            const sanitizedInitialCards = Number(msg.initialCards);
+                            const initialCards = Number.isInteger(sanitizedInitialCards) && sanitizedInitialCards >= 1 && sanitizedInitialCards <= 10
+                                ? sanitizedInitialCards
+                                : 6;
+                            await startGame(room, initialCards);
                         } catch (error) {
-                            await pool.query('ROLLBACK');
                             console.error('Error al iniciar juego:', error);
                             safeSend(player.ws, {
                                 type: 'notification',
@@ -1160,11 +1234,9 @@ wss.on('connection', async (ws, req) => {
                 // En el manejador de mensajes WebSocket
                 case 'play_card':
                     if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        // Validar campos requeridos
-                        const requiredFields = ['cardValue', 'position', 'playerId', 'roomId'];
-                        const missingFields = requiredFields.filter(field => !msg[field]);
+                        const { missingFields, isValid } = validatePlayCardPayload(msg);
 
-                        if (missingFields.length > 0) {
+                        if (!isValid) {
                             return safeSend(player.ws, {
                                 type: 'notification',
                                 message: `Faltan campos requeridos: ${missingFields.join(', ')}`,
@@ -1189,7 +1261,7 @@ wss.on('connection', async (ws, req) => {
                             playerName: player.name,
                             isPlayedThisTurn: true
                         };
-                        handlePlayCard(room, player, enhancedMsg);
+                        await handlePlayCard(room, player, enhancedMsg);
                     }
                     break;
                 case 'end_turn':
@@ -1274,10 +1346,11 @@ wss.on('connection', async (ws, req) => {
 
                         room.players.forEach(player => {
                             player.cards = [];
-                            player.cardsPlayedThisTurn = [];
+                            resetPlayerTurnState(player);
+                            player.cardsPlayedThisTurn = 0;
                         });
 
-                        await saveGameState(msg.roomId);
+                        await flushSaveGameState(msg.roomId);
 
                         broadcastToRoom(room, {
                             type: 'room_reset',
@@ -1288,7 +1361,9 @@ wss.on('connection', async (ws, req) => {
                 case 'update_player':
                     const playerToUpdate = room.players.find(p => p.id === msg.playerId);
                     if (playerToUpdate) {
-                        playerToUpdate.name = msg.name;
+                        const sanitizedName = sanitizePlayerName(msg.name);
+                        if (!sanitizedName) break;
+                        playerToUpdate.name = sanitizedName;
                         broadcastToRoom(room, {
                             type: 'player_update',
                             players: room.players.map(p => ({
@@ -1314,7 +1389,8 @@ wss.on('connection', async (ws, req) => {
                                         name: p.name,
                                         isHost: p.isHost,
                                         cards: p.cards,
-                                        cardsPlayedThisTurn: p.cardsPlayedThisTurn,
+                                        cardsPlayedThisTurn: getPlayerTurnCount(p),
+                                        movesThisTurn: getTurnState(p).moves,
                                         totalCardsPlayed: p.totalCardsPlayed || 0,
                                         lastActivity: p.lastActivity
                                     })),
@@ -1329,7 +1405,7 @@ wss.on('connection', async (ws, req) => {
                                 },
                                 history: boardHistory.get(roomId),
                                 currentPlayerState: {
-                                    cardsPlayedThisTurn: player.cardsPlayedThisTurn || 0,
+                                    cardsPlayedThisTurn: getPlayerTurnCount(player),
                                     minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
                                 }
                             });
@@ -1346,13 +1422,14 @@ wss.on('connection', async (ws, req) => {
 
     ws.on('close', async () => {
         player.ws = null;
+        wsRateLimit.delete(playerId);
         try {
             await pool.query(`
                 UPDATE player_connections
                 SET connection_status = 'disconnected'
                 WHERE player_id = $1
             `, [playerId]);
-            await saveGameState(roomId);
+            await flushSaveGameState(roomId);
             console.log(`💾 Estado guardado al desconectarse ${player.name}`);
         } catch (error) {
             console.error('Error al actualizar estado de conexión:', error);
@@ -1369,7 +1446,7 @@ wss.on('connection', async (ws, req) => {
                 });
             }
         }
-        saveGameState(roomId);
+        flushSaveGameState(roomId).catch(err => console.error('Error al guardar al cerrar ws:', err));
     });
 });
 
