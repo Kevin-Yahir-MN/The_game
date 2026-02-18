@@ -30,7 +30,28 @@ function setupWebSocket(server) {
         }
     });
 
+    const heartbeatIntervalMs = 25000;
+    const heartbeatInterval = setInterval(() => {
+        wss.clients.forEach((client) => {
+            if (client.isAlive === false) {
+                return client.terminate();
+            }
+
+            client.isAlive = false;
+            client.ping();
+        });
+    }, heartbeatIntervalMs);
+
+    wss.on('close', () => {
+        clearInterval(heartbeatInterval);
+    });
+
     wss.on('connection', async (ws, req) => {
+        ws.isAlive = true;
+        ws.on('pong', () => {
+            ws.isAlive = true;
+        });
+
         const params = new URLSearchParams((req.url || '').split('?')[1] || '');
         const roomId = params.get('roomId');
         const playerId = params.get('playerId');

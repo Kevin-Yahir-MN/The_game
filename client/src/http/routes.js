@@ -8,7 +8,21 @@ const { createTurnState } = require('../utils/turnState');
 const { flushSaveGameState } = require('../services/persistence');
 const { broadcastToRoom } = require('../services/communication');
 
+const MAX_PLAYERS_PER_ROOM = 6;
+
 function registerHttpRoutes(app) {
+
+    app.get('/health', (req, res) => {
+        res.set('Cache-Control', 'no-store');
+        res.json({
+            success: true,
+            status: 'ok',
+            uptimeSeconds: Math.floor(process.uptime()),
+            activeRooms: rooms.size,
+            timestamp: new Date().toISOString()
+        });
+    });
+
     app.post('/create-room', async (req, res) => {
         const playerName = sanitizePlayerName(req.body?.playerName);
         if (!playerName) {
@@ -106,6 +120,13 @@ function registerHttpRoutes(app) {
             }
 
             const room = rooms.get(roomId);
+            if (room.players.length >= MAX_PLAYERS_PER_ROOM) {
+                return res.status(409).json({
+                    success: false,
+                    message: `La sala alcanzó el máximo de ${MAX_PLAYERS_PER_ROOM} jugadores`
+                });
+            }
+
             const playerId = uuidv4();
 
             await withTransaction(async (client) => {
