@@ -3,11 +3,11 @@ const http = require('http');
 const path = require('path');
 const compression = require('compression');
 
-const { PORT, allowedOrigins } = require('./src/config');
+const { PORT, allowedOrigins } = require('src/config');
 const { initializeDatabase, cleanupOldGames } = require('./src/db');
-const { registerHttpRoutes } = require('./src/http/routes');
-const { restoreActiveGames } = require('./src/services/persistence');
-const { setupWebSocket } = require('./src/ws/websocket');
+const { registerHttpRoutes } = require('src/http/routes');
+const { restoreActiveGames } = require('src/services/persistence');
+const { setupWebSocket } = require('src/ws/websocket');
 
 const app = express();
 const server = http.createServer(app);
