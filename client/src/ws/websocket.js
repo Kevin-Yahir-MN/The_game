@@ -44,6 +44,46 @@ function parseWsMessage(message) {
     }
 }
 
+function isTransientDbConnectionError(error) {
+    if (!error) return false;
+    const message = String(error.message || '').toLowerCase();
+    const causeMessage = String(error.cause?.message || '').toLowerCase();
+
+    return (
+        message.includes('connection terminated') ||
+        message.includes('connection timeout') ||
+        causeMessage.includes('connection terminated') ||
+        causeMessage.includes('connection timeout')
+    );
+}
+
+async function safePersistOnDisconnect(roomId, playerId) {
+    try {
+        await pool.query(`
+            UPDATE player_connections
+            SET connection_status = 'disconnected'
+            WHERE player_id = $1
+        `, [playerId]);
+    } catch (error) {
+        if (isTransientDbConnectionError(error)) {
+            console.warn('⚠️ No se pudo marcar desconexión (BD inactiva/transitoria).');
+            return false;
+        }
+        throw error;
+    }
+
+    try {
+        await flushSaveGameState(roomId);
+        return true;
+    } catch (error) {
+        if (isTransientDbConnectionError(error)) {
+            console.warn('⚠️ No se pudo guardar estado al desconectar (BD inactiva/transitoria).');
+            return false;
+        }
+        throw error;
+    }
+}
+
 function setupWebSocket(server) {
     const wss = new WebSocket.Server({
         server,
@@ -163,11 +203,16 @@ function setupWebSocket(server) {
                 player.lastActivity = Date.now();
 
                 if (msg.type === 'ping') {
-                    await pool.query(`
-                        UPDATE player_connections
-                        SET last_ping = NOW()
-                        WHERE player_id = $1
-                    `, [playerId]);
+                    try {
+                        await pool.query(`
+                            UPDATE player_connections
+                            SET last_ping = NOW()
+                            WHERE player_id = $1
+                        `, [playerId]);
+                    } catch (error) {
+                        if (!isTransientDbConnectionError(error)) throw error;
+                        console.warn('⚠️ Ping recibido, pero no se pudo actualizar last_ping por BD inactiva.');
+                    }
                     return;
                 }
 
@@ -406,14 +451,12 @@ function setupWebSocket(server) {
         ws.on('close', async () => {
             player.ws = null;
             wsRateLimit.delete(playerId);
+
             try {
-                await pool.query(`
-                    UPDATE player_connections
-                    SET connection_status = 'disconnected'
-                    WHERE player_id = $1
-                `, [playerId]);
-                await flushSaveGameState(roomId);
-                console.log(`💾 Estado guardado al desconectarse ${player.name}`);
+                const persisted = await safePersistOnDisconnect(roomId, playerId);
+                if (persisted) {
+                    console.log(`💾 Estado guardado al desconectarse ${player.name}`);
+                }
             } catch (error) {
                 console.error('Error al actualizar estado de conexión:', error);
             }
