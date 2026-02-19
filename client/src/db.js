@@ -28,6 +28,29 @@ async function withTransaction(callback) {
     }
 }
 
+async function ensureCascadeForeignKey() {
+    await pool.query(`
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'player_connections_room_id_fkey'
+                  AND conrelid = 'player_connections'::regclass
+            ) THEN
+                ALTER TABLE player_connections
+                DROP CONSTRAINT player_connections_room_id_fkey;
+            END IF;
+
+            ALTER TABLE player_connections
+            ADD CONSTRAINT player_connections_room_id_fkey
+            FOREIGN KEY (room_id)
+            REFERENCES game_states(room_id)
+            ON DELETE CASCADE;
+        END $$;
+    `);
+}
+
 async function initializeDatabase() {
     try {
         await pool.query(`
@@ -37,17 +60,19 @@ async function initializeDatabase() {
                 last_activity TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT NOW()
             );
-            
+
             CREATE TABLE IF NOT EXISTS player_connections (
                 player_id UUID PRIMARY KEY,
                 room_id VARCHAR(4) NOT NULL,
                 last_ping TIMESTAMP NOT NULL,
-                connection_status VARCHAR(20) NOT NULL,
-                FOREIGN KEY (room_id) REFERENCES game_states(room_id) ON DELETE CASCADE
+                connection_status VARCHAR(20) NOT NULL
             );
-            
+
             CREATE INDEX IF NOT EXISTS idx_player_room ON player_connections(room_id);
         `);
+
+        await ensureCascadeForeignKey();
+
         console.log('✔ Tablas inicializadas correctamente');
     } catch (error) {
         console.error('❌ Error al inicializar base de datos:', error);
@@ -57,12 +82,29 @@ async function initializeDatabase() {
 
 async function cleanupOldGames() {
     try {
-        await pool.query(`
-            DELETE FROM game_states 
-            WHERE last_activity < NOW() - INTERVAL '4 hours'
-        `);
+        await withTransaction(async (client) => {
+            const staleRoomsQuery = `
+                SELECT room_id
+                FROM game_states
+                WHERE last_activity < NOW() - INTERVAL '4 hours'
+            `;
+            const { rows } = await client.query(staleRoomsQuery);
+            if (rows.length === 0) return;
+
+            const roomIds = rows.map((row) => row.room_id);
+
+            await client.query(
+                'DELETE FROM player_connections WHERE room_id = ANY($1::varchar[])',
+                [roomIds]
+            );
+
+            await client.query(
+                'DELETE FROM game_states WHERE room_id = ANY($1::varchar[])',
+                [roomIds]
+            );
+        });
     } catch (error) {
-        console.error(error);
+        console.error('Error limpiando partidas antiguas:', error);
     }
 }
 
