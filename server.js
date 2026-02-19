@@ -12,18 +12,28 @@ const { setupWebSocket } = require('./client/src/ws/websocket.js');
 const app = express();
 const server = http.createServer(app);
 
+app.disable('x-powered-by');
 app.use(compression());
-app.use(express.json());
+app.use(express.json({ limit: '64kb' }));
 app.use(express.static(path.join(__dirname, 'client')));
 
 app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (allowedOrigins.includes(origin)) {
+
+    if (origin && allowedOrigins.includes(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
-    if (req.method === 'OPTIONS') return res.status(200).end();
+
+    if (req.method === 'OPTIONS') {
+        if (origin && !allowedOrigins.includes(origin)) {
+            return res.status(403).end();
+        }
+        return res.status(204).end();
+    }
+
     next();
 });
 
@@ -33,6 +43,9 @@ setupWebSocket(server);
 initializeDatabase().then(() => {
     restoreActiveGames();
     setInterval(cleanupOldGames, 3600000);
+}).catch((error) => {
+    console.error('Error inicializando servidor:', error);
+    process.exit(1);
 });
 
 server.listen(PORT, () => {

@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const API_URL = 'https://the-game-2xks.onrender.com';
+    const API_URL = window.location.origin;
     const playerNameInput = document.getElementById('playerName');
     const createRoomBtn = document.getElementById('createRoom');
     const joinRoomBtn = document.getElementById('joinRoom');

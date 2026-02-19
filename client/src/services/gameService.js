@@ -13,6 +13,20 @@ const {
 const { broadcastToRoom, safeSend } = require('./communication');
 const { scheduleSaveGameState, flushSaveGameState } = require('./persistence');
 
+function toPersistedPlayer(player) {
+    return {
+        id: player.id,
+        name: player.name,
+        cards: player.cards,
+        isHost: player.isHost,
+        connected: player.ws?.readyState === WebSocket.OPEN,
+        cardsPlayedThisTurn: getPlayerTurnCount(player),
+        movesThisTurn: getTurnState(player).moves,
+        totalCardsPlayed: Number(player.totalCardsPlayed) || 0,
+        lastActivity: player.lastActivity
+    };
+}
+
 function updateBoardHistory(room, position, newValue) {
     const roomId = reverseRoomMap.get(room);
     if (!roomId) return;
@@ -310,7 +324,7 @@ async function startGame(room, initialCards = 6) {
                     last_activity = NOW()
                 WHERE room_id = $2
             `, [JSON.stringify({
-                players: room.players,
+                players: room.players.map(toPersistedPlayer),
                 gameState: {
                     ...room.gameState,
                     gameStarted: true,

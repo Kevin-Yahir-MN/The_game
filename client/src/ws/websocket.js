@@ -5,7 +5,7 @@ const { allowedOrigins } = require('../config');
 const { rooms, reverseRoomMap, boardHistory, wsRateLimit } = require('../state');
 const { sanitizePlayerName, isValidRoomId, validatePlayCardPayload } = require('../utils/validation');
 const { isWithinRateLimit } = require('../utils/rateLimit');
-const { initializeDeck, getPlayableCards } = require('../utils/gameRules');
+const { initializeDeck } = require('../utils/gameRules');
 const {
     handlePlayCard,
     handleUndoMove,
@@ -17,6 +17,32 @@ const {
 } = require('../services/gameService');
 const { safeSend, broadcastToRoom, sendGameState } = require('../services/communication');
 const { flushSaveGameState } = require('../services/persistence');
+
+function defaultHistory() {
+    return {
+        ascending1: [1],
+        ascending2: [1],
+        descending1: [100],
+        descending2: [100]
+    };
+}
+
+function parseWsMessage(message) {
+    const rawMessage = typeof message === 'string' ? message : message.toString();
+    if (rawMessage.length > 8 * 1024) {
+        const error = new Error('Payload demasiado grande');
+        error.code = 'PAYLOAD_TOO_LARGE';
+        throw error;
+    }
+
+    try {
+        return JSON.parse(rawMessage);
+    } catch (error) {
+        const parseError = new Error('JSON inválido');
+        parseError.code = 'INVALID_JSON';
+        throw parseError;
+    }
+}
 
 function setupWebSocket(server) {
     const wss = new WebSocket.Server({
@@ -106,12 +132,7 @@ function setupWebSocket(server) {
                     cardCount: p.cards.length
                 }))
             },
-            history: boardHistory.get(roomId) || {
-                ascending1: [1],
-                ascending2: [1],
-                descending1: [100],
-                descending2: [100]
-            },
+            history: boardHistory.get(roomId) || defaultHistory(),
             isYourTurn: room.gameState.currentTurn === player.id
         };
 
@@ -138,12 +159,7 @@ function setupWebSocket(server) {
                     });
                 }
 
-                const rawMessage = typeof message === 'string' ? message : message.toString();
-                if (rawMessage.length > 8 * 1024) {
-                    return ws.close(1009, 'Payload demasiado grande');
-                }
-
-                const msg = JSON.parse(rawMessage);
+                const msg = parseWsMessage(message);
                 player.lastActivity = Date.now();
 
                 if (msg.type === 'ping') {
@@ -157,38 +173,28 @@ function setupWebSocket(server) {
 
                 switch (msg.type) {
                     case 'deck_empty':
-                        if (rooms.has(msg.roomId)) {
-                            const room = rooms.get(msg.roomId);
-                            room.gameState.deck = [];
-                            broadcastToRoom(room, {
-                                type: 'game_state_update',
-                                remainingDeck: 0,
-                                minCardsRequired: 1
-                            });
-                        }
+                        room.gameState.deck = [];
+                        broadcastToRoom(room, {
+                            type: 'game_state_update',
+                            remainingDeck: 0,
+                            minCardsRequired: 1
+                        });
                         break;
                     case 'get_player_state':
-                        if (rooms.has(msg.roomId)) {
-                            const room = rooms.get(msg.roomId);
-                            const player = room.players.find(p => p.id === msg.playerId);
-
-                            if (player) {
-                                safeSend(player.ws, {
-                                    type: 'player_state_update',
-                                    cardsPlayedThisTurn: getPlayerTurnCount(player),
-                                    totalCardsPlayed: player.totalCardsPlayed || 0,
-                                    minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
-                                    currentTurn: room.gameState.currentTurn,
-                                    players: room.players.map(p => ({
-                                        id: p.id,
-                                        name: p.name,
-                                        isHost: p.isHost,
-                                        cardCount: p.cards?.length || 0,
-                                        cardsPlayedThisTurn: getPlayerTurnCount(p)
-                                    }))
-                                });
-                            }
-                        }
+                        safeSend(player.ws, {
+                            type: 'player_state_update',
+                            cardsPlayedThisTurn: getPlayerTurnCount(player),
+                            totalCardsPlayed: player.totalCardsPlayed || 0,
+                            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
+                            currentTurn: room.gameState.currentTurn,
+                            players: room.players.map(p => ({
+                                id: p.id,
+                                name: p.name,
+                                isHost: p.isHost,
+                                cardCount: p.cards?.length || 0,
+                                cardsPlayedThisTurn: getPlayerTurnCount(p)
+                            }))
+                        });
                         break;
                     case 'start_game':
                         if (player.isHost && !room.gameState.gameStarted) {
@@ -229,7 +235,7 @@ function setupWebSocket(server) {
                                 });
                             }
 
-                            if (msg.roomId !== reverseRoomMap.get(room)) {
+                            if (msg.roomId !== roomId) {
                                 return safeSend(player.ws, {
                                     type: 'notification',
                                     message: 'Sala no válida',
@@ -261,57 +267,39 @@ function setupWebSocket(server) {
                         if (room.gameState.gameStarted) sendGameState(room, player);
                         break;
                     case 'force_game_over':
-                        if (rooms.has(msg.roomId)) {
-                            const room = rooms.get(msg.roomId);
-                            const player = room.players.find(p => p.id === msg.playerId);
+                        broadcastToRoom(room, {
+                            type: 'game_over',
+                            result: 'lose',
+                            message: '¡Juego terminado! No hay movimientos válidos disponibles.',
+                            reason: msg.reason || 'no_valid_moves'
+                        });
+                        break;
+                    case 'check_solo_block': {
+                        if (room.players.length === 1) {
+                            const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+                            const cardsRemaining = Number(msg.cardsRemaining);
 
-                            if (player) {
+                            if (Number.isFinite(cardsRemaining) && cardsRemaining < minCardsRequired) {
                                 broadcastToRoom(room, {
                                     type: 'game_over',
                                     result: 'lose',
-                                    message: '¡Juego terminado! No hay movimientos válidos disponibles.',
-                                    reason: msg.reason || 'no_valid_moves'
+                                    message: `¡No puedes jugar el mínimo de ${minCardsRequired} carta(s) requerida(s)!`,
+                                    reason: 'min_cards_not_met_solo'
                                 });
                             }
                         }
                         break;
-                    case 'check_solo_block':
-                        if (rooms.has(msg.roomId)) {
-                            const room = rooms.get(msg.roomId);
-                            const player = room.players.find(p => p.id === msg.playerId);
-
-                            if (player && room.players.length === 1) {
-                                const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
-
-                                if (msg.cardsRemaining < minCardsRequired) {
-                                    broadcastToRoom(room, {
-                                        type: 'game_over',
-                                        result: 'lose',
-                                        message: `¡No puedes jugar el mínimo de ${minCardsRequired} carta(s) requerida(s)!`,
-                                        reason: 'min_cards_not_met_solo'
-                                    });
-                                }
-                            }
-                        }
-                        break;
+                    }
                     case 'self_blocked':
-                        if (rooms.has(msg.roomId)) {
-                            const room = rooms.get(msg.roomId);
-                            const player = room.players.find(p => p.id === msg.playerId);
-                            if (player) {
-                                broadcastToRoom(room, {
-                                    type: 'game_over',
-                                    result: 'lose',
-                                    message: `¡${player.name} se quedó sin movimientos posibles!`,
-                                    reason: 'self_blocked'
-                                });
-                            }
-                        }
+                        broadcastToRoom(room, {
+                            type: 'game_over',
+                            result: 'lose',
+                            message: `¡${player.name} se quedó sin movimientos posibles!`,
+                            reason: 'self_blocked'
+                        });
                         break;
                     case 'reset_room':
-                        if (player.isHost && rooms.has(msg.roomId)) {
-                            const room = rooms.get(msg.roomId);
-
+                        if (player.isHost) {
                             room.gameState = {
                                 deck: initializeDeck(),
                                 board: { ascending: [1, 1], descending: [100, 100] },
@@ -320,20 +308,15 @@ function setupWebSocket(server) {
                                 initialCards: room.gameState.initialCards || 6
                             };
 
-                            boardHistory.set(msg.roomId, {
-                                ascending1: [1],
-                                ascending2: [1],
-                                descending1: [100],
-                                descending2: [100]
+                            boardHistory.set(roomId, defaultHistory());
+
+                            room.players.forEach(currentPlayer => {
+                                currentPlayer.cards = [];
+                                resetPlayerTurnState(currentPlayer);
+                                currentPlayer.cardsPlayedThisTurn = 0;
                             });
 
-                            room.players.forEach(player => {
-                                player.cards = [];
-                                resetPlayerTurnState(player);
-                                player.cardsPlayedThisTurn = 0;
-                            });
-
-                            await flushSaveGameState(msg.roomId);
+                            await flushSaveGameState(roomId);
 
                             broadcastToRoom(room, {
                                 type: 'room_reset',
@@ -341,65 +324,82 @@ function setupWebSocket(server) {
                             });
                         }
                         break;
-                    case 'update_player':
-                        const playerToUpdate = room.players.find(p => p.id === msg.playerId);
-                        if (playerToUpdate) {
-                            const sanitizedName = sanitizePlayerName(msg.name);
-                            if (!sanitizedName) break;
-                            playerToUpdate.name = sanitizedName;
-                            broadcastToRoom(room, {
-                                type: 'player_update',
+                    case 'update_player': {
+                        const sanitizedName = sanitizePlayerName(msg.name);
+                        if (!sanitizedName) break;
+                        player.name = sanitizedName;
+                        broadcastToRoom(room, {
+                            type: 'player_update',
+                            players: room.players.map(p => ({
+                                id: p.id,
+                                name: p.name,
+                                isHost: p.isHost,
+                                cardCount: p.cards.length
+                            }))
+                        });
+                        break;
+                    }
+                    case 'get_full_state': {
+                        const currentRoomId = reverseRoomMap.get(room);
+                        safeSend(player.ws, {
+                            type: 'full_state_update',
+                            room: {
                                 players: room.players.map(p => ({
                                     id: p.id,
                                     name: p.name,
                                     isHost: p.isHost,
-                                    cardCount: p.cards.length
-                                }))
-                            });
-                        }
-                        break;
-                    case 'get_full_state':
-                        if (rooms.has(msg.roomId)) {
-                            const room = rooms.get(msg.roomId);
-                            const player = room.players.find(p => p.id === msg.playerId);
-                            if (player) {
-                                const roomId = reverseRoomMap.get(room);
-                                safeSend(player.ws, {
-                                    type: 'full_state_update',
-                                    room: {
-                                        players: room.players.map(p => ({
-                                            id: p.id,
-                                            name: p.name,
-                                            isHost: p.isHost,
-                                            cards: p.cards,
-                                            cardsPlayedThisTurn: getPlayerTurnCount(p),
-                                            movesThisTurn: getTurnState(p).moves,
-                                            totalCardsPlayed: p.totalCardsPlayed || 0,
-                                            lastActivity: p.lastActivity
-                                        })),
-                                        gameStarted: room.gameState.gameStarted
-                                    },
-                                    gameState: {
-                                        board: room.gameState.board,
-                                        currentTurn: room.gameState.currentTurn,
-                                        remainingDeck: room.gameState.deck.length,
-                                        initialCards: room.gameState.initialCards,
-                                        gameStarted: room.gameState.gameStarted
-                                    },
-                                    history: boardHistory.get(roomId),
-                                    currentPlayerState: {
-                                        cardsPlayedThisTurn: getPlayerTurnCount(player),
-                                        minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
-                                    }
-                                });
+                                    cards: p.cards,
+                                    cardsPlayedThisTurn: getPlayerTurnCount(p),
+                                    movesThisTurn: getTurnState(p).moves,
+                                    totalCardsPlayed: p.totalCardsPlayed || 0,
+                                    lastActivity: p.lastActivity
+                                })),
+                                gameStarted: room.gameState.gameStarted
+                            },
+                            gameState: {
+                                board: room.gameState.board,
+                                currentTurn: room.gameState.currentTurn,
+                                remainingDeck: room.gameState.deck.length,
+                                initialCards: room.gameState.initialCards,
+                                gameStarted: room.gameState.gameStarted
+                            },
+                            history: boardHistory.get(currentRoomId),
+                            currentPlayerState: {
+                                cardsPlayedThisTurn: getPlayerTurnCount(player),
+                                minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
                             }
-                        }
+                        });
                         break;
+                    }
                     default:
-                        console.log('Tipo de mensaje no reconocido:', msg.type);
+                        safeSend(player.ws, {
+                            type: 'notification',
+                            message: `Tipo de mensaje no reconocido: ${msg.type}`,
+                            isError: true,
+                            errorCode: 'UNKNOWN_MESSAGE_TYPE'
+                        });
                 }
             } catch (error) {
+                if (error.code === 'PAYLOAD_TOO_LARGE') {
+                    ws.close(1009, 'Payload demasiado grande');
+                    return;
+                }
+                if (error.code === 'INVALID_JSON') {
+                    safeSend(player.ws, {
+                        type: 'notification',
+                        message: 'Mensaje inválido: JSON malformado',
+                        isError: true,
+                        errorCode: 'INVALID_JSON'
+                    });
+                    return;
+                }
                 console.error('Error procesando mensaje:', error);
+                safeSend(player.ws, {
+                    type: 'notification',
+                    message: 'Error interno procesando mensaje',
+                    isError: true,
+                    errorCode: 'INTERNAL_ERROR'
+                });
             }
         });
 
@@ -429,7 +429,6 @@ function setupWebSocket(server) {
                     });
                 }
             }
-            flushSaveGameState(roomId).catch(err => console.error('Error al guardar al cerrar ws:', err));
         });
     });
 
