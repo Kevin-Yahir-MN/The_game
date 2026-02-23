@@ -192,6 +192,72 @@ body {
     width: 100%;
 }
 
+.auth-card {
+    padding: 1rem;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.auth-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.auth-header p {
+    margin: 0.4rem 0 1rem;
+    color: var(--gray);
+    font-size: 0.95rem;
+}
+
+.auth-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.auth-tab {
+    border: none;
+    border-radius: 8px;
+    padding: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--light);
+    transition: all 0.2s ease;
+}
+
+.auth-tab.active {
+    background: var(--primary);
+    color: white;
+}
+
+.auth-panel {
+    display: none;
+}
+
+.auth-panel.active {
+    display: block;
+}
+
+.btn-ghost {
+    margin-top: 0.5rem;
+    min-height: 48px;
+    padding: 0.8rem 1rem;
+    background: transparent;
+    color: var(--light);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.notification.success {
+    background: var(--success);
+}
+
 .game-info {
     margin-top: 2rem;
     padding: 1.5rem;

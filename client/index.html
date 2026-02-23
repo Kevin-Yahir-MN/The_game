@@ -17,6 +17,50 @@
 
         <div class="lobby-card">
             <div class="login-form">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <h3>Cuenta</h3>
+                        <p id="authStatus">No has iniciado sesión.</p>
+                    </div>
+
+                    <div class="auth-tabs">
+                        <button id="showLoginTab" class="auth-tab active" type="button">Iniciar sesión</button>
+                        <button id="showRegisterTab" class="auth-tab" type="button">Crear usuario</button>
+                    </div>
+
+                    <div id="loginPanel" class="auth-panel active">
+                        <div class="form-group">
+                            <label for="loginUsername">Usuario</label>
+                            <input type="text" id="loginUsername" placeholder="Ej: jugador123" maxlength="30">
+                        </div>
+                        <div class="form-group">
+                            <label for="loginPassword">Contraseña</label>
+                            <input type="password" id="loginPassword" placeholder="Tu contraseña" maxlength="100">
+                        </div>
+                        <button id="loginBtn" class="btn btn-secondary" type="button">Iniciar sesión</button>
+                    </div>
+
+                    <div id="registerPanel" class="auth-panel">
+                        <div class="form-group">
+                            <label for="registerDisplayName">Nombre visible</label>
+                            <input type="text" id="registerDisplayName" placeholder="Ej: Juan" maxlength="20">
+                        </div>
+                        <div class="form-group">
+                            <label for="registerUsername">Usuario</label>
+                            <input type="text" id="registerUsername" placeholder="Ej: juan_01" maxlength="30">
+                        </div>
+                        <div class="form-group">
+                            <label for="registerPassword">Contraseña</label>
+                            <input type="password" id="registerPassword" placeholder="Mínimo 6 caracteres"
+                                maxlength="100">
+                        </div>
+                        <button id="registerBtn" class="btn btn-primary" type="button">Crear usuario</button>
+                    </div>
+
+                    <button id="logoutBtn" class="btn btn-ghost" type="button" style="display: none;">Cerrar
+                        sesión</button>
+                </div>
+
                 <div class="form-group">
                     <label for="playerName">Tu nombre</label>
                     <input type="text" id="playerName" placeholder="Ej: John" maxlength="20">

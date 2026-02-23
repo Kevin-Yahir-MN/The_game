@@ -7,8 +7,28 @@ const { initializeDeck } = require('../utils/gameRules');
 const { createTurnState } = require('../utils/turnState');
 const { flushSaveGameState } = require('../services/persistence');
 const { broadcastToRoom } = require('../services/communication');
+const {
+    getTokenFromRequest,
+    registerUser,
+    loginUser,
+    createSession,
+    getUserFromToken,
+    deleteSession
+} = require('../services/authService');
 
 const MAX_PLAYERS_PER_ROOM = 6;
+
+function requireLength(value, min, max) {
+    if (typeof value !== 'string') return false;
+    const length = value.trim().length;
+    return length >= min && length <= max;
+}
+
+async function getAuthenticatedUser(req) {
+    const token = getTokenFromRequest(req);
+    if (!token) return null;
+    return getUserFromToken(token);
+}
 
 function registerHttpRoutes(app) {
 
@@ -23,8 +43,114 @@ function registerHttpRoutes(app) {
         });
     });
 
+    app.post('/auth/register', async (req, res) => {
+        const { username, password, displayName } = req.body || {};
+
+        if (!requireLength(username, 3, 30)) {
+            return res.status(400).json({ success: false, message: 'Usuario inválido (3-30 caracteres)' });
+        }
+
+        if (!requireLength(password, 6, 100)) {
+            return res.status(400).json({ success: false, message: 'La contraseña debe tener entre 6 y 100 caracteres' });
+        }
+
+        const sanitizedDisplayName = sanitizePlayerName(displayName);
+        if (!sanitizedDisplayName) {
+            return res.status(400).json({ success: false, message: 'Nombre visible inválido' });
+        }
+
+        try {
+            const user = await registerUser({
+                username,
+                password,
+                displayName: sanitizedDisplayName
+            });
+            const token = await createSession(user.id);
+
+            return res.status(201).json({
+                success: true,
+                token,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    displayName: user.display_name
+                }
+            });
+        } catch (error) {
+            if (error.code === 'USERNAME_EXISTS') {
+                return res.status(409).json({ success: false, message: error.message });
+            }
+            console.error('Error en registro:', error);
+            return res.status(500).json({ success: false, message: 'Error interno al registrar usuario' });
+        }
+    });
+
+    app.post('/auth/login', async (req, res) => {
+        const { username, password } = req.body || {};
+
+        if (!requireLength(username, 3, 30) || !requireLength(password, 6, 100)) {
+            return res.status(400).json({ success: false, message: 'Credenciales inválidas' });
+        }
+
+        try {
+            const user = await loginUser({ username, password });
+            if (!user) {
+                return res.status(401).json({ success: false, message: 'Usuario o contraseña incorrectos' });
+            }
+
+            const token = await createSession(user.id);
+            return res.json({
+                success: true,
+                token,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    displayName: user.display_name
+                }
+            });
+        } catch (error) {
+            console.error('Error en login:', error);
+            return res.status(500).json({ success: false, message: 'Error interno al iniciar sesión' });
+        }
+    });
+
+    app.get('/auth/me', async (req, res) => {
+        try {
+            const user = await getAuthenticatedUser(req);
+            if (!user) {
+                return res.status(401).json({ success: false, message: 'No autenticado' });
+            }
+
+            return res.json({
+                success: true,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    displayName: user.display_name
+                }
+            });
+        } catch (error) {
+            console.error('Error en auth/me:', error);
+            return res.status(500).json({ success: false, message: 'Error interno' });
+        }
+    });
+
+    app.post('/auth/logout', async (req, res) => {
+        try {
+            const token = getTokenFromRequest(req);
+            await deleteSession(token);
+            return res.json({ success: true });
+        } catch (error) {
+            console.error('Error en logout:', error);
+            return res.status(500).json({ success: false, message: 'Error interno cerrando sesión' });
+        }
+    });
+
     app.post('/create-room', async (req, res) => {
-        const playerName = sanitizePlayerName(req.body?.playerName);
+        const authUser = await getAuthenticatedUser(req);
+        const requestedName = sanitizePlayerName(req.body?.playerName);
+        const playerName = requestedName || authUser?.display_name;
+
         if (!playerName) {
             return res.status(400).json({ success: false, message: 'Nombre de jugador inválido' });
         }
@@ -96,7 +222,9 @@ function registerHttpRoutes(app) {
     });
 
     app.post('/join-room', async (req, res) => {
-        const playerName = sanitizePlayerName(req.body?.playerName);
+        const authUser = await getAuthenticatedUser(req);
+        const requestedName = sanitizePlayerName(req.body?.playerName);
+        const playerName = requestedName || authUser?.display_name;
         const roomId = req.body?.roomId;
 
         if (!playerName || !isValidRoomId(roomId)) {

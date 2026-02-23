@@ -8,6 +8,7 @@ const { initializeDatabase, cleanupOldGames } = require('./client/src/db.js');
 const { registerHttpRoutes } = require('./client/src/http/routes.js');
 const { restoreActiveGames } = require('./client/src/services/persistence.js');
 const { setupWebSocket } = require('./client/src/ws/websocket.js');
+const { cleanupExpiredSessions } = require('./client/src/services/authService.js');
 
 const app = express();
 const server = http.createServer(app);
@@ -43,6 +44,7 @@ setupWebSocket(server);
 initializeDatabase().then(() => {
     restoreActiveGames();
     setInterval(cleanupOldGames, 3600000);
+    setInterval(cleanupExpiredSessions, 3600000);
 }).catch((error) => {
     console.error('Error inicializando servidor:', error);
     process.exit(1);

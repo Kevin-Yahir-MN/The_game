@@ -69,6 +69,25 @@ async function initializeDatabase() {
             );
 
             CREATE INDEX IF NOT EXISTS idx_player_room ON player_connections(room_id);
+
+            CREATE TABLE IF NOT EXISTS users (
+                id UUID PRIMARY KEY,
+                username VARCHAR(30) UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                display_name VARCHAR(30) NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                token VARCHAR(128) PRIMARY KEY,
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                expires_at TIMESTAMP NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
         `);
 
         await ensureCascadeForeignKey();
