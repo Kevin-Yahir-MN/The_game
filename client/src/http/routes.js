@@ -14,7 +14,7 @@ const {
     createSession,
     getUserFromToken,
     deleteSession
-} = require('../services/authService');
+} = require('../services/authService.js');
 
 const MAX_PLAYERS_PER_ROOM = 6;
 
