@@ -9,9 +9,9 @@ function normalizeUsername(username) {
     return username.trim().toLowerCase();
 }
 
-function sanitizeDisplayName(name) {
+function normalizeDisplayName(name) {
     if (typeof name !== 'string') return '';
-    return name.trim().slice(0, 30);
+    return name.trim();
 }
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -22,7 +22,8 @@ function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
 function verifyPassword(password, storedHash) {
     const [salt, key] = String(storedHash || '').split(':');
     if (!salt || !key) return false;
-    const computed = crypto.scryptSync(password, salt, 64).toString('hex');
+
+    const computed = crypto.scryptSync(String(password), salt, 64).toString('hex');
     const keyBuffer = Buffer.from(key, 'hex');
     const computedBuffer = Buffer.from(computed, 'hex');
 
@@ -43,26 +44,37 @@ function getTokenFromRequest(req) {
 
 async function registerUser({ username, password, displayName }) {
     const normalizedUsername = normalizeUsername(username);
-    const cleanDisplayName = sanitizeDisplayName(displayName);
+    const normalizedDisplayName = normalizeDisplayName(displayName);
 
     return withTransaction(async (client) => {
-        const existing = await client.query(
+        const existingUsername = await client.query(
             'SELECT id FROM users WHERE username = $1',
             [normalizedUsername]
         );
 
-        if (existing.rowCount > 0) {
+        if (existingUsername.rowCount > 0) {
             const error = new Error('El nombre de usuario ya existe');
             error.code = 'USERNAME_EXISTS';
             throw error;
         }
 
+        const existingDisplayName = await client.query(
+            'SELECT id FROM users WHERE display_name = $1',
+            [normalizedDisplayName]
+        );
+
+        if (existingDisplayName.rowCount > 0) {
+            const error = new Error('El nombre visible ya está en uso');
+            error.code = 'DISPLAY_NAME_EXISTS';
+            throw error;
+        }
+
         const passwordHash = hashPassword(password);
         const insertResult = await client.query(
-            `INSERT INTO users (username, password_hash, display_name, created_at, updated_at)
+            `INSERT INTO users (id, username, password_hash, display_name, created_at, updated_at)
              VALUES ($1, $2, $3, $4, NOW(), NOW())
              RETURNING id, username, display_name, created_at`,
-            [uuidv4(), normalizedUsername, passwordHash, cleanDisplayName]
+            [uuidv4(), normalizedUsername, passwordHash, normalizedDisplayName]
         );
 
         return insertResult.rows[0];

@@ -127,13 +127,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function validateCredentials(username, password) {
-        if (!username || username.trim().length < 3) {
-            showError('El usuario debe tener al menos 3 caracteres');
+        if (!username || username.trim() === '') {
+            showError('El usuario es obligatorio');
             return false;
         }
 
-        if (!password || password.trim().length < 6) {
-            showError('La contraseña debe tener al menos 6 caracteres');
+        if (!password || password === '') {
+            showError('La contraseña es obligatoria');
+            return false;
+        }
+
+        return true;
+    }
+
+    function validateAuthDisplayName(displayName) {
+        if (!displayName || displayName.trim() === '') {
+            showError('El nombre visible es obligatorio');
             return false;
         }
 
@@ -231,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const username = registerUsernameInput.value.trim();
         const password = registerPasswordInput.value;
 
-        if (!validatePlayerName(displayName)) return;
+        if (!validateAuthDisplayName(displayName)) return;
         if (!validateCredentials(username, password)) return;
 
         setButtonLoading(registerBtn, true, 'Creando...', 'Crear usuario');

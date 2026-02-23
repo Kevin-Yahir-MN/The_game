@@ -72,9 +72,9 @@ async function initializeDatabase() {
 
             CREATE TABLE IF NOT EXISTS users (
                 id UUID PRIMARY KEY,
-                username VARCHAR(30) UNIQUE NOT NULL,
+                username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
-                display_name VARCHAR(30) NOT NULL,
+                display_name TEXT NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMP NOT NULL DEFAULT NOW()
             );
@@ -91,6 +91,15 @@ async function initializeDatabase() {
         `);
 
         await ensureCascadeForeignKey();
+
+        await pool.query(`
+            ALTER TABLE users
+            ALTER COLUMN username TYPE TEXT,
+            ALTER COLUMN display_name TYPE TEXT;
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_users_display_name_unique
+            ON users (display_name);
+        `);
 
         console.log('✔ Tablas inicializadas correctamente');
     } catch (error) {
