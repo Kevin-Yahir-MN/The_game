@@ -4,7 +4,7 @@ const path = require('path');
 const compression = require('compression');
 
 const { PORT, allowedOrigins } = require('./client/src/config.js');
-const { initializeDatabase, cleanupOldGames } = require('./client/src/db.js');
+const { initializeDatabase, cleanupOldGames, isTransientConnectionError } = require('./client/src/db.js');
 const { registerHttpRoutes } = require('./client/src/http/routes.js');
 const { restoreActiveGames } = require('./client/src/services/persistence.js');
 const { setupWebSocket } = require('./client/src/ws/websocket.js');
@@ -41,14 +41,35 @@ app.use((req, res, next) => {
 registerHttpRoutes(app);
 setupWebSocket(server);
 
-initializeDatabase().then(() => {
-    restoreActiveGames();
-    setInterval(cleanupOldGames, 3600000);
-    setInterval(cleanupExpiredSessions, 3600000);
-}).catch((error) => {
-    console.error('Error inicializando servidor:', error);
-    process.exit(1);
-});
+let hasInitialized = false;
+
+async function bootstrapDatabase() {
+    try {
+        await initializeDatabase();
+
+        if (!hasInitialized) {
+            restoreActiveGames();
+            setInterval(cleanupOldGames, 3600000);
+            setInterval(cleanupExpiredSessions, 3600000);
+            hasInitialized = true;
+        }
+
+        console.log('✅ Base de datos lista');
+    } catch (error) {
+        const transient = isTransientConnectionError(error);
+        console.error('Error inicializando servidor:', error);
+
+        if (transient) {
+            console.warn('⚠️ Error transitorio de conexión a BD. Se reintentará en 30s...');
+            setTimeout(bootstrapDatabase, 30000);
+            return;
+        }
+
+        process.exit(1);
+    }
+}
+
+bootstrapDatabase();
 
 server.listen(PORT, () => {
     console.log(`🚀 Servidor iniciado en puerto ${PORT}`);

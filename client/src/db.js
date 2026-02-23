@@ -2,6 +2,9 @@
 const { Pool } = require('pg');
 const { IS_PRODUCTION } = require('./config');
 
+const DB_INIT_MAX_RETRIES = Number(process.env.DB_INIT_MAX_RETRIES || 8);
+const DB_INIT_RETRY_DELAY_MS = Number(process.env.DB_INIT_RETRY_DELAY_MS || 4000);
+
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
@@ -10,8 +13,37 @@ const pool = new Pool({
     },
     max: 5,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000
+    connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 10000),
+    keepAlive: true
 });
+
+pool.on('error', (error) => {
+    console.error('⚠️ Error inesperado en pool de PostgreSQL:', error.message);
+});
+
+function isTransientConnectionError(error) {
+    if (!error) return false;
+
+    const code = String(error.code || '').toUpperCase();
+    const message = String(error.message || '').toLowerCase();
+    const causeMessage = String(error.cause?.message || '').toLowerCase();
+
+    return (
+        code === 'ETIMEDOUT' ||
+        code === 'ECONNRESET' ||
+        code === 'ECONNREFUSED' ||
+        code === 'ENETUNREACH' ||
+        message.includes('connection timeout') ||
+        message.includes('connection terminated') ||
+        message.includes('terminating connection') ||
+        causeMessage.includes('connection terminated') ||
+        causeMessage.includes('connection timeout')
+    );
+}
+
+function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function withTransaction(callback) {
     const client = await pool.connect();
@@ -51,60 +83,80 @@ async function ensureCascadeForeignKey() {
     `);
 }
 
+async function runSchemaSetup() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS game_states (
+            room_id VARCHAR(4) PRIMARY KEY,
+            game_data JSONB NOT NULL,
+            last_activity TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS player_connections (
+            player_id UUID PRIMARY KEY,
+            room_id VARCHAR(4) NOT NULL,
+            last_ping TIMESTAMP NOT NULL,
+            connection_status VARCHAR(20) NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_player_room ON player_connections(room_id);
+
+        CREATE TABLE IF NOT EXISTS users (
+            id UUID PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            token VARCHAR(128) PRIMARY KEY,
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            expires_at TIMESTAMP NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+        CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
+    `);
+
+    await ensureCascadeForeignKey();
+
+    await pool.query(`
+        ALTER TABLE users
+        ALTER COLUMN username TYPE TEXT,
+        ALTER COLUMN display_name TYPE TEXT;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_display_name_unique
+        ON users (display_name);
+    `);
+}
+
 async function initializeDatabase() {
-    try {
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS game_states (
-                room_id VARCHAR(4) PRIMARY KEY,
-                game_data JSONB NOT NULL,
-                last_activity TIMESTAMP NOT NULL,
-                created_at TIMESTAMP DEFAULT NOW()
-            );
+    let attempt = 0;
 
-            CREATE TABLE IF NOT EXISTS player_connections (
-                player_id UUID PRIMARY KEY,
-                room_id VARCHAR(4) NOT NULL,
-                last_ping TIMESTAMP NOT NULL,
-                connection_status VARCHAR(20) NOT NULL
-            );
+    while (attempt < DB_INIT_MAX_RETRIES) {
+        attempt++;
 
-            CREATE INDEX IF NOT EXISTS idx_player_room ON player_connections(room_id);
+        try {
+            await runSchemaSetup();
+            console.log('✔ Tablas inicializadas correctamente');
+            return;
+        } catch (error) {
+            const transient = isTransientConnectionError(error);
+            const isLastAttempt = attempt >= DB_INIT_MAX_RETRIES;
 
-            CREATE TABLE IF NOT EXISTS users (
-                id UUID PRIMARY KEY,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                display_name TEXT NOT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-            );
+            console.error(`❌ Error al inicializar base de datos (intento ${attempt}/${DB_INIT_MAX_RETRIES}):`, error.message || error);
 
-            CREATE TABLE IF NOT EXISTS user_sessions (
-                token VARCHAR(128) PRIMARY KEY,
-                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-                expires_at TIMESTAMP NOT NULL
-            );
+            if (!transient || isLastAttempt) {
+                throw error;
+            }
 
-            CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
-            CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
-        `);
-
-        await ensureCascadeForeignKey();
-
-        await pool.query(`
-            ALTER TABLE users
-            ALTER COLUMN username TYPE TEXT,
-            ALTER COLUMN display_name TYPE TEXT;
-
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_users_display_name_unique
-            ON users (display_name);
-        `);
-
-        console.log('✔ Tablas inicializadas correctamente');
-    } catch (error) {
-        console.error('❌ Error al inicializar base de datos:', error);
-        throw error;
+            const delay = DB_INIT_RETRY_DELAY_MS * attempt;
+            console.warn(`⏳ Reintentando inicialización de BD en ${delay}ms...`);
+            await wait(delay);
+        }
     }
 }
 
@@ -150,5 +202,6 @@ module.exports = {
     withTransaction,
     initializeDatabase,
     cleanupOldGames,
-    generateUniqueRoomId
+    generateUniqueRoomId,
+    isTransientConnectionError
 };
