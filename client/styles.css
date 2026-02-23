@@ -1340,3 +1340,23 @@ body {
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
+
+.guest-card,
+.active-user-card {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.active-user-card h3 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.active-user-card p {
+    margin: 0.6rem 0 1rem;
+    color: var(--light);
+    font-weight: 600;
+}

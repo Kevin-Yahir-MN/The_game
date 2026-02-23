@@ -2,8 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_URL = window.location.origin;
     const AUTH_TOKEN_KEY = 'authToken';
     const AUTH_USER_KEY = 'authUser';
+    const GUEST_USER_KEY = 'guestUser';
 
-    const playerNameInput = document.getElementById('playerName');
     const createRoomBtn = document.getElementById('createRoom');
     const joinRoomBtn = document.getElementById('joinRoom');
     const roomCodeInput = document.getElementById('roomCode');
@@ -23,6 +23,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const registerDisplayNameInput = document.getElementById('registerDisplayName');
     const registerUsernameInput = document.getElementById('registerUsername');
     const registerPasswordInput = document.getElementById('registerPassword');
+
+    const guestNameInput = document.getElementById('guestName');
+    const acceptGuestBtn = document.getElementById('acceptGuestBtn');
+
+    const authOptionsContainer = document.getElementById('authOptionsContainer');
+    const activeUserContainer = document.getElementById('activeUserContainer');
+    const activeUserLabel = document.getElementById('activeUserLabel');
 
     function showError(message) {
         const errorElement = document.createElement('div');
@@ -66,29 +73,67 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function getGuestUser() {
+        const raw = localStorage.getItem(GUEST_USER_KEY);
+        if (!raw) return null;
+
+        try {
+            return JSON.parse(raw);
+        } catch {
+            return null;
+        }
+    }
+
     function saveAuth(token, user) {
         localStorage.setItem(AUTH_TOKEN_KEY, token);
         localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
-        updateAuthUI(user);
+        localStorage.removeItem(GUEST_USER_KEY);
+        refreshIdentityUI();
     }
 
-    function clearAuth() {
+    function saveGuestUser(name) {
         localStorage.removeItem(AUTH_TOKEN_KEY);
         localStorage.removeItem(AUTH_USER_KEY);
-        updateAuthUI(null);
+        localStorage.setItem(GUEST_USER_KEY, JSON.stringify({
+            displayName: name,
+            username: `guest_${name}`,
+            isGuest: true
+        }));
+        refreshIdentityUI();
     }
 
-    function updateAuthUI(user) {
-        const isLoggedIn = !!user;
+    function clearIdentity() {
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        localStorage.removeItem(AUTH_USER_KEY);
+        localStorage.removeItem(GUEST_USER_KEY);
+        refreshIdentityUI();
+    }
+
+    function getCurrentIdentity() {
+        const authUser = getAuthUser();
+        if (authUser) return { ...authUser, isGuest: false };
+
+        const guestUser = getGuestUser();
+        if (guestUser) return guestUser;
+
+        return null;
+    }
+
+    function refreshIdentityUI() {
+        const identity = getCurrentIdentity();
+        const isLoggedIn = !!identity;
 
         authStatus.textContent = isLoggedIn
-            ? `Sesión iniciada como ${user.displayName} (@${user.username})`
+            ? `Sesión iniciada como ${identity.displayName}${identity.isGuest ? ' (invitado)' : ` (@${identity.username})`}`
             : 'No has iniciado sesión.';
 
-        logoutBtn.style.display = isLoggedIn ? 'flex' : 'none';
+        authOptionsContainer.style.display = isLoggedIn ? 'none' : 'block';
+        activeUserContainer.style.display = isLoggedIn ? 'block' : 'none';
 
-        if (isLoggedIn && user.displayName) {
-            playerNameInput.value = user.displayName;
+        if (isLoggedIn) {
+            activeUserLabel.textContent = identity.displayName;
+        } else {
+            activeUserLabel.textContent = '-';
         }
     }
 
@@ -100,18 +145,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loginPanel.classList.toggle('active', isLogin);
         registerPanel.classList.toggle('active', !isLogin);
-    }
-
-    function validatePlayerName(name) {
-        if (!name || name.trim() === '') {
-            showError('Ingresa tu nombre');
-            return false;
-        }
-        if (name.length > 20) {
-            showError('El nombre no puede tener más de 20 caracteres');
-            return false;
-        }
-        return true;
     }
 
     function validateRoomCode(code) {
@@ -169,17 +202,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function hydrateSession() {
         const token = getAuthToken();
-        const cachedUser = getAuthUser();
 
         if (!token) {
-            updateAuthUI(null);
+            refreshIdentityUI();
             return;
         }
 
         try {
             const response = await fetchWithAuth(`${API_URL}/auth/me`, { method: 'GET' });
             if (!response.ok) {
-                clearAuth();
+                localStorage.removeItem(AUTH_TOKEN_KEY);
+                localStorage.removeItem(AUTH_USER_KEY);
+                refreshIdentityUI();
                 return;
             }
 
@@ -190,13 +224,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     username: data.user.username,
                     displayName: data.user.displayName
                 };
-                saveAuth(token, normalizedUser);
+                localStorage.setItem(AUTH_USER_KEY, JSON.stringify(normalizedUser));
             } else {
-                clearAuth();
+                localStorage.removeItem(AUTH_TOKEN_KEY);
+                localStorage.removeItem(AUTH_USER_KEY);
             }
         } catch (error) {
             console.error('Error verificando sesión:', error);
-            updateAuthUI(cachedUser);
+        } finally {
+            refreshIdentityUI();
         }
     }
 
@@ -273,26 +309,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    logoutBtn.addEventListener('click', async () => {
-        try {
-            await fetchWithAuth(`${API_URL}/auth/logout`, {
-                method: 'POST'
-            });
-        } catch (error) {
-            console.error('Error al cerrar sesión:', error);
-        } finally {
-            clearAuth();
-            showSuccess('Sesión cerrada');
+    acceptGuestBtn.addEventListener('click', () => {
+        const guestName = guestNameInput.value.trim();
+        if (!guestName) {
+            showError('Ingresa un nombre para invitado');
+            return;
         }
+
+        saveGuestUser(guestName);
+        showSuccess('Usuario temporal creado');
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+        const token = getAuthToken();
+        if (token) {
+            try {
+                await fetchWithAuth(`${API_URL}/auth/logout`, {
+                    method: 'POST'
+                });
+            } catch (error) {
+                console.error('Error al cerrar sesión:', error);
+            }
+        }
+
+        clearIdentity();
+        showSuccess('Sesión cerrada');
     });
 
     showLoginTab.addEventListener('click', () => switchAuthTab('login'));
     showRegisterTab.addEventListener('click', () => switchAuthTab('register'));
 
     createRoomBtn.addEventListener('click', async () => {
-        const playerName = playerNameInput.value.trim();
+        const identity = getCurrentIdentity();
+        if (!identity || !identity.displayName) {
+            showError('Primero inicia sesión, crea usuario o usa invitado');
+            return;
+        }
 
-        if (!validatePlayerName(playerName)) return;
+        const playerName = identity.displayName;
 
         createRoomBtn.disabled = true;
         createRoomBtn.textContent = 'Creando...';
@@ -328,10 +382,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     joinRoomBtn.addEventListener('click', async () => {
-        const playerName = playerNameInput.value.trim();
+        const identity = getCurrentIdentity();
+        if (!identity || !identity.displayName) {
+            showError('Primero inicia sesión, crea usuario o usa invitado');
+            return;
+        }
+
+        const playerName = identity.displayName;
         const roomCode = roomCodeInput.value.trim();
 
-        if (!validatePlayerName(playerName)) return;
         if (!validateRoomCode(roomCode)) return;
 
         joinRoomBtn.disabled = true;
@@ -370,15 +429,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    playerNameInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            createRoomBtn.click();
-        }
-    });
-
     roomCodeInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             joinRoomBtn.click();
+        }
+    });
+
+    guestNameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            acceptGuestBtn.click();
         }
     });
 
