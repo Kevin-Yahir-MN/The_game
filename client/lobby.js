@@ -6,7 +6,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const createRoomBtn = document.getElementById('createRoom');
     const joinRoomBtn = document.getElementById('joinRoom');
-    const roomCodeInput = document.getElementById('roomCode');
+    const joinRoomModal = document.getElementById('joinRoomModal');
+    const joinRoomBackdrop = document.getElementById('joinRoomBackdrop');
+    const joinRoomCodeInput = document.getElementById('joinRoomCodeInput');
+    const confirmJoinRoomBtn = document.getElementById('confirmJoinRoomBtn');
+    const cancelJoinRoomBtn = document.getElementById('cancelJoinRoomBtn');
 
     const authStatus = document.getElementById('authStatus');
     const loginPanel = document.getElementById('loginPanel');
@@ -120,6 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem(AUTH_TOKEN_KEY);
         localStorage.removeItem(AUTH_USER_KEY);
         localStorage.removeItem(GUEST_USER_KEY);
+        closeJoinRoomModal();
         toggleAccountView(false);
         refreshIdentityUI();
     }
@@ -170,6 +175,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loginPanel.classList.toggle('active', isLogin);
         registerPanel.classList.toggle('active', !isLogin);
+    }
+
+    function openJoinRoomModal() {
+        if (!joinRoomModal) return;
+        joinRoomModal.style.display = 'flex';
+        if (joinRoomCodeInput) {
+            joinRoomCodeInput.value = '';
+            joinRoomCodeInput.focus();
+        }
+    }
+
+    function closeJoinRoomModal() {
+        if (!joinRoomModal) return;
+        joinRoomModal.style.display = 'none';
+        if (confirmJoinRoomBtn) {
+            confirmJoinRoomBtn.disabled = false;
+            confirmJoinRoomBtn.textContent = 'Unirse';
+        }
     }
 
     function validateRoomCode(code) {
@@ -516,7 +539,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    joinRoomBtn.addEventListener('click', async () => {
+    joinRoomBtn.addEventListener('click', () => {
+        const identity = getCurrentIdentity();
+        if (!identity || !identity.displayName) {
+            showError('Primero inicia sesión, crea usuario o usa invitado');
+            return;
+        }
+
+        openJoinRoomModal();
+    });
+
+    confirmJoinRoomBtn.addEventListener('click', async () => {
         const identity = getCurrentIdentity();
         if (!identity || !identity.displayName) {
             showError('Primero inicia sesión, crea usuario o usa invitado');
@@ -524,12 +557,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const playerName = identity.displayName;
-        const roomCode = roomCodeInput.value.trim();
+        const roomCode = joinRoomCodeInput.value.trim();
 
         if (!validateRoomCode(roomCode)) return;
 
-        joinRoomBtn.disabled = true;
-        joinRoomBtn.textContent = 'Uniendo...';
+        setButtonLoading(confirmJoinRoomBtn, true, 'Uniendo...', 'Unirse');
 
         try {
             const response = await fetchWithAuth(`${API_URL}/join-room`, {
@@ -559,14 +591,19 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error:', error);
             showError('Error al conectar con el servidor');
         } finally {
-            joinRoomBtn.disabled = false;
-            joinRoomBtn.textContent = 'Unirse';
+            setButtonLoading(confirmJoinRoomBtn, false, 'Uniendo...', 'Unirse');
         }
     });
 
-    roomCodeInput.addEventListener('keypress', (e) => {
+    cancelJoinRoomBtn.addEventListener('click', closeJoinRoomModal);
+    joinRoomBackdrop.addEventListener('click', closeJoinRoomModal);
+
+    joinRoomCodeInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
-            joinRoomBtn.click();
+            confirmJoinRoomBtn.click();
+        }
+        if (e.key === 'Escape') {
+            closeJoinRoomModal();
         }
     });
 
