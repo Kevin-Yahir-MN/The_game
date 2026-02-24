@@ -1378,3 +1378,19 @@ body {
     margin: 0.3rem 0;
     color: var(--light);
 }
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+.account-panel .form-group {
+    width: 100%;
+}
+
+.account-panel .form-group input {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+}
