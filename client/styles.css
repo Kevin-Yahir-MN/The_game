@@ -1408,7 +1408,7 @@ body {
 }
 
 .btn-back-menu {
-    align-self: flex-start;
+    align-self: flex-end;
     width: auto;
     min-height: 38px;
     padding: 0.5rem 0.9rem;
