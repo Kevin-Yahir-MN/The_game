@@ -12,11 +12,13 @@ const {
 } = require('../utils/turnState');
 const { broadcastToRoom, safeSend } = require('./communication');
 const { scheduleSaveGameState, flushSaveGameState } = require('./persistence');
+const { recordUsersGameResult } = require('./authService');
 
 function toPersistedPlayer(player) {
     return {
         id: player.id,
         name: player.name,
+        userId: player.userId || null,
         cards: player.cards,
         isHost: player.isHost,
         connected: player.ws?.readyState === WebSocket.OPEN,
@@ -59,13 +61,33 @@ function updateBoardHistory(room, position, newValue) {
     }
 }
 
+
+function finalizeGame(room, { result, message, reason }) {
+    if (room.gameState.gameFinished) return;
+    room.gameState.gameFinished = true;
+
+    const userIds = room.players
+        .map((player) => player.userId)
+        .filter(Boolean);
+
+    recordUsersGameResult(userIds, result === 'win').catch((error) => {
+        console.error('Error actualizando estadísticas de cuenta:', error);
+    });
+
+    broadcastToRoom(room, {
+        type: 'game_over',
+        result,
+        message,
+        reason
+    });
+}
+
 function checkGameStatus(room) {
     const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
     const deckEmpty = room.gameState.deck.length === 0;
 
     if (allPlayersEmpty && deckEmpty) {
-        broadcastToRoom(room, {
-            type: 'game_over',
+        finalizeGame(room, {
             result: 'win',
             message: '¡Todos ganan! Todas las cartas jugadas.',
             reason: 'all_cards_played'
@@ -76,8 +98,7 @@ function checkGameStatus(room) {
     const totalCardsInHand = room.players.reduce((sum, player) => sum + player.cards.length, 0);
 
     if (deckEmpty && totalCardsInHand <= 10 && !canAnyPlayerPlay(room)) {
-        broadcastToRoom(room, {
-            type: 'game_over',
+        finalizeGame(room, {
             result: 'win',
             message: '¡Victoria! Sin movimientos posibles y solo ' + totalCardsInHand + ' cartas restantes.',
             reason: 'low_remaining_cards'
@@ -86,8 +107,7 @@ function checkGameStatus(room) {
     }
 
     if (deckEmpty && totalCardsInHand > 10 && !canAnyPlayerPlay(room)) {
-        broadcastToRoom(room, {
-            type: 'game_over',
+        finalizeGame(room, {
             result: 'lose',
             message: '¡Derrota! Sin movimientos posibles y ' + totalCardsInHand + ' cartas restantes (más de 10).',
             reason: 'too_many_remaining_cards'
@@ -145,12 +165,12 @@ async function handlePlayCard(room, player, msg) {
         const playableCards = getPlayableCards(player.cards, room.gameState.board);
         if (playableCards.length === 0) {
             await flushSaveGameState(reverseRoomMap.get(room));
-            return broadcastToRoom(room, {
-                type: 'game_over',
+            finalizeGame(room, {
                 result: 'lose',
                 message: `¡${player.name} no puede seguir jugando cartas!`,
                 reason: 'min_cards_not_met'
             });
+            return;
         }
     }
 
@@ -286,12 +306,12 @@ async function endTurn(room, player) {
         const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
         if (playableCards.length < minCardsRequired && nextPlayer.cards.length > 0) {
             await flushSaveGameState(reverseRoomMap.get(room));
-            return broadcastToRoom(room, {
-                type: 'game_over',
+            finalizeGame(room, {
                 result: 'lose',
                 message: `¡${nextPlayer.name} no puede jugar el mínimo de ${minCardsRequired} carta(s) requerida(s)!`,
                 reason: 'min_cards_not_met'
             });
+            return;
         }
     }
 
@@ -328,6 +348,7 @@ async function startGame(room, initialCards = 6) {
                 gameState: {
                     ...room.gameState,
                     gameStarted: true,
+                    gameFinished: false,
                     initialCards
                 },
                 history: boardHistory.get(roomId)
@@ -352,6 +373,7 @@ async function startGame(room, initialCards = 6) {
         });
 
         room.gameState.gameStarted = true;
+        room.gameState.gameFinished = false;
         room.gameState.initialCards = initialCards;
 
         room.players.forEach(player => {
@@ -401,6 +423,7 @@ async function startGame(room, initialCards = 6) {
 }
 
 module.exports = {
+    finalizeGame,
     updateBoardHistory,
     checkGameStatus,
     handlePlayCard,

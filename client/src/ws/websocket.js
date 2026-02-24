@@ -13,7 +13,8 @@ const {
     startGame,
     getPlayerTurnCount,
     getTurnState,
-    resetPlayerTurnState
+    resetPlayerTurnState,
+    finalizeGame
 } = require('../services/gameService');
 const { safeSend, broadcastToRoom, sendGameState } = require('../services/communication');
 const { flushSaveGameState } = require('../services/persistence');
@@ -312,8 +313,7 @@ function setupWebSocket(server) {
                         if (room.gameState.gameStarted) sendGameState(room, player);
                         break;
                     case 'force_game_over':
-                        broadcastToRoom(room, {
-                            type: 'game_over',
+                        finalizeGame(room, {
                             result: 'lose',
                             message: '¡Juego terminado! No hay movimientos válidos disponibles.',
                             reason: msg.reason || 'no_valid_moves'
@@ -325,8 +325,7 @@ function setupWebSocket(server) {
                             const cardsRemaining = Number(msg.cardsRemaining);
 
                             if (Number.isFinite(cardsRemaining) && cardsRemaining < minCardsRequired) {
-                                broadcastToRoom(room, {
-                                    type: 'game_over',
+                                finalizeGame(room, {
                                     result: 'lose',
                                     message: `¡No puedes jugar el mínimo de ${minCardsRequired} carta(s) requerida(s)!`,
                                     reason: 'min_cards_not_met_solo'
@@ -336,8 +335,7 @@ function setupWebSocket(server) {
                         break;
                     }
                     case 'self_blocked':
-                        broadcastToRoom(room, {
-                            type: 'game_over',
+                        finalizeGame(room, {
                             result: 'lose',
                             message: `¡${player.name} se quedó sin movimientos posibles!`,
                             reason: 'self_blocked'
@@ -350,7 +348,8 @@ function setupWebSocket(server) {
                                 board: { ascending: [1, 1], descending: [100, 100] },
                                 currentTurn: room.players[0].id,
                                 gameStarted: false,
-                                initialCards: room.gameState.initialCards || 6
+                                initialCards: room.gameState.initialCards || 6,
+                                gameFinished: false
                             };
 
                             boardHistory.set(roomId, defaultHistory());
