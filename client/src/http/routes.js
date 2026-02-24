@@ -13,6 +13,9 @@ const {
     loginUser,
     createSession,
     getUserFromToken,
+    getAccountById,
+    updateDisplayName,
+    changePassword,
     deleteSession
 } = require('../services/authService');
 
@@ -142,6 +145,88 @@ function registerHttpRoutes(app) {
         }
     });
 
+    app.get('/auth/account', async (req, res) => {
+        try {
+            const user = await getAuthenticatedUser(req);
+            if (!user) {
+                return res.status(401).json({ success: false, message: 'No autenticado' });
+            }
+
+            const account = await getAccountById(user.id);
+            if (!account) {
+                return res.status(404).json({ success: false, message: 'Cuenta no encontrada' });
+            }
+
+            return res.json({
+                success: true,
+                account: {
+                    id: account.id,
+                    username: account.username,
+                    displayName: account.display_name,
+                    stats: {
+                        gamesPlayed: Number(account.games_played) || 0,
+                        wins: Number(account.wins) || 0,
+                        winStreak: Number(account.win_streak) || 0
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error en auth/account:', error);
+            return res.status(500).json({ success: false, message: 'Error interno cargando cuenta' });
+        }
+    });
+
+    app.patch('/auth/account', async (req, res) => {
+        try {
+            const user = await getAuthenticatedUser(req);
+            if (!user) {
+                return res.status(401).json({ success: false, message: 'No autenticado' });
+            }
+
+            const { displayName, currentPassword, newPassword } = req.body || {};
+            let updatedAccount = null;
+
+            if (hasContent(displayName)) {
+                updatedAccount = await updateDisplayName(user.id, displayName);
+            }
+
+            if (hasContent(currentPassword) || hasContent(newPassword)) {
+                if (!hasContent(currentPassword) || !hasContent(newPassword)) {
+                    return res.status(400).json({ success: false, message: 'Para cambiar contraseña, envía contraseña actual y nueva' });
+                }
+                await changePassword(user.id, currentPassword, newPassword);
+            }
+
+            const account = updatedAccount || await getAccountById(user.id);
+            if (!account) {
+                return res.status(404).json({ success: false, message: 'Cuenta no encontrada' });
+            }
+
+            return res.json({
+                success: true,
+                account: {
+                    id: account.id,
+                    username: account.username,
+                    displayName: account.display_name,
+                    stats: {
+                        gamesPlayed: Number(account.games_played) || 0,
+                        wins: Number(account.wins) || 0,
+                        winStreak: Number(account.win_streak) || 0
+                    }
+                }
+            });
+        } catch (error) {
+            if (error.code === 'DISPLAY_NAME_EXISTS') {
+                return res.status(409).json({ success: false, message: error.message });
+            }
+            if (error.code === 'INVALID_CURRENT_PASSWORD') {
+                return res.status(400).json({ success: false, message: error.message });
+            }
+            console.error('Error en PATCH auth/account:', error);
+            return res.status(500).json({ success: false, message: 'Error interno actualizando cuenta' });
+        }
+    });
+
     app.post('/create-room', async (req, res) => {
         const authUser = await getAuthenticatedUser(req);
         const requestedName = sanitizePlayerName(req.body?.playerName);
@@ -187,6 +272,7 @@ function registerHttpRoutes(app) {
                     id: playerId,
                     name: playerName,
                     isHost: true,
+                    userId: authUser?.id || null,
                     ws: null,
                     cards: [],
                     cardsPlayedThisTurn: 0,
@@ -270,6 +356,7 @@ function registerHttpRoutes(app) {
                 id: playerId,
                 name: playerName,
                 isHost: false,
+                userId: authUser?.id || null,
                 ws: null,
                 cards: [],
                 cardsPlayedThisTurn: 0,
