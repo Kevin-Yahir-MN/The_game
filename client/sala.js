@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function sendPlayerUpdate() {
         if (socket?.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
-                type: 'player_update',
+                type: 'update_player',
                 playerId: playerId,
                 name: playerName,
                 isHost: isHost,
