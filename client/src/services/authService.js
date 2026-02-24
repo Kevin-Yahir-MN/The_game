@@ -133,6 +133,103 @@ async function getUserFromToken(token) {
     return result.rowCount > 0 ? result.rows[0] : null;
 }
 
+async function getAccountById(userId) {
+    const result = await pool.query(
+        `SELECT id, username, display_name, games_played, wins, win_streak
+         FROM users
+         WHERE id = $1`,
+        [userId]
+    );
+
+    return result.rowCount > 0 ? result.rows[0] : null;
+}
+
+async function updateDisplayName(userId, displayName) {
+    const normalizedDisplayName = normalizeDisplayName(displayName);
+
+    return withTransaction(async (client) => {
+        const existing = await client.query(
+            'SELECT id FROM users WHERE display_name = $1 AND id <> $2',
+            [normalizedDisplayName, userId]
+        );
+
+        if (existing.rowCount > 0) {
+            const error = new Error('El nombre visible ya está en uso');
+            error.code = 'DISPLAY_NAME_EXISTS';
+            throw error;
+        }
+
+        const result = await client.query(
+            `UPDATE users
+             SET display_name = $1,
+                 updated_at = NOW()
+             WHERE id = $2
+             RETURNING id, username, display_name, games_played, wins, win_streak`,
+            [normalizedDisplayName, userId]
+        );
+
+        return result.rowCount > 0 ? result.rows[0] : null;
+    });
+}
+
+async function changePassword(userId, currentPassword, newPassword) {
+    const result = await pool.query(
+        'SELECT password_hash FROM users WHERE id = $1',
+        [userId]
+    );
+
+    if (result.rowCount === 0) {
+        const error = new Error('Usuario no encontrado');
+        error.code = 'USER_NOT_FOUND';
+        throw error;
+    }
+
+    const storedHash = result.rows[0].password_hash;
+    if (!verifyPassword(currentPassword, storedHash)) {
+        const error = new Error('La contraseña actual es incorrecta');
+        error.code = 'INVALID_CURRENT_PASSWORD';
+        throw error;
+    }
+
+    const newHash = hashPassword(newPassword);
+    await pool.query(
+        `UPDATE users
+         SET password_hash = $1,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [newHash, userId]
+    );
+}
+
+async function recordUsersGameResult(userIds, didWin) {
+    if (!Array.isArray(userIds) || userIds.length === 0) return;
+
+    const uniqueIds = [...new Set(userIds.filter(Boolean))];
+    if (uniqueIds.length === 0) return;
+
+    if (didWin) {
+        await pool.query(
+            `UPDATE users
+             SET games_played = games_played + 1,
+                 wins = wins + 1,
+                 win_streak = win_streak + 1,
+                 updated_at = NOW()
+             WHERE id = ANY($1::uuid[])`,
+            [uniqueIds]
+        );
+        return;
+    }
+
+    await pool.query(
+        `UPDATE users
+         SET games_played = games_played + 1,
+             win_streak = 0,
+             updated_at = NOW()
+         WHERE id = ANY($1::uuid[])`,
+        [uniqueIds]
+    );
+}
+
 async function deleteSession(token) {
     if (!token) return;
     await pool.query('DELETE FROM user_sessions WHERE token = $1', [token]);
@@ -148,6 +245,10 @@ module.exports = {
     loginUser,
     createSession,
     getUserFromToken,
+    getAccountById,
+    updateDisplayName,
+    changePassword,
+    recordUsersGameResult,
     deleteSession,
     cleanupExpiredSessions
 };

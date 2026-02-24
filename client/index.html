@@ -74,7 +74,36 @@
                 <div id="activeUserContainer" class="active-user-card" style="display: none;">
                     <h3>Usuario activo</h3>
                     <p id="activeUserLabel">-</p>
+                    <button id="myAccountBtn" class="btn btn-secondary" type="button">Mi cuenta</button>
                     <button id="logoutBtn" class="btn btn-ghost" type="button">Cerrar sesión</button>
+                </div>
+
+                <div id="myAccountPanel" class="account-panel" style="display: none;">
+                    <h3>Mi cuenta</h3>
+
+                    <div class="account-stats">
+                        <p><strong>Partidas jugadas:</strong> <span id="statGamesPlayed">0</span></p>
+                        <p><strong>Victorias:</strong> <span id="statWins">0</span></p>
+                        <p><strong>Victorias consecutivas:</strong> <span id="statWinStreak">0</span></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="accountDisplayName">Cambiar nombre visible</label>
+                        <input type="text" id="accountDisplayName" placeholder="Nuevo nombre visible">
+                    </div>
+                    <button id="saveDisplayNameBtn" class="btn btn-primary" type="button">Guardar nombre</button>
+
+                    <div class="separator"><span>seguridad</span></div>
+
+                    <div class="form-group">
+                        <label for="currentPassword">Contraseña actual</label>
+                        <input type="password" id="currentPassword" placeholder="Contraseña actual">
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">Nueva contraseña</label>
+                        <input type="password" id="newPassword" placeholder="Nueva contraseña">
+                    </div>
+                    <button id="changePasswordBtn" class="btn btn-secondary" type="button">Cambiar contraseña</button>
                 </div>
 
                 <div class="action-buttons">

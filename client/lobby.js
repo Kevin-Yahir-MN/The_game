@@ -31,6 +31,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeUserContainer = document.getElementById('activeUserContainer');
     const activeUserLabel = document.getElementById('activeUserLabel');
 
+    const myAccountBtn = document.getElementById('myAccountBtn');
+    const myAccountPanel = document.getElementById('myAccountPanel');
+    const accountDisplayNameInput = document.getElementById('accountDisplayName');
+    const saveDisplayNameBtn = document.getElementById('saveDisplayNameBtn');
+    const currentPasswordInput = document.getElementById('currentPassword');
+    const newPasswordInput = document.getElementById('newPassword');
+    const changePasswordBtn = document.getElementById('changePasswordBtn');
+
+    const statGamesPlayed = document.getElementById('statGamesPlayed');
+    const statWins = document.getElementById('statWins');
+    const statWinStreak = document.getElementById('statWinStreak');
+
     function showError(message) {
         const errorElement = document.createElement('div');
         errorElement.className = 'notification error';
@@ -106,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem(AUTH_TOKEN_KEY);
         localStorage.removeItem(AUTH_USER_KEY);
         localStorage.removeItem(GUEST_USER_KEY);
+        myAccountPanel.style.display = 'none';
         refreshIdentityUI();
     }
 
@@ -132,8 +145,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isLoggedIn) {
             activeUserLabel.textContent = identity.displayName;
+            myAccountBtn.style.display = identity.isGuest ? 'none' : 'flex';
         } else {
             activeUserLabel.textContent = '-';
+            myAccountBtn.style.display = 'none';
+            myAccountPanel.style.display = 'none';
         }
     }
 
@@ -198,6 +214,27 @@ document.addEventListener('DOMContentLoaded', () => {
             ...options,
             headers
         });
+    }
+
+    async function loadMyAccount() {
+        try {
+            const response = await fetchWithAuth(`${API_URL}/auth/account`, { method: 'GET' });
+            const data = await response.json();
+
+            if (!response.ok || !data.success || !data.account) {
+                showError(data.message || 'No se pudo cargar Mi cuenta');
+                return;
+            }
+
+            const account = data.account;
+            accountDisplayNameInput.value = account.displayName || '';
+            statGamesPlayed.textContent = String(account.stats?.gamesPlayed || 0);
+            statWins.textContent = String(account.stats?.wins || 0);
+            statWinStreak.textContent = String(account.stats?.winStreak || 0);
+        } catch (error) {
+            console.error('Error cargando cuenta:', error);
+            showError('Error cargando Mi cuenta');
+        }
     }
 
     async function hydrateSession() {
@@ -318,6 +355,90 @@ document.addEventListener('DOMContentLoaded', () => {
 
         saveGuestUser(guestName);
         showSuccess('Usuario temporal creado');
+    });
+
+    myAccountBtn.addEventListener('click', async () => {
+        if (myAccountPanel.style.display === 'none') {
+            myAccountPanel.style.display = 'block';
+            await loadMyAccount();
+            return;
+        }
+
+        myAccountPanel.style.display = 'none';
+    });
+
+    saveDisplayNameBtn.addEventListener('click', async () => {
+        const displayName = accountDisplayNameInput.value.trim();
+        if (!displayName) {
+            showError('Ingresa un nombre visible válido');
+            return;
+        }
+
+        setButtonLoading(saveDisplayNameBtn, true, 'Guardando...', 'Guardar nombre');
+
+        try {
+            const response = await fetchWithAuth(`${API_URL}/auth/account`, {
+                method: 'PATCH',
+                body: JSON.stringify({ displayName })
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                showError(data.message || 'No se pudo actualizar el nombre');
+                return;
+            }
+
+            const existingAuth = getAuthUser();
+            if (existingAuth) {
+                localStorage.setItem(AUTH_USER_KEY, JSON.stringify({
+                    ...existingAuth,
+                    displayName: data.account.displayName
+                }));
+            }
+
+            refreshIdentityUI();
+            await loadMyAccount();
+            showSuccess('Nombre actualizado');
+        } catch (error) {
+            console.error('Error actualizando nombre:', error);
+            showError('Error actualizando nombre');
+        } finally {
+            setButtonLoading(saveDisplayNameBtn, false, 'Guardando...', 'Guardar nombre');
+        }
+    });
+
+    changePasswordBtn.addEventListener('click', async () => {
+        const currentPassword = currentPasswordInput.value;
+        const newPassword = newPasswordInput.value;
+
+        if (!currentPassword || !newPassword) {
+            showError('Completa contraseña actual y nueva');
+            return;
+        }
+
+        setButtonLoading(changePasswordBtn, true, 'Cambiando...', 'Cambiar contraseña');
+
+        try {
+            const response = await fetchWithAuth(`${API_URL}/auth/account`, {
+                method: 'PATCH',
+                body: JSON.stringify({ currentPassword, newPassword })
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                showError(data.message || 'No se pudo cambiar la contraseña');
+                return;
+            }
+
+            currentPasswordInput.value = '';
+            newPasswordInput.value = '';
+            showSuccess('Contraseña actualizada correctamente');
+        } catch (error) {
+            console.error('Error cambiando contraseña:', error);
+            showError('Error cambiando contraseña');
+        } finally {
+            setButtonLoading(changePasswordBtn, false, 'Cambiando...', 'Cambiar contraseña');
+        }
     });
 
     logoutBtn.addEventListener('click', async () => {
