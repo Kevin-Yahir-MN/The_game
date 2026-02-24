@@ -33,6 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const myAccountBtn = document.getElementById('myAccountBtn');
     const myAccountPanel = document.getElementById('myAccountPanel');
+    const backToMenuBtn = document.getElementById('backToMenuBtn');
+    const mainActions = document.getElementById('mainActions');
     const accountDisplayNameInput = document.getElementById('accountDisplayName');
     const saveDisplayNameBtn = document.getElementById('saveDisplayNameBtn');
     const currentPasswordInput = document.getElementById('currentPassword');
@@ -118,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem(AUTH_TOKEN_KEY);
         localStorage.removeItem(AUTH_USER_KEY);
         localStorage.removeItem(GUEST_USER_KEY);
-        myAccountPanel.style.display = 'none';
+        toggleAccountView(false);
         refreshIdentityUI();
     }
 
@@ -130,6 +132,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (guestUser) return guestUser;
 
         return null;
+    }
+
+    function toggleAccountView(showAccount) {
+        myAccountPanel.style.display = showAccount ? 'block' : 'none';
+        if (mainActions) {
+            mainActions.style.display = showAccount ? 'none' : 'flex';
+        }
     }
 
     function refreshIdentityUI() {
@@ -149,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             activeUserLabel.textContent = '-';
             myAccountBtn.style.display = 'none';
-            myAccountPanel.style.display = 'none';
+            toggleAccountView(false);
         }
     }
 
@@ -358,13 +367,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     myAccountBtn.addEventListener('click', async () => {
-        if (myAccountPanel.style.display === 'none') {
-            myAccountPanel.style.display = 'block';
+        const isHidden = myAccountPanel.style.display === 'none';
+        if (isHidden) {
+            toggleAccountView(true);
             await loadMyAccount();
             return;
         }
 
-        myAccountPanel.style.display = 'none';
+        toggleAccountView(false);
+    });
+
+    backToMenuBtn.addEventListener('click', () => {
+        toggleAccountView(false);
     });
 
     saveDisplayNameBtn.addEventListener('click', async () => {
@@ -562,5 +576,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    toggleAccountView(false);
     hydrateSession();
 });
