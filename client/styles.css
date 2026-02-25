@@ -1408,12 +1408,13 @@ body {
 }
 
 .btn-back-menu {
-    align-self: flex-end;
-    width: auto;
+    display: block;
+    width: fit-content;
     min-height: 38px;
     padding: 0.5rem 0.9rem;
     font-size: 0.9rem;
     margin-top: 1.1rem;
+    margin-left: auto;
 }
 
 .join-room-modal {
