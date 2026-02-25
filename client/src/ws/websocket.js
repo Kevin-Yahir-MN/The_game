@@ -85,6 +85,8 @@ async function safePersistOnDisconnect(roomId, playerId) {
     }
 }
 
+const ALLOWED_EMOJI_REACTIONS = ['happy', 'sad', 'angry', 'poop', 'love', 'wow'];
+
 function setupWebSocket(server) {
     const wss = new WebSocket.Server({
         server,
@@ -380,6 +382,26 @@ function setupWebSocket(server) {
                                 isHost: p.isHost,
                                 cardCount: p.cards.length
                             }))
+                        });
+                        break;
+                    }
+                    case 'emoji_reaction': {
+                        const code = typeof msg.emoji === 'string' ? msg.emoji.trim() : '';
+                        if (!ALLOWED_EMOJI_REACTIONS.includes(code)) {
+                            safeSend(player.ws, {
+                                type: 'notification',
+                                message: 'Reacción no permitida',
+                                isError: true,
+                                errorCode: 'INVALID_EMOJI_REACTION'
+                            });
+                            break;
+                        }
+
+                        broadcastToRoom(room, {
+                            type: 'emoji_reaction',
+                            emoji: code,
+                            fromPlayerId: player.id,
+                            fromPlayerName: player.name
                         });
                         break;
                     }

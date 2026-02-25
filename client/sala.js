@@ -23,6 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameSettings = document.getElementById('gameSettings');
     const initialCardsSelect = document.getElementById('initialCards');
     const backToMenuBtn = document.getElementById('backToMenu');
+    const emojiButtonsContainer = document.getElementById('emojiButtons');
+    const emojiMessagesList = document.getElementById('emojiMessages');
 
     // Mostrar notificación
     function showNotification(message, isError = false) {
@@ -187,9 +189,51 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (message.type === 'notification') {
                 showNotification(message.message, message.isError);
             }
+            else if (message.type === 'emoji_reaction') {
+                renderEmojiReaction(message);
+            }
         } catch (error) {
             console.error('Error procesando mensaje:', error);
         }
+    }
+
+    function renderEmojiReaction(message) {
+        if (!emojiMessagesList) return;
+
+        const emojiMap = {
+            happy: '😊',
+            sad: '😢',
+            angry: '😡',
+            poop: '💩',
+            love: '😍',
+            wow: '😮'
+        };
+
+        const emojiChar = emojiMap[message.emoji];
+        if (!emojiChar) return;
+
+        const item = document.createElement('li');
+        item.className = 'emoji-message';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'emoji-message-name';
+        nameSpan.textContent = message.fromPlayerName || 'Jugador';
+
+        const emojiSpan = document.createElement('span');
+        emojiSpan.className = 'emoji-message-emoji';
+        emojiSpan.textContent = emojiChar;
+
+        item.appendChild(nameSpan);
+        item.appendChild(emojiSpan);
+
+        emojiMessagesList.appendChild(item);
+
+        // Limitar a las últimas 20 reacciones
+        while (emojiMessagesList.children.length > 20) {
+            emojiMessagesList.removeChild(emojiMessagesList.firstChild);
+        }
+
+        emojiMessagesList.scrollTop = emojiMessagesList.scrollHeight;
     }
 
     // Actualizar lista de jugadores en UI
@@ -313,6 +357,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (backToMenuBtn) {
             backToMenuBtn.addEventListener('click', backToMenu);
+        }
+
+        if (emojiButtonsContainer && socket) {
+            emojiButtonsContainer.addEventListener('click', (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) return;
+                const emojiCode = target.dataset.emoji;
+                if (!emojiCode) return;
+                if (socket.readyState !== WebSocket.OPEN) {
+                    showNotification('No hay conexión para enviar reacción', true);
+                    return;
+                }
+
+                socket.send(JSON.stringify({
+                    type: 'emoji_reaction',
+                    emoji: emojiCode,
+                    roomId,
+                    playerId
+                }));
+            });
         }
 
         createConnectionStatusElement();

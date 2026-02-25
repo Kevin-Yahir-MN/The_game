@@ -349,6 +349,79 @@ body {
     background: rgba(46, 204, 113, 0.1);
 }
 
+.room-emoji-chat {
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 12px;
+    padding: 1rem 1.2rem;
+    margin-bottom: 1.5rem;
+}
+
+.room-emoji-chat h3 {
+    margin: 0 0 0.8rem;
+    font-size: 1.1rem;
+    color: var(--light);
+}
+
+.emoji-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.emoji-button {
+    border: none;
+    border-radius: 999px;
+    padding: 0.45rem 0.7rem;
+    font-size: 1.3rem;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.emoji-button:hover {
+    transform: translateY(-2px) scale(1.05);
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.45);
+}
+
+.emoji-button:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.emoji-messages {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 140px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.emoji-message {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.35);
+    font-size: 0.9rem;
+}
+
+.emoji-message-name {
+    color: var(--light);
+    font-weight: 500;
+}
+
+.emoji-message-emoji {
+    font-size: 1.4rem;
+}
+
 .room-secondary-button {
     background: var(--accent);
     color: white;
