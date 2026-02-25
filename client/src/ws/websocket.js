@@ -85,7 +85,20 @@ async function safePersistOnDisconnect(roomId, playerId) {
     }
 }
 
-const ALLOWED_EMOJI_REACTIONS = ['happy', 'sad', 'angry', 'poop', 'love', 'wow'];
+const ALLOWED_EMOJI_REACTIONS = [
+    'happy',
+    'sad',
+    'angry',
+    'poop',
+    'love',
+    'wow',
+    'middle',
+    'cry',
+    'proud',
+    'angel',
+    'demon',
+    'sleep'
+];
 const EMOJI_WINDOW_MS = 10_000;
 const EMOJI_MAX_PER_WINDOW = 3;
 

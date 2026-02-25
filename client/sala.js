@@ -206,7 +206,13 @@ document.addEventListener('DOMContentLoaded', () => {
             angry: '😡',
             poop: '💩',
             love: '😍',
-            wow: '😮'
+            wow: '😮',
+            middle: '🖕',
+            cry: '😭',
+            proud: '😎',
+            angel: '😇',
+            demon: '😈',
+            sleep: '😴'
         };
 
         const emojiChar = emojiMap[message.emoji];
