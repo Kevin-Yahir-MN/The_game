@@ -129,37 +129,48 @@ function setupWebSocket(server) {
         }
 
         const room = rooms.get(roomId);
-        const player = room.players.find(p => p.id === playerId);
-        if (!player) return ws.close(1008, 'Jugador no registrado');
+        room.spectators = Array.isArray(room.spectators) ? room.spectators : [];
 
-        try {
-            await pool.query(`
-                INSERT INTO player_connections 
-                (player_id, room_id, last_ping, connection_status)
-                VALUES ($1, $2, NOW(), 'connected')
-                ON CONFLICT (player_id) 
-                DO UPDATE SET 
-                    room_id = $2,
-                    last_ping = NOW(),
-                    connection_status = 'connected'
-            `, [playerId, roomId]);
-        } catch (error) {
-            console.error('Error al actualizar player_connections:', error);
+        const player = room.players.find(p => p.id === playerId);
+        const spectator = room.spectators.find(s => s.id === playerId);
+        const participant = player || spectator;
+
+        if (!participant) return ws.close(1008, 'Participante no registrado');
+
+        if (player) {
+            try {
+                await pool.query(`
+                    INSERT INTO player_connections 
+                    (player_id, room_id, last_ping, connection_status)
+                    VALUES ($1, $2, NOW(), 'connected')
+                    ON CONFLICT (player_id) 
+                    DO UPDATE SET 
+                        room_id = $2,
+                        last_ping = NOW(),
+                        connection_status = 'connected'
+                `, [playerId, roomId]);
+            } catch (error) {
+                console.error('Error al actualizar player_connections:', error);
+            }
         }
 
-        player.ws = ws;
-        player.lastActivity = Date.now();
+        participant.ws = ws;
+        participant.lastActivity = Date.now();
+        participant.isSpectator = !!spectator;
+
         if (playerName) {
             const decodedName = sanitizePlayerName(decodeURIComponent(playerName));
-            if (decodedName) player.name = decodedName;
+            if (decodedName) participant.name = decodedName;
         }
 
         const response = {
             type: 'init_game',
-            playerId: player.id,
-            playerName: player.name,
+            playerId: participant.id,
+            playerName: participant.name,
             roomId,
-            isHost: player.isHost,
+            isHost: player ? player.isHost : false,
+            isSpectator: !!spectator,
+            spectatorCount: room.spectators.length,
             gameState: {
                 board: room.gameState.board,
                 currentTurn: room.gameState.currentTurn,
@@ -174,10 +185,10 @@ function setupWebSocket(server) {
                 }))
             },
             history: boardHistory.get(roomId) || defaultHistory(),
-            isYourTurn: room.gameState.currentTurn === player.id
+            isYourTurn: !spectator && room.gameState.currentTurn === participant.id
         };
 
-        if (room.gameState.gameStarted) {
+        if (room.gameState.gameStarted && !spectator) {
             response.yourCards = player.cards;
             response.players = room.players.map(p => ({
                 id: p.id,
@@ -201,7 +212,7 @@ function setupWebSocket(server) {
                 }
 
                 const msg = parseWsMessage(message);
-                player.lastActivity = Date.now();
+                participant.lastActivity = Date.now();
 
                 if (msg.type === 'ping') {
                     try {
@@ -217,6 +228,15 @@ function setupWebSocket(server) {
                     return;
                 }
 
+                if (spectator && !['get_game_state', 'get_full_state', 'get_player_state', 'ping'].includes(msg.type)) {
+                    return safeSend(participant.ws, {
+                        type: 'notification',
+                        message: 'Modo espectador: no puedes realizar acciones en la partida',
+                        isError: true,
+                        errorCode: 'SPECTATOR_READ_ONLY'
+                    });
+                }
+
                 switch (msg.type) {
                     case 'deck_empty':
                         room.gameState.deck = [];
@@ -227,10 +247,10 @@ function setupWebSocket(server) {
                         });
                         break;
                     case 'get_player_state':
-                        safeSend(player.ws, {
+                        safeSend(participant.ws, {
                             type: 'player_state_update',
-                            cardsPlayedThisTurn: getPlayerTurnCount(player),
-                            totalCardsPlayed: player.totalCardsPlayed || 0,
+                            cardsPlayedThisTurn: player ? getPlayerTurnCount(player) : 0,
+                            totalCardsPlayed: player?.totalCardsPlayed || 0,
                             minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
                             currentTurn: room.gameState.currentTurn,
                             players: room.players.map(p => ({
@@ -243,7 +263,7 @@ function setupWebSocket(server) {
                         });
                         break;
                     case 'start_game':
-                        if (player.isHost && !room.gameState.gameStarted) {
+                        if (player && player.isHost && !room.gameState.gameStarted) {
                             try {
                                 const connectedPlayers = room.players.filter(p =>
                                     p.ws?.readyState === WebSocket.OPEN
@@ -260,7 +280,7 @@ function setupWebSocket(server) {
                                 await startGame(room, initialCards);
                             } catch (error) {
                                 console.error('Error al iniciar juego:', error);
-                                safeSend(player.ws, {
+                                safeSend(participant.ws, {
                                     type: 'notification',
                                     message: 'Error al iniciar el juego: ' + error.message,
                                     isError: true
@@ -269,11 +289,11 @@ function setupWebSocket(server) {
                         }
                         break;
                     case 'play_card':
-                        if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                        if (player && player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                             const { missingFields, isValid } = validatePlayCardPayload(msg);
 
                             if (!isValid) {
-                                return safeSend(player.ws, {
+                                return safeSend(participant.ws, {
                                     type: 'notification',
                                     message: `Faltan campos requeridos: ${missingFields.join(', ')}`,
                                     isError: true,
@@ -282,7 +302,7 @@ function setupWebSocket(server) {
                             }
 
                             if (msg.roomId !== roomId) {
-                                return safeSend(player.ws, {
+                                return safeSend(participant.ws, {
                                     type: 'notification',
                                     message: 'Sala no válida',
                                     isError: true,
@@ -300,17 +320,17 @@ function setupWebSocket(server) {
                         }
                         break;
                     case 'end_turn':
-                        if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                        if (player && player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                             await endTurn(room, player);
                         }
                         break;
                     case 'undo_move':
-                        if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                        if (player && player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
                             handleUndoMove(room, player, msg);
                         }
                         break;
                     case 'get_game_state':
-                        if (room.gameState.gameStarted) sendGameState(room, player);
+                        if (room.gameState.gameStarted) sendGameState(room, participant);
                         break;
                     case 'force_game_over':
                         finalizeGame(room, {
@@ -337,12 +357,12 @@ function setupWebSocket(server) {
                     case 'self_blocked':
                         finalizeGame(room, {
                             result: 'lose',
-                            message: `¡${player.name} se quedó sin movimientos posibles!`,
+                            message: `¡${participant.name} se quedó sin movimientos posibles!`,
                             reason: 'self_blocked'
                         });
                         break;
                     case 'reset_room':
-                        if (player.isHost) {
+                        if (player && player.isHost) {
                             room.gameState = {
                                 deck: initializeDeck(),
                                 board: { ascending: [1, 1], descending: [100, 100] },
@@ -371,7 +391,7 @@ function setupWebSocket(server) {
                     case 'update_player': {
                         const sanitizedName = sanitizePlayerName(msg.name);
                         if (!sanitizedName) break;
-                        player.name = sanitizedName;
+                        participant.name = sanitizedName;
                         broadcastToRoom(room, {
                             type: 'player_update',
                             players: room.players.map(p => ({
@@ -385,7 +405,7 @@ function setupWebSocket(server) {
                     }
                     case 'get_full_state': {
                         const currentRoomId = reverseRoomMap.get(room);
-                        safeSend(player.ws, {
+                        safeSend(participant.ws, {
                             type: 'full_state_update',
                             room: {
                                 players: room.players.map(p => ({
@@ -408,15 +428,17 @@ function setupWebSocket(server) {
                                 gameStarted: room.gameState.gameStarted
                             },
                             history: boardHistory.get(currentRoomId),
+                            spectatorCount: room.spectators.length,
                             currentPlayerState: {
-                                cardsPlayedThisTurn: getPlayerTurnCount(player),
-                                minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+                                cardsPlayedThisTurn: player ? getPlayerTurnCount(player) : 0,
+                                minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
+                                isSpectator: !!spectator
                             }
                         });
                         break;
                     }
                     default:
-                        safeSend(player.ws, {
+                        safeSend(participant.ws, {
                             type: 'notification',
                             message: `Tipo de mensaje no reconocido: ${msg.type}`,
                             isError: true,
@@ -429,7 +451,7 @@ function setupWebSocket(server) {
                     return;
                 }
                 if (error.code === 'INVALID_JSON') {
-                    safeSend(player.ws, {
+                    safeSend(participant.ws, {
                         type: 'notification',
                         message: 'Mensaje inválido: JSON malformado',
                         isError: true,
@@ -438,7 +460,7 @@ function setupWebSocket(server) {
                     return;
                 }
                 console.error('Error procesando mensaje:', error);
-                safeSend(player.ws, {
+                safeSend(participant.ws, {
                     type: 'notification',
                     message: 'Error interno procesando mensaje',
                     isError: true,
@@ -448,8 +470,17 @@ function setupWebSocket(server) {
         });
 
         ws.on('close', async () => {
-            player.ws = null;
+            participant.ws = null;
             wsRateLimit.delete(playerId);
+
+            if (spectator) {
+                room.spectators = room.spectators.filter((currentSpectator) => currentSpectator.id !== participant.id);
+                broadcastToRoom(room, {
+                    type: 'spectator_count_update',
+                    spectatorCount: room.spectators.length
+                });
+                return;
+            }
 
             try {
                 const persisted = await safePersistOnDisconnect(roomId, playerId);

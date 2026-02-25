@@ -121,7 +121,8 @@ async function restoreActiveGames() {
                         currentTurn: null,
                         gameStarted: false,
                         initialCards: 6
-                    }
+                    },
+                    spectators: []
                 };
 
                 rooms.set(row.room_id, room);
