@@ -201,7 +201,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!emojiPopinsContainer) return;
 
         const emojiMap = {
-            happy: '😊',
             sad: '😢',
             angry: '😡',
             poop: '💩',
