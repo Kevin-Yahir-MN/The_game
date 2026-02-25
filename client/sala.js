@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const startBtn = document.getElementById('startGame');
     const gameSettings = document.getElementById('gameSettings');
     const initialCardsSelect = document.getElementById('initialCards');
+    const backToMenuBtn = document.getElementById('backToMenu');
 
     // Mostrar notificación
     function showNotification(message, isError = false) {
@@ -205,6 +206,19 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
     }
 
+
+    function backToMenu() {
+        sessionStorage.removeItem('roomId');
+        sessionStorage.removeItem('playerId');
+        sessionStorage.removeItem('isHost');
+
+        if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
+            socket.close();
+        }
+
+        window.location.href = 'index.html';
+    }
+
     // Manejar inicio del juego
     function handleGameStart() {
         clearInterval(playerUpdateInterval);
@@ -295,6 +309,10 @@ document.addEventListener('DOMContentLoaded', () => {
             startBtn.addEventListener('click', handleStartGame);
         } else {
             startBtn.remove();
+        }
+
+        if (backToMenuBtn) {
+            backToMenuBtn.addEventListener('click', backToMenu);
         }
 
         createConnectionStatusElement();
