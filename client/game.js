@@ -245,14 +245,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function recordCardPlayed(cardValue, position, playerId, previousValue) {
-        if (playerId !== currentPlayer.id) {
-            gameState.cardsPlayedThisTurn.push({
-                value: cardValue,
-                position,
-                playerId,
-                previousValue
-            });
-        }
+        gameState.cardsPlayedThisTurn.push({
+            value: cardValue,
+            position,
+            playerId,
+            previousValue
+        });
         updateGameInfo();
     }
 
@@ -1274,9 +1272,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         document.getElementById('progressText').textContent =
-            `${currentPlayerCardsPlayed + 1}/${minCardsRequired} carta(s) jugada(s)`;
+            `${currentPlayerCardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
 
-        const progressPercentage = Math.min(((currentPlayerCardsPlayed + 1) / minCardsRequired) * 100, 100);
+        const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
         document.getElementById('progressBar').style.width = `${progressPercentage}%`;
     }
 
