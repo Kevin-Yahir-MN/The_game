@@ -4,6 +4,7 @@ const reverseRoomMap = new Map();
 const boardHistory = new Map();
 const saveDebounceTimers = new Map();
 const wsRateLimit = new Map();
+const emojiRateLimit = new Map();
 
 const validPositions = ['asc1', 'asc2', 'desc1', 'desc2'];
 
@@ -13,5 +14,6 @@ module.exports = {
     boardHistory,
     saveDebounceTimers,
     wsRateLimit,
+    emojiRateLimit,
     validPositions
 };

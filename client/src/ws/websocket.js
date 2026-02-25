@@ -2,7 +2,7 @@
 const WebSocket = require('ws');
 const { pool } = require('../db');
 const { allowedOrigins } = require('../config');
-const { rooms, reverseRoomMap, boardHistory, wsRateLimit } = require('../state');
+const { rooms, reverseRoomMap, boardHistory, wsRateLimit, emojiRateLimit } = require('../state');
 const { sanitizePlayerName, isValidRoomId, validatePlayCardPayload } = require('../utils/validation');
 const { isWithinRateLimit } = require('../utils/rateLimit');
 const { initializeDeck } = require('../utils/gameRules');
@@ -86,6 +86,31 @@ async function safePersistOnDisconnect(roomId, playerId) {
 }
 
 const ALLOWED_EMOJI_REACTIONS = ['happy', 'sad', 'angry', 'poop', 'love', 'wow'];
+const EMOJI_WINDOW_MS = 10_000;
+const EMOJI_MAX_PER_WINDOW = 3;
+
+function checkEmojiRateLimit(playerId) {
+    const now = Date.now();
+    let history = emojiRateLimit.get(playerId) || [];
+    history = history.filter(timestamp => now - timestamp < EMOJI_WINDOW_MS);
+
+    if (history.length >= EMOJI_MAX_PER_WINDOW) {
+        const oldest = history[0];
+        const remainingMs = EMOJI_WINDOW_MS - (now - oldest);
+        return {
+            allowed: false,
+            remainingMs
+        };
+    }
+
+    history.push(now);
+    emojiRateLimit.set(playerId, history);
+
+    return {
+        allowed: true,
+        remainingMs: 0
+    };
+}
 
 function setupWebSocket(server) {
     const wss = new WebSocket.Server({
@@ -397,6 +422,18 @@ function setupWebSocket(server) {
                             break;
                         }
 
+                        const { allowed, remainingMs } = checkEmojiRateLimit(player.id);
+                        if (!allowed) {
+                            const seconds = Math.max(1, Math.ceil(remainingMs / 1000));
+                            safeSend(player.ws, {
+                                type: 'notification',
+                                message: `Has enviado demasiadas reacciones. Espera ${seconds} segundo(s) para enviar más emojis.`,
+                                isError: true,
+                                errorCode: 'EMOJI_RATE_LIMIT'
+                            });
+                            break;
+                        }
+
                         broadcastToRoom(room, {
                             type: 'emoji_reaction',
                             emoji: code,
@@ -472,6 +509,7 @@ function setupWebSocket(server) {
         ws.on('close', async () => {
             player.ws = null;
             wsRateLimit.delete(playerId);
+            emojiRateLimit.delete(playerId);
 
             try {
                 const persisted = await safePersistOnDisconnect(roomId, playerId);

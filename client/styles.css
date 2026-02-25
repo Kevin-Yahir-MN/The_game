@@ -393,13 +393,7 @@ body {
 
 .emoji-messages {
     list-style: none;
-    margin: 0;
-    padding: 0;
-    max-height: 140px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
+    display: none;
 }
 
 .emoji-message {
@@ -420,6 +414,38 @@ body {
 
 .emoji-message-emoji {
     font-size: 1.4rem;
+}
+
+.emoji-popins {
+    position: fixed;
+    top: 1.5rem;
+    right: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 1500;
+}
+
+.emoji-popin {
+    min-width: 120px;
+    padding: 0.5rem 0.8rem;
+    background: rgba(0, 0, 0, 0.85);
+    border-radius: 999px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    animation: fadeInUp 0.2s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .room-secondary-button {

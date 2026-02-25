@@ -33,7 +33,6 @@
                 <button type="button" class="emoji-button" data-emoji="love" aria-label="Amor">😍</button>
                 <button type="button" class="emoji-button" data-emoji="wow" aria-label="Sorpresa">😮</button>
             </div>
-            <ul class="emoji-messages" id="emojiMessages" aria-live="polite"></ul>
         </div>
 
         <div class="game-settings" id="gameSettings" style="display: none;">
@@ -52,6 +51,8 @@
         <button id="backToMenu" class="room-secondary-button" type="button">Volver al menú</button>
         <button id="startGame">Iniciar Juego</button>
     </div>
+
+    <div id="emojiPopins" class="emoji-popins" aria-live="polite" aria-atomic="false"></div>
 
     <script src="sala.js"></script>
     <script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>

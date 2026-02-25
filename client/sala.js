@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialCardsSelect = document.getElementById('initialCards');
     const backToMenuBtn = document.getElementById('backToMenu');
     const emojiButtonsContainer = document.getElementById('emojiButtons');
-    const emojiMessagesList = document.getElementById('emojiMessages');
+    const emojiPopinsContainer = document.getElementById('emojiPopins');
 
     // Mostrar notificación
     function showNotification(message, isError = false) {
@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderEmojiReaction(message) {
-        if (!emojiMessagesList) return;
+        if (!emojiPopinsContainer) return;
 
         const emojiMap = {
             happy: '😊',
@@ -212,8 +212,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const emojiChar = emojiMap[message.emoji];
         if (!emojiChar) return;
 
-        const item = document.createElement('li');
-        item.className = 'emoji-message';
+        const item = document.createElement('div');
+        item.className = 'emoji-popin emoji-message';
 
         const nameSpan = document.createElement('span');
         nameSpan.className = 'emoji-message-name';
@@ -226,14 +226,13 @@ document.addEventListener('DOMContentLoaded', () => {
         item.appendChild(nameSpan);
         item.appendChild(emojiSpan);
 
-        emojiMessagesList.appendChild(item);
+        emojiPopinsContainer.appendChild(item);
 
-        // Limitar a las últimas 20 reacciones
-        while (emojiMessagesList.children.length > 20) {
-            emojiMessagesList.removeChild(emojiMessagesList.firstChild);
-        }
-
-        emojiMessagesList.scrollTop = emojiMessagesList.scrollHeight;
+        setTimeout(() => {
+            if (emojiPopinsContainer.contains(item)) {
+                emojiPopinsContainer.removeChild(item);
+            }
+        }, 2000);
     }
 
     // Actualizar lista de jugadores en UI
