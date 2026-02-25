@@ -43,8 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentPlayer = {
         id: sanitizeInput(sessionStorage.getItem('playerId')),
         name: sanitizeInput(sessionStorage.getItem('playerName')),
-        isHost: sessionStorage.getItem('isHost') === 'true',
-        isSpectator: sessionStorage.getItem('isSpectator') === 'true'
+        isHost: sessionStorage.getItem('isHost') === 'true'
     };
 
     const roomId = sanitizeInput(sessionStorage.getItem('roomId'));
@@ -64,8 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
         animatingCards: [],
         columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
         boardCards: [],
-        historyIconAreas: [],
-        spectatorCount: 0
+        historyIconAreas: []
     };
 
     const cardPool = {
@@ -301,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}&playerName=${encodeURIComponent(currentPlayer.name || 'Espectador')}`);
+        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
 
         socket.onopen = () => {
             clearTimeout(reconnectTimeout);
@@ -388,8 +386,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'move_undone': handleMoveUndone(message); break;
                     case 'room_reset': resetGameState(); break;
                     case 'player_update': handlePlayerUpdate(message); break;
-                    case 'spectator_joined': handleSpectatorJoined(message); break;
-                    case 'spectator_count_update': updateSpectatorCount(message.spectatorCount); break;
                     default: log('Mensaje no reconocido:', message);
                 }
             } catch (error) {
@@ -572,10 +568,6 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.initialCards = message.gameState.initialCards || gameState.initialCards;
         gameState.players = message.room.players || gameState.players;
 
-        if (typeof message.spectatorCount === 'number') {
-            updateSpectatorCount(message.spectatorCount);
-        }
-
         updateGameInfo();
     }
 
@@ -584,8 +576,6 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.board = message.gameState.board;
         gameState.remainingDeck = message.gameState.remainingDeck;
         gameState.initialCards = message.gameState.initialCards || 6;
-        currentPlayer.isSpectator = !!message.isSpectator;
-        setupSpectatorMode();
 
         gameState.columnHistory = {
             asc1: message.history?.ascending1 || [1],
@@ -600,10 +590,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        if (typeof message.spectatorCount === 'number') {
-            updateSpectatorCount(message.spectatorCount);
-        }
-
         if (message.gameState.gameStarted && message.yourCards) {
             updatePlayerCards(message.yourCards);
         }
@@ -611,49 +597,6 @@ document.addEventListener('DOMContentLoaded', () => {
         restoreGameState();
         updatePlayersPanel();
         updateGameInfo();
-    }
-
-    function createSpectatorCounterElement() {
-        const counter = document.createElement('div');
-        counter.id = 'spectatorCounter';
-        counter.className = 'spectator-counter';
-        document.body.appendChild(counter);
-        return counter;
-    }
-
-    function updateSpectatorCount(count = 0) {
-        gameState.spectatorCount = Number.isFinite(Number(count)) ? Number(count) : 0;
-        const counter = document.getElementById('spectatorCounter') || createSpectatorCounterElement();
-        counter.textContent = `👀 Espectadores: ${gameState.spectatorCount}`;
-    }
-
-    function setupSpectatorMode() {
-        if (!currentPlayer.isSpectator) return;
-
-        if (endTurnButton) {
-            endTurnButton.style.display = 'none';
-            endTurnButton.disabled = true;
-        }
-
-        const progressText = document.getElementById('progressText');
-        if (progressText) {
-            progressText.textContent = 'Modo espectador';
-        }
-
-        const progressBar = document.getElementById('progressBar');
-        if (progressBar) {
-            progressBar.style.width = '0%';
-        }
-    }
-
-    function handleSpectatorJoined(message) {
-        if (typeof message.spectatorCount === 'number') {
-            updateSpectatorCount(message.spectatorCount);
-        }
-
-        if (message.spectatorName) {
-            showNotification(`El espectador ${message.spectatorName} se unió`);
-        }
     }
 
     function showNotification(message, isError = false) {
@@ -674,6 +617,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => notification.remove(), 300);
         }, isError || message.includes('GAME OVER') ? 3000 : 3000);
     }
+
     function showColumnHistory(columnId) {
         if (document.getElementById('historyModal').style.display === 'block') {
             return;
@@ -812,11 +756,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.appendChild(backdrop);
         backdrop.appendChild(gameOverDiv);
 
+        // Mostrar el backdrop con transición suave
         setTimeout(() => {
             backdrop.style.opacity = '1';
             gameOverDiv.style.transform = 'translateY(0)';
         }, 10);
 
+        // Botón de retorno
         document.getElementById('returnToRoom').addEventListener('click', async () => {
             const button = document.getElementById('returnToRoom');
             button.disabled = true;
@@ -907,18 +853,12 @@ document.addEventListener('DOMContentLoaded', () => {
         progressBarElement.style.width = `${Math.min((cardsPlayed / minCardsRequired) * 100, 100)}%`;
 
         if (endTurnButton) {
-            if (currentPlayer.isSpectator) {
-                endTurnButton.style.display = 'none';
-                endTurnButton.disabled = true;
-            } else {
-                endTurnButton.style.display = 'inline-block';
-                endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
-                const remainingCards = minCardsRequired - cardsPlayed;
-                endTurnButton.title = remainingCards > 0
-                    ? `Necesitas jugar ${remainingCards} carta(s) más${deckEmpty ? ' (Mazo vacío)' : ''}`
-                    : 'Puedes terminar tu turno';
-                endTurnButton.style.backgroundColor = cardsPlayed >= minCardsRequired ? '#2ecc71' : '#e74c3c';
-            }
+            endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
+            const remainingCards = minCardsRequired - cardsPlayed;
+            endTurnButton.title = remainingCards > 0
+                ? `Necesitas jugar ${remainingCards} carta(s) más${deckEmpty ? ' (Mazo vacío)' : ''}`
+                : 'Puedes terminar tu turno';
+            endTurnButton.style.backgroundColor = cardsPlayed >= minCardsRequired ? '#2ecc71' : '#e74c3c';
         }
     }
 
@@ -1048,8 +988,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleCanvasClick(e) {
-        if (currentPlayer.isSpectator) return;
-
         if (document.getElementById('historyModal').style.display === 'block') {
             return;
         }
@@ -1108,8 +1046,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMouseDown(e) {
-        if (currentPlayer.isSpectator) return;
-
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
@@ -1315,8 +1251,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function endTurn() {
-        if (currentPlayer.isSpectator) return;
-
         const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
         const cardsPlayed = currentPlayerObj?.cardsPlayedThisTurn || 0;
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
@@ -1426,16 +1360,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawPlayerCards() {
-        if (currentPlayer.isSpectator) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-            ctx.fillRect(0, PLAYER_CARDS_Y - 20, canvas.width, CARD_HEIGHT + 40);
-            ctx.fillStyle = '#ecf0f1';
-            ctx.font = 'bold 24px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('Modo espectador: no puedes ver cartas de jugadores', canvas.width / 2, PLAYER_CARDS_Y + 45);
-            return;
-        }
-
         const backgroundHeight = CARD_HEIGHT + 30;
         const backgroundWidth = gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 40;
 
@@ -1696,8 +1620,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 pulseInterval: 20000
             };
 
-            setupSpectatorMode();
-            updateSpectatorCount(gameState.spectatorCount || 0);
             connectWebSocket();
             setTimeout(() => {
                 updatePlayersPanel();

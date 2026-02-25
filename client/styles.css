@@ -1472,17 +1472,3 @@ body {
     display: flex;
     gap: 0.8rem;
 }
-
-.spectator-counter {
-    position: fixed;
-    right: 20px;
-    bottom: 20px;
-    z-index: 20;
-    background: rgba(0, 0, 0, 0.75);
-    color: var(--light);
-    padding: 0.55rem 0.85rem;
-    border-radius: 10px;
-    font-weight: 600;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
-}

@@ -324,18 +324,17 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             const data = await response.json();
-
-            if (!response.ok || !data.success || !data.token || !data.user) {
+            if (!response.ok || !data.success) {
                 showError(data.message || 'No se pudo iniciar sesión');
                 return;
             }
 
             saveAuth(data.token, data.user);
+            showSuccess('Sesión iniciada correctamente');
             loginPasswordInput.value = '';
-            showSuccess('Sesión iniciada');
         } catch (error) {
             console.error('Error en login:', error);
-            showError('Error de conexión al iniciar sesión');
+            showError('Error al conectar con el servidor');
         } finally {
             setButtonLoading(loginBtn, false, 'Ingresando...', 'Iniciar sesión');
         }
@@ -346,7 +345,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const username = registerUsernameInput.value.trim();
         const password = registerPasswordInput.value;
 
-        if (!validateAuthDisplayName(displayName) || !validateCredentials(username, password)) return;
+        if (!validateAuthDisplayName(displayName)) return;
+        if (!validateCredentials(username, password)) return;
 
         setButtonLoading(registerBtn, true, 'Creando...', 'Crear usuario');
 
@@ -357,22 +357,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 },
-                body: JSON.stringify({ displayName, username, password })
+                body: JSON.stringify({ username, password, displayName })
             });
 
             const data = await response.json();
-
-            if (!response.ok || !data.success || !data.token || !data.user) {
-                showError(data.message || 'No se pudo crear la cuenta');
+            if (!response.ok || !data.success) {
+                showError(data.message || 'No se pudo crear el usuario');
                 return;
             }
 
             saveAuth(data.token, data.user);
+            showSuccess('Usuario creado correctamente');
             registerPasswordInput.value = '';
-            showSuccess('Cuenta creada correctamente');
+            switchAuthTab('login');
         } catch (error) {
             console.error('Error en registro:', error);
-            showError('Error de conexión al registrar');
+            showError('Error al conectar con el servidor');
         } finally {
             setButtonLoading(registerBtn, false, 'Creando...', 'Crear usuario');
         }
@@ -380,16 +380,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     acceptGuestBtn.addEventListener('click', () => {
         const guestName = guestNameInput.value.trim();
-
-        if (!validateAuthDisplayName(guestName)) return;
+        if (!guestName) {
+            showError('Ingresa un nombre para invitado');
+            return;
+        }
 
         saveGuestUser(guestName);
-        showSuccess(`Entraste como invitado: ${guestName}`);
+        showSuccess('Usuario temporal creado');
     });
 
     myAccountBtn.addEventListener('click', async () => {
-        toggleAccountView(true);
-        await loadMyAccount();
+        const isHidden = myAccountPanel.style.display === 'none';
+        if (isHidden) {
+            toggleAccountView(true);
+            await loadMyAccount();
+            return;
+        }
+
+        toggleAccountView(false);
     });
 
     backToMenuBtn.addEventListener('click', () => {
@@ -399,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
     saveDisplayNameBtn.addEventListener('click', async () => {
         const displayName = accountDisplayNameInput.value.trim();
         if (!displayName) {
-            showError('Ingresa un nombre visible');
+            showError('Ingresa un nombre visible válido');
             return;
         }
 
@@ -410,21 +418,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'PATCH',
                 body: JSON.stringify({ displayName })
             });
-
             const data = await response.json();
 
-            if (!response.ok || !data.success || !data.account) {
+            if (!response.ok || !data.success) {
                 showError(data.message || 'No se pudo actualizar el nombre');
                 return;
             }
 
-            const currentUser = getAuthUser();
-            if (currentUser) {
-                const updatedUser = { ...currentUser, displayName: data.account.displayName };
-                localStorage.setItem(AUTH_USER_KEY, JSON.stringify(updatedUser));
+            const existingAuth = getAuthUser();
+            if (existingAuth) {
+                localStorage.setItem(AUTH_USER_KEY, JSON.stringify({
+                    ...existingAuth,
+                    displayName: data.account.displayName
+                }));
             }
+
             refreshIdentityUI();
-            showSuccess('Nombre visible actualizado');
+            await loadMyAccount();
+            showSuccess('Nombre actualizado');
         } catch (error) {
             console.error('Error actualizando nombre:', error);
             showError('Error actualizando nombre');
@@ -515,7 +526,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionStorage.setItem('playerId', data.playerId);
                 sessionStorage.setItem('roomId', data.roomId);
                 sessionStorage.setItem('isHost', 'true');
-                sessionStorage.removeItem('isSpectator');
                 window.location.href = 'sala.html';
             } else {
                 showError(data.message || 'Error al crear la sala');
@@ -573,14 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionStorage.setItem('playerId', data.playerId);
                 sessionStorage.setItem('roomId', roomCode);
                 sessionStorage.setItem('isHost', 'false');
-
-                if (data.isSpectator) {
-                    sessionStorage.setItem('isSpectator', 'true');
-                    window.location.href = 'game.html';
-                } else {
-                    sessionStorage.removeItem('isSpectator');
-                    window.location.href = 'sala.html';
-                }
+                window.location.href = 'sala.html';
             } else {
                 showError(data.message || 'Error al unirse a la sala');
             }

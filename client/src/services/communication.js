@@ -17,7 +17,7 @@ function sendGameState(room, player) {
     const state = {
         b: room.gameState.board,
         t: room.gameState.currentTurn,
-        y: player.isSpectator ? [] : (player.cards || []),
+        y: player.cards,
         i: room.gameState.initialCards,
         d: room.gameState.deck.length,
         p: room.players.map(p => ({
@@ -43,22 +43,17 @@ function broadcastToRoom(room, message, options = {}) {
         message.remainingDeck = room.gameState.deck.length;
     }
 
-    const recipients = [
-        ...(Array.isArray(room.players) ? room.players : []),
-        ...(Array.isArray(room.spectators) ? room.spectators : [])
-    ];
-
-    recipients.forEach((recipient) => {
-        if (recipient.id !== skipPlayerId && recipient.ws?.readyState === WebSocket.OPEN) {
+    room.players.forEach(player => {
+        if (player.id !== skipPlayerId && player.ws?.readyState === WebSocket.OPEN) {
             const completeMessage = {
                 ...message,
                 timestamp: Date.now()
             };
 
-            safeSend(recipient.ws, completeMessage);
+            safeSend(player.ws, completeMessage);
 
             if (includeGameState) {
-                sendGameState(room, recipient);
+                sendGameState(room, player);
             }
         }
     });

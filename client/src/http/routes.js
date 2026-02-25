@@ -285,8 +285,7 @@ function registerHttpRoutes(app) {
                     currentTurn: playerId,
                     gameStarted: false,
                     initialCards: 6
-                },
-                spectators: []
+                }
             };
 
             rooms.set(roomId, room);
@@ -331,34 +330,6 @@ function registerHttpRoutes(app) {
             }
 
             const room = rooms.get(roomId);
-            room.spectators = Array.isArray(room.spectators) ? room.spectators : [];
-
-            if (room.gameState.gameStarted) {
-                const spectatorId = uuidv4();
-                room.spectators.push({
-                    id: spectatorId,
-                    name: playerName,
-                    ws: null,
-                    joinedAt: Date.now()
-                });
-
-                broadcastToRoom(room, {
-                    type: 'spectator_joined',
-                    spectatorName: playerName,
-                    spectatorCount: room.spectators.length
-                });
-
-                return res.json({
-                    success: true,
-                    playerId: spectatorId,
-                    playerName,
-                    isHost: false,
-                    roomId,
-                    isSpectator: true,
-                    gameStarted: true
-                });
-            }
-
             if (room.players.length >= MAX_PLAYERS_PER_ROOM) {
                 return res.status(409).json({
                     success: false,
@@ -414,9 +385,7 @@ function registerHttpRoutes(app) {
                 playerId,
                 playerName,
                 isHost: false,
-                roomId,
-                isSpectator: false,
-                gameStarted: room.gameState.gameStarted
+                roomId
             });
 
         } catch (error) {
