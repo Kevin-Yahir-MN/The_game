@@ -3,8 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const ctx = canvas.getContext('2d');
     const WS_URL = 'wss://the-game-2xks.onrender.com';
     const endTurnButton = document.getElementById('endTurnBtn');
-    const gameEmojiButtons = document.getElementById('gameEmojiButtons');
-    const emojiPopinsContainer = document.getElementById('emojiPopins');
     const STATE_UPDATE_THROTTLE = 200;
     const TARGET_FPS = 60;
     const MAX_RECONNECT_ATTEMPTS = 5;
@@ -383,7 +381,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'turn_changed': handleTurnChanged(message); break;
                     case 'deck_empty_state': handleDeckEmptyState(message); break;
                     case 'deck_empty_notification': showNotification(message.message, message.isError); break;
-                    case 'emoji_reaction': renderEmojiReaction(message); break;
                     case 'move_undone': handleMoveUndone(message); break;
                     case 'room_reset': resetGameState(); break;
                     case 'player_update': handlePlayerUpdate(message); break;
@@ -617,49 +614,6 @@ document.addEventListener('DOMContentLoaded', () => {
             notification.style.animation = 'notificationExit 0.3s forwards';
             setTimeout(() => notification.remove(), 300);
         }, isError || message.includes('GAME OVER') ? 3000 : 3000);
-    }
-
-    function renderEmojiReaction(message) {
-        if (!emojiPopinsContainer) return;
-
-        const emojiMap = {
-            sad: '😢',
-            angry: '😡',
-            poop: '💩',
-            love: '😍',
-            wow: '😮',
-            middle: '🖕',
-            cry: '😭',
-            proud: '😎',
-            angel: '😇',
-            demon: '😈',
-            sleep: '😴'
-        };
-
-        const emojiChar = emojiMap[message.emoji];
-        if (!emojiChar) return;
-
-        const item = document.createElement('div');
-        item.className = 'emoji-popin emoji-message';
-
-        const nameSpan = document.createElement('span');
-        nameSpan.className = 'emoji-message-name';
-        nameSpan.textContent = message.fromPlayerName || 'Jugador';
-
-        const emojiSpan = document.createElement('span');
-        emojiSpan.className = 'emoji-message-emoji';
-        emojiSpan.textContent = emojiChar;
-
-        item.appendChild(nameSpan);
-        item.appendChild(emojiSpan);
-
-        emojiPopinsContainer.appendChild(item);
-
-        setTimeout(() => {
-            if (emojiPopinsContainer.contains(item)) {
-                emojiPopinsContainer.removeChild(item);
-            }
-        }, 2000);
     }
 
     function showColumnHistory(columnId) {
@@ -1665,25 +1619,6 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             connectWebSocket();
-            if (gameEmojiButtons) {
-                gameEmojiButtons.addEventListener('click', (event) => {
-                    const target = event.target;
-                    if (!(target instanceof HTMLElement)) return;
-                    const emojiCode = target.dataset.emoji;
-                    if (!emojiCode) return;
-                    if (!socket || socket.readyState !== WebSocket.OPEN) {
-                        showNotification('No hay conexión para enviar reacción', true);
-                        return;
-                    }
-
-                    socket.send(JSON.stringify({
-                        type: 'emoji_reaction',
-                        emoji: emojiCode,
-                        roomId,
-                        playerId: currentPlayer.id
-                    }));
-                });
-            }
 
             setTimeout(() => {
                 updatePlayersPanel();
