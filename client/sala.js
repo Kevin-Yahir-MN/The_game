@@ -359,13 +359,13 @@ document.addEventListener('DOMContentLoaded', () => {
             backToMenuBtn.addEventListener('click', backToMenu);
         }
 
-        if (emojiButtonsContainer && socket) {
+        if (emojiButtonsContainer) {
             emojiButtonsContainer.addEventListener('click', (event) => {
                 const target = event.target;
                 if (!(target instanceof HTMLElement)) return;
                 const emojiCode = target.dataset.emoji;
                 if (!emojiCode) return;
-                if (socket.readyState !== WebSocket.OPEN) {
+                if (!socket || socket.readyState !== WebSocket.OPEN) {
                     showNotification('No hay conexión para enviar reacción', true);
                     return;
                 }
