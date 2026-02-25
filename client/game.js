@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ctx = canvas.getContext('2d');
     const WS_URL = 'wss://the-game-2xks.onrender.com';
     const endTurnButton = document.getElementById('endTurnBtn');
+    const emojiButtonsContainer = document.getElementById('emojiButtons');
     const STATE_UPDATE_THROTTLE = 200;
     const TARGET_FPS = 60;
     const MAX_RECONNECT_ATTEMPTS = 5;
@@ -384,6 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'move_undone': handleMoveUndone(message); break;
                     case 'room_reset': resetGameState(); break;
                     case 'player_update': handlePlayerUpdate(message); break;
+                    case 'emoji_reaction': renderEmojiReaction(message); break;
                     default: log('Mensaje no reconocido:', message);
                 }
             } catch (error) {
@@ -447,6 +449,68 @@ document.addEventListener('DOMContentLoaded', () => {
             desc1: message.history.descending1 || [100],
             desc2: message.history.descending2 || [100]
         };
+    }
+
+    // Asegura que exista el contenedor de mensajes debajo de la lista de jugadores
+    function ensureEmojiMessagesContainer() {
+        let msgs = document.getElementById('emojiMessages');
+        const panel = document.getElementById('playersPanel');
+        if (!msgs && panel) {
+            msgs = document.createElement('ul');
+            msgs.id = 'emojiMessages';
+            msgs.className = 'emoji-messages';
+            panel.appendChild(msgs);
+        }
+        return msgs;
+    }
+
+    // Muestra un mensaje con el emoji enviado por otro jugador
+    function renderEmojiReaction(message) {
+        const msgs = ensureEmojiMessagesContainer();
+        if (!msgs) return;
+
+        const emojiMap = {
+            sad: '😢',
+            angry: '😡',
+            poop: '💩',
+            love: '😍',
+            wow: '😮',
+            middle: '🖕',
+            cry: '😭',
+            proud: '😎',
+            angel: '😇',
+            demon: '😈',
+            sleep: '😴'
+        };
+
+        const emojiChar = emojiMap[message.emoji];
+        if (!emojiChar) return;
+
+        const item = document.createElement('li');
+        item.className = 'emoji-message';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'emoji-message-name';
+        nameSpan.textContent = message.fromPlayerName || 'Jugador';
+
+        const emojiSpan = document.createElement('span');
+        emojiSpan.className = 'emoji-message-emoji';
+        emojiSpan.textContent = emojiChar;
+
+        item.appendChild(nameSpan);
+        item.appendChild(emojiSpan);
+
+        msgs.appendChild(item);
+        msgs.style.display = 'block';
+
+        setTimeout(() => {
+            if (msgs.contains(item)) {
+                msgs.removeChild(item);
+            }
+            if (msgs.children.length === 0) {
+                msgs.style.display = 'none';
+            }
+        }, 2000);
     }
 
     function handleDeckEmpty() {
@@ -1411,6 +1475,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('')}
             </ul>
         `;
+
+        // asegurarse de que el contenedor de mensajes de emoji exista
+        ensureEmojiMessagesContainer();
     }
 
     function handleCardAnimations() {
@@ -1617,6 +1684,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 pulseDuration: 500,
                 pulseInterval: 20000
             };
+
+            // configurar botones de emoji si existen
+            if (emojiButtonsContainer) {
+                emojiButtonsContainer.addEventListener('click', (event) => {
+                    const target = event.target;
+                    if (!(target instanceof HTMLElement)) return;
+                    const emojiCode = target.dataset.emoji;
+                    if (!emojiCode) return;
+                    if (!socket || socket.readyState !== WebSocket.OPEN) {
+                        showNotification('No hay conexión para enviar reacción', true);
+                        return;
+                    }
+
+                    socket.send(JSON.stringify({
+                        type: 'emoji_reaction',
+                        emoji: emojiCode,
+                        roomId,
+                        playerId: currentPlayer.id
+                    }));
+                });
+            }
 
             connectWebSocket();
 

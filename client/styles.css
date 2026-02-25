@@ -1005,6 +1005,10 @@ body {
     animation: pulse 1.5s infinite;
 }
 
+.players-panel .emoji-messages {
+    margin-top: 10px;
+}
+
 .history-icon {
     transition: all 0.5s ease;
     cursor: pointer;
