@@ -521,13 +521,16 @@ body {
 /* layout for sala buttons */
 .button-row {
     display: flex;
-    gap: 0.5rem; /* botones más juntos */
+    gap: 0.25rem; /* aún más juntos */
     justify-content: center;
-    margin-bottom: 1rem;
+    margin: 1rem 2rem; /* margen considerable alrededor del grupo */
 }
 
 .button-row button {
     display: inline-flex;
+    flex: 1;              /* tamaño igual */
+    min-width: 120px;     /* evita que sean demasiado estrechos */
+    justify-content: center;
 }
 
 .game-settings {
