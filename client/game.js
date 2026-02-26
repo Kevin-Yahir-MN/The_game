@@ -21,7 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const BOARD_POSITION = {
         x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
-        y: canvas.height * 0.3
+        // elevar ligeramente el tablero moviendo su coordenada Y hacia arriba
+        y: canvas.height * 0.25
     };
     const PLAYER_CARDS_Y = canvas.height * 0.6;
     const BUTTONS_Y = canvas.height * 0.85;
