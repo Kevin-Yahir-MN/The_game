@@ -229,6 +229,7 @@ function registerHttpRoutes(app) {
 
     app.post('/create-room', async (req, res) => {
         const authUser = await getAuthenticatedUser(req);
+        console.log('[ROUTES] create-room: authUserId=' + (authUser ? authUser.id : 'null'));
         const requestedName = sanitizePlayerName(req.body?.playerName);
         const playerName = requestedName || authUser?.display_name;
 
@@ -305,6 +306,7 @@ function registerHttpRoutes(app) {
 
     app.post('/join-room', async (req, res) => {
         const authUser = await getAuthenticatedUser(req);
+        console.log('[ROUTES] join-room: authUserId=' + (authUser ? authUser.id : 'null'));
         const requestedName = sanitizePlayerName(req.body?.playerName);
         const playerName = requestedName || authUser?.display_name;
         const roomId = req.body?.roomId;

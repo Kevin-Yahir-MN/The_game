@@ -70,8 +70,11 @@ function finalizeGame(room, { result, message, reason }) {
         .map((player) => player.userId)
         .filter(Boolean);
 
+    console.log('[GAME] Finalizing: result=' + result + ', players=' + room.players.length + ', validUserIds=' + userIds.length);
+    room.players.forEach((p, idx) => console.log('[GAME]   Player ' + idx + ': id=' + p.id + ', userId=' + p.userId));
+
     recordUsersGameResult(userIds, result === 'win').catch((error) => {
-        console.error('Error actualizando estadísticas de cuenta:', error);
+        console.error('[GAME] Error updating stats:', error);
     });
 
     broadcastToRoom(room, {

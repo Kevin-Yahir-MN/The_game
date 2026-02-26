@@ -202,32 +202,46 @@ async function changePassword(userId, currentPassword, newPassword) {
 }
 
 async function recordUsersGameResult(userIds, didWin) {
-    if (!Array.isArray(userIds) || userIds.length === 0) return;
+    console.log('[AUTH] recordUsersGameResult called with userIds=' + JSON.stringify(userIds) + ', didWin=' + didWin);
+    
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+        console.warn('[AUTH] Invalid or empty userIds array');
+        return;
+    }
 
     const uniqueIds = [...new Set(userIds.filter(Boolean))];
-    if (uniqueIds.length === 0) return;
+    if (uniqueIds.length === 0) {
+        console.warn('[AUTH] No valid IDs after deduplication');
+        return;
+    }
+
+    console.log('[AUTH] Updating stats for ' + uniqueIds.length + ' users');
 
     if (didWin) {
-        await pool.query(
+        const result = await pool.query(
             `UPDATE users
              SET games_played = games_played + 1,
                  wins = wins + 1,
                  win_streak = win_streak + 1,
                  updated_at = NOW()
-             WHERE id = ANY($1::uuid[])`,
+             WHERE id = ANY($1::uuid[])
+             RETURNING id, games_played, wins`,
             [uniqueIds]
         );
+        console.log('[AUTH] Win updated for ' + result.rowCount + ' rows');
         return;
     }
 
-    await pool.query(
+    const result = await pool.query(
         `UPDATE users
          SET games_played = games_played + 1,
              win_streak = 0,
              updated_at = NOW()
-         WHERE id = ANY($1::uuid[])`,
+         WHERE id = ANY($1::uuid[])
+         RETURNING id, games_played`,
         [uniqueIds]
     );
+    console.log('[AUTH] Loss updated for ' + result.rowCount + ' rows');
 }
 
 async function deleteSession(token) {
