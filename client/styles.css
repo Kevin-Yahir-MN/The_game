@@ -518,6 +518,18 @@ body {
     animation: loadingAnimation 1.5s infinite;
 }
 
+/* layout for sala buttons */
+.button-row {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.button-row button {
+    display: inline-flex;
+}
+
 .game-settings {
     background: rgba(0, 0, 0, 0.3);
     padding: 1.5rem;
