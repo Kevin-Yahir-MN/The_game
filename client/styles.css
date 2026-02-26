@@ -353,7 +353,6 @@ body {
     background: rgba(0, 0, 0, 0.25);
     border-radius: 12px;
     padding: 1rem 1.2rem;
-    margin-top: 1rem; /* espacio entre el canvas y los botones */
     margin-bottom: 1.5rem;
 }
 
