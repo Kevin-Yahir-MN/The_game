@@ -5,6 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const endTurnButton = document.getElementById('endTurnBtn');
     const emojiButtonsContainer = document.getElementById('emojiButtons');
     const STATE_UPDATE_THROTTLE = 200;
+    // reposition floating emoji messages when the window resizes
+    window.addEventListener('resize', () => {
+        positionEmojiMessages();
+    });
     const TARGET_FPS = 60;
     const MAX_RECONNECT_ATTEMPTS = 5;
     const RECONNECT_BASE_DELAY = 2000;
@@ -451,15 +455,34 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    // Position the floating emoji messages list so it appears below the players panel
+    function positionEmojiMessages() {
+        const msgs = document.getElementById('emojiMessages');
+        const panel = document.getElementById('playersPanel');
+        if (!msgs || !panel) return;
+        const rect = panel.getBoundingClientRect();
+        msgs.style.position = 'fixed';
+        msgs.style.right = '20px';
+        msgs.style.top = (rect.bottom + 5) + 'px';
+        // keep it above other UI
+        msgs.style.zIndex = 21;
+    }
+
     // Asegura que exista el contenedor de mensajes debajo de la lista de jugadores
     function ensureEmojiMessagesContainer() {
         let msgs = document.getElementById('emojiMessages');
         const panel = document.getElementById('playersPanel');
-        if (!msgs && panel) {
+        if (!msgs) {
             msgs = document.createElement('ul');
             msgs.id = 'emojiMessages';
             msgs.className = 'emoji-messages';
-            panel.appendChild(msgs);
+            // insert the list *after* the players panel (not inside it)
+            if (panel && panel.parentNode) {
+                panel.parentNode.insertBefore(msgs, panel.nextSibling);
+            } else {
+                document.body.appendChild(msgs);
+            }
+            positionEmojiMessages();
         }
         return msgs;
     }
@@ -502,6 +525,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         msgs.appendChild(item);
         msgs.style.display = 'block';
+        // ensure container stays under the panel if it changed size
+        positionEmojiMessages();
 
         setTimeout(() => {
             if (msgs.contains(item)) {
@@ -1478,6 +1503,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // asegurarse de que el contenedor de mensajes de emoji exista
         ensureEmojiMessagesContainer();
+        // reposicionar por si el panel cambió de tamaño
+        positionEmojiMessages();
     }
 
     function handleCardAnimations() {

@@ -1005,8 +1005,18 @@ body {
     animation: pulse 1.5s infinite;
 }
 
+/* when the messages container was inside the panel we added a top margin; no longer needed */
 .players-panel .emoji-messages {
-    margin-top: 10px;
+    margin-top: 0;
+}
+
+/* floating container below the players panel */
+#emojiMessages {
+    position: fixed;
+    right: 20px; /* align with panel */
+    z-index: 21;
+    max-width: 260px;
+    /* top is set dynamically via JS to sit just beneath the panel */
 }
 
 .history-icon {
