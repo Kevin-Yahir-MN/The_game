@@ -450,24 +450,28 @@ body {
 }
 
 .room-secondary-button {
-    background: var(--accent);
+    /* use same dimensions and styling as startGame button */
+    background: var(--secondary);
     color: white;
     border: none;
-    padding: 0.9rem 1.2rem;
+    padding: 1.5rem 2rem;
     border-radius: 12px;
-    font-size: 1rem;
+    font-size: 1.1rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
-    margin: 0 auto 1rem;
-    display: block;
-    box-shadow: 0 6px 12px rgba(231, 76, 60, 0.3);
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    box-shadow: 0 6px 12px rgba(46, 204, 113, 0.3);
 }
 
 .room-secondary-button:hover {
-    background: #c0392b;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(192, 57, 43, 0.4);
+    background: #27ae60; /* same as startGame hover */
+    transform: translateY(-3px);
+    box-shadow: 0 8px 16px rgba(39, 174, 96, 0.4);
 }
 
 #startGame {
@@ -521,16 +525,13 @@ body {
 /* layout for sala buttons */
 .button-row {
     display: flex;
-    gap: 0.25rem; /* aún más juntos */
+    gap: 0.5rem; /* botones ligeramente separados */
     justify-content: center;
-    margin: 1rem 2rem; /* margen considerable alrededor del grupo */
+    margin-bottom: 1rem;
 }
 
 .button-row button {
     display: inline-flex;
-    flex: 1;              /* tamaño igual */
-    min-width: 120px;     /* evita que sean demasiado estrechos */
-    justify-content: center;
 }
 
 .game-settings {
