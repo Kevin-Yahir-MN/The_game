@@ -405,6 +405,7 @@ body {
     border-radius: 999px;
     background: rgba(0, 0, 0, 0.35);
     font-size: 0.9rem;
+    margin-bottom: 0.4rem; /* espacio entre cada mensaje */
 }
 
 .emoji-message-name {
