@@ -237,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (emojiPopinsContainer.contains(item)) {
                 emojiPopinsContainer.removeChild(item);
             }
-        }, 2000);
+        }, 3500); // mostrar popin 3.5 segundos
     }
 
     // Actualizar lista de jugadores en UI

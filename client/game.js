@@ -535,7 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (msgs.children.length === 0) {
                 msgs.style.display = 'none';
             }
-        }, 2000);
+        }, 3500); // mostrar 3.5 segundos
     }
 
     function handleDeckEmpty() {
