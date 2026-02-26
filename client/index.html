@@ -4,22 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>The Game - Juego multijugador online con salas privadas</title>
-
-    <meta name="description"
-        content="Juega The Game online. Crea salas privadas, compite con amigos y gestiona tu cuenta. Juego multijugador en tiempo real desde el navegador.">
-
-    <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://the-game-2xks.onrender.com/">
-
-    <!-- Open Graph -->
-    <meta property="og:title" content="The Game - Juego multijugador online">
-    <meta property="og:description"
-        content="Crea una sala o únete con un código y juega en tiempo real desde tu navegador.">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://the-game-2xks.onrender.com/">
-
+    <title>The Game - Lobby</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
@@ -27,7 +12,7 @@
 <body>
     <div class="lobby-container">
         <div class="lobby-header">
-            <h1>The Game - Juego multijugador online</h1>
+            <h1>THE GAME ONLINE</h1>
         </div>
 
         <div class="lobby-card">
@@ -124,6 +109,7 @@
                         menú</button>
                 </div>
 
+
                 <div id="mainActions" class="action-buttons">
                     <button id="createRoom" class="btn btn-primary">
                         <span class="btn-icon">+</span> Crear nueva sala
@@ -133,38 +119,24 @@
                         <span class="btn-icon">→</span> Unirse a sala
                     </button>
                 </div>
+
+                <div id="joinRoomModal" class="join-room-modal" style="display: none;">
+                    <div id="joinRoomBackdrop" class="join-room-backdrop"></div>
+                    <div class="join-room-dialog" role="dialog" aria-modal="true" aria-labelledby="joinRoomModalTitle">
+                        <h3 id="joinRoomModalTitle">Unirse a sala</h3>
+                        <div class="form-group">
+                            <label for="joinRoomCodeInput">Código de sala</label>
+                            <input type="text" id="joinRoomCodeInput" placeholder="Ej: 1234" maxlength="4" autofocus>
+                        </div>
+                        <div class="join-room-actions">
+                            <button id="confirmJoinRoomBtn" class="btn btn-secondary" type="button">Unirse</button>
+                            <button id="cancelJoinRoomBtn" class="btn btn-ghost" type="button">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-
-    <!-- Sección SEO visible -->
-    <section style="padding:40px 20px; max-width:900px; margin:auto;">
-        <h2>¿Qué es The Game?</h2>
-        <p>
-            The Game es un juego multijugador online donde puedes crear salas privadas,
-            invitar amigos mediante un código y competir en tiempo real desde tu navegador.
-            No requiere descargas y permite jugar como invitado o con cuenta registrada.
-        </p>
-
-        <h2>Características principales</h2>
-        <ul>
-            <li>Creación de salas privadas con código</li>
-            <li>Modo invitado o registro de usuario</li>
-            <li>Seguimiento de estadísticas personales</li>
-            <li>Juego online en tiempo real</li>
-        </ul>
-    </section>
-
-    <footer style="background:#111; color:#aaa; text-align:center; padding:20px; font-size:14px; margin-top:40px;">
-        <p>
-            © 2026 The Game. Proyecto independiente sin fines de lucro.
-        </p>
-        <p>
-            Este sitio no está afiliado, asociado ni respaldado por ninguna empresa externa.
-            Todos los nombres, marcas y contenidos pertenecen a sus respectivos propietarios.
-        </p>
-    </footer>
-
     <script src="lobby.js"></script>
 
     <script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
