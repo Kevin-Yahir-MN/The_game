@@ -521,7 +521,7 @@ body {
 /* layout for sala buttons */
 .button-row {
     display: flex;
-    gap: 1rem;
+    gap: 0.5rem; /* botones más juntos */
     justify-content: center;
     margin-bottom: 1rem;
 }
