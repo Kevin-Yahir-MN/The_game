@@ -69,8 +69,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
-        // Re-render the friends list so invite buttons reflect currentPlayers immediately
-        renderFriendList();
     }
 
 
@@ -373,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (response.ok && data.success) {
                         friends.push({ id: uid, displayName: btn.closest('li').querySelector('.player-name').textContent });
                         renderFriendList();
-                        updatePlayersUI(players); // rerender to remove button
+                        updatePlayersUI(currentPlayers); // rerender to remove button
                     } else {
                         showNotification(data.message || 'Error agregando amigo', true);
                     }
