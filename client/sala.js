@@ -109,6 +109,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
 
+    // Mostrar un modal simple con mensaje y texto de redirección
+    function showRedirectModal(message) {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        backdrop.style.opacity = '0';
+
+        const dialog = document.createElement('div');
+        dialog.className = 'redirect-modal';
+        dialog.innerHTML = `
+            <p>${message}</p>
+            <p>Redirigiendo al menú...</p>
+        `;
+
+        document.body.appendChild(backdrop);
+        backdrop.appendChild(dialog);
+
+        // animar aparición
+        setTimeout(() => {
+            backdrop.style.opacity = '1';
+        }, 10);
+    }
+
     // Actualizar estado de conexión en UI
     function updateConnectionStatus(status, isError = false) {
         connectionStatus = status;
@@ -276,14 +298,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 showNotification(`${message.playerName} salió de la sala`);
             }
             else if (message.type === 'host_left_room') {
-                // El host abandonó la sala, redirigir a index.html
-                showNotification('El host abandonó la sala', true);
+                // Usar un modal en lugar de notificación
+                showRedirectModal('El host abandonó la sala');
                 setTimeout(() => {
                     // Limpiar sessionStorage
                     sessionStorage.removeItem('roomId');
                     sessionStorage.removeItem('playerId');
                     sessionStorage.removeItem('isHost');
-                    // Redirigir a index.html
                     window.location.href = 'index.html';
                 }, 2000);
             }
