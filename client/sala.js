@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const inviteBtn = `<button class="invite-friend-btn" ${disabledAttr} ${titleAttr} data-friend-id="${f.id}" data-friend-name="${f.displayName}">Invitar</button>`;
             return `<li>${f.displayName} ${inviteBtn}</li>`;
         }).join('');
-        
+
         c.querySelectorAll('.invite-friend-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const friendId = btn.dataset.friendId;

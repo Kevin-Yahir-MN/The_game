@@ -148,7 +148,8 @@ async function runSchemaSetup() {
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_users_display_name_unique
         ON users (display_name);
-    `);}
+    `);
+}
 
 async function initializeDatabase() {
     let attempt = 0;

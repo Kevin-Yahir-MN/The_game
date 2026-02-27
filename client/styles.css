@@ -52,7 +52,7 @@ body {
     position: absolute;
     top: 1rem;
     left: 1rem;
-    background: rgba(0,0,0,0.3);
+    background: rgba(0, 0, 0, 0.3);
     padding: 1rem;
     border-radius: 8px;
     max-width: 280px;
@@ -414,6 +414,7 @@ body {
     color: white;
     cursor: pointer;
 }
+
 .add-friend-btn:hover {
     background: #27ae60;
 }
@@ -474,7 +475,8 @@ body {
     border-radius: 999px;
     background: rgba(0, 0, 0, 0.35);
     font-size: 0.9rem;
-    margin-bottom: 0.4rem; /* espacio entre cada mensaje */
+    margin-bottom: 0.4rem;
+    /* espacio entre cada mensaje */
 }
 
 .emoji-message-name {
@@ -520,7 +522,8 @@ body {
 
 .room-secondary-button {
     /* same dimensions but red background and centered */
-    background: var(--accent); /* rojo */
+    background: var(--accent);
+    /* rojo */
     color: white;
     border: none;
     padding: 1.5rem 2rem;
@@ -529,7 +532,8 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
-    margin: 0 auto; /* centrado horizontal como startGame */
+    margin: 0 auto;
+    /* centrado horizontal como startGame */
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -538,7 +542,8 @@ body {
 }
 
 .room-secondary-button:hover {
-    background: #c0392b; /* darker red hover */
+    background: #c0392b;
+    /* darker red hover */
     transform: translateY(-3px);
     box-shadow: 0 8px 16px rgba(192, 57, 43, 0.4);
 }
@@ -594,7 +599,8 @@ body {
 /* layout for sala buttons */
 .button-row {
     display: flex;
-    gap: 0.5rem; /* botones ligeramente separados */
+    gap: 0.5rem;
+    /* botones ligeramente separados */
     justify-content: center;
     margin-bottom: 1rem;
 }
@@ -1099,7 +1105,8 @@ body {
 /* floating container below the players panel */
 #emojiMessages {
     position: fixed;
-    right: 20px; /* align with panel */
+    right: 20px;
+    /* align with panel */
     z-index: 21;
     max-width: 260px;
     /* top is set dynamically via JS to sit just beneath the panel */
