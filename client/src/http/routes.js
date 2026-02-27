@@ -331,7 +331,11 @@ function registerHttpRoutes(app) {
                     currentTurn: playerId,
                     gameStarted: false,
                     initialCards: 6
-                }
+                },
+                // flag used to suppress player removal during the brief
+                // transition that occurs when a game resets and everyone
+                // hops back to the lobby page
+                resetting: false
             };
 
             rooms.set(roomId, room);

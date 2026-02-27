@@ -456,6 +456,14 @@ function setupWebSocket(server) {
                         break;
                     case 'reset_room':
                         if (player.isHost) {
+                            // mark the room as "in the middle of a reset" so that
+                            // clients which disconnect immediately afterwards (e.g.
+                            // the ones that navigate back to the lobby after seeing
+                            // the game‑over screen) are not treated as having left the
+                            // room.  the flag is cleared a few seconds later once the
+                            // transition period has passed.
+                            room.resetting = true;
+
                             room.gameState = {
                                 deck: initializeDeck(),
                                 board: { ascending: [1, 1], descending: [100, 100] },
@@ -479,6 +487,14 @@ function setupWebSocket(server) {
                                 type: 'room_reset',
                                 message: 'La sala ha sido reiniciada para una nueva partida'
                             });
+
+                            // clear the flag after a short grace period; by the time
+                            // the timer expires everyone who intended to reconnect
+                            // should have done so (or been removed by their own
+                            // subsequent leave actions).
+                            setTimeout(() => {
+                                room.resetting = false;
+                            }, 5000);
                         }
                         break;
                     case 'update_player': {
@@ -657,15 +673,18 @@ function setupWebSocket(server) {
                 console.error('Error al actualizar estado de conexión:', error);
             }
 
-            // Solo remover al jugador si la partida aún no ha comenzado
-            // Si la partida ya comenzó, mantenerlo en la sala para que pueda reconectarse
-            if (!room.gameState.gameStarted) {
+            // sólo remover al jugador si la partida aún no ha comenzado **y**
+            // no estamos en el breve periodo posterior a un reinicio de sala.
+            // después de una partida el flag `room.resetting` permanece verdadero
+            // durante unos segundos; así evitamos expulsar a la gente que está
+            // simplemente navegando de vuelta a la sala para empezar de nuevo.
+            if (!room.gameState.gameStarted && !room.resetting) {
                 const playerIndex = room.players.findIndex(p => p.id === playerId);
                 if (playerIndex !== -1) {
                     room.players.splice(playerIndex, 1);
                 }
 
-                // Notificar a todos que este jugador se desconectó (solo en pre-juego)
+                // Notificar a todos que este jugador se desconectó (solo en pre‑juego)
                 broadcastToRoom(room, {
                     type: 'player_left',
                     playerId: playerId,
