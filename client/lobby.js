@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
     style.textContent = `
         .invite-popup {
             position: fixed;
-            top: 20px;
+            bottom: 20px;
             right: 20px;
             background: rgba(0,0,0,0.85);
             color: white;
@@ -498,36 +498,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    function displayInvite(invite) {
-        // invite: { fromDisplayName, roomId, inviterPlayerId }
-        const popup = document.createElement('div');
-        popup.className = 'invite-popup';
-        popup.innerHTML = `
-            <p><strong>${invite.fromDisplayName}</strong> te invita a su sala.</p>
-            <button id="acceptInviteBtn">Aceptar</button>
-            <button id="declineInviteBtn">Declinar</button>
-        `;
-        document.body.appendChild(popup);
-
-        const removePopup = () => popup.remove();
-        const timer = setTimeout(() => {
-            removePopup();
-        }, 10000);
-
-
-        popup.querySelector('#declineInviteBtn').addEventListener('click', () => {
-            clearTimeout(timer);
-            removePopup();
-            if (lobbyWs && lobbyWs.readyState === WebSocket.OPEN) {
-                lobbyWs.send(JSON.stringify({
-                    type: 'invite_response',
-                    inviterPlayerId: invite.inviterPlayerId,
-                    accepted: false,
-                    roomId: invite.roomId
-                }));
-            }
-        });
-    }
 
 
     // resto de código sigue abajo
