@@ -1684,6 +1684,7 @@ document.addEventListener('DOMContentLoaded', () => {
         Promise.all([
             loadAsset('cards-icon.png').then(img => { if (img) historyIcon = img; }).catch(err => {
                 log('Error loading history icon', err);
+                return null; // continuar aunque falle
             })
         ]).then(() => {
             canvas.width = 800;
@@ -1745,6 +1746,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }).catch(err => {
             log('Error initializing game', err);
             showNotification('Error al cargar los recursos del juego', true);
+            // Intentar conectar de todas formas
+            connectWebSocket();
         });
     }
 
