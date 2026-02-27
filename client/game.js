@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const WS_URL = 'wss://the-game-2xks.onrender.com';
     const endTurnButton = document.getElementById('endTurnBtn');
     const emojiButtonsContainer = document.getElementById('emojiButtons');
-    const STATE_UPDATE_THROTTLE = 200;
+    // throttle for incoming full-state updates (ms). set to 0 to process every message immediately
+    const STATE_UPDATE_THROTTLE = 0;
     // reposition floating emoji messages when the window resizes
     window.addEventListener('resize', () => {
         positionEmojiMessages();
@@ -365,7 +366,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                if (message.type === 'gs' && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
+                // process all gs updates when throttle is 0
+                if (message.type === 'gs' && STATE_UPDATE_THROTTLE > 0 && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
                     return;
                 }
 
@@ -1548,6 +1550,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const value = message.cardValue;
         const previousValue = getStackValue(position);
 
+        // update board immediately for everyone
+        updateStack(position, value);
+
         if (message.playerId !== currentPlayer.id && !isMyTurn()) {
             const targetPos = getColumnPosition(position);
 
@@ -1561,15 +1566,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 fromY: -CARD_HEIGHT,
                 column: position,
                 onComplete: () => {
-                    updateStack(position, value);
                     showNotification(`${message.playerName} jugó un ${value}`);
                 }
             };
 
             gameState.animatingCards.push(animation);
         } else {
-            updateStack(position, value);
-
             // Nueva verificación de condición de derrota local
             const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
             if (minCardsRequired === 2 && message.cardsPlayedThisTurn === 1) {

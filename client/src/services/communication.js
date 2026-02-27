@@ -37,7 +37,8 @@ function sendGameState(room, player) {
 }
 
 function broadcastToRoom(room, message, options = {}) {
-    const { includeGameState = false, skipPlayerId = null } = options;
+    // by default we include the latest game state so all clients stay in sync
+    const { includeGameState = true, skipPlayerId = null } = options;
 
     if (includeGameState && message.remainingDeck == null) {
         message.remainingDeck = room.gameState.deck.length;
