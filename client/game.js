@@ -698,18 +698,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function showNotification(message, isError = false) {
         const existing = document.querySelector('.notification');
         if (existing) {
-            existing.style.animation = 'notificationExit 0.3s forwards';
+            existing.style.animation = 'notificationExit 0.15s forwards';
             setTimeout(() => existing.remove(), 300);
         }
 
         const notification = document.createElement('div');
         notification.className = `notification ${isError ? 'error' : ''}`;
         notification.textContent = message;
-        notification.style.animation = 'notificationEnter 0.3s forwards';
+        notification.style.animation = 'notificationEnter 0.15s forwards';
         document.body.appendChild(notification);
 
         setTimeout(() => {
-            notification.style.animation = 'notificationExit 0.3s forwards';
+            notification.style.animation = 'notificationExit 0.15s forwards';
             setTimeout(() => notification.remove(), 300);
         }, isError || message.includes('GAME OVER') ? 3000 : 3000);
     }
@@ -1259,7 +1259,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const animation = {
             card: dragStartCard,
             startTime: Date.now(),
-            duration: 300,
+            duration: 150,
             targetX: startX,
             targetY: PLAYER_CARDS_Y,
             fromX: dragStartCard.x,
@@ -1567,7 +1567,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 newCard: cardPool.get(value, targetPos.x, -CARD_HEIGHT, false, true),
                 currentCard: cardPool.get(previousValue, targetPos.x, targetPos.y, false, false),
                 startTime: Date.now(),
-                duration: 300,
+                duration: 150,
                 targetX: targetPos.x,
                 targetY: targetPos.y,
                 fromY: -CARD_HEIGHT,
