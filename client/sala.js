@@ -69,6 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
+        // Re-render the friends list so invite buttons reflect currentPlayers immediately
+        renderFriendList();
     }
 
 
