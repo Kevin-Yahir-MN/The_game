@@ -666,7 +666,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (message.isHost !== undefined) {
             sessionStorage.setItem('isHost', message.isHost ? 'true' : 'false');
         }
-        
+
         gameState.currentTurn = message.gameState.currentTurn;
         gameState.board = message.gameState.board;
         gameState.remainingDeck = message.gameState.remainingDeck;
