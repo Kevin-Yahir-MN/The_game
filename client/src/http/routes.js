@@ -147,7 +147,13 @@ function registerHttpRoutes(app) {
     app.post('/auth/logout', async (req, res) => {
         try {
             const token = getTokenFromRequest(req);
-            await deleteSession(token);
+            // intentar obtener usuario para borrar todas sus sesiones
+            const user = await getUserFromToken(token);
+            if (user && user.id) {
+                await pool.query('DELETE FROM user_sessions WHERE user_id = $1', [user.id]);
+            } else if (token) {
+                await deleteSession(token);
+            }
             return res.json({ success: true });
         } catch (error) {
             console.error('Error en logout:', error);

@@ -47,6 +47,16 @@ async function bootstrapDatabase() {
     try {
         await initializeDatabase();
 
+        // eliminar cualquier sesión antigua que pudiera existir antes de
+        // desplegar esta versión; esto resuelve el caso de usuarios previos
+        // bloqueados por registros de sesión heredados.
+        try {
+            await pool.query('DELETE FROM user_sessions');
+            console.log('🧹 Se han purgado todas las sesiones antiguas');
+        } catch (err) {
+            console.error('Error purgando sesiones al inicio:', err);
+        }
+
         if (!hasInitialized) {
             restoreActiveGames();
             setInterval(cleanupOldGames, 3600000);
