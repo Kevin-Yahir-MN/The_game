@@ -242,7 +242,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const message = JSON.parse(event.data);
 
-            if (message.type === 'full_state_update') {
+            if (message.type === 'init_game') {
+                // Actualizar lista de jugadores con el estado inicial
+                updatePlayersUI(message.gameState.players);
+            }
+            else if (message.type === 'full_state_update') {
                 // Actualizar UI con el estado completo del servidor
                 updatePlayersUI(message.room.players);
 
@@ -372,6 +376,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
+
+        // Re-render friends list to update disabled/enabled state of invite buttons
+        renderFriendList();
     }
 
 

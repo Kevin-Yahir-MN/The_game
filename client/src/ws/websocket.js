@@ -267,6 +267,7 @@ function setupWebSocket(server) {
                     name: p.name,
                     isHost: p.isHost,
                     cardCount: p.cards.length,
+                    connected: p.ws?.readyState === WebSocket.OPEN,
                     userId: p.userId || null
                 }))
             },
@@ -279,13 +280,27 @@ function setupWebSocket(server) {
             response.players = room.players.map(p => ({
                 id: p.id,
                 name: p.name,
+                isHost: p.isHost,
                 cardCount: p.cards.length,
                 cardsPlayedThisTurn: getPlayerTurnCount(p),
+                connected: p.ws?.readyState === WebSocket.OPEN,
                 userId: p.userId || null
             }));
         }
 
         safeSend(ws, response);
+
+        // Notificar a todos los jugadores que alguien se conectó
+        broadcastToRoom(room, {
+            type: 'room_update',
+            players: room.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                isHost: p.isHost,
+                connected: p.ws?.readyState === WebSocket.OPEN,
+                userId: p.userId || null
+            }))
+        });
 
         ws.on('message', async (message) => {
             try {
