@@ -96,6 +96,12 @@ body {
     background-color: #27ae60;
 }
 
+.invite-friend-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background-color: #999;
+}
+
 .lobby-header p {
     font-size: 1.1rem;
     color: var(--gray);

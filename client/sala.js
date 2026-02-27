@@ -42,7 +42,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         c.innerHTML = friends.map(f => {
             const alreadyInRoom = currentPlayers.some(p => p.userId === f.id);
-            const inviteBtn = alreadyInRoom ? '' : `<button class="invite-friend-btn" data-friend-id="${f.id}" data-friend-name="${f.displayName}">Invitar</button>`;
+            const disabledAttr = alreadyInRoom ? 'disabled' : '';
+            const titleAttr = alreadyInRoom ? 'title="Ya está en la sala"' : '';
+            const inviteBtn = `<button class="invite-friend-btn" ${disabledAttr} ${titleAttr} data-friend-id="${f.id}" data-friend-name="${f.displayName}">Invitar</button>`;
             return `<li>${f.displayName} ${inviteBtn}</li>`;
         }).join('');
         
