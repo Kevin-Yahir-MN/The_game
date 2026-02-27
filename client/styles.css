@@ -55,7 +55,7 @@ body {
     background: rgba(0,0,0,0.3);
     padding: 1rem;
     border-radius: 8px;
-    max-width: 200px;
+    max-width: 280px;
 }
 
 .friends-container h3 {
@@ -73,7 +73,27 @@ body {
 .friends-container li {
     font-size: 0.9rem;
     color: var(--light);
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.invite-friend-btn {
+    background-color: var(--secondary);
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    transition: background-color 0.2s;
+}
+
+.invite-friend-btn:hover {
+    background-color: #27ae60;
 }
 
 .lobby-header p {

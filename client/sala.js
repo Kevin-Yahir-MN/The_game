@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // estado de amigos en sala
     let friends = [];
+    let currentPlayers = [];
     async function loadFriends() {
         friends = [];
         try {
@@ -39,74 +40,35 @@ document.addEventListener('DOMContentLoaded', () => {
             c.innerHTML = '<li>(sin amigos)</li>';
             return;
         }
-        c.innerHTML = friends.map(f => `<li>${f.displayName}</li>`).join('');
-    }
-
-    function showInviteModal() {
-        if (!friends || friends.length === 0) {
-            showNotification('No tienes amigos para invitar', true);
-            return;
-        }
-        // simple modal listing friends; clicking one sends invite
-        const modal = document.createElement('div');
-        modal.className = 'invite-modal';
-        modal.innerHTML = `
-            <div class="invite-modal-content">
-                <h3>Invitar amigo</h3>
-                <ul id="inviteFriendList">
-                    ${friends.map(f => `<li data-id="${f.id}">${f.displayName}</li>`).join('')}
-                </ul>
-                <button id="closeInviteModal">Cerrar</button>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        modal.querySelector('#closeInviteModal').addEventListener('click', () => modal.remove());
-        modal.querySelectorAll('#inviteFriendList li').forEach(li => {
-            li.addEventListener('click', () => {
-                const fid = li.dataset.id;
-                if (!fid) return;
-                // enviar mensaje a servidor via socket
-                if (socket && socket.readyState === WebSocket.OPEN) {
+        c.innerHTML = friends.map(f => {
+            const alreadyInRoom = currentPlayers.some(p => p.userId === f.id);
+            const inviteBtn = alreadyInRoom ? '' : `<button class="invite-friend-btn" data-friend-id="${f.id}" data-friend-name="${f.displayName}">Invitar</button>`;
+            return `<li>${f.displayName} ${inviteBtn}</li>`;
+        }).join('');
+        
+        c.querySelectorAll('.invite-friend-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const friendId = btn.dataset.friendId;
+                const friendName = btn.dataset.friendName;
+                if (!friendId || !socket || socket.readyState !== WebSocket.OPEN) {
+                    showNotification('No se pudo enviar la invitación', true);
+                    return;
+                }
+                try {
                     socket.send(JSON.stringify({
                         type: 'invite_friend',
-                        targetUserId: fid,
+                        targetUserId: friendId,
                         roomId
                     }));
-                    showNotification(`Invitación enviada a ${li.textContent}`);
-                } else {
-                    showNotification('No hay conexión para enviar invitación', true);
+                    showNotification(`Invitación enviada a ${friendName}`);
+                } catch (e) {
+                    console.error('Error enviando invitación:', e);
+                    showNotification('Error enviando invitación', true);
                 }
-                modal.remove();
             });
         });
     }
 
-    // estilos temporales del modal
-    const inviteStyle = document.createElement('style');
-    inviteStyle.textContent = `
-        .invite-modal {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-        .invite-modal-content {
-            background: #222;
-            padding: 1.5rem;
-            border-radius: 8px;
-            color: white;
-            max-width: 300px;
-        }
-        #inviteFriendList li {
-            padding: 0.5rem;
-            cursor: pointer;
-        }
-        #inviteFriendList li:hover { background: rgba(255,255,255,0.1); }
-    `;
-    document.head.appendChild(inviteStyle);
 
     const MAX_RECONNECT_ATTEMPTS = 10;
     const RECONNECT_BASE_DELAY = 2000;
@@ -355,6 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Actualizar lista de jugadores en UI
     function updatePlayersUI(players) {
         if (!players || !Array.isArray(players)) return;
+        currentPlayers = players; // guardar referencia global
         const me = getAuthUser();
         playersList.innerHTML = players.map(player => {
             const isMe = player.id === playerId;
@@ -400,6 +363,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch (err) {
                     console.error('Error agregando amigo:', err);
                     showNotification('Error agregando amigo', true);
+                    // Actualizar lista de amigos también, por si alguno está en la sala
+                    renderFriendList();
                 }
             });
         });
@@ -505,26 +470,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const fc = document.getElementById('friendsContainer');
         if (fc) fc.style.display = authUser ? 'block' : 'none';
 
-        const inviteBtn = document.getElementById('inviteFriendBtn');
-        if (inviteBtn) {
-            inviteBtn.addEventListener('click', () => {
-                showInviteModal();
-            });
-        }
-
         updatePlayersList();
-        loadFriends().then(() => {
-            if (inviteBtn) {
-                inviteBtn.style.display = (!authUser || friends.length === 0) ? 'none' : '';
-            }
-        });
-
-        if (inviteBtn) {
-            // ocultar botón si no hay usuario o no hay amigos
-            if (!authUser || friends.length === 0) {
-                inviteBtn.style.display = 'none';
-            }
-        }
+        loadFriends();
 
         if (isHost) {
             gameSettings.style.display = 'block';
