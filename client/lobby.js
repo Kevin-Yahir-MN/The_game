@@ -276,10 +276,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // estado local de amigos
-    let friends = [];
-    let lobbyWs = null;
-
     function refreshIdentityUI() {
         const identity = getCurrentIdentity();
         const isLoggedIn = !!identity;
@@ -379,12 +375,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (token) {
             headers.Authorization = `Bearer ${token}`;
         }
-        return fetch(url, {
-            ...options,
-            headers
-        });
-    }
-
         return fetch(url, {
             ...options,
             headers
@@ -524,41 +514,6 @@ document.addEventListener('DOMContentLoaded', () => {
             removePopup();
         }, 10000);
 
-        popup.querySelector('#acceptInviteBtn').addEventListener('click', async () => {
-            clearTimeout(timer);
-            removePopup();
-            // notificar aceptación
-            if (lobbyWs && lobbyWs.readyState === WebSocket.OPEN) {
-                lobbyWs.send(JSON.stringify({
-                    type: 'invite_response',
-                    inviterPlayerId: invite.inviterPlayerId,
-                    accepted: true,
-                    roomId: invite.roomId
-                }));
-            }
-            // unirse automáticamente
-                const response = await fetchWithAuth(`${API_URL}/join-room`, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        playerName: identity.displayName,
-                        roomId: invite.roomId
-                    })
-                });
-                const data = await response.json();
-                if (response.ok && data.success) {
-                    sessionStorage.setItem('playerName', identity.displayName);
-                    sessionStorage.setItem('playerId', data.playerId);
-                    sessionStorage.setItem('roomId', invite.roomId);
-                    sessionStorage.setItem('isHost', 'false');
-                    window.location.href = 'sala.html';
-                } else {
-                    showError(data.message || 'No se pudo unir a la sala');
-                }
-            } catch (e) {
-                console.error('Error uniéndose tras invitación:', e);
-                showError('Error al unirse a la sala');
-            }
-        });
 
         popup.querySelector('#declineInviteBtn').addEventListener('click', () => {
             clearTimeout(timer);
@@ -574,24 +529,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // estilos temporales para la invitación (podrían moverse a css)
-    const style = document.createElement('style');
-    style.textContent = `
-        .invite-popup {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.85);
-            color: white;
-            padding: 1rem;
-            border-radius: 8px;
-            z-index: 1000;
-        }
-        .invite-popup button {
-            margin: 0.25rem;
-        }
-    `;
-    document.head.appendChild(style);
 
     // resto de código sigue abajo
 
