@@ -456,25 +456,18 @@ function setupWebSocket(server) {
                         break;
                     case 'leave_room':
                         // El jugador abandona intencionalmente la sala
-                        // Si es el host, transferir el rol a otro jugador conectado
-                        if (player.isHost && room.players.length > 1) {
-                            const newHost = room.players.find(p => p.id !== playerId && p.ws?.readyState === WebSocket.OPEN);
-                            if (newHost) {
-                                newHost.isHost = true;
-                                room.originalHostId = newHost.id;
-                                // Notificar al nuevo host que ahora es host
-                                safeSend(newHost.ws, {
-                                    type: 'you_are_now_host',
-                                    message: 'Ahora eres el host de la sala'
-                                });
-                                // Notificar a todos que hay un nuevo host
-                                broadcastToRoom(room, {
-                                    type: 'notification',
-                                    message: `${newHost.name} es ahora el host`,
-                                    isError: false
-                                });
-                                console.log(`[ROOM] Host transferido a ${newHost.name}`);
-                            }
+                        if (player.isHost) {
+                            // Si el host abandona, notificar a todos los otros jugadores
+                            // (NO al host) para que se redirijan a index.html
+                            room.players.forEach(p => {
+                                if (p.id !== playerId && p.ws?.readyState === WebSocket.OPEN) {
+                                    safeSend(p.ws, {
+                                        type: 'host_left_room',
+                                        message: 'El host abandonó la sala'
+                                    });
+                                }
+                            });
+                            console.log(`[ROOM] Host ${player.name} abandonó la sala`);
                         }
                         // Proceder con el cierre normal
                         ws.close();

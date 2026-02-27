@@ -275,13 +275,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 updatePlayersUI(message.players);
                 showNotification(`${message.playerName} salió de la sala`);
             }
-            else if (message.type === 'you_are_now_host') {
-                // El usuario actual ahora es el host
-                isHost = true;
-                sessionStorage.setItem('isHost', 'true');
-                gameSettings.style.display = 'block';
-                startBtn.classList.add('visible');
-                showNotification('Ahora eres el host de la sala');
+            else if (message.type === 'host_left_room') {
+                // El host abandonó la sala, redirigir a index.html
+                showNotification('El host abandonó la sala', true);
+                setTimeout(() => {
+                    // Limpiar sessionStorage
+                    sessionStorage.removeItem('roomId');
+                    sessionStorage.removeItem('playerId');
+                    sessionStorage.removeItem('isHost');
+                    // Redirigir a index.html
+                    window.location.href = 'index.html';
+                }, 2000);
             }
             else if (message.type === 'notification') {
                 showNotification(message.message, message.isError);
