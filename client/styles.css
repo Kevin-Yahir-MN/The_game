@@ -47,6 +47,35 @@ body {
     letter-spacing: 1px;
 }
 
+/* lista de amigos en el lobby */
+.friends-container {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    background: rgba(0,0,0,0.3);
+    padding: 1rem;
+    border-radius: 8px;
+    max-width: 200px;
+}
+
+.friends-container h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.1rem;
+    color: var(--light);
+}
+
+.friends-container ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.friends-container li {
+    font-size: 0.9rem;
+    color: var(--light);
+    margin-bottom: 0.25rem;
+}
+
 .lobby-header p {
     font-size: 1.1rem;
     color: var(--gray);
@@ -347,6 +376,20 @@ body {
 #playersList li.you {
     border-left: 4px solid var(--secondary);
     background: rgba(46, 204, 113, 0.1);
+}
+
+.add-friend-btn {
+    margin-left: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    border: none;
+    border-radius: 6px;
+    background: var(--secondary);
+    color: white;
+    cursor: pointer;
+}
+.add-friend-btn:hover {
+    background: #27ae60;
 }
 
 .room-emoji-chat {

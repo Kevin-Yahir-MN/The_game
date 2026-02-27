@@ -227,6 +227,51 @@ function registerHttpRoutes(app) {
         }
     });
 
+
+    // rutas de amigos
+    app.get('/friends', async (req, res) => {
+        try {
+            const user = await getAuthenticatedUser(req);
+            if (!user) {
+                return res.status(401).json({ success: false, message: 'No autenticado' });
+            }
+            const friends = await require('../services/friendService').getFriends(user.id);
+            return res.json({ success: true, friends });
+        } catch (error) {
+            console.error('Error obteniendo lista de amigos:', error);
+            return res.status(500).json({ success: false, message: 'Error interno al cargar amigos' });
+        }
+    });
+
+    app.post('/friends', async (req, res) => {
+        try {
+            const user = await getAuthenticatedUser(req);
+            if (!user) {
+                return res.status(401).json({ success: false, message: 'No autenticado' });
+            }
+            const { friendId } = req.body || {};
+            if (!friendId) {
+                return res.status(400).json({ success: false, message: 'friendId requerido' });
+            }
+
+            await require('../services/friendService').addFriend(user.id, friendId);
+            return res.json({ success: true });
+        } catch (error) {
+            console.error('Error agregando amigo:', error);
+            if (error.code === 'FRIEND_NOT_FOUND') {
+                return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+            }
+            if (error.code === 'ALREADY_FRIEND') {
+                return res.status(409).json({ success: false, message: 'Ya es tu amigo' });
+            }
+            if (error.code === 'SELF_FRIEND') {
+                return res.status(400).json({ success: false, message: 'No puedes agregarte a ti mismo' });
+            }
+            return res.status(500).json({ success: false, message: 'Error interno al agregar amigo' });
+        }
+    });
+
+    // continuar con rutas existentes
     app.post('/create-room', async (req, res) => {
         const authUser = await getAuthenticatedUser(req);
         console.log('[ROUTES] create-room: authUserId=' + (authUser ? authUser.id : 'null'));
@@ -378,7 +423,8 @@ function registerHttpRoutes(app) {
                     name: p.name,
                     isHost: p.isHost,
                     cardCount: p.cards.length,
-                    connected: p.ws !== null
+                    connected: p.ws !== null,
+                    userId: p.userId || null
                 }))
             });
 
@@ -448,7 +494,8 @@ function registerHttpRoutes(app) {
                 name: p.name,
                 isHost: p.isHost,
                 cardCount: p.cards.length,
-                connected: p.ws !== null
+                connected: p.ws !== null,
+                userId: p.userId || null
             })),
             gameStarted: room.gameState.gameStarted,
             currentTurn: room.gameState.currentTurn,

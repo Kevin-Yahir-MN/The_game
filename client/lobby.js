@@ -49,6 +49,136 @@ document.addEventListener('DOMContentLoaded', () => {
     const statWins = document.getElementById('statWins');
     const statWinStreak = document.getElementById('statWinStreak');
 
+    // ---- estado y lógica de amigos ----
+    let friends = [];
+    let lobbyWs = null;
+
+    async function loadFriends() {
+        friends = [];
+        try {
+            const response = await fetchWithAuth(`${API_URL}/friends`, { method: 'GET' });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                friends = data.friends || [];
+            }
+        } catch (err) {
+            console.error('Error cargando amigos:', err);
+        }
+        renderFriendList();
+    }
+
+    function renderFriendList() {
+        const container = document.getElementById('friendList');
+        if (!container) return;
+        if (friends.length === 0) {
+            container.innerHTML = '<li>(sin amigos)</li>';
+            return;
+        }
+        container.innerHTML = friends.map(f => `<li>${f.displayName}</li>`).join('');
+    }
+
+    function setupLobbyWebSocket() {
+        if (lobbyWs) lobbyWs.close();
+        const identity = getCurrentIdentity();
+        if (!identity) return;
+        const token = getAuthToken();
+        const wsUrl = new URL(API_URL.replace(/^http/, 'ws'));
+        wsUrl.searchParams.set('lobby', 'true');
+        if (token) wsUrl.searchParams.set('token', token);
+        if (identity.isGuest) {
+            let lobbyId = sessionStorage.getItem('lobbyId');
+            if (!lobbyId) {
+                lobbyId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+                sessionStorage.setItem('lobbyId', lobbyId);
+            }
+            wsUrl.searchParams.set('lobbyId', lobbyId);
+            wsUrl.searchParams.set('displayName', identity.displayName);
+        }
+        lobbyWs = new WebSocket(wsUrl);
+        lobbyWs.onmessage = evt => {
+            try {
+                const msg = JSON.parse(evt.data);
+                if (msg.type === 'friend_invite') {
+                    displayInvite(msg);
+                }
+            } catch (e) {
+                console.error('WS lobby parse error', e);
+            }
+        };
+    }
+
+    function displayInvite(invite) {
+        const popup = document.createElement('div');
+        popup.className = 'invite-popup';
+        popup.innerHTML = `
+            <p><strong>${invite.fromDisplayName}</strong> te invita a su sala.</p>
+            <button id="acceptInviteBtn">Aceptar</button>
+            <button id="declineInviteBtn">Declinar</button>
+        `;
+        document.body.appendChild(popup);
+        const remove = () => popup.remove();
+        const timer = setTimeout(remove, 10000);
+        popup.querySelector('#acceptInviteBtn').addEventListener('click', async () => {
+            clearTimeout(timer);
+            remove();
+            const identity = getCurrentIdentity();
+            if (!identity || !identity.displayName) return;
+            try {
+                const response = await fetchWithAuth(`${API_URL}/join-room`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        playerName: identity.displayName,
+                        roomId: invite.roomId
+                    })
+                });
+                const data = await response.json();
+                if (response.ok && data.success) {
+                    sessionStorage.setItem('playerName', identity.displayName);
+                    sessionStorage.setItem('playerId', data.playerId);
+                    sessionStorage.setItem('roomId', invite.roomId);
+                    sessionStorage.setItem('isHost', 'false');
+                    window.location.href = 'sala.html';
+                } else {
+                    showError(data.message || 'No se pudo unir a la sala');
+                }
+            } catch (e) {
+                console.error('Error al aceptar invitación', e);
+                showError('Error al unirse a la sala');
+            }
+        });
+        popup.querySelector('#declineInviteBtn').addEventListener('click', () => {
+            clearTimeout(timer);
+            remove();
+            if (lobbyWs && lobbyWs.readyState === WebSocket.OPEN) {
+                lobbyWs.send(JSON.stringify({
+                    type: 'invite_response',
+                    inviterPlayerId: invite.inviterPlayerId,
+                    accepted: false,
+                    roomId: invite.roomId
+                }));
+            }
+        });
+    }
+
+    // inyectar estilos rápidos
+    const style = document.createElement('style');
+    style.textContent = `
+        .invite-popup {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            z-index: 1000;
+        }
+        .invite-popup button {
+            margin: 0.25rem;
+        }
+    `;
+    document.head.appendChild(style);
+
     function showError(message) {
         const errorElement = document.createElement('div');
         errorElement.className = 'notification error';
@@ -146,6 +276,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // estado local de amigos
+    let friends = [];
+    let lobbyWs = null;
+
     function refreshIdentityUI() {
         const identity = getCurrentIdentity();
         const isLoggedIn = !!identity;
@@ -153,6 +287,11 @@ document.addEventListener('DOMContentLoaded', () => {
         authStatus.textContent = isLoggedIn
             ? `Sesión iniciada como ${identity.displayName}${identity.isGuest ? ' (invitado)' : ` (@${identity.username})`}`
             : 'No has iniciado sesión.';
+
+        const friendsContainerEl = document.getElementById('friendsContainer');
+        if (friendsContainerEl) {
+            friendsContainerEl.style.display = isLoggedIn ? 'block' : 'none';
+        }
 
         authOptionsContainer.style.display = isLoggedIn ? 'none' : 'block';
         activeUserContainer.style.display = isLoggedIn ? 'block' : 'none';
@@ -237,10 +376,14 @@ document.addEventListener('DOMContentLoaded', () => {
             'Accept': 'application/json',
             ...(options.headers || {})
         };
-
         if (token) {
             headers.Authorization = `Bearer ${token}`;
         }
+        return fetch(url, {
+            ...options,
+            headers
+        });
+    }
 
         return fetch(url, {
             ...options,
@@ -271,7 +414,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function hydrateSession() {
         const token = getAuthToken();
-
         if (!token) {
             refreshIdentityUI();
             return;
@@ -282,28 +424,176 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) {
                 localStorage.removeItem(AUTH_TOKEN_KEY);
                 localStorage.removeItem(AUTH_USER_KEY);
-                refreshIdentityUI();
-                return;
-            }
-
-            const data = await response.json();
-            if (data.success && data.user) {
-                const normalizedUser = {
-                    id: data.user.id,
-                    username: data.user.username,
-                    displayName: data.user.displayName
-                };
-                localStorage.setItem(AUTH_USER_KEY, JSON.stringify(normalizedUser));
             } else {
-                localStorage.removeItem(AUTH_TOKEN_KEY);
-                localStorage.removeItem(AUTH_USER_KEY);
+                const data = await response.json();
+                if (data.success && data.user) {
+                    const normalizedUser = {
+                        id: data.user.id,
+                        username: data.user.username,
+                        displayName: data.user.displayName
+                    };
+                    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(normalizedUser));
+                } else {
+                    localStorage.removeItem(AUTH_TOKEN_KEY);
+                    localStorage.removeItem(AUTH_USER_KEY);
+                }
             }
         } catch (error) {
             console.error('Error verificando sesión:', error);
-        } finally {
-            refreshIdentityUI();
+        }
+
+        refreshIdentityUI();
+        // si seguimos con token válido, cargamos datos de amigos y abrimos socket
+        if (token && getAuthUser()) {
+            await loadFriends();
+            setupLobbyWebSocket();
         }
     }
+
+    // --- amigos y WebSocket de lobby ---
+
+    async function loadFriends() {
+        friends = [];
+        try {
+            const response = await fetchWithAuth(`${API_URL}/friends`, { method: 'GET' });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                friends = data.friends || [];
+            }
+        } catch (err) {
+            console.error('Error cargando amigos:', err);
+        }
+        renderFriendList();
+    }
+
+    function renderFriendList() {
+        const container = document.getElementById('friendList');
+        if (!container) return;
+        container.innerHTML = friends.map(f => `<li>${f.displayName}</li>`).join('') || '<li>(sin amigos)</li>';
+    }
+
+    function setupLobbyWebSocket() {
+        if (lobbyWs) {
+            lobbyWs.close();
+        }
+        const identity = getCurrentIdentity();
+        if (!identity) return;
+
+        const token = getAuthToken();
+        const wsUrl = new URL(API_URL.replace(/^http/, 'ws'));
+        wsUrl.searchParams.set('lobby', 'true');
+        if (token) wsUrl.searchParams.set('token', token);
+        if (!identity.isGuest) {
+            // nada más, el servidor obtendrá userId desde token
+        } else {
+            let lobbyId = sessionStorage.getItem('lobbyId');
+            if (!lobbyId) {
+                lobbyId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+                sessionStorage.setItem('lobbyId', lobbyId);
+            }
+            wsUrl.searchParams.set('lobbyId', lobbyId);
+            wsUrl.searchParams.set('displayName', identity.displayName);
+        }
+
+        lobbyWs = new WebSocket(wsUrl);
+        lobbyWs.onmessage = (evt) => {
+            try {
+                const msg = JSON.parse(evt.data);
+                if (msg.type === 'friend_invite') {
+                    displayInvite(msg);
+                }
+            } catch (err) {
+                console.error('Error procesando mensaje WS del lobby:', err);
+            }
+        };
+    }
+
+    function displayInvite(invite) {
+        // invite: { fromDisplayName, roomId, inviterPlayerId }
+        const popup = document.createElement('div');
+        popup.className = 'invite-popup';
+        popup.innerHTML = `
+            <p><strong>${invite.fromDisplayName}</strong> te invita a su sala.</p>
+            <button id="acceptInviteBtn">Aceptar</button>
+            <button id="declineInviteBtn">Declinar</button>
+        `;
+        document.body.appendChild(popup);
+
+        const removePopup = () => popup.remove();
+        const timer = setTimeout(() => {
+            removePopup();
+        }, 10000);
+
+        popup.querySelector('#acceptInviteBtn').addEventListener('click', async () => {
+            clearTimeout(timer);
+            removePopup();
+            // notificar aceptación
+            if (lobbyWs && lobbyWs.readyState === WebSocket.OPEN) {
+                lobbyWs.send(JSON.stringify({
+                    type: 'invite_response',
+                    inviterPlayerId: invite.inviterPlayerId,
+                    accepted: true,
+                    roomId: invite.roomId
+                }));
+            }
+            // unirse automáticamente
+                const response = await fetchWithAuth(`${API_URL}/join-room`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        playerName: identity.displayName,
+                        roomId: invite.roomId
+                    })
+                });
+                const data = await response.json();
+                if (response.ok && data.success) {
+                    sessionStorage.setItem('playerName', identity.displayName);
+                    sessionStorage.setItem('playerId', data.playerId);
+                    sessionStorage.setItem('roomId', invite.roomId);
+                    sessionStorage.setItem('isHost', 'false');
+                    window.location.href = 'sala.html';
+                } else {
+                    showError(data.message || 'No se pudo unir a la sala');
+                }
+            } catch (e) {
+                console.error('Error uniéndose tras invitación:', e);
+                showError('Error al unirse a la sala');
+            }
+        });
+
+        popup.querySelector('#declineInviteBtn').addEventListener('click', () => {
+            clearTimeout(timer);
+            removePopup();
+            if (lobbyWs && lobbyWs.readyState === WebSocket.OPEN) {
+                lobbyWs.send(JSON.stringify({
+                    type: 'invite_response',
+                    inviterPlayerId: invite.inviterPlayerId,
+                    accepted: false,
+                    roomId: invite.roomId
+                }));
+            }
+        });
+    }
+
+    // estilos temporales para la invitación (podrían moverse a css)
+    const style = document.createElement('style');
+    style.textContent = `
+        .invite-popup {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            z-index: 1000;
+        }
+        .invite-popup button {
+            margin: 0.25rem;
+        }
+    `;
+    document.head.appendChild(style);
+
+    // resto de código sigue abajo
 
     loginBtn.addEventListener('click', async () => {
         const username = loginUsernameInput.value.trim();
@@ -332,6 +622,8 @@ document.addEventListener('DOMContentLoaded', () => {
             saveAuth(data.token, data.user);
             showSuccess('Sesión iniciada correctamente');
             loginPasswordInput.value = '';
+            await loadFriends();
+            setupLobbyWebSocket();
         } catch (error) {
             console.error('Error en login:', error);
             showError('Error al conectar con el servidor');
@@ -370,6 +662,8 @@ document.addEventListener('DOMContentLoaded', () => {
             showSuccess('Usuario creado correctamente');
             registerPasswordInput.value = '';
             switchAuthTab('login');
+            await loadFriends();
+            setupLobbyWebSocket();
         } catch (error) {
             console.error('Error en registro:', error);
             showError('Error al conectar con el servidor');
@@ -492,6 +786,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         clearIdentity();
         showSuccess('Sesión cerrada');
+        // cerrar socket y limpiar lista amigos
+        if (lobbyWs) {
+            lobbyWs.close();
+            lobbyWs = null;
+        }
+        friends = [];
+        renderFriendList();
     });
 
     showLoginTab.addEventListener('click', () => switchAuthTab('login'));

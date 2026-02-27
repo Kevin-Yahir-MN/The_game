@@ -1,5 +1,6 @@
 // src/ws/websocket.js
 const WebSocket = require('ws');
+const { v4: uuidv4 } = require('uuid');
 const { pool } = require('../db');
 const { allowedOrigins } = require('../config');
 const { rooms, reverseRoomMap, boardHistory, wsRateLimit, emojiRateLimit } = require('../state');
@@ -18,6 +19,11 @@ const {
 } = require('../services/gameService');
 const { safeSend, broadcastToRoom, sendGameState } = require('../services/communication');
 const { flushSaveGameState } = require('../services/persistence');
+// necesitamos autenticación para conexiones de lobby
+const { getUserFromToken } = require('../services/authService');
+
+// mapa simple para clientes en el lobby (no en una sala)
+const lobbyClients = new Map(); // key = userId or lobbyId -> { ws, userId, displayName }
 
 function defaultHistory() {
     return {
@@ -159,6 +165,57 @@ function setupWebSocket(server) {
         });
 
         const params = new URLSearchParams((req.url || '').split('?')[1] || '');
+        const isLobby = params.get('lobby') === 'true';
+
+        // lobby connection: sólo para recibir invitaciones y respuesta
+        if (isLobby) {
+            const token = params.get('token');
+            let identity = null;
+            if (token) {
+                identity = await getUserFromToken(token);
+            }
+            let lobbyId;
+            if (identity) {
+                lobbyId = identity.id;
+            } else {
+                lobbyId = params.get('lobbyId') || uuidv4();
+            }
+            const display = identity ? identity.display_name : decodeURIComponent(params.get('displayName') || 'Invitado');
+            lobbyClients.set(lobbyId, { ws, userId: identity ? identity.id : null, displayName: display });
+
+            ws.on('close', () => {
+                lobbyClients.delete(lobbyId);
+            });
+
+            ws.on('message', async (message) => {
+                try {
+                    const msg = parseWsMessage(message);
+                    // manejar respuesta de invitación
+                    if (msg.type === 'invite_response') {
+                        const { inviterPlayerId, accepted, roomId: rId, fromUserId } = msg;
+                        // buscar invitador dentro de las salas
+                        for (const [rid, room] of rooms) {
+                            const player = room.players.find(p => p.id === inviterPlayerId);
+                            if (player && player.ws) {
+                                safeSend(player.ws, {
+                                    type: 'friend_invite_response',
+                                    accepted,
+                                    roomId: rId,
+                                    fromUserId: fromUserId || lobbyId
+                                });
+                                break;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error procesando mensaje de lobby:', error);
+                }
+            });
+
+            // no continuamos con el resto de la lógica de sala
+            return;
+        }
+
         const roomId = params.get('roomId');
         const playerId = params.get('playerId');
         const playerName = params.get('playerName');
@@ -209,7 +266,8 @@ function setupWebSocket(server) {
                     id: p.id,
                     name: p.name,
                     isHost: p.isHost,
-                    cardCount: p.cards.length
+                    cardCount: p.cards.length,
+                    userId: p.userId || null
                 }))
             },
             history: boardHistory.get(roomId) || defaultHistory(),
@@ -222,7 +280,8 @@ function setupWebSocket(server) {
                 id: p.id,
                 name: p.name,
                 cardCount: p.cards.length,
-                cardsPlayedThisTurn: getPlayerTurnCount(p)
+                cardsPlayedThisTurn: getPlayerTurnCount(p),
+                userId: p.userId || null
             }));
         }
 
@@ -452,6 +511,57 @@ function setupWebSocket(server) {
                             fromPlayerId: player.id,
                             fromPlayerName: player.name
                         });
+                        break;
+                    }
+                    case 'invite_friend': {
+                        // el cliente en sala solicita enviar invitación a amigo en lobby
+                        const targetUserId = msg.targetUserId;
+                        if (typeof targetUserId !== 'string') break;
+
+                        if (!player.userId) {
+                            safeSend(player.ws, {
+                                type: 'notification',
+                                message: 'Debes estar autenticado para invitar amigos',
+                                isError: true
+                            });
+                            break;
+                        }
+
+                        // verificar relación de amistad
+                        try {
+                            const res = await pool.query(
+                                'SELECT 1 FROM friends WHERE user_id = $1 AND friend_id = $2',
+                                [player.userId, targetUserId]
+                            );
+                            if (res.rowCount === 0) {
+                                safeSend(player.ws, {
+                                    type: 'notification',
+                                    message: 'Solo puedes invitar a tus amigos',
+                                    isError: true
+                                });
+                                break;
+                            }
+                        } catch (dbErr) {
+                            console.error('Error comprobando amistad:', dbErr);
+                            // continuar, no bloqueamos invitación en caso de error de BD?
+                        }
+
+                        const target = lobbyClients.get(targetUserId);
+                        if (target && target.ws && target.ws.readyState === WebSocket.OPEN) {
+                            safeSend(target.ws, {
+                                type: 'friend_invite',
+                                fromUserId: player.userId || null,
+                                fromDisplayName: player.name,
+                                inviterPlayerId: player.id,
+                                roomId
+                            });
+                        } else {
+                            safeSend(player.ws, {
+                                type: 'notification',
+                                message: 'El usuario no está en el lobby o no disponible',
+                                isError: true
+                            });
+                        }
                         break;
                     }
                     case 'get_full_state': {

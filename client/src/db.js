@@ -124,6 +124,15 @@ async function runSchemaSetup() {
         CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
     `);
 
+    // tabla para amistades unilaterales: cada fila indica que user_id añadió a friend_id
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS friends (
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            friend_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            PRIMARY KEY (user_id, friend_id)
+        );
+    `);
+
     await ensureCascadeForeignKey();
 
     await pool.query(`
@@ -139,8 +148,7 @@ async function runSchemaSetup() {
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_users_display_name_unique
         ON users (display_name);
-    `);
-}
+    `);}
 
 async function initializeDatabase() {
     let attempt = 0;
