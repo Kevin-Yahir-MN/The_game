@@ -110,7 +110,7 @@ async function hasActiveSession(userId) {
     // primero limpiar sesiones expiradas para evitar falsos positivos
     // esto es especialmente importante si el logout falló por error de red
     await pool.query('DELETE FROM user_sessions WHERE expires_at <= NOW()');
-    
+
     const result = await pool.query(
         `SELECT 1 FROM user_sessions
          WHERE user_id = $1 AND expires_at > NOW()

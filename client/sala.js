@@ -275,6 +275,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 updatePlayersUI(message.players);
                 showNotification(`${message.playerName} salió de la sala`);
             }
+            else if (message.type === 'you_are_now_host') {
+                // El usuario actual ahora es el host
+                isHost = true;
+                sessionStorage.setItem('isHost', 'true');
+                gameSettings.style.display = 'block';
+                startBtn.classList.add('visible');
+                showNotification('Ahora eres el host de la sala');
+            }
             else if (message.type === 'notification') {
                 showNotification(message.message, message.isError);
             }
@@ -390,13 +398,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function backToMenu() {
+        // Notificar al servidor que estamos abandonando la sala
+        // para que pueda transferir el host si es necesario
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            try {
+                socket.send(JSON.stringify({
+                    type: 'leave_room',
+                    roomId: roomId,
+                    playerId: playerId
+                }));
+            } catch (e) {
+                console.error('Error notificando abandono:', e);
+            }
+            // Esperar un poco para que el mensaje se procese
+            setTimeout(() => {
+                socket.close();
+            }, 100);
+        }
+
         sessionStorage.removeItem('roomId');
         sessionStorage.removeItem('playerId');
         sessionStorage.removeItem('isHost');
-
-        if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
-            socket.close();
-        }
 
         window.location.href = 'index.html';
     }
