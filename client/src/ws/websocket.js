@@ -546,6 +546,7 @@ function setupWebSocket(server) {
                         // Proceder con el cierre normal
                         ws.close();
                         break;
+                    case 'update_player': {
                         const sanitizedName = sanitizePlayerName(msg.name);
                         if (!sanitizedName) break;
                         player.name = sanitizedName;
@@ -559,200 +560,200 @@ function setupWebSocket(server) {
                             }))
                         });
                         break;
-                }
+                    }
                     case 'emoji_reaction': {
-                    const code = typeof msg.emoji === 'string' ? msg.emoji.trim() : '';
-                    if (!ALLOWED_EMOJI_REACTIONS.includes(code)) {
-                        safeSend(player.ws, {
-                            type: 'notification',
-                            message: 'Reacción no permitida',
-                            isError: true,
-                            errorCode: 'INVALID_EMOJI_REACTION'
-                        });
-                        break;
-                    }
-
-                    const { allowed, remainingMs } = checkEmojiRateLimit(player.id);
-                    if (!allowed) {
-                        const seconds = Math.max(1, Math.ceil(remainingMs / 1000));
-                        safeSend(player.ws, {
-                            type: 'notification',
-                            message: `Has enviado demasiadas reacciones. Espera ${seconds} segundo(s) para enviar más emojis.`,
-                            isError: true,
-                            errorCode: 'EMOJI_RATE_LIMIT'
-                        });
-                        break;
-                    }
-
-                    broadcastToRoom(room, {
-                        type: 'emoji_reaction',
-                        emoji: code,
-                        fromPlayerId: player.id,
-                        fromPlayerName: player.name
-                    });
-                    break;
-                }
-                    case 'invite_friend': {
-                    // el cliente en sala solicita enviar invitación a amigo en lobby
-                    const targetUserId = msg.targetUserId;
-                    if (typeof targetUserId !== 'string') break;
-
-                    if (!player.userId) {
-                        safeSend(player.ws, {
-                            type: 'notification',
-                            message: 'Debes estar autenticado para invitar amigos',
-                            isError: true
-                        });
-                        break;
-                    }
-
-                    // verificar relación de amistad
-                    try {
-                        const res = await pool.query(
-                            'SELECT 1 FROM friends WHERE user_id = $1 AND friend_id = $2',
-                            [player.userId, targetUserId]
-                        );
-                        if (res.rowCount === 0) {
+                        const code = typeof msg.emoji === 'string' ? msg.emoji.trim() : '';
+                        if (!ALLOWED_EMOJI_REACTIONS.includes(code)) {
                             safeSend(player.ws, {
                                 type: 'notification',
-                                message: 'Solo puedes invitar a tus amigos',
+                                message: 'Reacción no permitida',
+                                isError: true,
+                                errorCode: 'INVALID_EMOJI_REACTION'
+                            });
+                            break;
+                        }
+
+                        const { allowed, remainingMs } = checkEmojiRateLimit(player.id);
+                        if (!allowed) {
+                            const seconds = Math.max(1, Math.ceil(remainingMs / 1000));
+                            safeSend(player.ws, {
+                                type: 'notification',
+                                message: `Has enviado demasiadas reacciones. Espera ${seconds} segundo(s) para enviar más emojis.`,
+                                isError: true,
+                                errorCode: 'EMOJI_RATE_LIMIT'
+                            });
+                            break;
+                        }
+
+                        broadcastToRoom(room, {
+                            type: 'emoji_reaction',
+                            emoji: code,
+                            fromPlayerId: player.id,
+                            fromPlayerName: player.name
+                        });
+                        break;
+                    }
+                    case 'invite_friend': {
+                        // el cliente en sala solicita enviar invitación a amigo en lobby
+                        const targetUserId = msg.targetUserId;
+                        if (typeof targetUserId !== 'string') break;
+
+                        if (!player.userId) {
+                            safeSend(player.ws, {
+                                type: 'notification',
+                                message: 'Debes estar autenticado para invitar amigos',
                                 isError: true
                             });
                             break;
                         }
-                    } catch (dbErr) {
-                        console.error('Error comprobando amistad:', dbErr);
-                        // continuar, no bloqueamos invitación en caso de error de BD?
-                    }
 
-                    const target = lobbyClients.get(targetUserId);
-                    if (target && target.ws && target.ws.readyState === WebSocket.OPEN) {
-                        safeSend(target.ws, {
-                            type: 'friend_invite',
-                            fromUserId: player.userId || null,
-                            fromDisplayName: player.name,
-                            inviterPlayerId: player.id,
-                            roomId
+                        // verificar relación de amistad
+                        try {
+                            const res = await pool.query(
+                                'SELECT 1 FROM friends WHERE user_id = $1 AND friend_id = $2',
+                                [player.userId, targetUserId]
+                            );
+                            if (res.rowCount === 0) {
+                                safeSend(player.ws, {
+                                    type: 'notification',
+                                    message: 'Solo puedes invitar a tus amigos',
+                                    isError: true
+                                });
+                                break;
+                            }
+                        } catch (dbErr) {
+                            console.error('Error comprobando amistad:', dbErr);
+                            // continuar, no bloqueamos invitación en caso de error de BD?
+                        }
+
+                        const target = lobbyClients.get(targetUserId);
+                        if (target && target.ws && target.ws.readyState === WebSocket.OPEN) {
+                            safeSend(target.ws, {
+                                type: 'friend_invite',
+                                fromUserId: player.userId || null,
+                                fromDisplayName: player.name,
+                                inviterPlayerId: player.id,
+                                roomId
+                            });
+                        } else {
+                            safeSend(player.ws, {
+                                type: 'notification',
+                                message: 'El usuario no está en el lobby o no disponible',
+                                isError: true
+                            });
+                        }
+                        break;
+                    }
+                    case 'get_full_state': {
+                        const currentRoomId = reverseRoomMap.get(room);
+                        safeSend(player.ws, {
+                            type: 'full_state_update',
+                            room: {
+                                players: room.players.map(p => ({
+                                    id: p.id,
+                                    name: p.name,
+                                    isHost: p.isHost,
+                                    cards: p.cards,
+                                    cardsPlayedThisTurn: getPlayerTurnCount(p),
+                                    movesThisTurn: getTurnState(p).moves,
+                                    totalCardsPlayed: p.totalCardsPlayed || 0,
+                                    lastActivity: p.lastActivity
+                                })),
+                                gameStarted: room.gameState.gameStarted
+                            },
+                            gameState: {
+                                board: room.gameState.board,
+                                currentTurn: room.gameState.currentTurn,
+                                remainingDeck: room.gameState.deck.length,
+                                initialCards: room.gameState.initialCards,
+                                gameStarted: room.gameState.gameStarted
+                            },
+                            history: boardHistory.get(currentRoomId),
+                            currentPlayerState: {
+                                cardsPlayedThisTurn: getPlayerTurnCount(player),
+                                minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
+                            }
                         });
-                    } else {
+                        break;
+                    }
+                    default:
                         safeSend(player.ws, {
                             type: 'notification',
-                            message: 'El usuario no está en el lobby o no disponible',
-                            isError: true
+                            message: `Tipo de mensaje no reconocido: ${msg.type}`,
+                            isError: true,
+                            errorCode: 'UNKNOWN_MESSAGE_TYPE'
                         });
-                    }
-                    break;
                 }
-                    case 'get_full_state': {
-                    const currentRoomId = reverseRoomMap.get(room);
-                    safeSend(player.ws, {
-                        type: 'full_state_update',
-                        room: {
-                            players: room.players.map(p => ({
-                                id: p.id,
-                                name: p.name,
-                                isHost: p.isHost,
-                                cards: p.cards,
-                                cardsPlayedThisTurn: getPlayerTurnCount(p),
-                                movesThisTurn: getTurnState(p).moves,
-                                totalCardsPlayed: p.totalCardsPlayed || 0,
-                                lastActivity: p.lastActivity
-                            })),
-                            gameStarted: room.gameState.gameStarted
-                        },
-                        gameState: {
-                            board: room.gameState.board,
-                            currentTurn: room.gameState.currentTurn,
-                            remainingDeck: room.gameState.deck.length,
-                            initialCards: room.gameState.initialCards,
-                            gameStarted: room.gameState.gameStarted
-                        },
-                        history: boardHistory.get(currentRoomId),
-                        currentPlayerState: {
-                            cardsPlayedThisTurn: getPlayerTurnCount(player),
-                            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
-                        }
-                    });
-                    break;
-                }
-                    default:
-                safeSend(player.ws, {
-                    type: 'notification',
-                    message: `Tipo de mensaje no reconocido: ${msg.type}`,
-                    isError: true,
-                    errorCode: 'UNKNOWN_MESSAGE_TYPE'
-                });
-            }
             } catch (error) {
-            if (error.code === 'PAYLOAD_TOO_LARGE') {
-                ws.close(1009, 'Payload demasiado grande');
-                return;
-            }
-            if (error.code === 'INVALID_JSON') {
+                if (error.code === 'PAYLOAD_TOO_LARGE') {
+                    ws.close(1009, 'Payload demasiado grande');
+                    return;
+                }
+                if (error.code === 'INVALID_JSON') {
+                    safeSend(player.ws, {
+                        type: 'notification',
+                        message: 'Mensaje inválido: JSON malformado',
+                        isError: true,
+                        errorCode: 'INVALID_JSON'
+                    });
+                    return;
+                }
+                console.error('Error procesando mensaje:', error);
                 safeSend(player.ws, {
                     type: 'notification',
-                    message: 'Mensaje inválido: JSON malformado',
+                    message: 'Error interno procesando mensaje',
                     isError: true,
-                    errorCode: 'INVALID_JSON'
+                    errorCode: 'INTERNAL_ERROR'
                 });
-                return;
             }
-            console.error('Error procesando mensaje:', error);
-            safeSend(player.ws, {
-                type: 'notification',
-                message: 'Error interno procesando mensaje',
-                isError: true,
-                errorCode: 'INTERNAL_ERROR'
-            });
-        }
+        });
+
+        ws.on('close', async () => {
+            player.ws = null;
+            wsRateLimit.delete(playerId);
+            emojiRateLimit.delete(playerId);
+
+            try {
+                const persisted = await safePersistOnDisconnect(roomId, playerId);
+                if (persisted) {
+                    console.log(`💾 Estado guardado al desconectarse ${player.name}`);
+                }
+            } catch (error) {
+                console.error('Error al actualizar estado de conexión:', error);
+            }
+
+            // sólo remover al jugador si la partida aún no ha comenzado **y**
+            // no estamos en el breve periodo posterior a un reinicio de sala.
+            // después de una partida el flag `room.resetting` permanece verdadero
+            // durante unos segundos; así evitamos expulsar a la gente que está
+            // simplemente navegando de vuelta a la sala para empezar de nuevo.
+            if (!room.gameState.gameStarted && !room.resetting) {
+                const playerIndex = room.players.findIndex(p => p.id === playerId);
+                if (playerIndex !== -1) {
+                    room.players.splice(playerIndex, 1);
+                }
+
+                // Notificar a todos que este jugador se desconectó (solo en pre‑juego)
+                broadcastToRoom(room, {
+                    type: 'player_left',
+                    playerId: playerId,
+                    playerName: player.name,
+                    players: room.players.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        isHost: p.isHost,
+                        connected: p.ws?.readyState === WebSocket.OPEN,
+                        userId: p.userId || null
+                    }))
+                });
+            }
+            // Nota: Ya NO asignamos un nuevo host cuando el actual se desconecta.
+            // El host original (almacenado en room.originalHostId) siempre permanece
+            // como host incluso si sufre desconexiones temporales.
+        });
     });
 
-    ws.on('close', async () => {
-        player.ws = null;
-        wsRateLimit.delete(playerId);
-        emojiRateLimit.delete(playerId);
-
-        try {
-            const persisted = await safePersistOnDisconnect(roomId, playerId);
-            if (persisted) {
-                console.log(`💾 Estado guardado al desconectarse ${player.name}`);
-            }
-        } catch (error) {
-            console.error('Error al actualizar estado de conexión:', error);
-        }
-
-        // sólo remover al jugador si la partida aún no ha comenzado **y**
-        // no estamos en el breve periodo posterior a un reinicio de sala.
-        // después de una partida el flag `room.resetting` permanece verdadero
-        // durante unos segundos; así evitamos expulsar a la gente que está
-        // simplemente navegando de vuelta a la sala para empezar de nuevo.
-        if (!room.gameState.gameStarted && !room.resetting) {
-            const playerIndex = room.players.findIndex(p => p.id === playerId);
-            if (playerIndex !== -1) {
-                room.players.splice(playerIndex, 1);
-            }
-
-            // Notificar a todos que este jugador se desconectó (solo en pre‑juego)
-            broadcastToRoom(room, {
-                type: 'player_left',
-                playerId: playerId,
-                playerName: player.name,
-                players: room.players.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    isHost: p.isHost,
-                    connected: p.ws?.readyState === WebSocket.OPEN,
-                    userId: p.userId || null
-                }))
-            });
-        }
-        // Nota: Ya NO asignamos un nuevo host cuando el actual se desconecta.
-        // El host original (almacenado en room.originalHostId) siempre permanece
-        // como host incluso si sufre desconexiones temporales.
-    });
-});
-
-return wss;
+    return wss;
 }
 
 module.exports = { setupWebSocket };
