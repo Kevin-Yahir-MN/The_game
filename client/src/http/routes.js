@@ -12,6 +12,7 @@ const {
     registerUser,
     loginUser,
     createSession,
+    hasActiveSession,
     getUserFromToken,
     getAccountById,
     updateDisplayName,
@@ -95,6 +96,15 @@ function registerHttpRoutes(app) {
             const user = await loginUser({ username, password });
             if (!user) {
                 return res.status(401).json({ success: false, message: 'Usuario o contraseña incorrectos' });
+            }
+
+            // verificar si el usuario ya tiene una sesión activa
+            const hasSession = await hasActiveSession(user.id);
+            if (hasSession) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Este usuario ya se encuentra en sesión en otro dispositivo'
+                });
             }
 
             const token = await createSession(user.id);

@@ -106,6 +106,16 @@ async function loginUser({ username, password }) {
     };
 }
 
+async function hasActiveSession(userId) {
+    const result = await pool.query(
+        `SELECT 1 FROM user_sessions
+         WHERE user_id = $1 AND expires_at > NOW()
+         LIMIT 1`,
+        [userId]
+    );
+    return result.rowCount > 0;
+}
+
 async function createSession(userId) {
     const token = generateSessionToken();
     const expiresAtQuery = `NOW() + INTERVAL '${TOKEN_TTL_DAYS} days'`;
@@ -203,7 +213,7 @@ async function changePassword(userId, currentPassword, newPassword) {
 
 async function recordUsersGameResult(userIds, didWin) {
     console.log('[AUTH] recordUsersGameResult called with userIds=' + JSON.stringify(userIds) + ', didWin=' + didWin);
-    
+
     if (!Array.isArray(userIds) || userIds.length === 0) {
         console.warn('[AUTH] Invalid or empty userIds array');
         return;
@@ -258,6 +268,7 @@ module.exports = {
     registerUser,
     loginUser,
     createSession,
+    hasActiveSession,
     getUserFromToken,
     getAccountById,
     updateDisplayName,
