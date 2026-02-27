@@ -657,8 +657,28 @@ function setupWebSocket(server) {
                 console.error('Error al actualizar estado de conexión:', error);
             }
 
-            if (player.isHost && room.players.length > 1) {
-                const newHost = room.players.find(p => p.id !== player.id && p.ws?.readyState === WebSocket.OPEN);
+            // Remover al jugador de la sala
+            const playerIndex = room.players.findIndex(p => p.id === playerId);
+            if (playerIndex !== -1) {
+                room.players.splice(playerIndex, 1);
+            }
+
+            // Notificar a todos que este jugador se desconectó (sin incluirlo en la lista)
+            broadcastToRoom(room, {
+                type: 'player_left',
+                playerId: playerId,
+                playerName: player.name,
+                players: room.players.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    isHost: p.isHost,
+                    connected: p.ws?.readyState === WebSocket.OPEN,
+                    userId: p.userId || null
+                }))
+            });
+
+            if (player.isHost && room.players.length > 0) {
+                const newHost = room.players.find(p => p.ws?.readyState === WebSocket.OPEN);
                 if (newHost) {
                     newHost.isHost = true;
                     broadcastToRoom(room, {

@@ -268,6 +268,10 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (message.type === 'room_update') {
                 updatePlayersUI(message.players);
             }
+            else if (message.type === 'player_left') {
+                updatePlayersUI(message.players);
+                showNotification(`${message.playerName} salió de la sala`);
+            }
             else if (message.type === 'notification') {
                 showNotification(message.message, message.isError);
             }
