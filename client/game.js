@@ -303,7 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}`);
+        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}&playerName=${encodeURIComponent(currentPlayer.name)}`);
 
         socket.onopen = () => {
             clearTimeout(reconnectTimeout);
@@ -665,6 +665,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.board = message.gameState.board;
         gameState.remainingDeck = message.gameState.remainingDeck;
         gameState.initialCards = message.gameState.initialCards || 6;
+        gameState.players = message.gameState.players || gameState.players;
 
         gameState.columnHistory = {
             asc1: message.history?.ascending1 || [1],
