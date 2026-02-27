@@ -4,7 +4,7 @@ const path = require('path');
 const compression = require('compression');
 
 const { PORT, allowedOrigins } = require('./client/src/config.js');
-const { initializeDatabase, cleanupOldGames, isTransientConnectionError } = require('./client/src/db.js');
+const { pool, initializeDatabase, cleanupOldGames, isTransientConnectionError } = require('./client/src/db.js');
 const { registerHttpRoutes } = require('./client/src/http/routes.js');
 const { restoreActiveGames } = require('./client/src/services/persistence.js');
 const { setupWebSocket } = require('./client/src/ws/websocket.js');

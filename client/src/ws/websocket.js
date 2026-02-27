@@ -1,7 +1,7 @@
 // src/ws/websocket.js
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
-const { pool } = require('../db');
+const { pool, isTransientConnectionError } = require('../db');
 const { allowedOrigins } = require('../config');
 const { rooms, reverseRoomMap, boardHistory, wsRateLimit, emojiRateLimit } = require('../state');
 const { sanitizePlayerName, isValidRoomId, validatePlayCardPayload } = require('../utils/validation');
@@ -43,26 +43,23 @@ function parseWsMessage(message) {
     }
 
     try {
-        return JSON.parse(rawMessage);
+        const parsed = JSON.parse(rawMessage);
+        // Validate that message has a type field
+        if (!parsed.type || typeof parsed.type !== 'string') {
+            const error = new Error('Mensaje debe contener un campo "type"');
+            error.code = 'INVALID_MESSAGE_TYPE';
+            throw error;
+        }
+        return parsed;
     } catch (error) {
+        if (error.code === 'INVALID_MESSAGE_TYPE') throw error;
         const parseError = new Error('JSON inválido');
         parseError.code = 'INVALID_JSON';
         throw parseError;
     }
 }
 
-function isTransientDbConnectionError(error) {
-    if (!error) return false;
-    const message = String(error.message || '').toLowerCase();
-    const causeMessage = String(error.cause?.message || '').toLowerCase();
-
-    return (
-        message.includes('connection terminated') ||
-        message.includes('connection timeout') ||
-        causeMessage.includes('connection terminated') ||
-        causeMessage.includes('connection timeout')
-    );
-}
+// Using isTransientConnectionError from db.js module
 
 async function safePersistOnDisconnect(roomId, playerId) {
     try {
@@ -72,7 +69,7 @@ async function safePersistOnDisconnect(roomId, playerId) {
             WHERE player_id = $1
         `, [playerId]);
     } catch (error) {
-        if (isTransientDbConnectionError(error)) {
+        if (isTransientConnectionError(error)) {
             console.warn('⚠️ No se pudo marcar desconexión (BD inactiva/transitoria).');
             return false;
         }
@@ -83,7 +80,7 @@ async function safePersistOnDisconnect(roomId, playerId) {
         await flushSaveGameState(roomId);
         return true;
     } catch (error) {
-        if (isTransientDbConnectionError(error)) {
+        if (isTransientConnectionError(error)) {
             console.warn('⚠️ No se pudo guardar estado al desconectar (BD inactiva/transitoria).');
             return false;
         }
@@ -324,7 +321,7 @@ function setupWebSocket(server) {
                             WHERE player_id = $1
                         `, [playerId]);
                     } catch (error) {
-                        if (!isTransientDbConnectionError(error)) throw error;
+                        if (!isTransientConnectionError(error)) throw error;
                         console.warn('⚠️ Ping recibido, pero no se pudo actualizar last_ping por BD inactiva.');
                     }
                     return;

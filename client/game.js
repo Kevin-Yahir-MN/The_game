@@ -1637,17 +1637,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function cleanup() {
+        // Clear game state
         gameState.animatingCards = [];
+        animationQueue = [];
+        dirtyAreas = [];
 
+        // Clean up drag state
         if (dragStartCard) {
             dragStartCard.endDrag();
             dragStartCard = null;
         }
         isDragging = false;
+
+        // Clear timers and animation frames
         clearInterval(historyIconsAnimation.interval);
         clearTimeout(reconnectTimeout);
         cancelAnimationFrame(animationFrameId);
 
+        // Close WebSocket properly
         if (socket) {
             socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null;
             if (socket.readyState === WebSocket.OPEN) {
@@ -1656,6 +1663,7 @@ document.addEventListener('DOMContentLoaded', () => {
             socket = null;
         }
 
+        // Remove canvas event listeners
         const events = {
             click: handleCanvasClick,
             mousedown: handleMouseDown,
@@ -1671,14 +1679,24 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.removeEventListener(event, handler);
         });
 
+        // Remove UI event listeners
         document.getElementById('endTurnBtn')?.removeEventListener('click', endTurn);
         document.getElementById('modalBackdrop')?.removeEventListener('click', closeHistoryModal);
 
+        // Remove emoji button listeners
+        if (emojiButtonsContainer) {
+            emojiButtonsContainer.removeEventListener('click', (event) => { });
+        }
+
+        // Remove all temporary DOM elements
         document.querySelectorAll('.notification, .game-over-backdrop').forEach(el => el.remove());
 
+        // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        gameState.animatingCards = [];
+
+        // Clear memory caches
         assetCache.clear();
+        cardPool.pool = [];
     }
 
     function initGame() {

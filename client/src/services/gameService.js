@@ -70,8 +70,9 @@ function finalizeGame(room, { result, message, reason }) {
         .map((player) => player.userId)
         .filter(Boolean);
 
-    console.log('[GAME] Finalizing: result=' + result + ', players=' + room.players.length + ', validUserIds=' + userIds.length);
-    room.players.forEach((p, idx) => console.log('[GAME]   Player ' + idx + ': id=' + p.id + ', userId=' + p.userId));
+    if (!require('../config').IS_PRODUCTION) {
+        console.log('[GAME] Finalizing: result=' + result + ', players=' + room.players.length + ', validUserIds=' + userIds.length);
+    }
 
     recordUsersGameResult(userIds, result === 'win').catch((error) => {
         console.error('[GAME] Error updating stats:', error);
