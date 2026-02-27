@@ -661,6 +661,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleInitGame(message) {
+        // asegurarse de que el sessionStorage está sincronizado con el servidor
+        // así cuando se reconecta el cliente obtiene el estado correcto de host
+        if (message.isHost !== undefined) {
+            sessionStorage.setItem('isHost', message.isHost ? 'true' : 'false');
+        }
+        
         gameState.currentTurn = message.gameState.currentTurn;
         gameState.board = message.gameState.board;
         gameState.remainingDeck = message.gameState.remainingDeck;

@@ -475,11 +475,16 @@ function setupWebSocket(server) {
 
                             boardHistory.set(roomId, defaultHistory());
 
+                            // restaurar el estado de host: solo el host original puede ser host
+                            const originalHostId = room.originalHostId || room.players[0].id;
                             room.players.forEach(currentPlayer => {
                                 currentPlayer.cards = [];
                                 resetPlayerTurnState(currentPlayer);
                                 currentPlayer.cardsPlayedThisTurn = 0;
+                                // restaurar host original
+                                currentPlayer.isHost = (currentPlayer.id === originalHostId);
                             });
+                            room.originalHostId = originalHostId;
 
                             await flushSaveGameState(roomId);
 
@@ -698,18 +703,9 @@ function setupWebSocket(server) {
                     }))
                 });
             }
-
-            if (player.isHost && room.players.length > 0) {
-                const newHost = room.players.find(p => p.ws?.readyState === WebSocket.OPEN);
-                if (newHost) {
-                    newHost.isHost = true;
-                    broadcastToRoom(room, {
-                        type: 'notification',
-                        message: `${newHost.name} es ahora el host`,
-                        isError: false
-                    });
-                }
-            }
+            // Nota: Ya NO asignamos un nuevo host cuando el actual se desconecta.
+            // El host original (almacenado en room.originalHostId) siempre permanece
+            // como host incluso si sufre desconexiones temporales.
         });
     });
 

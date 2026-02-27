@@ -28,7 +28,8 @@ async function saveGameState(roomId) {
                 gameStarted: room.gameState.gameStarted,
                 initialCards: room.gameState.initialCards
             },
-            history: boardHistory.get(roomId)
+            history: boardHistory.get(roomId),
+            originalHostId: room.originalHostId
         };
 
         const client = await pool.connect();
@@ -102,6 +103,7 @@ async function restoreActiveGames() {
                     };
                 }
 
+                const originalHostId = gameData.originalHostId || (gameData.players && gameData.players[0]?.id);
                 const room = {
                     players: gameData.players?.map(p => ({
                         ...p,
@@ -113,7 +115,9 @@ async function restoreActiveGames() {
                             moves: Array.isArray(p.movesThisTurn) ? p.movesThisTurn : []
                         },
                         totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
-                        lastActivity: Date.now()
+                        lastActivity: Date.now(),
+                        // asegurar que solo el host original sea host
+                        isHost: p.id === originalHostId
                     })) || [],
                     gameState: gameData.gameState || {
                         deck: initializeDeck(),
@@ -122,6 +126,7 @@ async function restoreActiveGames() {
                         gameStarted: false,
                         initialCards: 6
                     },
+                    originalHostId: originalHostId,
                     resetting: false
                 };
 

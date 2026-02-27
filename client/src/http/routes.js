@@ -332,6 +332,8 @@ function registerHttpRoutes(app) {
                     gameStarted: false,
                     initialCards: 6
                 },
+                // el host original nunca cambia, incluso si se desconecta
+                originalHostId: playerId,
                 // flag used to suppress player removal during the brief
                 // transition that occurs when a game resets and everyone
                 // hops back to the lobby page

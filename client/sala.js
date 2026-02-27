@@ -245,6 +245,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (message.type === 'init_game') {
                 // Actualizar lista de jugadores con el estado inicial
                 updatePlayersUI(message.gameState.players);
+                // asegurarse de que el sessionStorage está sincronizado con el servidor
+                // así cuando se reconecta el cliente obtiene el estado correcto de host
+                if (message.isHost !== undefined) {
+                    sessionStorage.setItem('isHost', message.isHost ? 'true' : 'false');
+                }
             }
             else if (message.type === 'full_state_update') {
                 // Actualizar UI con el estado completo del servidor
