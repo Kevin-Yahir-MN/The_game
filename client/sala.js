@@ -45,9 +45,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const disabledAttr = alreadyInRoom ? 'disabled' : '';
             const titleAttr = alreadyInRoom ? 'title="Ya está en la sala"' : '';
             const inviteBtn = `<button class="invite-friend-btn" ${disabledAttr} ${titleAttr} data-friend-id="${f.id}" data-friend-name="${f.displayName}">Invitar</button>`;
-            return `<li>${f.displayName} ${inviteBtn}</li>`;
+            return `<li><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span> ${inviteBtn}</li>`;
         }).join('');
 
+        // attach click handlers
         c.querySelectorAll('.invite-friend-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const friendId = btn.dataset.friendId;
@@ -67,6 +68,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.error('Error enviando invitación:', e);
                     showNotification('Error enviando invitación', true);
                 }
+            });
+        });
+
+        c.querySelectorAll('.friend-name').forEach(span => {
+            span.addEventListener('click', () => {
+                const fid = span.dataset.friendId;
+                if (fid) showFriendModal(fid);
             });
         });
     }
@@ -95,6 +103,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const backToMenuBtn = document.getElementById('backToMenu');
     const emojiButtonsContainer = document.getElementById('emojiButtons');
     const emojiPopinsContainer = document.getElementById('emojiPopins');
+    const friendModal = document.getElementById('friendModal');
+    const modalFriendName = document.getElementById('modalFriendName');
+    const modalGamesPlayed = document.getElementById('modalGamesPlayed');
+    const modalWins = document.getElementById('modalWins');
+    const modalWinStreak = document.getElementById('modalWinStreak');
+    const removeFriendBtn = document.getElementById('removeFriendBtn');
 
     // Mostrar notificación
     function showNotification(message, isError = false) {
@@ -130,6 +144,59 @@ document.addEventListener('DOMContentLoaded', () => {
             backdrop.style.opacity = '1';
         }, 10);
     }
+
+    // funciones para el modal de información de amigo
+    function showFriendModal(friendId) {
+        fetchWithAuth(`${API_URL}/users/${friendId}`)
+            .then(resp => resp.json())
+            .then(data => {
+                if (data.success && data.account) {
+                    modalFriendName.textContent = data.account.displayName;
+                    modalGamesPlayed.textContent = data.account.stats.gamesPlayed;
+                    modalWins.textContent = data.account.stats.wins;
+                    modalWinStreak.textContent = data.account.stats.winStreak;
+                    friendModal.classList.remove('hidden');
+                    friendModal.dataset.currentId = friendId;
+                } else {
+                    showNotification('No se pudo cargar información del amigo', true);
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching friend info', err);
+                showNotification('Error cargando información', true);
+            });
+    }
+
+    function closeFriendModal() {
+        friendModal.classList.add('hidden');
+        delete friendModal.dataset.currentId;
+    }
+
+    removeFriendBtn.addEventListener('click', () => {
+        const fid = friendModal.dataset.currentId;
+        if (!fid) return;
+        fetchWithAuth(`${API_URL}/friends/${fid}`, { method: 'DELETE' })
+            .then(resp => resp.json())
+            .then(json => {
+                if (json.success) {
+                    showNotification('Amigo eliminado');
+                    closeFriendModal();
+                    loadFriends();
+                } else {
+                    showNotification('Error eliminando amigo', true);
+                }
+            })
+            .catch(err => {
+                console.error('Error deleting friend', err);
+                showNotification('Error eliminando amigo', true);
+            });
+    });
+
+    friendModal.addEventListener('click', (e) => {
+        if (e.target === friendModal) {
+            closeFriendModal();
+        }
+    });
 
     // Actualizar estado de conexión en UI
     function updateConnectionStatus(status, isError = false) {

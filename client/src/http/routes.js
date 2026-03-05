@@ -287,6 +287,58 @@ function registerHttpRoutes(app) {
         }
     });
 
+    // eliminar amigo
+    app.delete('/friends/:id', async (req, res) => {
+        try {
+            const user = await getAuthenticatedUser(req);
+            if (!user) {
+                return res.status(401).json({ success: false, message: 'No autenticado' });
+            }
+            const friendId = req.params.id;
+            if (!friendId) {
+                return res.status(400).json({ success: false, message: 'friendId requerido' });
+            }
+
+            await require('../services/friendService').removeFriend(user.id, friendId);
+            return res.json({ success: true });
+        } catch (error) {
+            console.error('Error eliminando amigo:', error);
+            return res.status(500).json({ success: false, message: 'Error interno al eliminar amigo' });
+        }
+    });
+
+    // obtener información de cualquier usuario (para modal de amigos)
+    app.get('/users/:id', async (req, res) => {
+        try {
+            const user = await getAuthenticatedUser(req);
+            if (!user) {
+                return res.status(401).json({ success: false, message: 'No autenticado' });
+            }
+
+            const account = await getAccountById(req.params.id);
+            if (!account) {
+                return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+            }
+
+            return res.json({
+                success: true,
+                account: {
+                    id: account.id,
+                    username: account.username,
+                    displayName: account.display_name,
+                    stats: {
+                        gamesPlayed: Number(account.games_played) || 0,
+                        wins: Number(account.wins) || 0,
+                        winStreak: Number(account.win_streak) || 0
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error obteniendo usuario:', error);
+            return res.status(500).json({ success: false, message: 'Error interno al obtener usuario' });
+        }
+    });
+
     // continuar con rutas existentes
     app.post('/create-room', async (req, res) => {
         const authUser = await getAuthenticatedUser(req);

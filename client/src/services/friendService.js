@@ -56,6 +56,25 @@ async function addFriend(userId, friendId) {
     });
 }
 
+async function removeFriend(userId, friendId) {
+    if (!userId || !friendId) {
+        const error = new Error('userId y friendId son obligatorios');
+        error.code = 'MISSING_FIELDS';
+        throw error;
+    }
+
+    await pool.query(
+        'DELETE FROM friends WHERE user_id = $1 AND friend_id = $2',
+        [userId, friendId]
+    );
+}
+
+module.exports = {
+    getFriends,
+    addFriend,
+    removeFriend
+};
+
 module.exports = {
     getFriends,
     addFriend
