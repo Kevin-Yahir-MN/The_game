@@ -579,6 +579,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Inicializar la aplicación
     function initialize() {
+        // Mostrar la pantalla de carga
+        const loadingScreen = document.getElementById('loadingScreen');
+
         initializeUI();
         connectWebSocket();
 
@@ -591,6 +594,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Actualizar lista de jugadores periódicamente
         playerUpdateInterval = setInterval(updatePlayersList, PLAYER_UPDATE_INTERVAL);
+
+        // Ocultar la pantalla de carga después de 3 segundos
+        setTimeout(() => {
+            if (loadingScreen) {
+                loadingScreen.classList.add('hidden');
+            }
+        }, 3000);
     }
 
     // Limpieza al salir
