@@ -82,9 +82,19 @@ document.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = '<li>(sin amigos)</li>';
             return;
         }
-        container.innerHTML = friends.map(f => `<li data-friend-id="${f.id}">${f.displayName}</li>`).join('');
+        container.innerHTML = friends.map(f => {
+            const inviteBtn = `<button class="invite-friend-btn" disabled title="Invitación no disponible">Invitar</button>`;
+            return `<li data-friend-id="${f.id}"><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span> ${inviteBtn}</li>`;
+        }).join('');
 
-        // make rows clickable
+        // attach click handlers for invite buttons (disabled so just stop propagation)
+        container.querySelectorAll('.invite-friend-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        });
+
+        // make rows clickable to open modal
         container.querySelectorAll('li[data-friend-id]').forEach(li => {
             li.addEventListener('click', () => {
                 const fid = li.dataset.friendId;
