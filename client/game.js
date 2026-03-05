@@ -1705,6 +1705,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Mostrar la pantalla de carga
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.classList.remove('hidden');
+        }
+
         Promise.all([
             loadAsset('cards-icon.png').then(img => { if (img) historyIcon = img; }).catch(err => {
                 log('Error loading history icon', err);
@@ -1767,9 +1773,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 updatePlayersPanel();
             }, 1000);
             gameLoop();
+
+            // Ocultar la pantalla de carga después de 5 segundos
+            setTimeout(() => {
+                if (loadingScreen) {
+                    loadingScreen.classList.add('hidden');
+                }
+            }, 5000);
         }).catch(err => {
             log('Error initializing game', err);
             showNotification('Error al cargar los recursos del juego', true);
+            // Ocultar pantalla de carga en caso de error
+            if (loadingScreen) {
+                loadingScreen.classList.add('hidden');
+            }
             // Intentar conectar de todas formas
             connectWebSocket();
         });
