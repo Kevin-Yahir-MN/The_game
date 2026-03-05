@@ -45,12 +45,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const disabledAttr = alreadyInRoom ? 'disabled' : '';
             const titleAttr = alreadyInRoom ? 'title="Ya está en la sala"' : '';
             const inviteBtn = `<button class="invite-friend-btn" ${disabledAttr} ${titleAttr} data-friend-id="${f.id}" data-friend-name="${f.displayName}">Invitar</button>`;
-            return `<li><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span> ${inviteBtn}</li>`;
+            return `<li data-friend-id="${f.id}"><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span> ${inviteBtn}</li>`;
         }).join('');
 
-        // attach click handlers
+        // attach click handlers for invite buttons (stop propagation)
         c.querySelectorAll('.invite-friend-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 const friendId = btn.dataset.friendId;
                 const friendName = btn.dataset.friendName;
                 if (!friendId || !socket || socket.readyState !== WebSocket.OPEN) {
@@ -71,9 +72,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        c.querySelectorAll('.friend-name').forEach(span => {
-            span.addEventListener('click', () => {
-                const fid = span.dataset.friendId;
+        // click handler on entire list item
+        c.querySelectorAll('li[data-friend-id]').forEach(li => {
+            li.addEventListener('click', () => {
+                const fid = li.dataset.friendId;
                 if (fid) showFriendModal(fid);
             });
         });

@@ -961,6 +961,11 @@ body {
     color: var(--secondary);
 }
 
+/* make whole row pointer clickable */
+.friends-container li[data-friend-id] {
+    cursor: pointer;
+}
+
 .redirect-modal p {
     margin: 10px 0;
 }
