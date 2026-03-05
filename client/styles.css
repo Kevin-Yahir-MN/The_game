@@ -950,6 +950,17 @@ body {
     margin-top: 1rem;
 }
 
+/* clickable friend name style */
+.friend-name {
+    cursor: pointer;
+    color: var(--primary);
+    text-decoration: underline;
+}
+
+.friend-name:hover {
+    color: var(--secondary);
+}
+
 .redirect-modal p {
     margin: 10px 0;
 }
