@@ -67,6 +67,14 @@ document.addEventListener('DOMContentLoaded', () => {
         renderFriendList();
     }
 
+    // modal elements for lobby
+    const friendModal = document.getElementById('friendModal');
+    const modalFriendName = document.getElementById('modalFriendName');
+    const modalGamesPlayed = document.getElementById('modalGamesPlayed');
+    const modalWins = document.getElementById('modalWins');
+    const modalWinStreak = document.getElementById('modalWinStreak');
+    const removeFriendBtn = document.getElementById('removeFriendBtn');
+
     function renderFriendList() {
         const container = document.getElementById('friendList');
         if (!container) return;
@@ -74,8 +82,69 @@ document.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = '<li>(sin amigos)</li>';
             return;
         }
-        container.innerHTML = friends.map(f => `<li>${f.displayName}</li>`).join('');
+        container.innerHTML = friends.map(f => `<li data-friend-id="${f.id}">${f.displayName}</li>`).join('');
+
+        // make rows clickable
+        container.querySelectorAll('li[data-friend-id]').forEach(li => {
+            li.addEventListener('click', () => {
+                const fid = li.dataset.friendId;
+                if (fid) showFriendModal(fid);
+            });
+        });
     }
+
+    // friend modal functions
+    function showFriendModal(friendId) {
+        fetchWithAuth(`${API_URL}/users/${friendId}`)
+            .then(resp => resp.json())
+            .then(data => {
+                if (data.success && data.account) {
+                    modalFriendName.textContent = data.account.displayName;
+                    modalGamesPlayed.textContent = data.account.stats.gamesPlayed;
+                    modalWins.textContent = data.account.stats.wins;
+                    modalWinStreak.textContent = data.account.stats.winStreak;
+                    friendModal.classList.remove('hidden');
+                    friendModal.dataset.currentId = friendId;
+                } else {
+                    showNotification('No se pudo cargar información del amigo', true);
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching friend info', err);
+                showNotification('Error cargando información', true);
+            });
+    }
+
+    function closeFriendModal() {
+        friendModal.classList.add('hidden');
+        delete friendModal.dataset.currentId;
+    }
+
+    removeFriendBtn.addEventListener('click', () => {
+        const fid = friendModal.dataset.currentId;
+        if (!fid) return;
+        fetchWithAuth(`${API_URL}/friends/${fid}`, { method: 'DELETE' })
+            .then(resp => resp.json())
+            .then(json => {
+                if (json.success) {
+                    showNotification('Amigo eliminado');
+                    closeFriendModal();
+                    loadFriends();
+                } else {
+                    showNotification('Error eliminando amigo', true);
+                }
+            })
+            .catch(err => {
+                console.error('Error deleting friend', err);
+                showNotification('Error eliminando amigo', true);
+            });
+    });
+
+    friendModal.addEventListener('click', (e) => {
+        if (e.target === friendModal) {
+            closeFriendModal();
+        }
+    });
 
     function setupLobbyWebSocket() {
         if (lobbyWs) lobbyWs.close();

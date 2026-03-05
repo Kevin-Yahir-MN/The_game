@@ -21,6 +21,17 @@
             <ul id="friendList"></ul>
         </div>
 
+        <!-- Modal para información de amigo -->
+        <div id="friendModal" class="modal hidden">
+            <div class="modal-content">
+                <h2 id="modalFriendName"></h2>
+                <p>Partidas jugadas: <span id="modalGamesPlayed">0</span></p>
+                <p>Victorias: <span id="modalWins">0</span></p>
+                <p>Victorias consecutivas: <span id="modalWinStreak">0</span></p>
+                <button id="removeFriendBtn" class="danger-button">Eliminar amigo</button>
+            </div>
+        </div>
+
         <div class="lobby-card">
             <div class="login-form">
                 <div id="authOptionsContainer">
