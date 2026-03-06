@@ -5,7 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- autenticación ligera para manejo de amigos ---
     function getAuthToken() {
-        return localStorage.getItem('authToken');
+        // Tokens are now handled via httpOnly cookies, not accessible to client
+        return null;
     }
     function getAuthUser() {
         const raw = localStorage.getItem('authUser');
@@ -17,14 +18,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     async function fetchWithAuth(url, options = {}) {
-        const token = getAuthToken();
         const headers = {
             'Content-Type': 'application/json',
             Accept: 'application/json',
             ...(options.headers || {}),
         };
-        if (token) headers.Authorization = `Bearer ${token}`;
-        return fetch(url, { ...options, headers });
+        // No need to send Authorization header, cookies are sent automatically
+        return fetch(url, {
+            ...options,
+            credentials: 'include', // Ensure cookies are sent
+            headers
+        });
     }
 
     // estado de amigos en sala
@@ -56,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return `<li data-friend-id="${f.id}"><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span> ${inviteBtn}</li>`;
             })
             .join('');
+<<<<<<< HEAD
     }
 
     // friend modal functions
@@ -142,6 +147,55 @@ document.addEventListener('DOMContentLoaded', () => {
             closeFriendModal();
         }
     });
+=======
+
+        // attach click handlers for invite buttons (stop propagation)
+        c.querySelectorAll('.invite-friend-btn').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const friendId = btn.dataset.friendId;
+                const friendName = btn.dataset.friendName;
+                if (
+                    !friendId ||
+                    !socket ||
+                    socket.readyState !== WebSocket.OPEN
+                ) {
+                    showNotification('No se pudo enviar la invitación', true);
+                    return;
+                }
+                try {
+                    socket.send(
+                        JSON.stringify({
+                            type: 'invite_friend',
+                            targetUserId: friendId,
+                            roomId,
+                        })
+                    );
+                    showNotification(`Invitación enviada a ${friendName}`);
+                } catch (e) {
+                    console.error('Error enviando invitación:', e);
+                    showNotification('Error enviando invitación', true);
+                }
+            });
+        });
+
+        // use delegation for row clicks
+        c.addEventListener('click', (e) => {
+            const li = e.target.closest('li[data-friend-id]');
+            if (!li) return;
+            const fid = li.dataset.friendId;
+            if (fid) showFriendModal(fid);
+        });
+    }
+
+    // modal elements for room
+    const friendModal = document.getElementById('friendModal');
+    const modalFriendName = document.getElementById('modalFriendName');
+    const modalGamesPlayed = document.getElementById('modalGamesPlayed');
+    const modalWins = document.getElementById('modalWins');
+    const modalWinStreak = document.getElementById('modalWinStreak');
+    const removeFriendBtn = document.getElementById('removeFriendBtn');
+>>>>>>> parent of 4d21222 (Revert friends list in room to original state: remove modal, loadFriends call, and click delegation)
 
     const MAX_RECONNECT_ATTEMPTS = 10;
     const RECONNECT_BASE_DELAY = 2000;
@@ -207,6 +261,92 @@ document.addEventListener('DOMContentLoaded', () => {
             backdrop.style.opacity = '1';
         }, 10);
     }
+
+    // funciones para el modal de información de amigo
+    function showFriendModal(friendId) {
+        const friendData = friends.find(
+            (f) => String(f.id) === String(friendId)
+        );
+        const name = friendData ? friendData.displayName : '';
+        const token = getAuthToken();
+        if (token) {
+            fetchWithAuth(`${API_URL}/users/${friendId}`)
+                .then((resp) => resp.json())
+                .then((data) => {
+                    if (data.success && data.account) {
+                        modalFriendName.textContent = data.account.displayName;
+                        modalGamesPlayed.textContent =
+                            data.account.stats.gamesPlayed;
+                        modalWins.textContent = data.account.stats.wins;
+                        modalWinStreak.textContent =
+                            data.account.stats.winStreak;
+                        friendModal.classList.remove('hidden');
+                        friendModal.dataset.currentId = friendId;
+                    } else {
+                        showNotification(
+                            'No se pudo cargar información del amigo',
+                            true
+                        );
+                    }
+                })
+                .catch((err) => {
+                    console.error('Error fetching friend info', err);
+                    // fallback show name only
+                    modalFriendName.textContent = name || 'Amigo';
+                    modalGamesPlayed.textContent = '-';
+                    modalWins.textContent = '-';
+                    modalWinStreak.textContent = '-';
+                    friendModal.classList.remove('hidden');
+                    friendModal.dataset.currentId = friendId;
+                });
+        } else {
+            modalFriendName.textContent = name || 'Amigo';
+            modalGamesPlayed.textContent = '-';
+            modalWins.textContent = '-';
+            modalWinStreak.textContent = '-';
+            removeFriendBtn.style.display = 'none';
+            friendModal.classList.remove('hidden');
+            friendModal.dataset.currentId = friendId;
+        }
+    }
+
+    function closeFriendModal() {
+        friendModal.classList.add('hidden');
+        delete friendModal.dataset.currentId;
+        if (removeFriendBtn) removeFriendBtn.style.display = '';
+    }
+
+    removeFriendBtn.addEventListener('click', () => {
+        const fid = friendModal.dataset.currentId;
+        if (!fid) return;
+        fetchWithAuth(`${API_URL}/friends/${fid}`, { method: 'DELETE' })
+            .then((resp) => resp.json())
+            .then((json) => {
+                if (json.success) {
+                    showNotification('Amigo eliminado');
+                    closeFriendModal();
+                    loadFriends();
+                } else {
+                    showNotification('Error eliminando amigo', true);
+                }
+            })
+            .catch((err) => {
+                console.error('Error deleting friend', err);
+                showNotification('Error eliminando amigo', true);
+            });
+    });
+
+    friendModal.addEventListener('click', (e) => {
+        if (e.target === friendModal) {
+            closeFriendModal();
+        }
+    });
+
+    friendModal.addEventListener('click', (e) => {
+        if (e.target === friendModal) {
+            closeFriendModal();
+        }
+    });
 
     // Actualizar estado de conexión en UI
     function updateConnectionStatus(status, isError = false) {
@@ -679,6 +819,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fc = document.getElementById('friendsContainer');
         if (fc) fc.style.display = authUser ? 'block' : 'none';
 
+        loadFriends(); // Load friends list
         updatePlayersList();
         loadFriends();
 
