@@ -52,51 +52,96 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         c.innerHTML = friends
             .map((f) => {
-                const alreadyInRoom = currentPlayers.some(
-                    (p) =>
-                        p &&
-                        p.userId != null &&
-                        String(p.userId) === String(f.id)
-                );
-                const disabledAttr = alreadyInRoom ? 'disabled' : '';
-                const titleAttr = alreadyInRoom
-                    ? 'title="Ya está en la sala"'
-                    : '';
-                const inviteBtn = `<button class="invite-friend-btn" ${disabledAttr} ${titleAttr} data-friend-id="${f.id}" data-friend-name="${f.displayName}">Invitar</button>`;
+                const inviteBtn = `<button class="invite-friend-btn" disabled title="Invitación no disponible">Invitar</button>`;
                 return `<li data-friend-id="${f.id}"><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span> ${inviteBtn}</li>`;
             })
             .join('');
-
-        // attach click handlers for invite buttons (stop propagation)
-        c.querySelectorAll('.invite-friend-btn').forEach((btn) => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const friendId = btn.dataset.friendId;
-                const friendName = btn.dataset.friendName;
-                if (
-                    !friendId ||
-                    !socket ||
-                    socket.readyState !== WebSocket.OPEN
-                ) {
-                    showNotification('No se pudo enviar la invitación', true);
-                    return;
-                }
-                try {
-                    socket.send(
-                        JSON.stringify({
-                            type: 'invite_friend',
-                            targetUserId: friendId,
-                            roomId,
-                        })
-                    );
-                    showNotification(`Invitación enviada a ${friendName}`);
-                } catch (e) {
-                    console.error('Error enviando invitación:', e);
-                    showNotification('Error enviando invitación', true);
-                }
-            });
-        });
     }
+
+    // friend modal functions
+    function showFriendModal(friendId) {
+        // find displayName from local list as fallback
+        const friendData = friends.find(
+            (f) => String(f.id) === String(friendId)
+        );
+        const name = friendData ? friendData.displayName : '';
+
+        const token = getAuthToken();
+        if (token) {
+            // attempt to fetch full account info
+            fetchWithAuth(`${API_URL}/users/${friendId}`)
+                .then((resp) => resp.json())
+                .then((data) => {
+                    if (data.success && data.account) {
+                        modalFriendName.textContent = data.account.displayName;
+                        modalGamesPlayed.textContent =
+                            data.account.stats.gamesPlayed;
+                        modalWins.textContent = data.account.stats.wins;
+                        modalWinStreak.textContent =
+                            data.account.stats.winStreak;
+                        friendModal.classList.remove('hidden');
+                        friendModal.dataset.currentId = friendId;
+                    } else {
+                        showNotification(
+                            'No se pudo cargar información del amigo',
+                            true
+                        );
+                    }
+                })
+                .catch((err) => {
+                    console.error('Error fetching friend info', err);
+                    // fallback: show modal with name only
+                    modalFriendName.textContent = friendData
+                        ? friendData.displayName
+                        : 'Amigo';
+                    modalGamesPlayed.textContent = 'N/A';
+                    modalWins.textContent = 'N/A';
+                    modalWinStreak.textContent = 'N/A';
+                    friendModal.classList.remove('hidden');
+                    friendModal.dataset.currentId = friendId;
+                });
+        } else {
+            // no token, fallback
+            modalFriendName.textContent = name || 'Amigo';
+            modalGamesPlayed.textContent = 'N/A';
+            modalWins.textContent = 'N/A';
+            modalWinStreak.textContent = 'N/A';
+            friendModal.classList.remove('hidden');
+            friendModal.dataset.currentId = friendId;
+        }
+    }
+
+    function closeFriendModal() {
+        friendModal.classList.add('hidden');
+        delete friendModal.dataset.currentId;
+        // show remove button again for next open
+        if (removeFriendBtn) removeFriendBtn.style.display = '';
+    }
+
+    removeFriendBtn.addEventListener('click', () => {
+        const fid = friendModal.dataset.currentId;
+        if (!fid) return;
+        fetchWithAuth(`${API_URL}/friends/${fid}`, { method: 'DELETE' })
+            .then((resp) => {
+                if (resp.ok) {
+                    showNotification('Amigo eliminado');
+                    closeFriendModal();
+                    loadFriends(); // reload list
+                } else {
+                    showNotification('Error eliminando amigo', true);
+                }
+            })
+            .catch((err) => {
+                console.error('Error deleting friend', err);
+                showNotification('Error eliminando amigo', true);
+            });
+    });
+
+    friendModal.addEventListener('click', (e) => {
+        if (e.target === friendModal) {
+            closeFriendModal();
+        }
+    });
 
     const MAX_RECONNECT_ATTEMPTS = 10;
     const RECONNECT_BASE_DELAY = 2000;
@@ -650,6 +695,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // también renderizamos la lista de amigos ahora que may have loaded
         renderFriendList();
+
+        // event delegation for friend list clicks
+        const friendListContainer = document.getElementById('friendList');
+        if (friendListContainer) {
+            friendListContainer.addEventListener('click', (e) => {
+                const li = e.target.closest('li[data-friend-id]');
+                if (!li) return;
+                const fid = li.dataset.friendId;
+                console.log('row clicked (delegated)', fid);
+                if (fid) showFriendModal(fid);
+            });
+        }
     }
 
     // Inicializar la aplicación
