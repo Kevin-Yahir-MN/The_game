@@ -5,8 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- autenticación ligera para manejo de amigos ---
     function getAuthToken() {
-        // Tokens are now handled via httpOnly cookies, not accessible to client
-        return null;
+        return localStorage.getItem('authToken');
     }
     function getAuthUser() {
         const raw = localStorage.getItem('authUser');
@@ -18,17 +17,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     async function fetchWithAuth(url, options = {}) {
+        const token = getAuthToken();
         const headers = {
             'Content-Type': 'application/json',
             Accept: 'application/json',
             ...(options.headers || {}),
         };
-        // No need to send Authorization header, cookies are sent automatically
-        return fetch(url, {
-            ...options,
-            credentials: 'include', // Ensure cookies are sent
-            headers
-        });
+        if (token) headers.Authorization = `Bearer ${token}`;
+        return fetch(url, { ...options, headers });
     }
 
     // estado de amigos en sala
@@ -100,23 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
-
-        // use delegation for row clicks
-        c.addEventListener('click', (e) => {
-            const li = e.target.closest('li[data-friend-id]');
-            if (!li) return;
-            const fid = li.dataset.friendId;
-            if (fid) showFriendModal(fid);
-        });
     }
-
-    // modal elements for room
-    const friendModal = document.getElementById('friendModal');
-    const modalFriendName = document.getElementById('modalFriendName');
-    const modalGamesPlayed = document.getElementById('modalGamesPlayed');
-    const modalWins = document.getElementById('modalWins');
-    const modalWinStreak = document.getElementById('modalWinStreak');
-    const removeFriendBtn = document.getElementById('removeFriendBtn');
 
     const MAX_RECONNECT_ATTEMPTS = 10;
     const RECONNECT_BASE_DELAY = 2000;
@@ -182,92 +162,6 @@ document.addEventListener('DOMContentLoaded', () => {
             backdrop.style.opacity = '1';
         }, 10);
     }
-
-    // funciones para el modal de información de amigo
-    function showFriendModal(friendId) {
-        const friendData = friends.find(
-            (f) => String(f.id) === String(friendId)
-        );
-        const name = friendData ? friendData.displayName : '';
-        const token = getAuthToken();
-        if (token) {
-            fetchWithAuth(`${API_URL}/users/${friendId}`)
-                .then((resp) => resp.json())
-                .then((data) => {
-                    if (data.success && data.account) {
-                        modalFriendName.textContent = data.account.displayName;
-                        modalGamesPlayed.textContent =
-                            data.account.stats.gamesPlayed;
-                        modalWins.textContent = data.account.stats.wins;
-                        modalWinStreak.textContent =
-                            data.account.stats.winStreak;
-                        friendModal.classList.remove('hidden');
-                        friendModal.dataset.currentId = friendId;
-                    } else {
-                        showNotification(
-                            'No se pudo cargar información del amigo',
-                            true
-                        );
-                    }
-                })
-                .catch((err) => {
-                    console.error('Error fetching friend info', err);
-                    // fallback show name only
-                    modalFriendName.textContent = name || 'Amigo';
-                    modalGamesPlayed.textContent = '-';
-                    modalWins.textContent = '-';
-                    modalWinStreak.textContent = '-';
-                    friendModal.classList.remove('hidden');
-                    friendModal.dataset.currentId = friendId;
-                });
-        } else {
-            modalFriendName.textContent = name || 'Amigo';
-            modalGamesPlayed.textContent = '-';
-            modalWins.textContent = '-';
-            modalWinStreak.textContent = '-';
-            removeFriendBtn.style.display = 'none';
-            friendModal.classList.remove('hidden');
-            friendModal.dataset.currentId = friendId;
-        }
-    }
-
-    function closeFriendModal() {
-        friendModal.classList.add('hidden');
-        delete friendModal.dataset.currentId;
-        if (removeFriendBtn) removeFriendBtn.style.display = '';
-    }
-
-    removeFriendBtn.addEventListener('click', () => {
-        const fid = friendModal.dataset.currentId;
-        if (!fid) return;
-        fetchWithAuth(`${API_URL}/friends/${fid}`, { method: 'DELETE' })
-            .then((resp) => resp.json())
-            .then((json) => {
-                if (json.success) {
-                    showNotification('Amigo eliminado');
-                    closeFriendModal();
-                    loadFriends();
-                } else {
-                    showNotification('Error eliminando amigo', true);
-                }
-            })
-            .catch((err) => {
-                console.error('Error deleting friend', err);
-                showNotification('Error eliminando amigo', true);
-            });
-    });
-
-    friendModal.addEventListener('click', (e) => {
-        if (e.target === friendModal) {
-            closeFriendModal();
-        }
-    });
-
-    friendModal.addEventListener('click', (e) => {
-        if (e.target === friendModal) {
-            closeFriendModal();
-        }
-    });
 
     // Actualizar estado de conexión en UI
     function updateConnectionStatus(status, isError = false) {
@@ -711,7 +605,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const fc = document.getElementById('friendsContainer');
         if (fc) fc.style.display = authUser ? 'block' : 'none';
 
-        loadFriends(); // Load friends list
         updatePlayersList();
         loadFriends();
 
