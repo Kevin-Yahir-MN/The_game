@@ -78,8 +78,3 @@ module.exports = {
     addFriend,
     removeFriend,
 };
-
-module.exports = {
-    getFriends,
-    addFriend,
-};
