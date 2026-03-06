@@ -85,10 +85,32 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderFriendList() {
         const container = document.getElementById('friendList');
         if (!container) return;
+        const isMain =
+            window.location.pathname === '/' ||
+            window.location.pathname.endsWith('index.html');
+
         if (friends.length === 0) {
             container.innerHTML = '<li>(sin amigos)</li>';
             return;
         }
+
+        if (isMain) {
+            // En la pantalla principal NO mostrar botones de invitar
+            container.innerHTML = friends
+                .map((f) => `<li data-friend-id="${f.id}"><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span></li>`)
+                .join('');
+
+            // allow opening friend modal by clicking the row
+            container.querySelectorAll('li[data-friend-id]').forEach((li) => {
+                li.addEventListener('click', () => {
+                    const fid = li.dataset.friendId;
+                    if (fid) showFriendModal(fid);
+                });
+            });
+            return;
+        }
+
+        // En otras páginas (ej. sala) mostrar botón de invitar
         container.innerHTML = friends
             .map((f) => {
                 const inviteBtn = `<button class="invite-friend-btn" data-friend-id="${f.id}">Invitar</button>`;
