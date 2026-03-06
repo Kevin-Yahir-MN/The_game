@@ -256,6 +256,12 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.onopen = () => {
             reconnectAttempts = 0;
             updateConnectionStatus('Conectado');
+            // ocultar pantalla de carga cuando la conexión se establezca
+            try {
+                hideLoadingScreen();
+            } catch (e) {
+                console.warn('hideLoadingScreen no disponible:', e);
+            }
             showNotification('Conectado al servidor');
 
             pingInterval = setInterval(() => {
@@ -636,9 +642,32 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.ok) {
                 const data = await response.json();
                 if (data.success) updatePlayersUI(data.players);
+                // Si logramos actualizar jugadores, ocultamos pantalla de carga
+                try {
+                    hideLoadingScreen();
+                } catch (e) {
+                    /* ignore */
+                }
             }
         } catch (error) {
             console.error('Error actualizando jugadores:', error);
+        }
+    }
+
+    // Oculta de forma segura la pantalla de carga
+    function hideLoadingScreen() {
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (!loadingScreen) return;
+        if (!loadingScreen.classList.contains('hidden')) {
+            loadingScreen.classList.add('hidden');
+            // opcional: eliminar del DOM tras la transición para evitar interacciones inesperadas
+            setTimeout(() => {
+                try {
+                    if (loadingScreen.parentNode) loadingScreen.parentNode.removeChild(loadingScreen);
+                } catch (e) {
+                    /* noop */
+                }
+            }, 600);
         }
     }
 
