@@ -5,7 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- autenticación ligera para manejo de amigos ---
     function getAuthToken() {
-        return localStorage.getItem('authToken');
+        // Tokens are now handled via httpOnly cookies, not accessible to client
+        return null;
     }
     function getAuthUser() {
         const raw = localStorage.getItem('authUser');
@@ -17,14 +18,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     async function fetchWithAuth(url, options = {}) {
-        const token = getAuthToken();
         const headers = {
             'Content-Type': 'application/json',
             Accept: 'application/json',
             ...(options.headers || {}),
         };
-        if (token) headers.Authorization = `Bearer ${token}`;
-        return fetch(url, { ...options, headers });
+        // No need to send Authorization header, cookies are sent automatically
+        return fetch(url, {
+            ...options,
+            credentials: 'include', // Ensure cookies are sent
+            headers
+        });
     }
 
     // estado de amigos en sala
@@ -105,6 +109,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (fid) showFriendModal(fid);
         });
     }
+
+    // modal elements for room
+    const friendModal = document.getElementById('friendModal');
+    const modalFriendName = document.getElementById('modalFriendName');
+    const modalGamesPlayed = document.getElementById('modalGamesPlayed');
+    const modalWins = document.getElementById('modalWins');
+    const modalWinStreak = document.getElementById('modalWinStreak');
+    const removeFriendBtn = document.getElementById('removeFriendBtn');
 
     const MAX_RECONNECT_ATTEMPTS = 10;
     const RECONNECT_BASE_DELAY = 2000;
@@ -243,6 +255,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Error deleting friend', err);
                 showNotification('Error eliminando amigo', true);
             });
+    });
+
+    friendModal.addEventListener('click', (e) => {
+        if (e.target === friendModal) {
+            closeFriendModal();
+        }
     });
 
     friendModal.addEventListener('click', (e) => {
@@ -693,6 +711,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fc = document.getElementById('friendsContainer');
         if (fc) fc.style.display = authUser ? 'block' : 'none';
 
+        loadFriends(); // Load friends list
         updatePlayersList();
         loadFriends();
 
