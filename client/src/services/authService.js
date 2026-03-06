@@ -8,12 +8,9 @@ const TOKEN_TTL_DAYS = 30;
 const redisClient = redis.createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
 });
-let redisConnected = false;
 redisClient
     .connect()
-    .then(() => { redisConnected = true; })
     .catch((err) => console.error('Redis connection error:', err));
-redisClient.on('error', () => { redisConnected = false; });
 
 function normalizeUsername(username) {
     if (typeof username !== 'string') return '';
@@ -161,15 +158,13 @@ async function getUserFromToken(token) {
 
 async function getAccountById(userId) {
     const cacheKey = `user:${userId}`;
-    if (redisConnected) {
-        try {
-            const cached = await redisClient.get(cacheKey);
-            if (cached) {
-                return JSON.parse(cached);
-            }
-        } catch (err) {
-            console.warn('Redis get error:', err);
+    try {
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            return JSON.parse(cached);
         }
+    } catch (err) {
+        console.warn('Redis get error:', err);
     }
 
     const result = await pool.query(
@@ -181,12 +176,10 @@ async function getAccountById(userId) {
 
     if (result.rowCount > 0) {
         const account = result.rows[0];
-        if (redisConnected) {
-            try {
-                await redisClient.setEx(cacheKey, 300, JSON.stringify(account)); // Cache for 5 minutes
-            } catch (err) {
-                console.warn('Redis set error:', err);
-            }
+        try {
+            await redisClient.setEx(cacheKey, 300, JSON.stringify(account)); // Cache for 5 minutes
+        } catch (err) {
+            console.warn('Redis set error:', err);
         }
         return account;
     }
@@ -219,12 +212,10 @@ async function updateDisplayName(userId, displayName) {
         );
 
         if (result.rowCount > 0) {
-            if (redisConnected) {
-                try {
-                    await redisClient.del(`user:${userId}`);
-                } catch (err) {
-                    console.warn('Redis del error:', err);
-                }
+            try {
+                await redisClient.del(`user:${userId}`);
+            } catch (err) {
+                console.warn('Redis del error:', err);
             }
         }
 
@@ -260,12 +251,10 @@ async function changePassword(userId, currentPassword, newPassword) {
         [newHash, userId]
     );
 
-    if (redisConnected) {
-        try {
-            await redisClient.del(`user:${userId}`);
-        } catch (err) {
-            console.warn('Redis del error:', err);
-        }
+    try {
+        await redisClient.del(`user:${userId}`);
+    } catch (err) {
+        console.warn('Redis del error:', err);
     }
 }
 
@@ -303,13 +292,11 @@ async function recordUsersGameResult(userIds, didWin) {
         );
         console.log('[AUTH] Win updated for ' + result.rowCount + ' rows');
         // Invalidate cache
-        if (redisConnected) {
-            for (const id of uniqueIds) {
-                try {
-                    await redisClient.del(`user:${id}`);
-                } catch (err) {
-                    console.warn('Redis del error:', err);
-                }
+        for (const id of uniqueIds) {
+            try {
+                await redisClient.del(`user:${id}`);
+            } catch (err) {
+                console.warn('Redis del error:', err);
             }
         }
         return;
@@ -326,13 +313,11 @@ async function recordUsersGameResult(userIds, didWin) {
     );
     console.log('[AUTH] Loss updated for ' + result.rowCount + ' rows');
     // Invalidate cache
-    if (redisConnected) {
-        for (const id of uniqueIds) {
-            try {
-                await redisClient.del(`user:${id}`);
-            } catch (err) {
-                console.warn('Redis del error:', err);
-            }
+    for (const id of uniqueIds) {
+        try {
+            await redisClient.del(`user:${id}`);
+        } catch (err) {
+            console.warn('Redis del error:', err);
         }
     }
 }
