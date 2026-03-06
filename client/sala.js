@@ -10,11 +10,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function getAuthUser() {
         const raw = localStorage.getItem('authUser');
         if (!raw) return null;
-        try { return JSON.parse(raw); } catch { return null; }
+        try {
+            return JSON.parse(raw);
+        } catch {
+            return null;
+        }
     }
     async function fetchWithAuth(url, options = {}) {
         const token = getAuthToken();
-        const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json', ...(options.headers || {}) };
+        const headers = {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            ...(options.headers || {}),
+        };
         if (token) headers.Authorization = `Bearer ${token}`;
         return fetch(url, { ...options, headers });
     }
@@ -25,7 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadFriends() {
         friends = [];
         try {
-            const resp = await fetchWithAuth(`${API_URL}/friends`, { method: 'GET' });
+            const resp = await fetchWithAuth(`${API_URL}/friends`, {
+                method: 'GET',
+            });
             const json = await resp.json();
             if (resp.ok && json.success) friends = json.friends || [];
         } catch (e) {
@@ -40,30 +50,45 @@ document.addEventListener('DOMContentLoaded', () => {
             c.innerHTML = '<li>(sin amigos)</li>';
             return;
         }
-        c.innerHTML = friends.map(f => {
-            const alreadyInRoom = currentPlayers.some(p => (p && p.userId != null) && String(p.userId) === String(f.id));
-            const disabledAttr = alreadyInRoom ? 'disabled' : '';
-            const titleAttr = alreadyInRoom ? 'title="Ya está en la sala"' : '';
-            const inviteBtn = `<button class="invite-friend-btn" ${disabledAttr} ${titleAttr} data-friend-id="${f.id}" data-friend-name="${f.displayName}">Invitar</button>`;
-            return `<li data-friend-id="${f.id}"><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span> ${inviteBtn}</li>`;
-        }).join('');
+        c.innerHTML = friends
+            .map((f) => {
+                const alreadyInRoom = currentPlayers.some(
+                    (p) =>
+                        p &&
+                        p.userId != null &&
+                        String(p.userId) === String(f.id)
+                );
+                const disabledAttr = alreadyInRoom ? 'disabled' : '';
+                const titleAttr = alreadyInRoom
+                    ? 'title="Ya está en la sala"'
+                    : '';
+                const inviteBtn = `<button class="invite-friend-btn" ${disabledAttr} ${titleAttr} data-friend-id="${f.id}" data-friend-name="${f.displayName}">Invitar</button>`;
+                return `<li data-friend-id="${f.id}"><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span> ${inviteBtn}</li>`;
+            })
+            .join('');
 
         // attach click handlers for invite buttons (stop propagation)
-        c.querySelectorAll('.invite-friend-btn').forEach(btn => {
+        c.querySelectorAll('.invite-friend-btn').forEach((btn) => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const friendId = btn.dataset.friendId;
                 const friendName = btn.dataset.friendName;
-                if (!friendId || !socket || socket.readyState !== WebSocket.OPEN) {
+                if (
+                    !friendId ||
+                    !socket ||
+                    socket.readyState !== WebSocket.OPEN
+                ) {
                     showNotification('No se pudo enviar la invitación', true);
                     return;
                 }
                 try {
-                    socket.send(JSON.stringify({
-                        type: 'invite_friend',
-                        targetUserId: friendId,
-                        roomId
-                    }));
+                    socket.send(
+                        JSON.stringify({
+                            type: 'invite_friend',
+                            targetUserId: friendId,
+                            roomId,
+                        })
+                    );
                     showNotification(`Invitación enviada a ${friendName}`);
                 } catch (e) {
                     console.error('Error enviando invitación:', e);
@@ -80,7 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (fid) showFriendModal(fid);
         });
     }
-
 
     const MAX_RECONNECT_ATTEMPTS = 10;
     const RECONNECT_BASE_DELAY = 2000;
@@ -149,25 +173,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // funciones para el modal de información de amigo
     function showFriendModal(friendId) {
-        const friendData = friends.find(f => String(f.id) === String(friendId));
+        const friendData = friends.find(
+            (f) => String(f.id) === String(friendId)
+        );
         const name = friendData ? friendData.displayName : '';
         const token = getAuthToken();
         if (token) {
             fetchWithAuth(`${API_URL}/users/${friendId}`)
-                .then(resp => resp.json())
-                .then(data => {
+                .then((resp) => resp.json())
+                .then((data) => {
                     if (data.success && data.account) {
                         modalFriendName.textContent = data.account.displayName;
-                        modalGamesPlayed.textContent = data.account.stats.gamesPlayed;
+                        modalGamesPlayed.textContent =
+                            data.account.stats.gamesPlayed;
                         modalWins.textContent = data.account.stats.wins;
-                        modalWinStreak.textContent = data.account.stats.winStreak;
+                        modalWinStreak.textContent =
+                            data.account.stats.winStreak;
                         friendModal.classList.remove('hidden');
                         friendModal.dataset.currentId = friendId;
                     } else {
-                        showNotification('No se pudo cargar información del amigo', true);
+                        showNotification(
+                            'No se pudo cargar información del amigo',
+                            true
+                        );
                     }
                 })
-                .catch(err => {
+                .catch((err) => {
                     console.error('Error fetching friend info', err);
                     // fallback show name only
                     modalFriendName.textContent = name || 'Amigo';
@@ -198,8 +229,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const fid = friendModal.dataset.currentId;
         if (!fid) return;
         fetchWithAuth(`${API_URL}/friends/${fid}`, { method: 'DELETE' })
-            .then(resp => resp.json())
-            .then(json => {
+            .then((resp) => resp.json())
+            .then((json) => {
                 if (json.success) {
                     showNotification('Amigo eliminado');
                     closeFriendModal();
@@ -208,7 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     showNotification('Error eliminando amigo', true);
                 }
             })
-            .catch(err => {
+            .catch((err) => {
                 console.error('Error deleting friend', err);
                 showNotification('Error eliminando amigo', true);
             });
@@ -223,7 +254,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Actualizar estado de conexión en UI
     function updateConnectionStatus(status, isError = false) {
         connectionStatus = status;
-        const statusElement = document.getElementById('connectionStatus') || createConnectionStatusElement();
+        const statusElement =
+            document.getElementById('connectionStatus') ||
+            createConnectionStatusElement();
         statusElement.textContent = status;
         statusElement.className = isError ? 'error' : '';
     }
@@ -241,17 +274,25 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(reconnectTimeout);
 
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            showNotification('No se puede conectar al servidor. Recarga la página.', true);
+            showNotification(
+                'No se puede conectar al servidor. Recarga la página.',
+                true
+            );
             return;
         }
 
         updateConnectionStatus('Conectando...');
 
-        if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
+        if (
+            socket &&
+            [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)
+        ) {
             socket.close();
         }
 
-        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${playerId}&playerName=${encodeURIComponent(playerName)}`);
+        socket = new WebSocket(
+            `${WS_URL}?roomId=${roomId}&playerId=${playerId}&playerName=${encodeURIComponent(playerName)}`
+        );
 
         let pingInterval;
 
@@ -263,12 +304,14 @@ document.addEventListener('DOMContentLoaded', () => {
             pingInterval = setInterval(() => {
                 if (socket?.readyState === WebSocket.OPEN) {
                     try {
-                        socket.send(JSON.stringify({
-                            type: 'ping',
-                            playerId: playerId,
-                            roomId: roomId,
-                            timestamp: Date.now()
-                        }));
+                        socket.send(
+                            JSON.stringify({
+                                type: 'ping',
+                                playerId: playerId,
+                                roomId: roomId,
+                                timestamp: Date.now(),
+                            })
+                        );
                     } catch (error) {
                         console.error('Error enviando ping:', error);
                     }
@@ -278,11 +321,13 @@ document.addEventListener('DOMContentLoaded', () => {
             sendPlayerUpdate();
 
             if (connectionStatus === 'reconnecting') {
-                socket.send(JSON.stringify({
-                    type: 'get_full_state',
-                    playerId: playerId,
-                    roomId: roomId
-                }));
+                socket.send(
+                    JSON.stringify({
+                        type: 'get_full_state',
+                        playerId: playerId,
+                        roomId: roomId,
+                    })
+                );
             }
             connectionStatus = 'connected';
         };
@@ -291,9 +336,14 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(pingInterval);
             if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                 reconnectAttempts++;
-                const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1), 30000);
+                const delay = Math.min(
+                    RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1),
+                    30000
+                );
                 reconnectTimeout = setTimeout(connectWebSocket, delay);
-                updateConnectionStatus(`Reconectando (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+                updateConnectionStatus(
+                    `Reconectando (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`
+                );
                 connectionStatus = 'reconnecting';
             } else {
                 updateConnectionStatus('Desconectado', true);
@@ -321,7 +371,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (message.type === 'friend_invite_response') {
                     const accepted = message.accepted;
                     const other = message.fromUserId || '';
-                    showNotification(accepted ? 'Tu invitación fue aceptada' : 'Tu invitación fue declinada');
+                    showNotification(
+                        accepted
+                            ? 'Tu invitación fue aceptada'
+                            : 'Tu invitación fue declinada'
+                    );
                     return;
                 }
 
@@ -335,14 +389,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Enviar actualización de jugador
     function sendPlayerUpdate() {
         if (socket?.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({
-                type: 'update_player',
-                playerId: playerId,
-                name: playerName,
-                isHost: isHost,
-                roomId: roomId,
-                status: 'active'
-            }));
+            socket.send(
+                JSON.stringify({
+                    type: 'update_player',
+                    playerId: playerId,
+                    name: playerName,
+                    isHost: isHost,
+                    roomId: roomId,
+                    status: 'active',
+                })
+            );
         }
     }
 
@@ -357,36 +413,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 // asegurarse de que el sessionStorage está sincronizado con el servidor
                 // así cuando se reconecta el cliente obtiene el estado correcto de host
                 if (message.isHost !== undefined) {
-                    sessionStorage.setItem('isHost', message.isHost ? 'true' : 'false');
+                    sessionStorage.setItem(
+                        'isHost',
+                        message.isHost ? 'true' : 'false'
+                    );
                 }
-            }
-            else if (message.type === 'full_state_update') {
+            } else if (message.type === 'full_state_update') {
                 // Actualizar UI con el estado completo del servidor
                 updatePlayersUI(message.room.players);
 
                 // Nueva: Guardar estado en sessionStorage
-                sessionStorage.setItem('gameState', JSON.stringify({
-                    players: message.room.players,
-                    currentTurn: message.gameState.currentTurn,
-                    initialCards: message.gameState.initialCards
-                }));
+                sessionStorage.setItem(
+                    'gameState',
+                    JSON.stringify({
+                        players: message.room.players,
+                        currentTurn: message.gameState.currentTurn,
+                        initialCards: message.gameState.initialCards,
+                    })
+                );
 
                 if (isHost) {
                     gameSettings.style.display = 'block';
                     startBtn.classList.add('visible');
                 }
-            }
-            else if (message.type === 'game_started') {
+            } else if (message.type === 'game_started') {
                 handleGameStart();
-            }
-            else if (message.type === 'room_update') {
+            } else if (message.type === 'room_update') {
                 updatePlayersUI(message.players);
-            }
-            else if (message.type === 'player_left') {
+            } else if (message.type === 'player_left') {
                 updatePlayersUI(message.players);
                 showNotification(`${message.playerName} salió de la sala`);
-            }
-            else if (message.type === 'host_left_room') {
+            } else if (message.type === 'host_left_room') {
                 // Usar un modal en lugar de notificación
                 showRedirectModal('El host abandonó la sala');
                 setTimeout(() => {
@@ -396,11 +453,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     sessionStorage.removeItem('isHost');
                     window.location.href = 'index.html';
                 }, 2000);
-            }
-            else if (message.type === 'notification') {
+            } else if (message.type === 'notification') {
                 showNotification(message.message, message.isError);
-            }
-            else if (message.type === 'emoji_reaction') {
+            } else if (message.type === 'emoji_reaction') {
                 renderEmojiReaction(message);
             }
         } catch (error) {
@@ -422,7 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
             proud: '😎',
             angel: '😇',
             demon: '😈',
-            sleep: '😴'
+            sleep: '😴',
         };
 
         const emojiChar = emojiMap[message.emoji];
@@ -456,18 +511,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!players || !Array.isArray(players)) return;
         currentPlayers = players; // guardar referencia global
         const me = getAuthUser();
-        playersList.innerHTML = players.map(player => {
-            const isMe = player.id === playerId;
-            let extraButton = '';
-            // mostrar "agregar amigo" sólo si estamos autenticados, el jugador tiene userId,
-            // no es yo y no está ya en mi lista de amigos
-            if (me && player.userId && !isMe) {
-                const already = friends.find(f => f.id === player.userId);
-                if (!already) {
-                    extraButton = ` <button class="add-friend-btn" data-userid="${player.userId}">Agregar amigo</button>`;
+        playersList.innerHTML = players
+            .map((player) => {
+                const isMe = player.id === playerId;
+                let extraButton = '';
+                // mostrar "agregar amigo" sólo si estamos autenticados, el jugador tiene userId,
+                // no es yo y no está ya en mi lista de amigos
+                if (me && player.userId && !isMe) {
+                    const already = friends.find((f) => f.id === player.userId);
+                    if (!already) {
+                        extraButton = ` <button class="add-friend-btn" data-userid="${player.userId}">Agregar amigo</button>`;
+                    }
                 }
-            }
-            return `
+                return `
             <li class="${player.isHost ? 'host' : ''} ${isMe ? 'you' : ''}">
                 <span class="player-name">${player.name || 'Jugador'}</span>
                 ${player.isHost ? '<span class="host-tag">(Host)</span>' : ''}
@@ -476,26 +532,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${extraButton}
             </li>
         `;
-        }).join('');
+            })
+            .join('');
 
         // attach listeners for add-friend buttons
         const buttons = playersList.querySelectorAll('.add-friend-btn');
-        buttons.forEach(btn => {
+        buttons.forEach((btn) => {
             btn.addEventListener('click', async (e) => {
                 const uid = btn.dataset.userid;
                 if (!uid) return;
                 try {
                     const response = await fetchWithAuth(`${API_URL}/friends`, {
                         method: 'POST',
-                        body: JSON.stringify({ friendId: uid })
+                        body: JSON.stringify({ friendId: uid }),
                     });
                     const data = await response.json();
                     if (response.ok && data.success) {
-                        friends.push({ id: uid, displayName: btn.closest('li').querySelector('.player-name').textContent });
+                        friends.push({
+                            id: uid,
+                            displayName: btn
+                                .closest('li')
+                                .querySelector('.player-name').textContent,
+                        });
                         renderFriendList();
                         updatePlayersUI(currentPlayers); // rerender to remove button
                     } else {
-                        showNotification(data.message || 'Error agregando amigo', true);
+                        showNotification(
+                            data.message || 'Error agregando amigo',
+                            true
+                        );
                     }
                 } catch (err) {
                     console.error('Error agregando amigo:', err);
@@ -510,17 +575,18 @@ document.addEventListener('DOMContentLoaded', () => {
         renderFriendList();
     }
 
-
     function backToMenu() {
         // Notificar al servidor que estamos abandonando la sala
         // para que pueda transferir el host si es necesario
         if (socket && socket.readyState === WebSocket.OPEN) {
             try {
-                socket.send(JSON.stringify({
-                    type: 'leave_room',
-                    roomId: roomId,
-                    playerId: playerId
-                }));
+                socket.send(
+                    JSON.stringify({
+                        type: 'leave_room',
+                        roomId: roomId,
+                        playerId: playerId,
+                    })
+                );
             } catch (e) {
                 console.error('Error notificando abandono:', e);
             }
@@ -563,18 +629,23 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Enviar comando de inicio al servidor
-            socket.send(JSON.stringify({
-                type: 'start_game',
-                playerId: playerId,
-                roomId: roomId,
-                initialCards: parseInt(initialCardsSelect.value)
-            }));
+            socket.send(
+                JSON.stringify({
+                    type: 'start_game',
+                    playerId: playerId,
+                    roomId: roomId,
+                    initialCards: parseInt(initialCardsSelect.value),
+                })
+            );
 
             // Timeout de seguridad reducido a 8 segundos
             const timeout = setTimeout(() => {
                 if (window.location.pathname.endsWith('sala.html')) {
                     resetStartButton();
-                    showNotification('El servidor está tardando en responder', true);
+                    showNotification(
+                        'El servidor está tardando en responder',
+                        true
+                    );
                 }
             }, 8000);
 
@@ -587,7 +658,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.location.href = 'game.html';
                 }
             });
-
         } catch (error) {
             console.error('Error al iniciar juego:', error);
             resetStartButton();
@@ -601,7 +671,6 @@ document.addEventListener('DOMContentLoaded', () => {
         startBtn.textContent = 'Iniciar Juego';
         startBtn.classList.remove('loading');
     }
-
 
     // Actualizar lista de jugadores via API
     async function updatePlayersList() {
@@ -646,16 +715,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const emojiCode = target.dataset.emoji;
                 if (!emojiCode) return;
                 if (!socket || socket.readyState !== WebSocket.OPEN) {
-                    showNotification('No hay conexión para enviar reacción', true);
+                    showNotification(
+                        'No hay conexión para enviar reacción',
+                        true
+                    );
                     return;
                 }
 
-                socket.send(JSON.stringify({
-                    type: 'emoji_reaction',
-                    emoji: emojiCode,
-                    roomId,
-                    playerId
-                }));
+                socket.send(
+                    JSON.stringify({
+                        type: 'emoji_reaction',
+                        emoji: emojiCode,
+                        roomId,
+                        playerId,
+                    })
+                );
             });
         }
 
@@ -682,7 +756,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 10000);
 
         // Actualizar lista de jugadores periódicamente
-        playerUpdateInterval = setInterval(updatePlayersList, PLAYER_UPDATE_INTERVAL);
+        playerUpdateInterval = setInterval(
+            updatePlayersList,
+            PLAYER_UPDATE_INTERVAL
+        );
 
         // Ocultar la pantalla de carga después de 5 segundos
         setTimeout(() => {

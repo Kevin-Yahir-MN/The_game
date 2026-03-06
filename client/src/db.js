@@ -3,18 +3,22 @@ const { Pool } = require('pg');
 const { IS_PRODUCTION } = require('./config');
 
 const DB_INIT_MAX_RETRIES = Number(process.env.DB_INIT_MAX_RETRIES || 8);
-const DB_INIT_RETRY_DELAY_MS = Number(process.env.DB_INIT_RETRY_DELAY_MS || 4000);
+const DB_INIT_RETRY_DELAY_MS = Number(
+    process.env.DB_INIT_RETRY_DELAY_MS || 4000
+);
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
         require: true,
-        rejectUnauthorized: IS_PRODUCTION
+        rejectUnauthorized: IS_PRODUCTION,
     },
     max: 5,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 10000),
-    keepAlive: true
+    connectionTimeoutMillis: Number(
+        process.env.DB_CONNECTION_TIMEOUT_MS || 10000
+    ),
+    keepAlive: true,
 });
 
 pool.on('error', (error) => {
@@ -165,14 +169,19 @@ async function initializeDatabase() {
             const transient = isTransientConnectionError(error);
             const isLastAttempt = attempt >= DB_INIT_MAX_RETRIES;
 
-            console.error(`❌ Error al inicializar base de datos (intento ${attempt}/${DB_INIT_MAX_RETRIES}):`, error.message || error);
+            console.error(
+                `❌ Error al inicializar base de datos (intento ${attempt}/${DB_INIT_MAX_RETRIES}):`,
+                error.message || error
+            );
 
             if (!transient || isLastAttempt) {
                 throw error;
             }
 
             const delay = DB_INIT_RETRY_DELAY_MS * attempt;
-            console.warn(`⏳ Reintentando inicialización de BD en ${delay}ms...`);
+            console.warn(
+                `⏳ Reintentando inicialización de BD en ${delay}ms...`
+            );
             await wait(delay);
         }
     }
@@ -209,7 +218,10 @@ async function cleanupOldGames() {
 async function generateUniqueRoomId(maxAttempts = 10) {
     for (let i = 0; i < maxAttempts; i++) {
         const roomId = Math.floor(1000 + Math.random() * 9000).toString();
-        const exists = await pool.query('SELECT 1 FROM game_states WHERE room_id = $1', [roomId]);
+        const exists = await pool.query(
+            'SELECT 1 FROM game_states WHERE room_id = $1',
+            [roomId]
+        );
         if (exists.rowCount === 0) return roomId;
     }
     throw new Error('No fue posible generar un roomId único');
@@ -221,5 +233,5 @@ module.exports = {
     initializeDatabase,
     cleanupOldGames,
     generateUniqueRoomId,
-    isTransientConnectionError
+    isTransientConnectionError,
 };

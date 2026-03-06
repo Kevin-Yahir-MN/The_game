@@ -11,10 +11,10 @@ async function getFriends(userId) {
          ORDER BY u.display_name ASC`,
         [userId]
     );
-    return result.rows.map(r => ({
+    return result.rows.map((r) => ({
         id: r.id,
         username: r.username,
-        displayName: r.display_name
+        displayName: r.display_name,
     }));
 }
 
@@ -32,7 +32,9 @@ async function addFriend(userId, friendId) {
 
     return withTransaction(async (client) => {
         // verificar que el amigo existe
-        const exists = await client.query('SELECT 1 FROM users WHERE id = $1', [friendId]);
+        const exists = await client.query('SELECT 1 FROM users WHERE id = $1', [
+            friendId,
+        ]);
         if (exists.rowCount === 0) {
             const error = new Error('Usuario no encontrado');
             error.code = 'FRIEND_NOT_FOUND';
@@ -44,7 +46,9 @@ async function addFriend(userId, friendId) {
             [userId, friendId]
         );
         if (already.rowCount > 0) {
-            const error = new Error('Ese jugador ya está en tu lista de amigos');
+            const error = new Error(
+                'Ese jugador ya está en tu lista de amigos'
+            );
             error.code = 'ALREADY_FRIEND';
             throw error;
         }
@@ -72,10 +76,10 @@ async function removeFriend(userId, friendId) {
 module.exports = {
     getFriends,
     addFriend,
-    removeFriend
+    removeFriend,
 };
 
 module.exports = {
     getFriends,
-    addFriend
+    addFriend,
 };

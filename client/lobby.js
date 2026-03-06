@@ -24,14 +24,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginUsernameInput = document.getElementById('loginUsername');
     const loginPasswordInput = document.getElementById('loginPassword');
 
-    const registerDisplayNameInput = document.getElementById('registerDisplayName');
+    const registerDisplayNameInput = document.getElementById(
+        'registerDisplayName'
+    );
     const registerUsernameInput = document.getElementById('registerUsername');
     const registerPasswordInput = document.getElementById('registerPassword');
 
     const guestNameInput = document.getElementById('guestName');
     const acceptGuestBtn = document.getElementById('acceptGuestBtn');
 
-    const authOptionsContainer = document.getElementById('authOptionsContainer');
+    const authOptionsContainer = document.getElementById(
+        'authOptionsContainer'
+    );
     const activeUserContainer = document.getElementById('activeUserContainer');
     const activeUserLabel = document.getElementById('activeUserLabel');
 
@@ -39,7 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const myAccountPanel = document.getElementById('myAccountPanel');
     const backToMenuBtn = document.getElementById('backToMenuBtn');
     const mainActions = document.getElementById('mainActions');
-    const accountDisplayNameInput = document.getElementById('accountDisplayName');
+    const accountDisplayNameInput =
+        document.getElementById('accountDisplayName');
     const saveDisplayNameBtn = document.getElementById('saveDisplayNameBtn');
     const currentPasswordInput = document.getElementById('currentPassword');
     const newPasswordInput = document.getElementById('newPassword');
@@ -56,7 +61,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadFriends() {
         friends = [];
         try {
-            const response = await fetchWithAuth(`${API_URL}/friends`, { method: 'GET' });
+            const response = await fetchWithAuth(`${API_URL}/friends`, {
+                method: 'GET',
+            });
             const data = await response.json();
             if (response.ok && data.success) {
                 friends = data.friends || [];
@@ -82,13 +89,15 @@ document.addEventListener('DOMContentLoaded', () => {
             container.innerHTML = '<li>(sin amigos)</li>';
             return;
         }
-        container.innerHTML = friends.map(f => {
-            const inviteBtn = `<button class="invite-friend-btn" disabled title="Invitación no disponible">Invitar</button>`;
-            return `<li data-friend-id="${f.id}"><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span> ${inviteBtn}</li>`;
-        }).join('');
+        container.innerHTML = friends
+            .map((f) => {
+                const inviteBtn = `<button class="invite-friend-btn" disabled title="Invitación no disponible">Invitar</button>`;
+                return `<li data-friend-id="${f.id}"><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span> ${inviteBtn}</li>`;
+            })
+            .join('');
 
         // attach click handlers for invite buttons (disabled so just stop propagation)
-        container.querySelectorAll('.invite-friend-btn').forEach(btn => {
+        container.querySelectorAll('.invite-friend-btn').forEach((btn) => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
             });
@@ -107,30 +116,39 @@ document.addEventListener('DOMContentLoaded', () => {
     // friend modal functions
     function showFriendModal(friendId) {
         // find displayName from local list as fallback
-        const friendData = friends.find(f => String(f.id) === String(friendId));
+        const friendData = friends.find(
+            (f) => String(f.id) === String(friendId)
+        );
         const name = friendData ? friendData.displayName : '';
 
         const token = getAuthToken();
         if (token) {
             // attempt to fetch full account info
             fetchWithAuth(`${API_URL}/users/${friendId}`)
-                .then(resp => resp.json())
-                .then(data => {
+                .then((resp) => resp.json())
+                .then((data) => {
                     if (data.success && data.account) {
                         modalFriendName.textContent = data.account.displayName;
-                        modalGamesPlayed.textContent = data.account.stats.gamesPlayed;
+                        modalGamesPlayed.textContent =
+                            data.account.stats.gamesPlayed;
                         modalWins.textContent = data.account.stats.wins;
-                        modalWinStreak.textContent = data.account.stats.winStreak;
+                        modalWinStreak.textContent =
+                            data.account.stats.winStreak;
                         friendModal.classList.remove('hidden');
                         friendModal.dataset.currentId = friendId;
                     } else {
-                        showNotification('No se pudo cargar información del amigo', true);
+                        showNotification(
+                            'No se pudo cargar información del amigo',
+                            true
+                        );
                     }
                 })
-                .catch(err => {
+                .catch((err) => {
                     console.error('Error fetching friend info', err);
                     // fallback: show modal with name only
-                    modalFriendName.textContent = friendData ? friendData.displayName : 'Amigo';
+                    modalFriendName.textContent = friendData
+                        ? friendData.displayName
+                        : 'Amigo';
                     modalGamesPlayed.textContent = '-';
                     modalWins.textContent = '-';
                     modalWinStreak.textContent = '-';
@@ -160,8 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const fid = friendModal.dataset.currentId;
         if (!fid) return;
         fetchWithAuth(`${API_URL}/friends/${fid}`, { method: 'DELETE' })
-            .then(resp => resp.json())
-            .then(json => {
+            .then((resp) => resp.json())
+            .then((json) => {
                 if (json.success) {
                     showNotification('Amigo eliminado');
                     closeFriendModal();
@@ -170,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     showNotification('Error eliminando amigo', true);
                 }
             })
-            .catch(err => {
+            .catch((err) => {
                 console.error('Error deleting friend', err);
                 showNotification('Error eliminando amigo', true);
             });
@@ -186,21 +204,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (lobbyWs) lobbyWs.close();
         const identity = getCurrentIdentity();
         if (!identity) return;
-        const token = getAuthToken();
         const wsUrl = new URL(API_URL.replace(/^http/, 'ws'));
         wsUrl.searchParams.set('lobby', 'true');
-        if (token) wsUrl.searchParams.set('token', token);
+        if (!identity.isGuest) wsUrl.searchParams.set('userId', identity.id);
         if (identity.isGuest) {
             let lobbyId = sessionStorage.getItem('lobbyId');
             if (!lobbyId) {
-                lobbyId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+                lobbyId = crypto.randomUUID
+                    ? crypto.randomUUID()
+                    : Math.random().toString(36).substring(2);
                 sessionStorage.setItem('lobbyId', lobbyId);
             }
             wsUrl.searchParams.set('lobbyId', lobbyId);
             wsUrl.searchParams.set('displayName', identity.displayName);
         }
         lobbyWs = new WebSocket(wsUrl);
-        lobbyWs.onmessage = evt => {
+        lobbyWs.onmessage = (evt) => {
             try {
                 const msg = JSON.parse(evt.data);
                 if (msg.type === 'friend_invite') {
@@ -223,46 +242,58 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.appendChild(popup);
         const remove = () => popup.remove();
         const timer = setTimeout(remove, 10000);
-        popup.querySelector('#acceptInviteBtn').addEventListener('click', async () => {
-            clearTimeout(timer);
-            remove();
-            const identity = getCurrentIdentity();
-            if (!identity || !identity.displayName) return;
-            try {
-                const response = await fetchWithAuth(`${API_URL}/join-room`, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        playerName: identity.displayName,
-                        roomId: invite.roomId
-                    })
-                });
-                const data = await response.json();
-                if (response.ok && data.success) {
-                    sessionStorage.setItem('playerName', identity.displayName);
-                    sessionStorage.setItem('playerId', data.playerId);
-                    sessionStorage.setItem('roomId', invite.roomId);
-                    sessionStorage.setItem('isHost', 'false');
-                    window.location.href = 'sala.html';
-                } else {
-                    showError(data.message || 'No se pudo unir a la sala');
+        popup
+            .querySelector('#acceptInviteBtn')
+            .addEventListener('click', async () => {
+                clearTimeout(timer);
+                remove();
+                const identity = getCurrentIdentity();
+                if (!identity || !identity.displayName) return;
+                try {
+                    const response = await fetchWithAuth(
+                        `${API_URL}/join-room`,
+                        {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                playerName: identity.displayName,
+                                roomId: invite.roomId,
+                            }),
+                        }
+                    );
+                    const data = await response.json();
+                    if (response.ok && data.success) {
+                        sessionStorage.setItem(
+                            'playerName',
+                            identity.displayName
+                        );
+                        sessionStorage.setItem('playerId', data.playerId);
+                        sessionStorage.setItem('roomId', invite.roomId);
+                        sessionStorage.setItem('isHost', 'false');
+                        window.location.href = 'sala.html';
+                    } else {
+                        showError(data.message || 'No se pudo unir a la sala');
+                    }
+                } catch (e) {
+                    console.error('Error al aceptar invitación', e);
+                    showError('Error al unirse a la sala');
                 }
-            } catch (e) {
-                console.error('Error al aceptar invitación', e);
-                showError('Error al unirse a la sala');
-            }
-        });
-        popup.querySelector('#declineInviteBtn').addEventListener('click', () => {
-            clearTimeout(timer);
-            remove();
-            if (lobbyWs && lobbyWs.readyState === WebSocket.OPEN) {
-                lobbyWs.send(JSON.stringify({
-                    type: 'invite_response',
-                    inviterPlayerId: invite.inviterPlayerId,
-                    accepted: false,
-                    roomId: invite.roomId
-                }));
-            }
-        });
+            });
+        popup
+            .querySelector('#declineInviteBtn')
+            .addEventListener('click', () => {
+                clearTimeout(timer);
+                remove();
+                if (lobbyWs && lobbyWs.readyState === WebSocket.OPEN) {
+                    lobbyWs.send(
+                        JSON.stringify({
+                            type: 'invite_response',
+                            inviterPlayerId: invite.inviterPlayerId,
+                            accepted: false,
+                            roomId: invite.roomId,
+                        })
+                    );
+                }
+            });
     }
 
     // inyectar estilos rápidos
@@ -312,7 +343,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getAuthToken() {
-        return localStorage.getItem(AUTH_TOKEN_KEY);
+        // Tokens are now handled via httpOnly cookies, not accessible to client
+        return null;
     }
 
     function getAuthUser() {
@@ -338,7 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function saveAuth(token, user) {
-        localStorage.setItem(AUTH_TOKEN_KEY, token);
+        // Token is now in httpOnly cookie, not stored in localStorage
         localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
         localStorage.removeItem(GUEST_USER_KEY);
         refreshIdentityUI();
@@ -347,16 +379,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function saveGuestUser(name) {
         localStorage.removeItem(AUTH_TOKEN_KEY);
         localStorage.removeItem(AUTH_USER_KEY);
-        localStorage.setItem(GUEST_USER_KEY, JSON.stringify({
-            displayName: name,
-            username: `guest_${name}`,
-            isGuest: true
-        }));
+        localStorage.setItem(
+            GUEST_USER_KEY,
+            JSON.stringify({
+                displayName: name,
+                username: `guest_${name}`,
+                isGuest: true,
+            })
+        );
         refreshIdentityUI();
     }
 
     function clearIdentity() {
-        localStorage.removeItem(AUTH_TOKEN_KEY);
+        // Token is in cookie, cleared via logout endpoint
         localStorage.removeItem(AUTH_USER_KEY);
         localStorage.removeItem(GUEST_USER_KEY);
         closeJoinRoomModal();
@@ -452,6 +487,12 @@ document.addEventListener('DOMContentLoaded', () => {
             showError('El usuario es obligatorio');
             return false;
         }
+        if (!/^[\p{L}\p{N}_\-\s]{2,24}$/u.test(username.trim())) {
+            showError(
+                'El usuario debe tener entre 2 y 24 caracteres, solo letras, números, espacios, guiones y guiones bajos'
+            );
+            return false;
+        }
 
         if (!password || password === '') {
             showError('La contraseña es obligatoria');
@@ -466,29 +507,34 @@ document.addEventListener('DOMContentLoaded', () => {
             showError('El nombre visible es obligatorio');
             return false;
         }
-
+        if (!/^[\p{L}\p{N}_\-\s]{2,24}$/u.test(displayName.trim())) {
+            showError(
+                'El nombre visible debe tener entre 2 y 24 caracteres, solo letras, números, espacios, guiones y guiones bajos'
+            );
+            return false;
+        }
         return true;
     }
 
     async function fetchWithAuth(url, options = {}) {
-        const token = getAuthToken();
         const headers = {
             'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            ...(options.headers || {})
+            Accept: 'application/json',
+            ...(options.headers || {}),
         };
-        if (token) {
-            headers.Authorization = `Bearer ${token}`;
-        }
+        // No need to send Authorization header, cookies are sent automatically
         return fetch(url, {
             ...options,
-            headers
+            credentials: 'include', // Ensure cookies are sent
+            headers,
         });
     }
 
     async function loadMyAccount() {
         try {
-            const response = await fetchWithAuth(`${API_URL}/auth/account`, { method: 'GET' });
+            const response = await fetchWithAuth(`${API_URL}/auth/account`, {
+                method: 'GET',
+            });
             const data = await response.json();
 
             if (!response.ok || !data.success || !data.account) {
@@ -498,7 +544,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const account = data.account;
             accountDisplayNameInput.value = account.displayName || '';
-            statGamesPlayed.textContent = String(account.stats?.gamesPlayed || 0);
+            statGamesPlayed.textContent = String(
+                account.stats?.gamesPlayed || 0
+            );
             statWins.textContent = String(account.stats?.wins || 0);
             statWinStreak.textContent = String(account.stats?.winStreak || 0);
         } catch (error) {
@@ -515,7 +563,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const response = await fetchWithAuth(`${API_URL}/auth/me`, { method: 'GET' });
+            const response = await fetchWithAuth(`${API_URL}/auth/me`, {
+                method: 'GET',
+            });
             if (!response.ok) {
                 localStorage.removeItem(AUTH_TOKEN_KEY);
                 localStorage.removeItem(AUTH_USER_KEY);
@@ -525,9 +575,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     const normalizedUser = {
                         id: data.user.id,
                         username: data.user.username,
-                        displayName: data.user.displayName
+                        displayName: data.user.displayName,
                     };
-                    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(normalizedUser));
+                    localStorage.setItem(
+                        AUTH_USER_KEY,
+                        JSON.stringify(normalizedUser)
+                    );
                 } else {
                     localStorage.removeItem(AUTH_TOKEN_KEY);
                     localStorage.removeItem(AUTH_USER_KEY);
@@ -551,7 +604,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadFriends() {
         friends = [];
         try {
-            const response = await fetchWithAuth(`${API_URL}/friends`, { method: 'GET' });
+            const response = await fetchWithAuth(`${API_URL}/friends`, {
+                method: 'GET',
+            });
             const data = await response.json();
             if (response.ok && data.success) {
                 friends = data.friends || [];
@@ -565,7 +620,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderFriendList() {
         const container = document.getElementById('friendList');
         if (!container) return;
-        container.innerHTML = friends.map(f => `<li>${f.displayName}</li>`).join('') || '<li>(sin amigos)</li>';
+        container.innerHTML =
+            friends.map((f) => `<li>${f.displayName}</li>`).join('') ||
+            '<li>(sin amigos)</li>';
     }
 
     function setupLobbyWebSocket() {
@@ -584,7 +641,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             let lobbyId = sessionStorage.getItem('lobbyId');
             if (!lobbyId) {
-                lobbyId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+                lobbyId = crypto.randomUUID
+                    ? crypto.randomUUID()
+                    : Math.random().toString(36).substring(2);
                 sessionStorage.setItem('lobbyId', lobbyId);
             }
             wsUrl.searchParams.set('lobbyId', lobbyId);
@@ -604,8 +663,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-
-
     // resto de código sigue abajo
 
     loginBtn.addEventListener('click', async () => {
@@ -621,9 +678,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    Accept: 'application/json',
                 },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ username, password }),
             });
 
             const data = await response.json();
@@ -641,7 +698,12 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error en login:', error);
             showError('Error al conectar con el servidor');
         } finally {
-            setButtonLoading(loginBtn, false, 'Ingresando...', 'Iniciar sesión');
+            setButtonLoading(
+                loginBtn,
+                false,
+                'Ingresando...',
+                'Iniciar sesión'
+            );
         }
     });
 
@@ -660,9 +722,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    Accept: 'application/json',
                 },
-                body: JSON.stringify({ username, password, displayName })
+                body: JSON.stringify({ username, password, displayName }),
             });
 
             const data = await response.json();
@@ -718,12 +780,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        setButtonLoading(saveDisplayNameBtn, true, 'Guardando...', 'Guardar nombre');
+        setButtonLoading(
+            saveDisplayNameBtn,
+            true,
+            'Guardando...',
+            'Guardar nombre'
+        );
 
         try {
             const response = await fetchWithAuth(`${API_URL}/auth/account`, {
                 method: 'PATCH',
-                body: JSON.stringify({ displayName })
+                body: JSON.stringify({ displayName }),
             });
             const data = await response.json();
 
@@ -734,10 +801,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const existingAuth = getAuthUser();
             if (existingAuth) {
-                localStorage.setItem(AUTH_USER_KEY, JSON.stringify({
-                    ...existingAuth,
-                    displayName: data.account.displayName
-                }));
+                localStorage.setItem(
+                    AUTH_USER_KEY,
+                    JSON.stringify({
+                        ...existingAuth,
+                        displayName: data.account.displayName,
+                    })
+                );
             }
 
             refreshIdentityUI();
@@ -747,7 +817,12 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error actualizando nombre:', error);
             showError('Error actualizando nombre');
         } finally {
-            setButtonLoading(saveDisplayNameBtn, false, 'Guardando...', 'Guardar nombre');
+            setButtonLoading(
+                saveDisplayNameBtn,
+                false,
+                'Guardando...',
+                'Guardar nombre'
+            );
         }
     });
 
@@ -760,12 +835,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        setButtonLoading(changePasswordBtn, true, 'Cambiando...', 'Cambiar contraseña');
+        setButtonLoading(
+            changePasswordBtn,
+            true,
+            'Cambiando...',
+            'Cambiar contraseña'
+        );
 
         try {
             const response = await fetchWithAuth(`${API_URL}/auth/account`, {
                 method: 'PATCH',
-                body: JSON.stringify({ currentPassword, newPassword })
+                body: JSON.stringify({ currentPassword, newPassword }),
             });
             const data = await response.json();
 
@@ -781,7 +861,12 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error cambiando contraseña:', error);
             showError('Error cambiando contraseña');
         } finally {
-            setButtonLoading(changePasswordBtn, false, 'Cambiando...', 'Cambiar contraseña');
+            setButtonLoading(
+                changePasswordBtn,
+                false,
+                'Cambiando...',
+                'Cambiar contraseña'
+            );
         }
     });
 
@@ -790,7 +875,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (token) {
             try {
                 await fetchWithAuth(`${API_URL}/auth/logout`, {
-                    method: 'POST'
+                    method: 'POST',
                 });
             } catch (error) {
                 console.error('Error al cerrar sesión:', error);
@@ -826,7 +911,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetchWithAuth(`${API_URL}/create-room`, {
                 method: 'POST',
-                body: JSON.stringify({ playerName })
+                body: JSON.stringify({ playerName }),
             });
 
             if (!response.ok) {
@@ -882,8 +967,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 body: JSON.stringify({
                     playerName,
-                    roomId: roomCode
-                })
+                    roomId: roomCode,
+                }),
             });
 
             if (!response.ok) {

@@ -3,8 +3,18 @@ const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
 const { pool, isTransientConnectionError } = require('../db');
 const { allowedOrigins } = require('../config');
-const { rooms, reverseRoomMap, boardHistory, wsRateLimit, emojiRateLimit } = require('../state');
-const { sanitizePlayerName, isValidRoomId, validatePlayCardPayload } = require('../utils/validation');
+const {
+    rooms,
+    reverseRoomMap,
+    boardHistory,
+    wsRateLimit,
+    emojiRateLimit,
+} = require('../state');
+const {
+    sanitizePlayerName,
+    isValidRoomId,
+    validatePlayCardPayload,
+} = require('../utils/validation');
 const { isWithinRateLimit } = require('../utils/rateLimit');
 const { initializeDeck } = require('../utils/gameRules');
 const {
@@ -15,9 +25,13 @@ const {
     getPlayerTurnCount,
     getTurnState,
     resetPlayerTurnState,
-    finalizeGame
+    finalizeGame,
 } = require('../services/gameService');
-const { safeSend, broadcastToRoom, sendGameState } = require('../services/communication');
+const {
+    safeSend,
+    broadcastToRoom,
+    sendGameState,
+} = require('../services/communication');
 const { flushSaveGameState } = require('../services/persistence');
 // necesitamos autenticación para conexiones de lobby
 const { getUserFromToken } = require('../services/authService');
@@ -30,12 +44,13 @@ function defaultHistory() {
         ascending1: [1],
         ascending2: [1],
         descending1: [100],
-        descending2: [100]
+        descending2: [100],
     };
 }
 
 function parseWsMessage(message) {
-    const rawMessage = typeof message === 'string' ? message : message.toString();
+    const rawMessage =
+        typeof message === 'string' ? message : message.toString();
     if (rawMessage.length > 8 * 1024) {
         const error = new Error('Payload demasiado grande');
         error.code = 'PAYLOAD_TOO_LARGE';
@@ -63,14 +78,19 @@ function parseWsMessage(message) {
 
 async function safePersistOnDisconnect(roomId, playerId) {
     try {
-        await pool.query(`
+        await pool.query(
+            `
             UPDATE player_connections
             SET connection_status = 'disconnected'
             WHERE player_id = $1
-        `, [playerId]);
+        `,
+            [playerId]
+        );
     } catch (error) {
         if (isTransientConnectionError(error)) {
-            console.warn('⚠️ No se pudo marcar desconexión (BD inactiva/transitoria).');
+            console.warn(
+                '⚠️ No se pudo marcar desconexión (BD inactiva/transitoria).'
+            );
             return false;
         }
         throw error;
@@ -81,7 +101,9 @@ async function safePersistOnDisconnect(roomId, playerId) {
         return true;
     } catch (error) {
         if (isTransientConnectionError(error)) {
-            console.warn('⚠️ No se pudo guardar estado al desconectar (BD inactiva/transitoria).');
+            console.warn(
+                '⚠️ No se pudo guardar estado al desconectar (BD inactiva/transitoria).'
+            );
             return false;
         }
         throw error;
@@ -99,7 +121,7 @@ const ALLOWED_EMOJI_REACTIONS = [
     'proud',
     'angel',
     'demon',
-    'sleep'
+    'sleep',
 ];
 const EMOJI_WINDOW_MS = 10_000;
 const EMOJI_MAX_PER_WINDOW = 3;
@@ -107,14 +129,14 @@ const EMOJI_MAX_PER_WINDOW = 3;
 function checkEmojiRateLimit(playerId) {
     const now = Date.now();
     let history = emojiRateLimit.get(playerId) || [];
-    history = history.filter(timestamp => now - timestamp < EMOJI_WINDOW_MS);
+    history = history.filter((timestamp) => now - timestamp < EMOJI_WINDOW_MS);
 
     if (history.length >= EMOJI_MAX_PER_WINDOW) {
         const oldest = history[0];
         const remainingMs = EMOJI_WINDOW_MS - (now - oldest);
         return {
             allowed: false,
-            remainingMs
+            remainingMs,
         };
     }
 
@@ -123,10 +145,15 @@ function checkEmojiRateLimit(playerId) {
 
     return {
         allowed: true,
-        remainingMs: 0
+        remainingMs: 0,
     };
 }
 
+/**
+ * Set up WebSocket server with connection handling
+ * @param {http.Server} server - HTTP server instance
+ * @returns {WebSocket.Server} WebSocket server instance
+ */
 function setupWebSocket(server) {
     const wss = new WebSocket.Server({
         server,
@@ -136,7 +163,7 @@ function setupWebSocket(server) {
                 return done(false, 403, 'Origen no permitido');
             }
             done(true);
-        }
+        },
     });
 
     const heartbeatIntervalMs = 25000;
@@ -166,10 +193,21 @@ function setupWebSocket(server) {
 
         // lobby connection: sólo para recibir invitaciones y respuesta
         if (isLobby) {
-            const token = params.get('token');
+            const userId = params.get('userId');
             let identity = null;
-            if (token) {
-                identity = await getUserFromToken(token);
+            if (userId) {
+                // Get user from DB by ID (assuming authenticated via cookies in HTTP, but for WS we trust the ID)
+                try {
+                    const result = await pool.query(
+                        'SELECT id, display_name FROM users WHERE id = $1',
+                        [userId]
+                    );
+                    if (result.rowCount > 0) {
+                        identity = result.rows[0];
+                    }
+                } catch (err) {
+                    console.error('Error fetching user for WS:', err);
+                }
             }
             let lobbyId;
             if (identity) {
@@ -177,8 +215,14 @@ function setupWebSocket(server) {
             } else {
                 lobbyId = params.get('lobbyId') || uuidv4();
             }
-            const display = identity ? identity.display_name : decodeURIComponent(params.get('displayName') || 'Invitado');
-            lobbyClients.set(lobbyId, { ws, userId: identity ? identity.id : null, displayName: display });
+            const display = identity
+                ? identity.display_name
+                : decodeURIComponent(params.get('displayName') || 'Invitado');
+            lobbyClients.set(lobbyId, {
+                ws,
+                userId: identity ? identity.id : null,
+                displayName: display,
+            });
 
             ws.on('close', () => {
                 lobbyClients.delete(lobbyId);
@@ -189,16 +233,23 @@ function setupWebSocket(server) {
                     const msg = parseWsMessage(message);
                     // manejar respuesta de invitación
                     if (msg.type === 'invite_response') {
-                        const { inviterPlayerId, accepted, roomId: rId, fromUserId } = msg;
+                        const {
+                            inviterPlayerId,
+                            accepted,
+                            roomId: rId,
+                            fromUserId,
+                        } = msg;
                         // buscar invitador dentro de las salas
                         for (const [rid, room] of rooms) {
-                            const player = room.players.find(p => p.id === inviterPlayerId);
+                            const player = room.players.find(
+                                (p) => p.id === inviterPlayerId
+                            );
                             if (player && player.ws) {
                                 safeSend(player.ws, {
                                     type: 'friend_invite_response',
                                     accepted,
                                     roomId: rId,
-                                    fromUserId: fromUserId || lobbyId
+                                    fromUserId: fromUserId || lobbyId,
                                 });
                                 break;
                             }
@@ -222,11 +273,12 @@ function setupWebSocket(server) {
         }
 
         const room = rooms.get(roomId);
-        const player = room.players.find(p => p.id === playerId);
+        const player = room.players.find((p) => p.id === playerId);
         if (!player) return ws.close(1008, 'Jugador no registrado');
 
         try {
-            await pool.query(`
+            await pool.query(
+                `
                 INSERT INTO player_connections 
                 (player_id, room_id, last_ping, connection_status)
                 VALUES ($1, $2, NOW(), 'connected')
@@ -235,7 +287,9 @@ function setupWebSocket(server) {
                     room_id = $2,
                     last_ping = NOW(),
                     connection_status = 'connected'
-            `, [playerId, roomId]);
+            `,
+                [playerId, roomId]
+            );
         } catch (error) {
             console.error('Error al actualizar player_connections:', error);
         }
@@ -243,7 +297,9 @@ function setupWebSocket(server) {
         player.ws = ws;
         player.lastActivity = Date.now();
         if (playerName) {
-            const decodedName = sanitizePlayerName(decodeURIComponent(playerName));
+            const decodedName = sanitizePlayerName(
+                decodeURIComponent(playerName)
+            );
             if (decodedName) player.name = decodedName;
         }
 
@@ -259,29 +315,29 @@ function setupWebSocket(server) {
                 gameStarted: room.gameState.gameStarted,
                 initialCards: room.gameState.initialCards,
                 remainingDeck: room.gameState.deck.length,
-                players: room.players.map(p => ({
+                players: room.players.map((p) => ({
                     id: p.id,
                     name: p.name,
                     isHost: p.isHost,
                     cardCount: p.cards.length,
                     connected: p.ws?.readyState === WebSocket.OPEN,
-                    userId: p.userId || null
-                }))
+                    userId: p.userId || null,
+                })),
             },
             history: boardHistory.get(roomId) || defaultHistory(),
-            isYourTurn: room.gameState.currentTurn === player.id
+            isYourTurn: room.gameState.currentTurn === player.id,
         };
 
         if (room.gameState.gameStarted) {
             response.yourCards = player.cards;
-            response.players = room.players.map(p => ({
+            response.players = room.players.map((p) => ({
                 id: p.id,
                 name: p.name,
                 isHost: p.isHost,
                 cardCount: p.cards.length,
                 cardsPlayedThisTurn: getPlayerTurnCount(p),
                 connected: p.ws?.readyState === WebSocket.OPEN,
-                userId: p.userId || null
+                userId: p.userId || null,
             }));
         }
 
@@ -290,13 +346,13 @@ function setupWebSocket(server) {
         // Notificar a todos los jugadores que alguien se conectó
         broadcastToRoom(room, {
             type: 'room_update',
-            players: room.players.map(p => ({
+            players: room.players.map((p) => ({
                 id: p.id,
                 name: p.name,
                 isHost: p.isHost,
                 connected: p.ws?.readyState === WebSocket.OPEN,
-                userId: p.userId || null
-            }))
+                userId: p.userId || null,
+            })),
         });
 
         ws.on('message', async (message) => {
@@ -304,9 +360,10 @@ function setupWebSocket(server) {
                 if (!isWithinRateLimit(playerId)) {
                     return safeSend(ws, {
                         type: 'notification',
-                        message: 'Has excedido el límite de mensajes por segundo',
+                        message:
+                            'Has excedido el límite de mensajes por segundo',
                         isError: true,
-                        errorCode: 'RATE_LIMIT_EXCEEDED'
+                        errorCode: 'RATE_LIMIT_EXCEEDED',
                     });
                 }
 
@@ -315,14 +372,19 @@ function setupWebSocket(server) {
 
                 if (msg.type === 'ping') {
                     try {
-                        await pool.query(`
+                        await pool.query(
+                            `
                             UPDATE player_connections
                             SET last_ping = NOW()
                             WHERE player_id = $1
-                        `, [playerId]);
+                        `,
+                            [playerId]
+                        );
                     } catch (error) {
                         if (!isTransientConnectionError(error)) throw error;
-                        console.warn('⚠️ Ping recibido, pero no se pudo actualizar last_ping por BD inactiva.');
+                        console.warn(
+                            '⚠️ Ping recibido, pero no se pudo actualizar last_ping por BD inactiva.'
+                        );
                     }
                     return;
                 }
@@ -333,7 +395,7 @@ function setupWebSocket(server) {
                         broadcastToRoom(room, {
                             type: 'game_state_update',
                             remainingDeck: 0,
-                            minCardsRequired: 1
+                            minCardsRequired: 1,
                         });
                         break;
                     case 'get_player_state':
@@ -341,53 +403,67 @@ function setupWebSocket(server) {
                             type: 'player_state_update',
                             cardsPlayedThisTurn: getPlayerTurnCount(player),
                             totalCardsPlayed: player.totalCardsPlayed || 0,
-                            minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
+                            minCardsRequired:
+                                room.gameState.deck.length > 0 ? 2 : 1,
                             currentTurn: room.gameState.currentTurn,
-                            players: room.players.map(p => ({
+                            players: room.players.map((p) => ({
                                 id: p.id,
                                 name: p.name,
                                 isHost: p.isHost,
                                 cardCount: p.cards?.length || 0,
-                                cardsPlayedThisTurn: getPlayerTurnCount(p)
-                            }))
+                                cardsPlayedThisTurn: getPlayerTurnCount(p),
+                            })),
                         });
                         break;
                     case 'start_game':
                         if (player.isHost && !room.gameState.gameStarted) {
                             try {
-                                const connectedPlayers = room.players.filter(p =>
-                                    p.ws?.readyState === WebSocket.OPEN
+                                const connectedPlayers = room.players.filter(
+                                    (p) => p.ws?.readyState === WebSocket.OPEN
                                 );
 
                                 if (connectedPlayers.length < 1) {
-                                    throw new Error('Se necesita al menos 1 jugador conectado');
+                                    throw new Error(
+                                        'Se necesita al menos 1 jugador conectado'
+                                    );
                                 }
 
-                                const sanitizedInitialCards = Number(msg.initialCards);
-                                const initialCards = Number.isInteger(sanitizedInitialCards) && sanitizedInitialCards >= 1 && sanitizedInitialCards <= 10
-                                    ? sanitizedInitialCards
-                                    : 6;
+                                const sanitizedInitialCards = Number(
+                                    msg.initialCards
+                                );
+                                const initialCards =
+                                    Number.isInteger(sanitizedInitialCards) &&
+                                        sanitizedInitialCards >= 1 &&
+                                        sanitizedInitialCards <= 10
+                                        ? sanitizedInitialCards
+                                        : 6;
                                 await startGame(room, initialCards);
                             } catch (error) {
                                 console.error('Error al iniciar juego:', error);
                                 safeSend(player.ws, {
                                     type: 'notification',
-                                    message: 'Error al iniciar el juego: ' + error.message,
-                                    isError: true
+                                    message:
+                                        'Error al iniciar el juego: ' +
+                                        error.message,
+                                    isError: true,
                                 });
                             }
                         }
                         break;
                     case 'play_card':
-                        if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                            const { missingFields, isValid } = validatePlayCardPayload(msg);
+                        if (
+                            player.id === room.gameState.currentTurn &&
+                            room.gameState.gameStarted
+                        ) {
+                            const { missingFields, isValid } =
+                                validatePlayCardPayload(msg);
 
                             if (!isValid) {
                                 return safeSend(player.ws, {
                                     type: 'notification',
                                     message: `Faltan campos requeridos: ${missingFields.join(', ')}`,
                                     isError: true,
-                                    errorCode: 'MISSING_REQUIRED_FIELDS'
+                                    errorCode: 'MISSING_REQUIRED_FIELDS',
                                 });
                             }
 
@@ -396,7 +472,7 @@ function setupWebSocket(server) {
                                     type: 'notification',
                                     message: 'Sala no válida',
                                     isError: true,
-                                    errorCode: 'INVALID_ROOM'
+                                    errorCode: 'INVALID_ROOM',
                                 });
                             }
 
@@ -404,41 +480,53 @@ function setupWebSocket(server) {
                                 ...msg,
                                 playerId: player.id,
                                 playerName: player.name,
-                                isPlayedThisTurn: true
+                                isPlayedThisTurn: true,
                             };
                             await handlePlayCard(room, player, enhancedMsg);
                         }
                         break;
                     case 'end_turn':
-                        if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                        if (
+                            player.id === room.gameState.currentTurn &&
+                            room.gameState.gameStarted
+                        ) {
                             await endTurn(room, player);
                         }
                         break;
                     case 'undo_move':
-                        if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                        if (
+                            player.id === room.gameState.currentTurn &&
+                            room.gameState.gameStarted
+                        ) {
                             handleUndoMove(room, player, msg);
                         }
                         break;
                     case 'get_game_state':
-                        if (room.gameState.gameStarted) sendGameState(room, player);
+                        if (room.gameState.gameStarted)
+                            sendGameState(room, player);
                         break;
                     case 'force_game_over':
                         finalizeGame(room, {
                             result: 'lose',
-                            message: '¡Juego terminado! No hay movimientos válidos disponibles.',
-                            reason: msg.reason || 'no_valid_moves'
+                            message:
+                                '¡Juego terminado! No hay movimientos válidos disponibles.',
+                            reason: msg.reason || 'no_valid_moves',
                         });
                         break;
                     case 'check_solo_block': {
                         if (room.players.length === 1) {
-                            const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+                            const minCardsRequired =
+                                room.gameState.deck.length > 0 ? 2 : 1;
                             const cardsRemaining = Number(msg.cardsRemaining);
 
-                            if (Number.isFinite(cardsRemaining) && cardsRemaining < minCardsRequired) {
+                            if (
+                                Number.isFinite(cardsRemaining) &&
+                                cardsRemaining < minCardsRequired
+                            ) {
                                 finalizeGame(room, {
                                     result: 'lose',
                                     message: `¡No puedes jugar el mínimo de ${minCardsRequired} carta(s) requerida(s)!`,
-                                    reason: 'min_cards_not_met_solo'
+                                    reason: 'min_cards_not_met_solo',
                                 });
                             }
                         }
@@ -448,7 +536,7 @@ function setupWebSocket(server) {
                         finalizeGame(room, {
                             result: 'lose',
                             message: `¡${player.name} se quedó sin movimientos posibles!`,
-                            reason: 'self_blocked'
+                            reason: 'self_blocked',
                         });
                         break;
                     case 'leave_room':
@@ -456,15 +544,20 @@ function setupWebSocket(server) {
                         if (player.isHost) {
                             // Si el host abandona, notificar a todos los otros jugadores
                             // (NO al host) para que se redirijan a index.html
-                            room.players.forEach(p => {
-                                if (p.id !== playerId && p.ws?.readyState === WebSocket.OPEN) {
+                            room.players.forEach((p) => {
+                                if (
+                                    p.id !== playerId &&
+                                    p.ws?.readyState === WebSocket.OPEN
+                                ) {
                                     safeSend(p.ws, {
                                         type: 'host_left_room',
-                                        message: 'El host abandonó la sala'
+                                        message: 'El host abandonó la sala',
                                     });
                                 }
                             });
-                            console.log(`[ROOM] Host ${player.name} abandonó la sala`);
+                            console.log(
+                                `[ROOM] Host ${player.name} abandonó la sala`
+                            );
                         }
                         // Proceder con el cierre normal
                         ws.close();
@@ -481,23 +574,28 @@ function setupWebSocket(server) {
 
                             room.gameState = {
                                 deck: initializeDeck(),
-                                board: { ascending: [1, 1], descending: [100, 100] },
+                                board: {
+                                    ascending: [1, 1],
+                                    descending: [100, 100],
+                                },
                                 currentTurn: room.players[0].id,
                                 gameStarted: false,
                                 initialCards: room.gameState.initialCards || 6,
-                                gameFinished: false
+                                gameFinished: false,
                             };
 
                             boardHistory.set(roomId, defaultHistory());
 
                             // restaurar el estado de host: solo el host original puede ser host
-                            const originalHostId = room.originalHostId || room.players[0].id;
-                            room.players.forEach(currentPlayer => {
+                            const originalHostId =
+                                room.originalHostId || room.players[0].id;
+                            room.players.forEach((currentPlayer) => {
                                 currentPlayer.cards = [];
                                 resetPlayerTurnState(currentPlayer);
                                 currentPlayer.cardsPlayedThisTurn = 0;
                                 // restaurar host original
-                                currentPlayer.isHost = (currentPlayer.id === originalHostId);
+                                currentPlayer.isHost =
+                                    currentPlayer.id === originalHostId;
                             });
                             room.originalHostId = originalHostId;
 
@@ -505,7 +603,8 @@ function setupWebSocket(server) {
 
                             broadcastToRoom(room, {
                                 type: 'room_reset',
-                                message: 'La sala ha sido reiniciada para una nueva partida'
+                                message:
+                                    'La sala ha sido reiniciada para una nueva partida',
                             });
 
                             // clear the flag after a short grace period; by the time
@@ -521,16 +620,22 @@ function setupWebSocket(server) {
                         // El jugador abandona intencionalmente la sala
                         // Si es el host, transferir el rol a otro jugador conectado
                         if (player.isHost && room.players.length > 1) {
-                            const newHost = room.players.find(p => p.id !== playerId && p.ws?.readyState === WebSocket.OPEN);
+                            const newHost = room.players.find(
+                                (p) =>
+                                    p.id !== playerId &&
+                                    p.ws?.readyState === WebSocket.OPEN
+                            );
                             if (newHost) {
                                 newHost.isHost = true;
                                 room.originalHostId = newHost.id;
                                 broadcastToRoom(room, {
                                     type: 'notification',
                                     message: `${newHost.name} es ahora el host`,
-                                    isError: false
+                                    isError: false,
                                 });
-                                console.log(`[ROOM] Host transferido a ${newHost.name}`);
+                                console.log(
+                                    `[ROOM] Host transferido a ${newHost.name}`
+                                );
                             }
                         }
                         // Proceder con el cierre normal
@@ -542,35 +647,43 @@ function setupWebSocket(server) {
                         player.name = sanitizedName;
                         broadcastToRoom(room, {
                             type: 'player_update',
-                            players: room.players.map(p => ({
+                            players: room.players.map((p) => ({
                                 id: p.id,
                                 name: p.name,
                                 isHost: p.isHost,
-                                cardCount: p.cards.length
-                            }))
+                                cardCount: p.cards.length,
+                            })),
                         });
                         break;
                     }
                     case 'emoji_reaction': {
-                        const code = typeof msg.emoji === 'string' ? msg.emoji.trim() : '';
+                        const code =
+                            typeof msg.emoji === 'string'
+                                ? msg.emoji.trim()
+                                : '';
                         if (!ALLOWED_EMOJI_REACTIONS.includes(code)) {
                             safeSend(player.ws, {
                                 type: 'notification',
                                 message: 'Reacción no permitida',
                                 isError: true,
-                                errorCode: 'INVALID_EMOJI_REACTION'
+                                errorCode: 'INVALID_EMOJI_REACTION',
                             });
                             break;
                         }
 
-                        const { allowed, remainingMs } = checkEmojiRateLimit(player.id);
+                        const { allowed, remainingMs } = checkEmojiRateLimit(
+                            player.id
+                        );
                         if (!allowed) {
-                            const seconds = Math.max(1, Math.ceil(remainingMs / 1000));
+                            const seconds = Math.max(
+                                1,
+                                Math.ceil(remainingMs / 1000)
+                            );
                             safeSend(player.ws, {
                                 type: 'notification',
                                 message: `Has enviado demasiadas reacciones. Espera ${seconds} segundo(s) para enviar más emojis.`,
                                 isError: true,
-                                errorCode: 'EMOJI_RATE_LIMIT'
+                                errorCode: 'EMOJI_RATE_LIMIT',
                             });
                             break;
                         }
@@ -579,7 +692,7 @@ function setupWebSocket(server) {
                             type: 'emoji_reaction',
                             emoji: code,
                             fromPlayerId: player.id,
-                            fromPlayerName: player.name
+                            fromPlayerName: player.name,
                         });
                         break;
                     }
@@ -591,8 +704,9 @@ function setupWebSocket(server) {
                         if (!player.userId) {
                             safeSend(player.ws, {
                                 type: 'notification',
-                                message: 'Debes estar autenticado para invitar amigos',
-                                isError: true
+                                message:
+                                    'Debes estar autenticado para invitar amigos',
+                                isError: true,
                             });
                             break;
                         }
@@ -607,7 +721,7 @@ function setupWebSocket(server) {
                                 safeSend(player.ws, {
                                     type: 'notification',
                                     message: 'Solo puedes invitar a tus amigos',
-                                    isError: true
+                                    isError: true,
                                 });
                                 break;
                             }
@@ -617,19 +731,24 @@ function setupWebSocket(server) {
                         }
 
                         const target = lobbyClients.get(targetUserId);
-                        if (target && target.ws && target.ws.readyState === WebSocket.OPEN) {
+                        if (
+                            target &&
+                            target.ws &&
+                            target.ws.readyState === WebSocket.OPEN
+                        ) {
                             safeSend(target.ws, {
                                 type: 'friend_invite',
                                 fromUserId: player.userId || null,
                                 fromDisplayName: player.name,
                                 inviterPlayerId: player.id,
-                                roomId
+                                roomId,
                             });
                         } else {
                             safeSend(player.ws, {
                                 type: 'notification',
-                                message: 'El usuario no está en el lobby o no disponible',
-                                isError: true
+                                message:
+                                    'El usuario no está en el lobby o no disponible',
+                                isError: true,
                             });
                         }
                         break;
@@ -639,7 +758,7 @@ function setupWebSocket(server) {
                         safeSend(player.ws, {
                             type: 'full_state_update',
                             room: {
-                                players: room.players.map(p => ({
+                                players: room.players.map((p) => ({
                                     id: p.id,
                                     name: p.name,
                                     isHost: p.isHost,
@@ -647,22 +766,23 @@ function setupWebSocket(server) {
                                     cardsPlayedThisTurn: getPlayerTurnCount(p),
                                     movesThisTurn: getTurnState(p).moves,
                                     totalCardsPlayed: p.totalCardsPlayed || 0,
-                                    lastActivity: p.lastActivity
+                                    lastActivity: p.lastActivity,
                                 })),
-                                gameStarted: room.gameState.gameStarted
+                                gameStarted: room.gameState.gameStarted,
                             },
                             gameState: {
                                 board: room.gameState.board,
                                 currentTurn: room.gameState.currentTurn,
                                 remainingDeck: room.gameState.deck.length,
                                 initialCards: room.gameState.initialCards,
-                                gameStarted: room.gameState.gameStarted
+                                gameStarted: room.gameState.gameStarted,
                             },
                             history: boardHistory.get(currentRoomId),
                             currentPlayerState: {
                                 cardsPlayedThisTurn: getPlayerTurnCount(player),
-                                minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
-                            }
+                                minCardsRequired:
+                                    room.gameState.deck.length > 0 ? 2 : 1,
+                            },
                         });
                         break;
                     }
@@ -671,7 +791,7 @@ function setupWebSocket(server) {
                             type: 'notification',
                             message: `Tipo de mensaje no reconocido: ${msg.type}`,
                             isError: true,
-                            errorCode: 'UNKNOWN_MESSAGE_TYPE'
+                            errorCode: 'UNKNOWN_MESSAGE_TYPE',
                         });
                 }
             } catch (error) {
@@ -684,7 +804,7 @@ function setupWebSocket(server) {
                         type: 'notification',
                         message: 'Mensaje inválido: JSON malformado',
                         isError: true,
-                        errorCode: 'INVALID_JSON'
+                        errorCode: 'INVALID_JSON',
                     });
                     return;
                 }
@@ -693,7 +813,7 @@ function setupWebSocket(server) {
                     type: 'notification',
                     message: 'Error interno procesando mensaje',
                     isError: true,
-                    errorCode: 'INTERNAL_ERROR'
+                    errorCode: 'INTERNAL_ERROR',
                 });
             }
         });
@@ -704,9 +824,14 @@ function setupWebSocket(server) {
             emojiRateLimit.delete(playerId);
 
             try {
-                const persisted = await safePersistOnDisconnect(roomId, playerId);
+                const persisted = await safePersistOnDisconnect(
+                    roomId,
+                    playerId
+                );
                 if (persisted) {
-                    console.log(`💾 Estado guardado al desconectarse ${player.name}`);
+                    console.log(
+                        `💾 Estado guardado al desconectarse ${player.name}`
+                    );
                 }
             } catch (error) {
                 console.error('Error al actualizar estado de conexión:', error);
@@ -718,7 +843,9 @@ function setupWebSocket(server) {
             // durante unos segundos; así evitamos expulsar a la gente que está
             // simplemente navegando de vuelta a la sala para empezar de nuevo.
             if (!room.gameState.gameStarted && !room.resetting) {
-                const playerIndex = room.players.findIndex(p => p.id === playerId);
+                const playerIndex = room.players.findIndex(
+                    (p) => p.id === playerId
+                );
                 if (playerIndex !== -1) {
                     room.players.splice(playerIndex, 1);
                 }
@@ -728,13 +855,13 @@ function setupWebSocket(server) {
                     type: 'player_left',
                     playerId: playerId,
                     playerName: player.name,
-                    players: room.players.map(p => ({
+                    players: room.players.map((p) => ({
                         id: p.id,
                         name: p.name,
                         isHost: p.isHost,
                         connected: p.ws?.readyState === WebSocket.OPEN,
-                        userId: p.userId || null
-                    }))
+                        userId: p.userId || null,
+                    })),
                 });
             }
             // Nota: Ya NO asignamos un nuevo host cuando el actual se desconecta.

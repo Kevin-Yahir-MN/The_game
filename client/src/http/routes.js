@@ -17,7 +17,7 @@ const {
     getAccountById,
     updateDisplayName,
     changePassword,
-    deleteSession
+    deleteSession,
 } = require('../services/authService');
 
 const MAX_PLAYERS_PER_ROOM = 6;
@@ -33,7 +33,6 @@ async function getAuthenticatedUser(req) {
 }
 
 function registerHttpRoutes(app) {
-
     app.get('/health', (req, res) => {
         res.set('Cache-Control', 'no-store');
         res.json({
@@ -41,47 +40,75 @@ function registerHttpRoutes(app) {
             status: 'ok',
             uptimeSeconds: Math.floor(process.uptime()),
             activeRooms: rooms.size,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         });
     });
 
     app.post('/auth/register', async (req, res) => {
         const { username, password, displayName } = req.body || {};
 
-        if (!hasContent(username) || !hasContent(password) || !hasContent(displayName)) {
-            return res.status(400).json({ success: false, message: 'Usuario, contraseña y nombre visible son obligatorios' });
+        if (
+            !hasContent(username) ||
+            !hasContent(password) ||
+            !hasContent(displayName)
+        ) {
+            return res
+                .status(400)
+                .json({
+                    success: false,
+                    message:
+                        'Usuario, contraseña y nombre visible son obligatorios',
+                });
         }
 
         try {
             const user = await registerUser({
                 username,
                 password,
-                displayName
+                displayName,
             });
             const token = await createSession(user.id);
 
+            res.cookie('authToken', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
+                maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+            });
+
             return res.status(201).json({
                 success: true,
-                token,
                 user: {
                     id: user.id,
                     username: user.username,
-                    displayName: user.display_name
-                }
+                    displayName: user.display_name,
+                },
             });
         } catch (error) {
-            if (error.code === 'USERNAME_EXISTS' || error.code === 'DISPLAY_NAME_EXISTS') {
-                return res.status(409).json({ success: false, message: error.message });
+            if (
+                error.code === 'USERNAME_EXISTS' ||
+                error.code === 'DISPLAY_NAME_EXISTS'
+            ) {
+                return res
+                    .status(409)
+                    .json({ success: false, message: error.message });
             }
 
             if (error.code === '23505') {
-                const message = String(error.constraint || '').includes('display_name')
+                const message = String(error.constraint || '').includes(
+                    'display_name'
+                )
                     ? 'El nombre visible ya está en uso'
                     : 'El nombre de usuario ya existe';
                 return res.status(409).json({ success: false, message });
             }
             console.error('Error en registro:', error);
-            return res.status(500).json({ success: false, message: 'Error interno al registrar usuario' });
+            return res
+                .status(500)
+                .json({
+                    success: false,
+                    message: 'Error interno al registrar usuario',
+                });
         }
     });
 
@@ -89,13 +116,23 @@ function registerHttpRoutes(app) {
         const { username, password } = req.body || {};
 
         if (!hasContent(username) || !hasContent(password)) {
-            return res.status(400).json({ success: false, message: 'Usuario y contraseña son obligatorios' });
+            return res
+                .status(400)
+                .json({
+                    success: false,
+                    message: 'Usuario y contraseña son obligatorios',
+                });
         }
 
         try {
             const user = await loginUser({ username, password });
             if (!user) {
-                return res.status(401).json({ success: false, message: 'Usuario o contraseña incorrectos' });
+                return res
+                    .status(401)
+                    .json({
+                        success: false,
+                        message: 'Usuario o contraseña incorrectos',
+                    });
             }
 
             // verificar si el usuario ya tiene una sesión activa
@@ -103,23 +140,34 @@ function registerHttpRoutes(app) {
             if (hasSession) {
                 return res.status(409).json({
                     success: false,
-                    message: 'Este usuario ya se encuentra en sesión en otro dispositivo'
+                    message:
+                        'Este usuario ya se encuentra en sesión en otro dispositivo',
                 });
             }
 
             const token = await createSession(user.id);
+            res.cookie('authToken', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
+                maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+            });
             return res.json({
                 success: true,
-                token,
                 user: {
                     id: user.id,
                     username: user.username,
-                    displayName: user.display_name
-                }
+                    displayName: user.display_name,
+                },
             });
         } catch (error) {
             console.error('Error en login:', error);
-            return res.status(500).json({ success: false, message: 'Error interno al iniciar sesión' });
+            return res
+                .status(500)
+                .json({
+                    success: false,
+                    message: 'Error interno al iniciar sesión',
+                });
         }
     });
 
@@ -127,7 +175,9 @@ function registerHttpRoutes(app) {
         try {
             const user = await getAuthenticatedUser(req);
             if (!user) {
-                return res.status(401).json({ success: false, message: 'No autenticado' });
+                return res
+                    .status(401)
+                    .json({ success: false, message: 'No autenticado' });
             }
 
             return res.json({
@@ -135,12 +185,14 @@ function registerHttpRoutes(app) {
                 user: {
                     id: user.id,
                     username: user.username,
-                    displayName: user.display_name
-                }
+                    displayName: user.display_name,
+                },
             });
         } catch (error) {
             console.error('Error en auth/me:', error);
-            return res.status(500).json({ success: false, message: 'Error interno' });
+            return res
+                .status(500)
+                .json({ success: false, message: 'Error interno' });
         }
     });
 
@@ -150,14 +202,23 @@ function registerHttpRoutes(app) {
             // intentar obtener usuario para borrar todas sus sesiones
             const user = await getUserFromToken(token);
             if (user && user.id) {
-                await pool.query('DELETE FROM user_sessions WHERE user_id = $1', [user.id]);
+                await pool.query(
+                    'DELETE FROM user_sessions WHERE user_id = $1',
+                    [user.id]
+                );
             } else if (token) {
                 await deleteSession(token);
             }
+            res.clearCookie('authToken');
             return res.json({ success: true });
         } catch (error) {
             console.error('Error en logout:', error);
-            return res.status(500).json({ success: false, message: 'Error interno cerrando sesión' });
+            return res
+                .status(500)
+                .json({
+                    success: false,
+                    message: 'Error interno cerrando sesión',
+                });
         }
     });
 
@@ -165,12 +226,16 @@ function registerHttpRoutes(app) {
         try {
             const user = await getAuthenticatedUser(req);
             if (!user) {
-                return res.status(401).json({ success: false, message: 'No autenticado' });
+                return res
+                    .status(401)
+                    .json({ success: false, message: 'No autenticado' });
             }
 
             const account = await getAccountById(user.id);
             if (!account) {
-                return res.status(404).json({ success: false, message: 'Cuenta no encontrada' });
+                return res
+                    .status(404)
+                    .json({ success: false, message: 'Cuenta no encontrada' });
             }
 
             return res.json({
@@ -182,13 +247,18 @@ function registerHttpRoutes(app) {
                     stats: {
                         gamesPlayed: Number(account.games_played) || 0,
                         wins: Number(account.wins) || 0,
-                        winStreak: Number(account.win_streak) || 0
-                    }
-                }
+                        winStreak: Number(account.win_streak) || 0,
+                    },
+                },
             });
         } catch (error) {
             console.error('Error en auth/account:', error);
-            return res.status(500).json({ success: false, message: 'Error interno cargando cuenta' });
+            return res
+                .status(500)
+                .json({
+                    success: false,
+                    message: 'Error interno cargando cuenta',
+                });
         }
     });
 
@@ -196,10 +266,13 @@ function registerHttpRoutes(app) {
         try {
             const user = await getAuthenticatedUser(req);
             if (!user) {
-                return res.status(401).json({ success: false, message: 'No autenticado' });
+                return res
+                    .status(401)
+                    .json({ success: false, message: 'No autenticado' });
             }
 
-            const { displayName, currentPassword, newPassword } = req.body || {};
+            const { displayName, currentPassword, newPassword } =
+                req.body || {};
             let updatedAccount = null;
 
             if (hasContent(displayName)) {
@@ -208,14 +281,22 @@ function registerHttpRoutes(app) {
 
             if (hasContent(currentPassword) || hasContent(newPassword)) {
                 if (!hasContent(currentPassword) || !hasContent(newPassword)) {
-                    return res.status(400).json({ success: false, message: 'Para cambiar contraseña, envía contraseña actual y nueva' });
+                    return res
+                        .status(400)
+                        .json({
+                            success: false,
+                            message:
+                                'Para cambiar contraseña, envía contraseña actual y nueva',
+                        });
                 }
                 await changePassword(user.id, currentPassword, newPassword);
             }
 
-            const account = updatedAccount || await getAccountById(user.id);
+            const account = updatedAccount || (await getAccountById(user.id));
             if (!account) {
-                return res.status(404).json({ success: false, message: 'Cuenta no encontrada' });
+                return res
+                    .status(404)
+                    .json({ success: false, message: 'Cuenta no encontrada' });
             }
 
             return res.json({
@@ -227,35 +308,51 @@ function registerHttpRoutes(app) {
                     stats: {
                         gamesPlayed: Number(account.games_played) || 0,
                         wins: Number(account.wins) || 0,
-                        winStreak: Number(account.win_streak) || 0
-                    }
-                }
+                        winStreak: Number(account.win_streak) || 0,
+                    },
+                },
             });
         } catch (error) {
             if (error.code === 'DISPLAY_NAME_EXISTS') {
-                return res.status(409).json({ success: false, message: error.message });
+                return res
+                    .status(409)
+                    .json({ success: false, message: error.message });
             }
             if (error.code === 'INVALID_CURRENT_PASSWORD') {
-                return res.status(400).json({ success: false, message: error.message });
+                return res
+                    .status(400)
+                    .json({ success: false, message: error.message });
             }
             console.error('Error en PATCH auth/account:', error);
-            return res.status(500).json({ success: false, message: 'Error interno actualizando cuenta' });
+            return res
+                .status(500)
+                .json({
+                    success: false,
+                    message: 'Error interno actualizando cuenta',
+                });
         }
     });
-
 
     // rutas de amigos
     app.get('/friends', async (req, res) => {
         try {
             const user = await getAuthenticatedUser(req);
             if (!user) {
-                return res.status(401).json({ success: false, message: 'No autenticado' });
+                return res
+                    .status(401)
+                    .json({ success: false, message: 'No autenticado' });
             }
-            const friends = await require('../services/friendService').getFriends(user.id);
+            const friends =
+                await require('../services/friendService').getFriends(user.id);
             return res.json({ success: true, friends });
         } catch (error) {
             console.error('Error obteniendo lista de amigos:', error);
-            return res.status(500).json({ success: false, message: 'Error interno al cargar amigos' });
+            return res
+                .status(500)
+                .json({
+                    success: false,
+                    message: 'Error interno al cargar amigos',
+                });
         }
     });
 
@@ -263,27 +360,48 @@ function registerHttpRoutes(app) {
         try {
             const user = await getAuthenticatedUser(req);
             if (!user) {
-                return res.status(401).json({ success: false, message: 'No autenticado' });
+                return res
+                    .status(401)
+                    .json({ success: false, message: 'No autenticado' });
             }
             const { friendId } = req.body || {};
             if (!friendId) {
-                return res.status(400).json({ success: false, message: 'friendId requerido' });
+                return res
+                    .status(400)
+                    .json({ success: false, message: 'friendId requerido' });
             }
 
-            await require('../services/friendService').addFriend(user.id, friendId);
+            await require('../services/friendService').addFriend(
+                user.id,
+                friendId
+            );
             return res.json({ success: true });
         } catch (error) {
             console.error('Error agregando amigo:', error);
             if (error.code === 'FRIEND_NOT_FOUND') {
-                return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+                return res
+                    .status(404)
+                    .json({ success: false, message: 'Usuario no encontrado' });
             }
             if (error.code === 'ALREADY_FRIEND') {
-                return res.status(409).json({ success: false, message: 'Ya es tu amigo' });
+                return res
+                    .status(409)
+                    .json({ success: false, message: 'Ya es tu amigo' });
             }
             if (error.code === 'SELF_FRIEND') {
-                return res.status(400).json({ success: false, message: 'No puedes agregarte a ti mismo' });
+                return res
+                    .status(400)
+                    .json({
+                        success: false,
+                        message: 'No puedes agregarte a ti mismo',
+                    });
             }
-            return res.status(500).json({ success: false, message: 'Error interno al agregar amigo' });
+            return res
+                .status(500)
+                .json({
+                    success: false,
+                    message: 'Error interno al agregar amigo',
+                });
         }
     });
 
@@ -292,18 +410,30 @@ function registerHttpRoutes(app) {
         try {
             const user = await getAuthenticatedUser(req);
             if (!user) {
-                return res.status(401).json({ success: false, message: 'No autenticado' });
+                return res
+                    .status(401)
+                    .json({ success: false, message: 'No autenticado' });
             }
             const friendId = req.params.id;
             if (!friendId) {
-                return res.status(400).json({ success: false, message: 'friendId requerido' });
+                return res
+                    .status(400)
+                    .json({ success: false, message: 'friendId requerido' });
             }
 
-            await require('../services/friendService').removeFriend(user.id, friendId);
+            await require('../services/friendService').removeFriend(
+                user.id,
+                friendId
+            );
             return res.json({ success: true });
         } catch (error) {
             console.error('Error eliminando amigo:', error);
-            return res.status(500).json({ success: false, message: 'Error interno al eliminar amigo' });
+            return res
+                .status(500)
+                .json({
+                    success: false,
+                    message: 'Error interno al eliminar amigo',
+                });
         }
     });
 
@@ -312,12 +442,16 @@ function registerHttpRoutes(app) {
         try {
             const user = await getAuthenticatedUser(req);
             if (!user) {
-                return res.status(401).json({ success: false, message: 'No autenticado' });
+                return res
+                    .status(401)
+                    .json({ success: false, message: 'No autenticado' });
             }
 
             const account = await getAccountById(req.params.id);
             if (!account) {
-                return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+                return res
+                    .status(404)
+                    .json({ success: false, message: 'Usuario no encontrado' });
             }
 
             return res.json({
@@ -329,25 +463,38 @@ function registerHttpRoutes(app) {
                     stats: {
                         gamesPlayed: Number(account.games_played) || 0,
                         wins: Number(account.wins) || 0,
-                        winStreak: Number(account.win_streak) || 0
-                    }
-                }
+                        winStreak: Number(account.win_streak) || 0,
+                    },
+                },
             });
         } catch (error) {
             console.error('Error obteniendo usuario:', error);
-            return res.status(500).json({ success: false, message: 'Error interno al obtener usuario' });
+            return res
+                .status(500)
+                .json({
+                    success: false,
+                    message: 'Error interno al obtener usuario',
+                });
         }
     });
 
     // continuar con rutas existentes
     app.post('/create-room', async (req, res) => {
         const authUser = await getAuthenticatedUser(req);
-        console.log('[ROUTES] create-room: authUserId=' + (authUser ? authUser.id : 'null'));
+        console.log(
+            '[ROUTES] create-room: authUserId=' +
+            (authUser ? authUser.id : 'null')
+        );
         const requestedName = sanitizePlayerName(req.body?.playerName);
         const playerName = requestedName || authUser?.display_name;
 
         if (!playerName) {
-            return res.status(400).json({ success: false, message: 'Nombre de jugador inválido' });
+            return res
+                .status(400)
+                .json({
+                    success: false,
+                    message: 'Nombre de jugador inválido',
+                });
         }
 
         const playerId = uuidv4();
@@ -355,77 +502,100 @@ function registerHttpRoutes(app) {
         try {
             const roomId = await generateUniqueRoomId();
             await withTransaction(async (client) => {
-                await client.query(`
+                await client.query(
+                    `
                     INSERT INTO game_states 
                     (room_id, game_data, last_activity)
                     VALUES ($1, $2, NOW())
-                `, [roomId, JSON.stringify({
-                    players: [],
-                    gameState: {
-                        deck: initializeDeck(),
-                        board: { ascending: [1, 1], descending: [100, 100] },
-                        currentTurn: playerId,
-                        gameStarted: false,
-                        initialCards: 6
-                    },
-                    history: {
-                        ascending1: [1], ascending2: [1],
-                        descending1: [100], descending2: [100]
-                    }
-                })]);
+                `,
+                    [
+                        roomId,
+                        JSON.stringify({
+                            players: [],
+                            gameState: {
+                                deck: initializeDeck(),
+                                board: {
+                                    ascending: [1, 1],
+                                    descending: [100, 100],
+                                },
+                                currentTurn: playerId,
+                                gameStarted: false,
+                                initialCards: 6,
+                            },
+                            history: {
+                                ascending1: [1],
+                                ascending2: [1],
+                                descending1: [100],
+                                descending2: [100],
+                            },
+                        }),
+                    ]
+                );
 
-                await client.query(`
+                await client.query(
+                    `
                     INSERT INTO player_connections 
                     (player_id, room_id, last_ping, connection_status)
                     VALUES ($1, $2, NOW(), 'connected')
-                `, [playerId, roomId]);
+                `,
+                    [playerId, roomId]
+                );
             });
 
             const room = {
-                players: [{
-                    id: playerId,
-                    name: playerName,
-                    isHost: true,
-                    userId: authUser?.id || null,
-                    ws: null,
-                    cards: [],
-                    cardsPlayedThisTurn: 0,
-                    turnState: createTurnState(),
-                    lastActivity: Date.now()
-                }],
+                players: [
+                    {
+                        id: playerId,
+                        name: playerName,
+                        isHost: true,
+                        userId: authUser?.id || null,
+                        ws: null,
+                        cards: [],
+                        cardsPlayedThisTurn: 0,
+                        turnState: createTurnState(),
+                        lastActivity: Date.now(),
+                    },
+                ],
                 gameState: {
                     deck: initializeDeck(),
                     board: { ascending: [1, 1], descending: [100, 100] },
                     currentTurn: playerId,
                     gameStarted: false,
-                    initialCards: 6
+                    initialCards: 6,
                 },
                 // el host original nunca cambia, incluso si se desconecta
                 originalHostId: playerId,
                 // flag used to suppress player removal during the brief
                 // transition that occurs when a game resets and everyone
                 // hops back to the lobby page
-                resetting: false
+                resetting: false,
             };
 
             rooms.set(roomId, room);
             reverseRoomMap.set(room, roomId);
             boardHistory.set(roomId, {
-                ascending1: [1], ascending2: [1],
-                descending1: [100], descending2: [100]
+                ascending1: [1],
+                ascending2: [1],
+                descending1: [100],
+                descending2: [100],
             });
 
             res.json({ success: true, roomId, playerId, playerName });
-
         } catch (error) {
             console.error('Error al crear sala:', error);
-            res.status(500).json({ success: false, message: 'Error al crear sala' });
+            res.status(500).json({
+                success: false,
+                message: 'Error al crear sala',
+            });
         }
     });
 
     app.post('/join-room', async (req, res) => {
         const authUser = await getAuthenticatedUser(req);
-        console.log('[ROUTES] join-room: authUserId=' + (authUser ? authUser.id : 'null'));
+        console.log(
+            '[ROUTES] join-room: authUserId=' +
+            (authUser ? authUser.id : 'null')
+        );
         const requestedName = sanitizePlayerName(req.body?.playerName);
         const playerName = requestedName || authUser?.display_name;
         const roomId = req.body?.roomId;
@@ -433,20 +603,26 @@ function registerHttpRoutes(app) {
         if (!playerName || !isValidRoomId(roomId)) {
             return res.status(400).json({
                 success: false,
-                message: 'Nombre de jugador y código de sala válidos requeridos'
+                message:
+                    'Nombre de jugador y código de sala válidos requeridos',
             });
         }
 
         try {
-            const roomCheck = await pool.query('SELECT 1 FROM game_states WHERE room_id = $1', [roomId]);
+            const roomCheck = await pool.query(
+                'SELECT 1 FROM game_states WHERE room_id = $1',
+                [roomId]
+            );
             if (roomCheck.rowCount === 0) {
-                return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+                return res
+                    .status(404)
+                    .json({ success: false, message: 'Sala no encontrada' });
             }
 
             if (!rooms.has(roomId)) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Sala no disponible'
+                    message: 'Sala no disponible',
                 });
             }
 
@@ -454,14 +630,15 @@ function registerHttpRoutes(app) {
             if (room.players.length >= MAX_PLAYERS_PER_ROOM) {
                 return res.status(409).json({
                     success: false,
-                    message: `La sala alcanzó el máximo de ${MAX_PLAYERS_PER_ROOM} jugadores`
+                    message: `La sala alcanzó el máximo de ${MAX_PLAYERS_PER_ROOM} jugadores`,
                 });
             }
 
             const playerId = uuidv4();
 
             await withTransaction(async (client) => {
-                await client.query(`
+                await client.query(
+                    `
                     INSERT INTO player_connections 
                     (player_id, room_id, last_ping, connection_status)
                     VALUES ($1, $2, NOW(), 'connected')
@@ -470,7 +647,9 @@ function registerHttpRoutes(app) {
                         room_id = $2,
                         last_ping = NOW(),
                         connection_status = 'connected'
-                `, [playerId, roomId]);
+                `,
+                    [playerId, roomId]
+                );
             });
 
             const newPlayer = {
@@ -482,7 +661,7 @@ function registerHttpRoutes(app) {
                 cards: [],
                 cardsPlayedThisTurn: 0,
                 turnState: createTurnState(),
-                lastActivity: Date.now()
+                lastActivity: Date.now(),
             };
             room.players.push(newPlayer);
 
@@ -492,14 +671,14 @@ function registerHttpRoutes(app) {
                 type: 'player_joined',
                 playerId: playerId,
                 playerName: playerName,
-                players: room.players.map(p => ({
+                players: room.players.map((p) => ({
                     id: p.id,
                     name: p.name,
                     isHost: p.isHost,
                     cardCount: p.cards.length,
                     connected: p.ws !== null,
-                    userId: p.userId || null
-                }))
+                    userId: p.userId || null,
+                })),
             });
 
             res.json({
@@ -507,22 +686,21 @@ function registerHttpRoutes(app) {
                 playerId,
                 playerName,
                 isHost: false,
-                roomId
+                roomId,
             });
-
         } catch (error) {
             console.error('Error al unirse a sala:', error);
 
             if (error.code === '23503') {
                 res.status(404).json({
                     success: false,
-                    message: 'Sala no existe en la base de datos'
+                    message: 'Sala no existe en la base de datos',
                 });
             } else {
                 res.status(500).json({
                     success: false,
                     message: 'Error al unirse a sala',
-                    error: error.message
+                    error: error.message,
                 });
             }
         }
@@ -532,10 +710,16 @@ function registerHttpRoutes(app) {
         try {
             const { playerId, roomId } = req.body;
             if (!playerId || !isValidRoomId(roomId)) {
-                return res.status(400).json({ success: false, error: 'Datos de conexión inválidos' });
+                return res
+                    .status(400)
+                    .json({
+                        success: false,
+                        error: 'Datos de conexión inválidos',
+                    });
             }
 
-            await pool.query(`
+            await pool.query(
+                `
                 INSERT INTO player_connections 
                 (player_id, room_id, last_ping, connection_status)
                 VALUES ($1, $2, NOW(), 'connected')
@@ -544,7 +728,9 @@ function registerHttpRoutes(app) {
                     room_id = $2,
                     last_ping = NOW(),
                     connection_status = 'connected'
-            `, [playerId, roomId]);
+            `,
+                [playerId, roomId]
+            );
 
             res.json({ success: true });
         } catch (error) {
@@ -557,23 +743,25 @@ function registerHttpRoutes(app) {
         res.set('Cache-Control', 'public, max-age=5');
         const roomId = req.params.roomId;
         if (!isValidRoomId(roomId) || !rooms.has(roomId)) {
-            return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+            return res
+                .status(404)
+                .json({ success: false, message: 'Sala no encontrada' });
         }
 
         const room = rooms.get(roomId);
         res.json({
             success: true,
-            players: room.players.map(p => ({
+            players: room.players.map((p) => ({
                 id: p.id,
                 name: p.name,
                 isHost: p.isHost,
                 cardCount: p.cards.length,
                 connected: p.ws !== null,
-                userId: p.userId || null
+                userId: p.userId || null,
             })),
             gameStarted: room.gameState.gameStarted,
             currentTurn: room.gameState.currentTurn,
-            initialCards: room.gameState.initialCards
+            initialCards: room.gameState.initialCards,
         });
     });
 
@@ -581,18 +769,20 @@ function registerHttpRoutes(app) {
         try {
             const roomId = req.params.roomId;
             if (!isValidRoomId(roomId)) {
-                return res.status(400).json({ success: false, error: 'roomId inválido' });
+                return res
+                    .status(400)
+                    .json({ success: false, error: 'roomId inválido' });
             }
             const history = boardHistory.get(roomId) || {
                 ascending1: [1],
                 ascending2: [1],
                 descending1: [100],
-                descending2: [100]
+                descending2: [100],
             };
 
             res.json({
                 success: true,
-                history
+                history,
             });
         } catch (error) {
             console.error('Error al obtener historial:', error);

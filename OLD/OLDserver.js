@@ -12,24 +12,25 @@ const app = express();
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3000;
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://the-game-2xks.onrender.com')
+const allowedOrigins = (
+    process.env.ALLOWED_ORIGINS || 'https://the-game-2xks.onrender.com'
+)
     .split(',')
-    .map(origin => origin.trim())
+    .map((origin) => origin.trim())
     .filter(Boolean);
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const ROOM_ID_REGEX = /^\d{4}$/;
 const PLAYER_NAME_REGEX = /^[\p{L}\p{N}_\- ]{2,24}$/u;
 
 const pool = new Pool({
-
     connectionString: process.env.DATABASE_URL,
     ssl: {
         require: true,
-        rejectUnauthorized: IS_PRODUCTION
+        rejectUnauthorized: IS_PRODUCTION,
     },
     max: 5,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000
+    connectionTimeoutMillis: 2000,
 });
 
 const rooms = new Map();
@@ -78,12 +79,12 @@ function getTurnState(player) {
         if (Array.isArray(player.cardsPlayedThisTurn)) {
             player.turnState = {
                 count: player.cardsPlayedThisTurn.length,
-                moves: player.cardsPlayedThisTurn
+                moves: player.cardsPlayedThisTurn,
             };
         } else {
             player.turnState = {
                 count: Number(player.cardsPlayedThisTurn) || 0,
-                moves: []
+                moves: [],
             };
         }
     }
@@ -110,7 +111,9 @@ function scheduleSaveGameState(roomId, delay = 300) {
     clearTimeout(saveDebounceTimers.get(roomId));
     const timer = setTimeout(() => {
         saveDebounceTimers.delete(roomId);
-        saveGameState(roomId).catch(err => console.error('Error en save debounced:', err));
+        saveGameState(roomId).catch((err) =>
+            console.error('Error en save debounced:', err)
+        );
     }, delay);
     saveDebounceTimers.set(roomId, timer);
 }
@@ -125,7 +128,9 @@ function flushSaveGameState(roomId) {
 
 function validatePlayCardPayload(msg) {
     const requiredFields = ['cardValue', 'position', 'playerId', 'roomId'];
-    const missingFields = requiredFields.filter(field => msg[field] === undefined || msg[field] === null);
+    const missingFields = requiredFields.filter(
+        (field) => msg[field] === undefined || msg[field] === null
+    );
     return { missingFields, isValid: missingFields.length === 0 };
 }
 
@@ -144,7 +149,10 @@ function isWithinRateLimit(playerId) {
 async function generateUniqueRoomId(maxAttempts = 10) {
     for (let i = 0; i < maxAttempts; i++) {
         const roomId = Math.floor(1000 + Math.random() * 9000).toString();
-        const exists = await pool.query('SELECT 1 FROM game_states WHERE room_id = $1', [roomId]);
+        const exists = await pool.query(
+            'SELECT 1 FROM game_states WHERE room_id = $1',
+            [roomId]
+        );
         if (exists.rowCount === 0) return roomId;
     }
     throw new Error('No fue posible generar un roomId único');
@@ -194,7 +202,7 @@ async function saveGameState(roomId) {
 
     try {
         const gameData = {
-            players: room.players.map(p => ({
+            players: room.players.map((p) => ({
                 id: p.id,
                 name: p.name,
                 cards: p.cards,
@@ -203,21 +211,22 @@ async function saveGameState(roomId) {
                 cardsPlayedThisTurn: getPlayerTurnCount(p),
                 movesThisTurn: getTurnState(p).moves,
                 totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
-                lastActivity: p.lastActivity
+                lastActivity: p.lastActivity,
             })),
             gameState: {
                 deck: room.gameState.deck,
                 board: room.gameState.board,
                 currentTurn: room.gameState.currentTurn,
                 gameStarted: room.gameState.gameStarted,
-                initialCards: room.gameState.initialCards
+                initialCards: room.gameState.initialCards,
             },
-            history: boardHistory.get(roomId)
+            history: boardHistory.get(roomId),
         };
 
         const client = await pool.connect();
         try {
-            const result = await client.query(`
+            const result = await client.query(
+                `
                 INSERT INTO game_states (room_id, game_data, last_activity)
                 VALUES ($1, $2, NOW())
                 ON CONFLICT (room_id) 
@@ -225,11 +234,16 @@ async function saveGameState(roomId) {
                     game_data = EXCLUDED.game_data,
                     last_activity = NOW()
                 RETURNING room_id
-            `, [roomId, JSON.stringify(gameData)]);
+            `,
+                [roomId, JSON.stringify(gameData)]
+            );
 
             return result.rowCount > 0;
         } catch (error) {
-            console.error(`Error al guardar estado para sala ${roomId}:`, error);
+            console.error(
+                `Error al guardar estado para sala ${roomId}:`,
+                error
+            );
             throw error;
         } finally {
             client.release();
@@ -256,7 +270,9 @@ async function restoreActiveGames() {
                 try {
                     gameData = JSON.parse(row.game_data);
                 } catch (e) {
-                    console.error(`❌ Error parseando JSON para sala ${row.room_id}`);
+                    console.error(
+                        `❌ Error parseando JSON para sala ${row.room_id}`
+                    );
                     continue;
                 }
 
@@ -265,40 +281,52 @@ async function restoreActiveGames() {
                         ascending1: [1],
                         ascending2: [1],
                         descending1: [100],
-                        descending2: [100]
+                        descending2: [100],
                     };
                 }
 
                 const room = {
-                    players: gameData.players?.map(p => ({
-                        ...p,
-                        ws: null,
-                        cards: p.cards || [],
-                        cardsPlayedThisTurn: Number(p.cardsPlayedThisTurn) || 0,
-                        turnState: {
-                            count: Number(p.cardsPlayedThisTurn) || 0,
-                            moves: Array.isArray(p.movesThisTurn) ? p.movesThisTurn : []
-                        },
-                        totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
-                        lastActivity: Date.now()
-                    })) || [],
+                    players:
+                        gameData.players?.map((p) => ({
+                            ...p,
+                            ws: null,
+                            cards: p.cards || [],
+                            cardsPlayedThisTurn:
+                                Number(p.cardsPlayedThisTurn) || 0,
+                            turnState: {
+                                count: Number(p.cardsPlayedThisTurn) || 0,
+                                moves: Array.isArray(p.movesThisTurn)
+                                    ? p.movesThisTurn
+                                    : [],
+                            },
+                            totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
+                            lastActivity: Date.now(),
+                        })) || [],
                     gameState: gameData.gameState || {
                         deck: initializeDeck(),
                         board: { ascending: [1, 1], descending: [100, 100] },
                         currentTurn: null,
                         gameStarted: false,
-                        initialCards: 6
-                    }
+                        initialCards: 6,
+                    },
                 };
 
                 rooms.set(row.room_id, room);
                 reverseRoomMap.set(room, row.room_id);
                 boardHistory.set(row.room_id, gameData.history);
 
-                console.log(`✅ Sala ${row.room_id} restaurada con historial`, gameData.history);
+                console.log(
+                    `✅ Sala ${row.room_id} restaurada con historial`,
+                    gameData.history
+                );
             } catch (error) {
-                console.error(`❌ Error restaurando sala ${row.room_id}:`, error);
-                await pool.query('DELETE FROM game_states WHERE room_id = $1', [row.room_id]);
+                console.error(
+                    `❌ Error restaurando sala ${row.room_id}:`,
+                    error
+                );
+                await pool.query('DELETE FROM game_states WHERE room_id = $1', [
+                    row.room_id,
+                ]);
             }
         }
     } catch (error) {
@@ -336,11 +364,14 @@ function broadcastToRoom(room, message, options = {}) {
         message.remainingDeck = room.gameState.deck.length;
     }
 
-    room.players.forEach(player => {
-        if (player.id !== skipPlayerId && player.ws?.readyState === WebSocket.OPEN) {
+    room.players.forEach((player) => {
+        if (
+            player.id !== skipPlayerId &&
+            player.ws?.readyState === WebSocket.OPEN
+        ) {
             const completeMessage = {
                 ...message,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             };
 
             safeSend(player.ws, completeMessage);
@@ -360,19 +391,19 @@ function sendGameState(room, player) {
         y: player.cards,
         i: room.gameState.initialCards,
         d: room.gameState.deck.length,
-        p: room.players.map(p => ({
+        p: room.players.map((p) => ({
             i: p.id,
             n: p.name,
             h: p.isHost,
             c: p.cards.length,
             s: getPlayerTurnCount(p),
-            pt: Number(p.totalCardsPlayed) || 0
-        }))
+            pt: Number(p.totalCardsPlayed) || 0,
+        })),
     };
 
     safeSend(player.ws, {
         type: 'gs',
-        s: state
+        s: state,
     });
 }
 
@@ -384,14 +415,14 @@ function updateBoardHistory(room, position, newValue) {
         ascending1: [1],
         ascending2: [1],
         descending1: [100],
-        descending2: [100]
+        descending2: [100],
     };
 
     const historyKey = {
-        'asc1': 'ascending1',
-        'asc2': 'ascending2',
-        'desc1': 'descending1',
-        'desc2': 'descending2'
+        asc1: 'ascending1',
+        asc2: 'ascending2',
+        desc1: 'descending1',
+        desc2: 'descending2',
     }[position];
 
     if (history[historyKey].slice(-1)[0] !== newValue) {
@@ -401,7 +432,7 @@ function updateBoardHistory(room, position, newValue) {
         broadcastToRoom(room, {
             type: 'column_history_update',
             column: position,
-            history: history[historyKey]
+            history: history[historyKey],
         });
 
         scheduleSaveGameState(roomId);
@@ -411,11 +442,15 @@ function updateBoardHistory(room, position, newValue) {
 function getPlayableCards(playerCards, board) {
     if (!playerCards || playerCards.length === 0) return [];
 
-    return playerCards.filter(card => {
-        const canPlayAsc1 = card > board.ascending[0] || card === board.ascending[0] - 10;
-        const canPlayAsc2 = card > board.ascending[1] || card === board.ascending[1] - 10;
-        const canPlayDesc1 = card < board.descending[0] || card === board.descending[0] + 10;
-        const canPlayDesc2 = card < board.descending[1] || card === board.descending[1] + 10;
+    return playerCards.filter((card) => {
+        const canPlayAsc1 =
+            card > board.ascending[0] || card === board.ascending[0] - 10;
+        const canPlayAsc2 =
+            card > board.ascending[1] || card === board.ascending[1] - 10;
+        const canPlayDesc1 =
+            card < board.descending[0] || card === board.descending[0] + 10;
+        const canPlayDesc2 =
+            card < board.descending[1] || card === board.descending[1] + 10;
 
         return canPlayAsc1 || canPlayAsc2 || canPlayDesc1 || canPlayDesc2;
     });
@@ -425,9 +460,18 @@ function isValidMove(cardValue, position, board) {
     const idx = position === 'asc1' || position === 'desc1' ? 0 : 1;
     const isAsc = position.includes('asc');
     const targetValue = isAsc ? board.ascending[idx] : board.descending[idx];
-    const exactDifference = isAsc ? cardValue === targetValue - 10 : cardValue === targetValue + 10;
-    const normalMove = isAsc ? cardValue > targetValue : cardValue < targetValue;
-    return { isValid: exactDifference || normalMove, targetValue, exactDifference, normalMove };
+    const exactDifference = isAsc
+        ? cardValue === targetValue - 10
+        : cardValue === targetValue + 10;
+    const normalMove = isAsc
+        ? cardValue > targetValue
+        : cardValue < targetValue;
+    return {
+        isValid: exactDifference || normalMove,
+        targetValue,
+        exactDifference,
+        normalMove,
+    };
 }
 
 async function handlePlayCard(room, player, msg) {
@@ -435,7 +479,7 @@ async function handlePlayCard(room, player, msg) {
         return safeSend(player.ws, {
             type: 'notification',
             message: 'Posición inválida',
-            isError: true
+            isError: true,
         });
     }
 
@@ -443,21 +487,35 @@ async function handlePlayCard(room, player, msg) {
         return safeSend(player.ws, {
             type: 'notification',
             message: 'No tienes esa carta',
-            isError: true
+            isError: true,
         });
     }
 
     const board = room.gameState.board;
-    const targetIdx = msg.position.includes('asc') ? (msg.position === 'asc1' ? 0 : 1) : (msg.position === 'desc1' ? 0 : 1);
-    const { isValid, targetValue } = isValidMove(msg.cardValue, msg.position, board);
+    const targetIdx = msg.position.includes('asc')
+        ? msg.position === 'asc1'
+            ? 0
+            : 1
+        : msg.position === 'desc1'
+          ? 0
+          : 1;
+    const { isValid, targetValue } = isValidMove(
+        msg.cardValue,
+        msg.position,
+        board
+    );
 
     if (!isValid) {
         return safeSend(player.ws, {
             type: 'invalid_move',
-            message: `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'
-                } que ${targetValue} o igual a ${msg.position.includes('asc') ? targetValue - 10 : targetValue + 10
-                }`,
-            isError: true
+            message: `Movimiento inválido. La carta debe ${
+                msg.position.includes('asc') ? 'ser mayor' : 'ser menor'
+            } que ${targetValue} o igual a ${
+                msg.position.includes('asc')
+                    ? targetValue - 10
+                    : targetValue + 10
+            }`,
+            isError: true,
         });
     }
 
@@ -473,22 +531,25 @@ async function handlePlayCard(room, player, msg) {
     incrementPlayerTurnState(player, {
         value: msg.cardValue,
         position: msg.position,
-        previousValue
+        previousValue,
     });
     player.cardsPlayedThisTurn = getPlayerTurnCount(player);
     player.totalCardsPlayed = (Number(player.totalCardsPlayed) || 0) + 1;
-    player.cards = player.cards.filter(c => c !== msg.cardValue);
+    player.cards = player.cards.filter((c) => c !== msg.cardValue);
 
     // Nueva verificación de condición de derrota
     if (room.gameState.deck.length > 0 && getPlayerTurnCount(player) === 1) {
-        const playableCards = getPlayableCards(player.cards, room.gameState.board);
+        const playableCards = getPlayableCards(
+            player.cards,
+            room.gameState.board
+        );
         if (playableCards.length === 0) {
             await flushSaveGameState(reverseRoomMap.get(room));
             return broadcastToRoom(room, {
                 type: 'game_over',
                 result: 'lose',
                 message: `¡${player.name} no puede seguir jugando cartas!`,
-                reason: 'min_cards_not_met'
+                reason: 'min_cards_not_met',
             });
         }
     }
@@ -497,18 +558,22 @@ async function handlePlayCard(room, player, msg) {
 
     const deckEmpty = room.gameState.deck.length === 0;
 
-    broadcastToRoom(room, {
-        type: 'card_played_animated',
-        playerId: player.id,
-        playerName: player.name,
-        cardValue: msg.cardValue,
-        position: msg.position,
-        previousValue: targetValue,
-        persistColor: true,
-        cardsPlayedThisTurn: getPlayerTurnCount(player),
-        remainingDeck: room.gameState.deck.length, // Asegurar que se envía
-        deckEmpty: deckEmpty // Nueva propiedad
-    }, { includeGameState: true });
+    broadcastToRoom(
+        room,
+        {
+            type: 'card_played_animated',
+            playerId: player.id,
+            playerName: player.name,
+            cardValue: msg.cardValue,
+            position: msg.position,
+            previousValue: targetValue,
+            persistColor: true,
+            cardsPlayedThisTurn: getPlayerTurnCount(player),
+            remainingDeck: room.gameState.deck.length, // Asegurar que se envía
+            deckEmpty: deckEmpty, // Nueva propiedad
+        },
+        { includeGameState: true }
+    );
 
     // Si el mazo acaba de vaciarse, enviar actualización especial
     if (deckEmpty && room.gameState.deck.length === 0) {
@@ -516,7 +581,7 @@ async function handlePlayCard(room, player, msg) {
             broadcastToRoom(room, {
                 type: 'deck_empty',
                 roomId: reverseRoomMap.get(room),
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
         }, 500);
     }
@@ -531,20 +596,19 @@ function handleUndoMove(room, player, msg) {
         return safeSend(player.ws, {
             type: 'notification',
             message: 'No hay jugadas para deshacer',
-            isError: true
+            isError: true,
         });
     }
 
     const lastMoveIndex = turnState.moves.findIndex(
-        move => move.value === msg.cardValue &&
-            move.position === msg.position
+        (move) => move.value === msg.cardValue && move.position === msg.position
     );
 
     if (lastMoveIndex === -1) {
         return safeSend(player.ws, {
             type: 'notification',
             message: 'No se encontró la jugada para deshacer',
-            isError: true
+            isError: true,
         });
     }
 
@@ -564,14 +628,18 @@ function handleUndoMove(room, player, msg) {
     turnState.count = Math.max(0, turnState.count - 1);
     player.cardsPlayedThisTurn = turnState.count;
 
-    broadcastToRoom(room, {
-        type: 'move_undone',
-        playerId: player.id,
-        playerName: player.name,
-        cardValue: msg.cardValue,
-        position: msg.position,
-        previousValue: lastMove.previousValue
-    }, { includeGameState: true });
+    broadcastToRoom(
+        room,
+        {
+            type: 'move_undone',
+            playerId: player.id,
+            playerName: player.name,
+            cardValue: msg.cardValue,
+            position: msg.position,
+            previousValue: lastMove.previousValue,
+        },
+        { includeGameState: true }
+    );
 }
 
 async function endTurn(room, player) {
@@ -584,7 +652,7 @@ async function endTurn(room, player) {
         return safeSend(player.ws, {
             type: 'notification',
             message: `Debes jugar al menos ${minCardsRequired} cartas este turno`,
-            isError: true
+            isError: true,
         });
     }
 
@@ -602,7 +670,9 @@ async function endTurn(room, player) {
     }
 
     // Buscar siguiente jugador que pueda jugar (si no hay cartas en mazo)
-    let nextIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
+    let nextIndex = room.players.findIndex(
+        (p) => p.id === room.gameState.currentTurn
+    );
     let nextPlayer;
     let attempts = 0;
 
@@ -618,10 +688,12 @@ async function endTurn(room, player) {
         }
 
         // Si hay cartas en mazo o el jugador puede mover, lo seleccionamos
-        if (!deckEmpty || getPlayableCards(nextPlayer.cards, room.gameState.board).length > 0) {
+        if (
+            !deckEmpty ||
+            getPlayableCards(nextPlayer.cards, room.gameState.board).length > 0
+        ) {
             break;
         }
-
     } while (true);
 
     room.gameState.currentTurn = nextPlayer.id;
@@ -630,37 +702,47 @@ async function endTurn(room, player) {
 
     // Verificar condiciones de derrota al inicio del turno (con cartas en mazo)
     if (!deckEmpty) {
-        const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-        if (playableCards.length < minCardsRequired && nextPlayer.cards.length > 0) {
+        const playableCards = getPlayableCards(
+            nextPlayer.cards,
+            room.gameState.board
+        );
+        if (
+            playableCards.length < minCardsRequired &&
+            nextPlayer.cards.length > 0
+        ) {
             await flushSaveGameState(reverseRoomMap.get(room));
             return broadcastToRoom(room, {
                 type: 'game_over',
                 result: 'lose',
                 message: `¡${nextPlayer.name} no puede jugar el mínimo de ${minCardsRequired} carta(s) requerida(s)!`,
-                reason: 'min_cards_not_met'
+                reason: 'min_cards_not_met',
             });
         }
     }
 
     await flushSaveGameState(reverseRoomMap.get(room));
 
-    broadcastToRoom(room, {
-        type: 'turn_changed',
-        newTurn: nextPlayer.id,
-        previousPlayer: player.id,
-        playerName: nextPlayer.name,
-        cardsPlayedThisTurn: 0,
-        minCardsRequired: minCardsRequired,
-        remainingDeck: room.gameState.deck.length,
-        deckEmpty: deckEmpty,
-        skippedPlayers: attempts - 1 // Número de jugadores saltados
-    }, { includeGameState: true });
+    broadcastToRoom(
+        room,
+        {
+            type: 'turn_changed',
+            newTurn: nextPlayer.id,
+            previousPlayer: player.id,
+            playerName: nextPlayer.name,
+            cardsPlayedThisTurn: 0,
+            minCardsRequired: minCardsRequired,
+            remainingDeck: room.gameState.deck.length,
+            deckEmpty: deckEmpty,
+            skippedPlayers: attempts - 1, // Número de jugadores saltados
+        },
+        { includeGameState: true }
+    );
 
     checkGameStatus(room);
 }
 
 function checkGameStatus(room) {
-    const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
+    const allPlayersEmpty = room.players.every((p) => p.cards.length === 0);
     const deckEmpty = room.gameState.deck.length === 0;
 
     // Condición de victoria a: Sin cartas en mazo y en manos de jugadores
@@ -669,21 +751,27 @@ function checkGameStatus(room) {
             type: 'game_over',
             result: 'win',
             message: '¡Todos ganan! Todas las cartas jugadas.',
-            reason: 'all_cards_played'
+            reason: 'all_cards_played',
         });
         return;
     }
 
     // Calcular suma total de cartas en manos de jugadores
-    const totalCardsInHand = room.players.reduce((sum, player) => sum + player.cards.length, 0);
+    const totalCardsInHand = room.players.reduce(
+        (sum, player) => sum + player.cards.length,
+        0
+    );
 
     // Condición de victoria b: Sin cartas en mazo y suma <= 10
     if (deckEmpty && totalCardsInHand <= 10 && !canAnyPlayerPlay(room)) {
         broadcastToRoom(room, {
             type: 'game_over',
             result: 'win',
-            message: '¡Victoria! Sin movimientos posibles y solo ' + totalCardsInHand + ' cartas restantes.',
-            reason: 'low_remaining_cards'
+            message:
+                '¡Victoria! Sin movimientos posibles y solo ' +
+                totalCardsInHand +
+                ' cartas restantes.',
+            reason: 'low_remaining_cards',
         });
         return;
     }
@@ -693,8 +781,11 @@ function checkGameStatus(room) {
         broadcastToRoom(room, {
             type: 'game_over',
             result: 'lose',
-            message: '¡Derrota! Sin movimientos posibles y ' + totalCardsInHand + ' cartas restantes (más de 10).',
-            reason: 'too_many_remaining_cards'
+            message:
+                '¡Derrota! Sin movimientos posibles y ' +
+                totalCardsInHand +
+                ' cartas restantes (más de 10).',
+            reason: 'too_many_remaining_cards',
         });
         return;
     }
@@ -702,7 +793,7 @@ function checkGameStatus(room) {
 
 // Función auxiliar para verificar si algún jugador puede hacer un movimiento
 function canAnyPlayerPlay(room) {
-    return room.players.some(player => {
+    return room.players.some((player) => {
         return getPlayableCards(player.cards, room.gameState.board).length > 0;
     });
 }
@@ -727,7 +818,9 @@ function shuffleArray(array) {
 app.post('/create-room', async (req, res) => {
     const playerName = sanitizePlayerName(req.body?.playerName);
     if (!playerName) {
-        return res.status(400).json({ success: false, message: 'Nombre de jugador inválido' });
+        return res
+            .status(400)
+            .json({ success: false, message: 'Nombre de jugador inválido' });
     }
 
     const playerId = uuidv4();
@@ -735,64 +828,84 @@ app.post('/create-room', async (req, res) => {
     try {
         const roomId = await generateUniqueRoomId();
         await withTransaction(async (client) => {
-            await client.query(`
+            await client.query(
+                `
                 INSERT INTO game_states 
                 (room_id, game_data, last_activity)
                 VALUES ($1, $2, NOW())
-            `, [roomId, JSON.stringify({
-                players: [],
-                gameState: {
-                    deck: initializeDeck(),
-                    board: { ascending: [1, 1], descending: [100, 100] },
-                    currentTurn: playerId,
-                    gameStarted: false,
-                    initialCards: 6
-                },
-                history: {
-                    ascending1: [1], ascending2: [1],
-                    descending1: [100], descending2: [100]
-                }
-            })]);
+            `,
+                [
+                    roomId,
+                    JSON.stringify({
+                        players: [],
+                        gameState: {
+                            deck: initializeDeck(),
+                            board: {
+                                ascending: [1, 1],
+                                descending: [100, 100],
+                            },
+                            currentTurn: playerId,
+                            gameStarted: false,
+                            initialCards: 6,
+                        },
+                        history: {
+                            ascending1: [1],
+                            ascending2: [1],
+                            descending1: [100],
+                            descending2: [100],
+                        },
+                    }),
+                ]
+            );
 
-            await client.query(`
+            await client.query(
+                `
                 INSERT INTO player_connections 
                 (player_id, room_id, last_ping, connection_status)
                 VALUES ($1, $2, NOW(), 'connected')
-            `, [playerId, roomId]);
+            `,
+                [playerId, roomId]
+            );
         });
 
         const room = {
-            players: [{
-                id: playerId,
-                name: playerName,
-                isHost: true,
-                ws: null,
-                cards: [],
-                cardsPlayedThisTurn: 0,
-                turnState: createTurnState(),
-                lastActivity: Date.now()
-            }],
+            players: [
+                {
+                    id: playerId,
+                    name: playerName,
+                    isHost: true,
+                    ws: null,
+                    cards: [],
+                    cardsPlayedThisTurn: 0,
+                    turnState: createTurnState(),
+                    lastActivity: Date.now(),
+                },
+            ],
             gameState: {
                 deck: initializeDeck(),
                 board: { ascending: [1, 1], descending: [100, 100] },
                 currentTurn: playerId,
                 gameStarted: false,
-                initialCards: 6
-            }
+                initialCards: 6,
+            },
         };
 
         rooms.set(roomId, room);
         reverseRoomMap.set(room, roomId);
         boardHistory.set(roomId, {
-            ascending1: [1], ascending2: [1],
-            descending1: [100], descending2: [100]
+            ascending1: [1],
+            ascending2: [1],
+            descending1: [100],
+            descending2: [100],
         });
 
         res.json({ success: true, roomId, playerId, playerName });
-
     } catch (error) {
         console.error('Error al crear sala:', error);
-        res.status(500).json({ success: false, message: 'Error al crear sala' });
+        res.status(500).json({
+            success: false,
+            message: 'Error al crear sala',
+        });
     }
 });
 
@@ -803,20 +916,25 @@ app.post('/join-room', async (req, res) => {
     if (!playerName || !isValidRoomId(roomId)) {
         return res.status(400).json({
             success: false,
-            message: 'Nombre de jugador y código de sala válidos requeridos'
+            message: 'Nombre de jugador y código de sala válidos requeridos',
         });
     }
 
     try {
-        const roomCheck = await pool.query('SELECT 1 FROM game_states WHERE room_id = $1', [roomId]);
+        const roomCheck = await pool.query(
+            'SELECT 1 FROM game_states WHERE room_id = $1',
+            [roomId]
+        );
         if (roomCheck.rowCount === 0) {
-            return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+            return res
+                .status(404)
+                .json({ success: false, message: 'Sala no encontrada' });
         }
 
         if (!rooms.has(roomId)) {
             return res.status(404).json({
                 success: false,
-                message: 'Sala no disponible'
+                message: 'Sala no disponible',
             });
         }
 
@@ -824,7 +942,8 @@ app.post('/join-room', async (req, res) => {
         const playerId = uuidv4();
 
         await withTransaction(async (client) => {
-            await client.query(`
+            await client.query(
+                `
                 INSERT INTO player_connections 
                 (player_id, room_id, last_ping, connection_status)
                 VALUES ($1, $2, NOW(), 'connected')
@@ -833,7 +952,9 @@ app.post('/join-room', async (req, res) => {
                     room_id = $2,
                     last_ping = NOW(),
                     connection_status = 'connected'
-            `, [playerId, roomId]);
+            `,
+                [playerId, roomId]
+            );
         });
 
         const newPlayer = {
@@ -844,7 +965,7 @@ app.post('/join-room', async (req, res) => {
             cards: [],
             cardsPlayedThisTurn: 0,
             turnState: createTurnState(),
-            lastActivity: Date.now()
+            lastActivity: Date.now(),
         };
         room.players.push(newPlayer);
 
@@ -854,13 +975,13 @@ app.post('/join-room', async (req, res) => {
             type: 'player_joined',
             playerId: playerId,
             playerName: playerName,
-            players: room.players.map(p => ({
+            players: room.players.map((p) => ({
                 id: p.id,
                 name: p.name,
                 isHost: p.isHost,
                 cardCount: p.cards.length,
-                connected: p.ws !== null
-            }))
+                connected: p.ws !== null,
+            })),
         });
 
         res.json({
@@ -868,22 +989,21 @@ app.post('/join-room', async (req, res) => {
             playerId,
             playerName,
             isHost: false,
-            roomId
+            roomId,
         });
-
     } catch (error) {
         console.error('Error al unirse a sala:', error);
 
         if (error.code === '23503') {
             res.status(404).json({
                 success: false,
-                message: 'Sala no existe en la base de datos'
+                message: 'Sala no existe en la base de datos',
             });
         } else {
             res.status(500).json({
                 success: false,
                 message: 'Error al unirse a sala',
-                error: error.message
+                error: error.message,
             });
         }
     }
@@ -893,10 +1013,13 @@ app.post('/register-connection', async (req, res) => {
     try {
         const { playerId, roomId } = req.body;
         if (!playerId || !isValidRoomId(roomId)) {
-            return res.status(400).json({ success: false, error: 'Datos de conexión inválidos' });
+            return res
+                .status(400)
+                .json({ success: false, error: 'Datos de conexión inválidos' });
         }
 
-        await pool.query(`
+        await pool.query(
+            `
             INSERT INTO player_connections 
             (player_id, room_id, last_ping, connection_status)
             VALUES ($1, $2, NOW(), 'connected')
@@ -905,7 +1028,9 @@ app.post('/register-connection', async (req, res) => {
                 room_id = $2,
                 last_ping = NOW(),
                 connection_status = 'connected'
-        `, [playerId, roomId]);
+        `,
+            [playerId, roomId]
+        );
 
         res.json({ success: true });
     } catch (error) {
@@ -918,22 +1043,24 @@ app.get('/room-info/:roomId', async (req, res) => {
     res.set('Cache-Control', 'public, max-age=5');
     const roomId = req.params.roomId;
     if (!isValidRoomId(roomId) || !rooms.has(roomId)) {
-        return res.status(404).json({ success: false, message: 'Sala no encontrada' });
+        return res
+            .status(404)
+            .json({ success: false, message: 'Sala no encontrada' });
     }
 
     const room = rooms.get(roomId);
     res.json({
         success: true,
-        players: room.players.map(p => ({
+        players: room.players.map((p) => ({
             id: p.id,
             name: p.name,
             isHost: p.isHost,
             cardCount: p.cards.length,
-            connected: p.ws !== null
+            connected: p.ws !== null,
         })),
         gameStarted: room.gameState.gameStarted,
         currentTurn: room.gameState.currentTurn,
-        initialCards: room.gameState.initialCards
+        initialCards: room.gameState.initialCards,
     });
 });
 
@@ -941,18 +1068,20 @@ app.get('/room-history/:roomId', async (req, res) => {
     try {
         const roomId = req.params.roomId;
         if (!isValidRoomId(roomId)) {
-            return res.status(400).json({ success: false, error: 'roomId inválido' });
+            return res
+                .status(400)
+                .json({ success: false, error: 'roomId inválido' });
         }
         const history = boardHistory.get(roomId) || {
             ascending1: [1],
             ascending2: [1],
             descending1: [100],
-            descending2: [100]
+            descending2: [100],
         };
 
         res.json({
             success: true,
-            history
+            history,
         });
     } catch (error) {
         console.error('Error al obtener historial:', error);
@@ -966,23 +1095,31 @@ async function startGame(room, initialCards = 6) {
 
     try {
         await withTransaction(async (client) => {
-            await client.query(`
+            await client.query(
+                `
                 UPDATE game_states
                 SET game_data = $1,
                     last_activity = NOW()
                 WHERE room_id = $2
-            `, [JSON.stringify({
-                players: room.players,
-                gameState: {
-                    ...room.gameState,
-                    gameStarted: true,
-                    initialCards
-                },
-                history: boardHistory.get(roomId)
-            }), roomId]);
+            `,
+                [
+                    JSON.stringify({
+                        players: room.players,
+                        gameState: {
+                            ...room.gameState,
+                            gameStarted: true,
+                            initialCards,
+                        },
+                        history: boardHistory.get(roomId),
+                    }),
+                    roomId,
+                ]
+            );
 
-            await Promise.all(room.players.map(player =>
-                client.query(`
+            await Promise.all(
+                room.players.map((player) =>
+                    client.query(
+                        `
                     INSERT INTO player_connections 
                     (player_id, room_id, last_ping, connection_status)
                     VALUES ($1, $2, NOW(), $3)
@@ -991,22 +1128,31 @@ async function startGame(room, initialCards = 6) {
                         room_id = $2,
                         last_ping = NOW(),
                         connection_status = $3
-                `, [
-                    player.id,
-                    roomId,
-                    player.ws?.readyState === WebSocket.OPEN ? 'connected' : 'disconnected'
-                ])
-            ));
+                `,
+                        [
+                            player.id,
+                            roomId,
+                            player.ws?.readyState === WebSocket.OPEN
+                                ? 'connected'
+                                : 'disconnected',
+                        ]
+                    )
+                )
+            );
         });
 
         room.gameState.gameStarted = true;
         room.gameState.initialCards = initialCards;
 
-        room.players.forEach(player => {
+        room.players.forEach((player) => {
             player.cards = [];
             resetPlayerTurnState(player);
             player.cardsPlayedThisTurn = 0;
-            for (let i = 0; i < initialCards && room.gameState.deck.length > 0; i++) {
+            for (
+                let i = 0;
+                i < initialCards && room.gameState.deck.length > 0;
+                i++
+            ) {
                 player.cards.push(room.gameState.deck.pop());
             }
         });
@@ -1021,27 +1167,26 @@ async function startGame(room, initialCards = 6) {
                 currentTurn: room.players[0].id,
                 remainingDeck: room.gameState.deck.length,
                 initialCards: initialCards,
-                players: room.players.map(p => ({
+                players: room.players.map((p) => ({
                     id: p.id,
                     name: p.name,
                     isHost: p.isHost,
                     cardCount: p.cards.length,
-                    cardsPlayedThisTurn: getPlayerTurnCount(p)
-                }))
-            }
+                    cardsPlayedThisTurn: getPlayerTurnCount(p),
+                })),
+            },
         });
 
-        room.players.forEach(player => {
+        room.players.forEach((player) => {
             if (player.ws?.readyState === WebSocket.OPEN) {
                 safeSend(player.ws, {
                     type: 'your_cards',
                     cards: player.cards,
                     playerName: player.name,
-                    currentPlayerId: player.id
+                    currentPlayerId: player.id,
                 });
             }
         });
-
     } catch (error) {
         console.error('Error al iniciar juego:', error);
         throw error;
@@ -1058,7 +1203,7 @@ const wss = new WebSocket.Server({
             return done(false, 403, 'Origen no permitido');
         }
         done(true);
-    }
+    },
 });
 
 initializeDatabase().then(() => {
@@ -1077,11 +1222,12 @@ wss.on('connection', async (ws, req) => {
     }
 
     const room = rooms.get(roomId);
-    const player = room.players.find(p => p.id === playerId);
+    const player = room.players.find((p) => p.id === playerId);
     if (!player) return ws.close(1008, 'Jugador no registrado');
 
     try {
-        await pool.query(`
+        await pool.query(
+            `
             INSERT INTO player_connections 
             (player_id, room_id, last_ping, connection_status)
             VALUES ($1, $2, NOW(), 'connected')
@@ -1090,7 +1236,9 @@ wss.on('connection', async (ws, req) => {
                 room_id = $2,
                 last_ping = NOW(),
                 connection_status = 'connected'
-        `, [playerId, roomId]);
+        `,
+            [playerId, roomId]
+        );
     } catch (error) {
         console.error('Error al actualizar player_connections:', error);
     }
@@ -1114,29 +1262,29 @@ wss.on('connection', async (ws, req) => {
             gameStarted: room.gameState.gameStarted,
             initialCards: room.gameState.initialCards,
             remainingDeck: room.gameState.deck.length,
-            players: room.players.map(p => ({
+            players: room.players.map((p) => ({
                 id: p.id,
                 name: p.name,
                 isHost: p.isHost,
-                cardCount: p.cards.length
-            }))
+                cardCount: p.cards.length,
+            })),
         },
         history: boardHistory.get(roomId) || {
             ascending1: [1],
             ascending2: [1],
             descending1: [100],
-            descending2: [100]
+            descending2: [100],
         },
-        isYourTurn: room.gameState.currentTurn === player.id
+        isYourTurn: room.gameState.currentTurn === player.id,
     };
 
     if (room.gameState.gameStarted) {
         response.yourCards = player.cards;
-        response.players = room.players.map(p => ({
+        response.players = room.players.map((p) => ({
             id: p.id,
             name: p.name,
             cardCount: p.cards.length,
-            cardsPlayedThisTurn: getPlayerTurnCount(p)
+            cardsPlayedThisTurn: getPlayerTurnCount(p),
         }));
     }
 
@@ -1149,11 +1297,12 @@ wss.on('connection', async (ws, req) => {
                     type: 'notification',
                     message: 'Has excedido el límite de mensajes por segundo',
                     isError: true,
-                    errorCode: 'RATE_LIMIT_EXCEEDED'
+                    errorCode: 'RATE_LIMIT_EXCEEDED',
                 });
             }
 
-            const rawMessage = typeof message === 'string' ? message : message.toString();
+            const rawMessage =
+                typeof message === 'string' ? message : message.toString();
             if (rawMessage.length > 8 * 1024) {
                 return ws.close(1009, 'Payload demasiado grande');
             }
@@ -1162,11 +1311,14 @@ wss.on('connection', async (ws, req) => {
             player.lastActivity = Date.now();
 
             if (msg.type === 'ping') {
-                await pool.query(`
+                await pool.query(
+                    `
                     UPDATE player_connections
                     SET last_ping = NOW()
                     WHERE player_id = $1
-                `, [playerId]);
+                `,
+                    [playerId]
+                );
                 return;
             }
 
@@ -1178,29 +1330,32 @@ wss.on('connection', async (ws, req) => {
                         broadcastToRoom(room, {
                             type: 'game_state_update',
                             remainingDeck: 0,
-                            minCardsRequired: 1
+                            minCardsRequired: 1,
                         });
                     }
                     break;
                 case 'get_player_state':
                     if (rooms.has(msg.roomId)) {
                         const room = rooms.get(msg.roomId);
-                        const player = room.players.find(p => p.id === msg.playerId);
+                        const player = room.players.find(
+                            (p) => p.id === msg.playerId
+                        );
 
                         if (player) {
                             safeSend(player.ws, {
                                 type: 'player_state_update',
                                 cardsPlayedThisTurn: getPlayerTurnCount(player),
                                 totalCardsPlayed: player.totalCardsPlayed || 0,
-                                minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1,
+                                minCardsRequired:
+                                    room.gameState.deck.length > 0 ? 2 : 1,
                                 currentTurn: room.gameState.currentTurn,
-                                players: room.players.map(p => ({
+                                players: room.players.map((p) => ({
                                     id: p.id,
                                     name: p.name,
                                     isHost: p.isHost,
                                     cardCount: p.cards?.length || 0,
-                                    cardsPlayedThisTurn: getPlayerTurnCount(p)
-                                }))
+                                    cardsPlayedThisTurn: getPlayerTurnCount(p),
+                                })),
                             });
                         }
                     }
@@ -1208,40 +1363,53 @@ wss.on('connection', async (ws, req) => {
                 case 'start_game':
                     if (player.isHost && !room.gameState.gameStarted) {
                         try {
-                            const connectedPlayers = room.players.filter(p =>
-                                p.ws?.readyState === WebSocket.OPEN
+                            const connectedPlayers = room.players.filter(
+                                (p) => p.ws?.readyState === WebSocket.OPEN
                             );
 
                             if (connectedPlayers.length < 1) {
-                                throw new Error('Se necesita al menos 1 jugador conectado');
+                                throw new Error(
+                                    'Se necesita al menos 1 jugador conectado'
+                                );
                             }
 
-                            const sanitizedInitialCards = Number(msg.initialCards);
-                            const initialCards = Number.isInteger(sanitizedInitialCards) && sanitizedInitialCards >= 1 && sanitizedInitialCards <= 10
-                                ? sanitizedInitialCards
-                                : 6;
+                            const sanitizedInitialCards = Number(
+                                msg.initialCards
+                            );
+                            const initialCards =
+                                Number.isInteger(sanitizedInitialCards) &&
+                                sanitizedInitialCards >= 1 &&
+                                sanitizedInitialCards <= 10
+                                    ? sanitizedInitialCards
+                                    : 6;
                             await startGame(room, initialCards);
                         } catch (error) {
                             console.error('Error al iniciar juego:', error);
                             safeSend(player.ws, {
                                 type: 'notification',
-                                message: 'Error al iniciar el juego: ' + error.message,
-                                isError: true
+                                message:
+                                    'Error al iniciar el juego: ' +
+                                    error.message,
+                                isError: true,
                             });
                         }
                     }
                     break;
                 // En el manejador de mensajes WebSocket
                 case 'play_card':
-                    if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
-                        const { missingFields, isValid } = validatePlayCardPayload(msg);
+                    if (
+                        player.id === room.gameState.currentTurn &&
+                        room.gameState.gameStarted
+                    ) {
+                        const { missingFields, isValid } =
+                            validatePlayCardPayload(msg);
 
                         if (!isValid) {
                             return safeSend(player.ws, {
                                 type: 'notification',
                                 message: `Faltan campos requeridos: ${missingFields.join(', ')}`,
                                 isError: true,
-                                errorCode: 'MISSING_REQUIRED_FIELDS'
+                                errorCode: 'MISSING_REQUIRED_FIELDS',
                             });
                         }
 
@@ -1251,7 +1419,7 @@ wss.on('connection', async (ws, req) => {
                                 type: 'notification',
                                 message: 'Sala no válida',
                                 isError: true,
-                                errorCode: 'INVALID_ROOM'
+                                errorCode: 'INVALID_ROOM',
                             });
                         }
 
@@ -1259,18 +1427,24 @@ wss.on('connection', async (ws, req) => {
                             ...msg,
                             playerId: player.id,
                             playerName: player.name,
-                            isPlayedThisTurn: true
+                            isPlayedThisTurn: true,
                         };
                         await handlePlayCard(room, player, enhancedMsg);
                     }
                     break;
                 case 'end_turn':
-                    if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                    if (
+                        player.id === room.gameState.currentTurn &&
+                        room.gameState.gameStarted
+                    ) {
                         await endTurn(room, player);
                     }
                     break;
                 case 'undo_move':
-                    if (player.id === room.gameState.currentTurn && room.gameState.gameStarted) {
+                    if (
+                        player.id === room.gameState.currentTurn &&
+                        room.gameState.gameStarted
+                    ) {
                         handleUndoMove(room, player, msg);
                     }
                     break;
@@ -1280,14 +1454,17 @@ wss.on('connection', async (ws, req) => {
                 case 'force_game_over':
                     if (rooms.has(msg.roomId)) {
                         const room = rooms.get(msg.roomId);
-                        const player = room.players.find(p => p.id === msg.playerId);
+                        const player = room.players.find(
+                            (p) => p.id === msg.playerId
+                        );
 
                         if (player) {
                             broadcastToRoom(room, {
                                 type: 'game_over',
                                 result: 'lose',
-                                message: '¡Juego terminado! No hay movimientos válidos disponibles.',
-                                reason: msg.reason || 'no_valid_moves'
+                                message:
+                                    '¡Juego terminado! No hay movimientos válidos disponibles.',
+                                reason: msg.reason || 'no_valid_moves',
                             });
                         }
                     }
@@ -1295,17 +1472,20 @@ wss.on('connection', async (ws, req) => {
                 case 'check_solo_block':
                     if (rooms.has(msg.roomId)) {
                         const room = rooms.get(msg.roomId);
-                        const player = room.players.find(p => p.id === msg.playerId);
+                        const player = room.players.find(
+                            (p) => p.id === msg.playerId
+                        );
 
                         if (player && room.players.length === 1) {
-                            const minCardsRequired = room.gameState.deck.length > 0 ? 2 : 1;
+                            const minCardsRequired =
+                                room.gameState.deck.length > 0 ? 2 : 1;
 
                             if (msg.cardsRemaining < minCardsRequired) {
                                 broadcastToRoom(room, {
                                     type: 'game_over',
                                     result: 'lose',
                                     message: `¡No puedes jugar el mínimo de ${minCardsRequired} carta(s) requerida(s)!`,
-                                    reason: 'min_cards_not_met_solo'
+                                    reason: 'min_cards_not_met_solo',
                                 });
                             }
                         }
@@ -1314,13 +1494,15 @@ wss.on('connection', async (ws, req) => {
                 case 'self_blocked':
                     if (rooms.has(msg.roomId)) {
                         const room = rooms.get(msg.roomId);
-                        const player = room.players.find(p => p.id === msg.playerId);
+                        const player = room.players.find(
+                            (p) => p.id === msg.playerId
+                        );
                         if (player) {
                             broadcastToRoom(room, {
                                 type: 'game_over',
                                 result: 'lose',
                                 message: `¡${player.name} se quedó sin movimientos posibles!`,
-                                reason: 'self_blocked'
+                                reason: 'self_blocked',
                             });
                         }
                     }
@@ -1331,20 +1513,23 @@ wss.on('connection', async (ws, req) => {
 
                         room.gameState = {
                             deck: initializeDeck(),
-                            board: { ascending: [1, 1], descending: [100, 100] },
+                            board: {
+                                ascending: [1, 1],
+                                descending: [100, 100],
+                            },
                             currentTurn: room.players[0].id,
                             gameStarted: false,
-                            initialCards: room.gameState.initialCards || 6
+                            initialCards: room.gameState.initialCards || 6,
                         };
 
                         boardHistory.set(msg.roomId, {
                             ascending1: [1],
                             ascending2: [1],
                             descending1: [100],
-                            descending2: [100]
+                            descending2: [100],
                         });
 
-                        room.players.forEach(player => {
+                        room.players.forEach((player) => {
                             player.cards = [];
                             resetPlayerTurnState(player);
                             player.cardsPlayedThisTurn = 0;
@@ -1354,60 +1539,69 @@ wss.on('connection', async (ws, req) => {
 
                         broadcastToRoom(room, {
                             type: 'room_reset',
-                            message: 'La sala ha sido reiniciada para una nueva partida'
+                            message:
+                                'La sala ha sido reiniciada para una nueva partida',
                         });
                     }
                     break;
                 case 'update_player':
-                    const playerToUpdate = room.players.find(p => p.id === msg.playerId);
+                    const playerToUpdate = room.players.find(
+                        (p) => p.id === msg.playerId
+                    );
                     if (playerToUpdate) {
                         const sanitizedName = sanitizePlayerName(msg.name);
                         if (!sanitizedName) break;
                         playerToUpdate.name = sanitizedName;
                         broadcastToRoom(room, {
                             type: 'player_update',
-                            players: room.players.map(p => ({
+                            players: room.players.map((p) => ({
                                 id: p.id,
                                 name: p.name,
                                 isHost: p.isHost,
-                                cardCount: p.cards.length
-                            }))
+                                cardCount: p.cards.length,
+                            })),
                         });
                     }
                     break;
                 case 'get_full_state':
                     if (rooms.has(msg.roomId)) {
                         const room = rooms.get(msg.roomId);
-                        const player = room.players.find(p => p.id === msg.playerId);
+                        const player = room.players.find(
+                            (p) => p.id === msg.playerId
+                        );
                         if (player) {
                             const roomId = reverseRoomMap.get(room);
                             safeSend(player.ws, {
                                 type: 'full_state_update',
                                 room: {
-                                    players: room.players.map(p => ({
+                                    players: room.players.map((p) => ({
                                         id: p.id,
                                         name: p.name,
                                         isHost: p.isHost,
                                         cards: p.cards,
-                                        cardsPlayedThisTurn: getPlayerTurnCount(p),
+                                        cardsPlayedThisTurn:
+                                            getPlayerTurnCount(p),
                                         movesThisTurn: getTurnState(p).moves,
-                                        totalCardsPlayed: p.totalCardsPlayed || 0,
-                                        lastActivity: p.lastActivity
+                                        totalCardsPlayed:
+                                            p.totalCardsPlayed || 0,
+                                        lastActivity: p.lastActivity,
                                     })),
-                                    gameStarted: room.gameState.gameStarted
+                                    gameStarted: room.gameState.gameStarted,
                                 },
                                 gameState: {
                                     board: room.gameState.board,
                                     currentTurn: room.gameState.currentTurn,
                                     remainingDeck: room.gameState.deck.length,
                                     initialCards: room.gameState.initialCards,
-                                    gameStarted: room.gameState.gameStarted
+                                    gameStarted: room.gameState.gameStarted,
                                 },
                                 history: boardHistory.get(roomId),
                                 currentPlayerState: {
-                                    cardsPlayedThisTurn: getPlayerTurnCount(player),
-                                    minCardsRequired: room.gameState.deck.length > 0 ? 2 : 1
-                                }
+                                    cardsPlayedThisTurn:
+                                        getPlayerTurnCount(player),
+                                    minCardsRequired:
+                                        room.gameState.deck.length > 0 ? 2 : 1,
+                                },
                             });
                         }
                     }
@@ -1424,11 +1618,14 @@ wss.on('connection', async (ws, req) => {
         player.ws = null;
         wsRateLimit.delete(playerId);
         try {
-            await pool.query(`
+            await pool.query(
+                `
                 UPDATE player_connections
                 SET connection_status = 'disconnected'
                 WHERE player_id = $1
-            `, [playerId]);
+            `,
+                [playerId]
+            );
             await flushSaveGameState(roomId);
             console.log(`💾 Estado guardado al desconectarse ${player.name}`);
         } catch (error) {
@@ -1436,17 +1633,21 @@ wss.on('connection', async (ws, req) => {
         }
 
         if (player.isHost && room.players.length > 1) {
-            const newHost = room.players.find(p => p.id !== player.id && p.ws?.readyState === WebSocket.OPEN);
+            const newHost = room.players.find(
+                (p) => p.id !== player.id && p.ws?.readyState === WebSocket.OPEN
+            );
             if (newHost) {
                 newHost.isHost = true;
                 broadcastToRoom(room, {
                     type: 'notification',
                     message: `${newHost.name} es ahora el host`,
-                    isError: false
+                    isError: false,
                 });
             }
         }
-        flushSaveGameState(roomId).catch(err => console.error('Error al guardar al cerrar ws:', err));
+        flushSaveGameState(roomId).catch((err) =>
+            console.error('Error al guardar al cerrar ws:', err)
+        );
     });
 });
 

@@ -2,11 +2,15 @@
 function getPlayableCards(playerCards, board) {
     if (!playerCards || playerCards.length === 0) return [];
 
-    return playerCards.filter(card => {
-        const canPlayAsc1 = card > board.ascending[0] || card === board.ascending[0] - 10;
-        const canPlayAsc2 = card > board.ascending[1] || card === board.ascending[1] - 10;
-        const canPlayDesc1 = card < board.descending[0] || card === board.descending[0] + 10;
-        const canPlayDesc2 = card < board.descending[1] || card === board.descending[1] + 10;
+    return playerCards.filter((card) => {
+        const canPlayAsc1 =
+            card > board.ascending[0] || card === board.ascending[0] - 10;
+        const canPlayAsc2 =
+            card > board.ascending[1] || card === board.ascending[1] - 10;
+        const canPlayDesc1 =
+            card < board.descending[0] || card === board.descending[0] + 10;
+        const canPlayDesc2 =
+            card < board.descending[1] || card === board.descending[1] + 10;
 
         return canPlayAsc1 || canPlayAsc2 || canPlayDesc1 || canPlayDesc2;
     });
@@ -16,13 +20,25 @@ function isValidMove(cardValue, position, board) {
     const idx = position === 'asc1' || position === 'desc1' ? 0 : 1;
     const isAsc = position.includes('asc');
     const targetValue = isAsc ? board.ascending[idx] : board.descending[idx];
-    const exactDifference = isAsc ? cardValue === targetValue - 10 : cardValue === targetValue + 10;
-    const normalMove = isAsc ? cardValue > targetValue : cardValue < targetValue;
-    return { isValid: exactDifference || normalMove, targetValue, exactDifference, normalMove };
+    const exactDifference = isAsc
+        ? cardValue === targetValue - 10
+        : cardValue === targetValue + 10;
+    const normalMove = isAsc
+        ? cardValue > targetValue
+        : cardValue < targetValue;
+    return {
+        isValid: exactDifference || normalMove,
+        targetValue,
+        exactDifference,
+        normalMove,
+    };
 }
 
 function canAnyPlayerPlay(room) {
-    return room.players.some(player => getPlayableCards(player.cards, room.gameState.board).length > 0);
+    return room.players.some(
+        (player) =>
+            getPlayableCards(player.cards, room.gameState.board).length > 0
+    );
 }
 
 function initializeDeck() {
@@ -44,5 +60,5 @@ module.exports = {
     isValidMove,
     canAnyPlayerPlay,
     initializeDeck,
-    shuffleArray
+    shuffleArray,
 };

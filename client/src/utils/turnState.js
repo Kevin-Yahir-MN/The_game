@@ -8,12 +8,12 @@ function getTurnState(player) {
         if (Array.isArray(player.cardsPlayedThisTurn)) {
             player.turnState = {
                 count: player.cardsPlayedThisTurn.length,
-                moves: player.cardsPlayedThisTurn
+                moves: player.cardsPlayedThisTurn,
             };
         } else {
             player.turnState = {
                 count: Number(player.cardsPlayedThisTurn) || 0,
-                moves: []
+                moves: [],
             };
         }
     }
@@ -41,5 +41,5 @@ module.exports = {
     getTurnState,
     getPlayerTurnCount,
     incrementPlayerTurnState,
-    resetPlayerTurnState
+    resetPlayerTurnState,
 };

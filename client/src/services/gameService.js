@@ -2,13 +2,17 @@
 const WebSocket = require('ws');
 const { withTransaction } = require('../db');
 const { validPositions, reverseRoomMap, boardHistory } = require('../state');
-const { getPlayableCards, isValidMove, canAnyPlayerPlay } = require('../utils/gameRules');
+const {
+    getPlayableCards,
+    isValidMove,
+    canAnyPlayerPlay,
+} = require('../utils/gameRules');
 const {
     createTurnState,
     getTurnState,
     getPlayerTurnCount,
     incrementPlayerTurnState,
-    resetPlayerTurnState
+    resetPlayerTurnState,
 } = require('../utils/turnState');
 const { broadcastToRoom, safeSend } = require('./communication');
 const { scheduleSaveGameState, flushSaveGameState } = require('./persistence');
@@ -25,7 +29,7 @@ function toPersistedPlayer(player) {
         cardsPlayedThisTurn: getPlayerTurnCount(player),
         movesThisTurn: getTurnState(player).moves,
         totalCardsPlayed: Number(player.totalCardsPlayed) || 0,
-        lastActivity: player.lastActivity
+        lastActivity: player.lastActivity,
     };
 }
 
@@ -37,14 +41,14 @@ function updateBoardHistory(room, position, newValue) {
         ascending1: [1],
         ascending2: [1],
         descending1: [100],
-        descending2: [100]
+        descending2: [100],
     };
 
     const historyKey = {
         asc1: 'ascending1',
         asc2: 'ascending2',
         desc1: 'descending1',
-        desc2: 'descending2'
+        desc2: 'descending2',
     }[position];
 
     if (history[historyKey].slice(-1)[0] !== newValue) {
@@ -54,24 +58,28 @@ function updateBoardHistory(room, position, newValue) {
         broadcastToRoom(room, {
             type: 'column_history_update',
             column: position,
-            history: history[historyKey]
+            history: history[historyKey],
         });
 
         scheduleSaveGameState(roomId);
     }
 }
 
-
 function finalizeGame(room, { result, message, reason }) {
     if (room.gameState.gameFinished) return;
     room.gameState.gameFinished = true;
 
-    const userIds = room.players
-        .map((player) => player.userId)
-        .filter(Boolean);
+    const userIds = room.players.map((player) => player.userId).filter(Boolean);
 
     if (!require('../config').IS_PRODUCTION) {
-        console.log('[GAME] Finalizing: result=' + result + ', players=' + room.players.length + ', validUserIds=' + userIds.length);
+        console.log(
+            '[GAME] Finalizing: result=' +
+                result +
+                ', players=' +
+                room.players.length +
+                ', validUserIds=' +
+                userIds.length
+        );
     }
 
     recordUsersGameResult(userIds, result === 'win').catch((error) => {
@@ -82,30 +90,36 @@ function finalizeGame(room, { result, message, reason }) {
         type: 'game_over',
         result,
         message,
-        reason
+        reason,
     });
 }
 
 function checkGameStatus(room) {
-    const allPlayersEmpty = room.players.every(p => p.cards.length === 0);
+    const allPlayersEmpty = room.players.every((p) => p.cards.length === 0);
     const deckEmpty = room.gameState.deck.length === 0;
 
     if (allPlayersEmpty && deckEmpty) {
         finalizeGame(room, {
             result: 'win',
             message: '¡Todos ganan! Todas las cartas jugadas.',
-            reason: 'all_cards_played'
+            reason: 'all_cards_played',
         });
         return;
     }
 
-    const totalCardsInHand = room.players.reduce((sum, player) => sum + player.cards.length, 0);
+    const totalCardsInHand = room.players.reduce(
+        (sum, player) => sum + player.cards.length,
+        0
+    );
 
     if (deckEmpty && totalCardsInHand <= 10 && !canAnyPlayerPlay(room)) {
         finalizeGame(room, {
             result: 'win',
-            message: '¡Victoria! Sin movimientos posibles y solo ' + totalCardsInHand + ' cartas restantes.',
-            reason: 'low_remaining_cards'
+            message:
+                '¡Victoria! Sin movimientos posibles y solo ' +
+                totalCardsInHand +
+                ' cartas restantes.',
+            reason: 'low_remaining_cards',
         });
         return;
     }
@@ -113,8 +127,11 @@ function checkGameStatus(room) {
     if (deckEmpty && totalCardsInHand > 10 && !canAnyPlayerPlay(room)) {
         finalizeGame(room, {
             result: 'lose',
-            message: '¡Derrota! Sin movimientos posibles y ' + totalCardsInHand + ' cartas restantes (más de 10).',
-            reason: 'too_many_remaining_cards'
+            message:
+                '¡Derrota! Sin movimientos posibles y ' +
+                totalCardsInHand +
+                ' cartas restantes (más de 10).',
+            reason: 'too_many_remaining_cards',
         });
     }
 }
@@ -124,7 +141,7 @@ async function handlePlayCard(room, player, msg) {
         return safeSend(player.ws, {
             type: 'notification',
             message: 'Posición inválida',
-            isError: true
+            isError: true,
         });
     }
 
@@ -132,19 +149,29 @@ async function handlePlayCard(room, player, msg) {
         return safeSend(player.ws, {
             type: 'notification',
             message: 'No tienes esa carta',
-            isError: true
+            isError: true,
         });
     }
 
     const board = room.gameState.board;
-    const targetIdx = msg.position.includes('asc') ? (msg.position === 'asc1' ? 0 : 1) : (msg.position === 'desc1' ? 0 : 1);
-    const { isValid, targetValue } = isValidMove(msg.cardValue, msg.position, board);
+    const targetIdx = msg.position.includes('asc')
+        ? msg.position === 'asc1'
+            ? 0
+            : 1
+        : msg.position === 'desc1'
+          ? 0
+          : 1;
+    const { isValid, targetValue } = isValidMove(
+        msg.cardValue,
+        msg.position,
+        board
+    );
 
     if (!isValid) {
         return safeSend(player.ws, {
             type: 'invalid_move',
             message: `Movimiento inválido. La carta debe ${msg.position.includes('asc') ? 'ser mayor' : 'ser menor'} que ${targetValue} o igual a ${msg.position.includes('asc') ? targetValue - 10 : targetValue + 10}`,
-            isError: true
+            isError: true,
         });
     }
 
@@ -159,20 +186,23 @@ async function handlePlayCard(room, player, msg) {
     incrementPlayerTurnState(player, {
         value: msg.cardValue,
         position: msg.position,
-        previousValue
+        previousValue,
     });
     player.cardsPlayedThisTurn = getPlayerTurnCount(player);
     player.totalCardsPlayed = (Number(player.totalCardsPlayed) || 0) + 1;
-    player.cards = player.cards.filter(c => c !== msg.cardValue);
+    player.cards = player.cards.filter((c) => c !== msg.cardValue);
 
     if (room.gameState.deck.length > 0 && getPlayerTurnCount(player) === 1) {
-        const playableCards = getPlayableCards(player.cards, room.gameState.board);
+        const playableCards = getPlayableCards(
+            player.cards,
+            room.gameState.board
+        );
         if (playableCards.length === 0) {
             await flushSaveGameState(reverseRoomMap.get(room));
             finalizeGame(room, {
                 result: 'lose',
                 message: `¡${player.name} no puede seguir jugando cartas!`,
-                reason: 'min_cards_not_met'
+                reason: 'min_cards_not_met',
             });
             return;
         }
@@ -182,25 +212,29 @@ async function handlePlayCard(room, player, msg) {
 
     const deckEmpty = room.gameState.deck.length === 0;
 
-    broadcastToRoom(room, {
-        type: 'card_played_animated',
-        playerId: player.id,
-        playerName: player.name,
-        cardValue: msg.cardValue,
-        position: msg.position,
-        previousValue: targetValue,
-        persistColor: true,
-        cardsPlayedThisTurn: getPlayerTurnCount(player),
-        remainingDeck: room.gameState.deck.length,
-        deckEmpty: deckEmpty
-    }, { includeGameState: true });
+    broadcastToRoom(
+        room,
+        {
+            type: 'card_played_animated',
+            playerId: player.id,
+            playerName: player.name,
+            cardValue: msg.cardValue,
+            position: msg.position,
+            previousValue: targetValue,
+            persistColor: true,
+            cardsPlayedThisTurn: getPlayerTurnCount(player),
+            remainingDeck: room.gameState.deck.length,
+            deckEmpty: deckEmpty,
+        },
+        { includeGameState: true }
+    );
 
     if (deckEmpty && room.gameState.deck.length === 0) {
         setTimeout(() => {
             broadcastToRoom(room, {
                 type: 'deck_empty',
                 roomId: reverseRoomMap.get(room),
-                timestamp: Date.now()
+                timestamp: Date.now(),
             });
         }, 500);
     }
@@ -215,20 +249,19 @@ function handleUndoMove(room, player, msg) {
         return safeSend(player.ws, {
             type: 'notification',
             message: 'No hay jugadas para deshacer',
-            isError: true
+            isError: true,
         });
     }
 
     const lastMoveIndex = turnState.moves.findIndex(
-        move => move.value === msg.cardValue &&
-            move.position === msg.position
+        (move) => move.value === msg.cardValue && move.position === msg.position
     );
 
     if (lastMoveIndex === -1) {
         return safeSend(player.ws, {
             type: 'notification',
             message: 'No se encontró la jugada para deshacer',
-            isError: true
+            isError: true,
         });
     }
 
@@ -248,14 +281,18 @@ function handleUndoMove(room, player, msg) {
     turnState.count = Math.max(0, turnState.count - 1);
     player.cardsPlayedThisTurn = turnState.count;
 
-    broadcastToRoom(room, {
-        type: 'move_undone',
-        playerId: player.id,
-        playerName: player.name,
-        cardValue: msg.cardValue,
-        position: msg.position,
-        previousValue: lastMove.previousValue
-    }, { includeGameState: true });
+    broadcastToRoom(
+        room,
+        {
+            type: 'move_undone',
+            playerId: player.id,
+            playerName: player.name,
+            cardValue: msg.cardValue,
+            position: msg.position,
+            previousValue: lastMove.previousValue,
+        },
+        { includeGameState: true }
+    );
 }
 
 async function endTurn(room, player) {
@@ -267,7 +304,7 @@ async function endTurn(room, player) {
         return safeSend(player.ws, {
             type: 'notification',
             message: `Debes jugar al menos ${minCardsRequired} cartas este turno`,
-            isError: true
+            isError: true,
         });
     }
 
@@ -283,7 +320,9 @@ async function endTurn(room, player) {
         }
     }
 
-    let nextIndex = room.players.findIndex(p => p.id === room.gameState.currentTurn);
+    let nextIndex = room.players.findIndex(
+        (p) => p.id === room.gameState.currentTurn
+    );
     let nextPlayer;
     let attempts = 0;
 
@@ -296,10 +335,12 @@ async function endTurn(room, player) {
             break;
         }
 
-        if (!deckEmpty || getPlayableCards(nextPlayer.cards, room.gameState.board).length > 0) {
+        if (
+            !deckEmpty ||
+            getPlayableCards(nextPlayer.cards, room.gameState.board).length > 0
+        ) {
             break;
         }
-
     } while (true);
 
     room.gameState.currentTurn = nextPlayer.id;
@@ -307,13 +348,19 @@ async function endTurn(room, player) {
     player.cardsPlayedThisTurn = 0;
 
     if (!deckEmpty) {
-        const playableCards = getPlayableCards(nextPlayer.cards, room.gameState.board);
-        if (playableCards.length < minCardsRequired && nextPlayer.cards.length > 0) {
+        const playableCards = getPlayableCards(
+            nextPlayer.cards,
+            room.gameState.board
+        );
+        if (
+            playableCards.length < minCardsRequired &&
+            nextPlayer.cards.length > 0
+        ) {
             await flushSaveGameState(reverseRoomMap.get(room));
             finalizeGame(room, {
                 result: 'lose',
                 message: `¡${nextPlayer.name} no puede jugar el mínimo de ${minCardsRequired} carta(s) requerida(s)!`,
-                reason: 'min_cards_not_met'
+                reason: 'min_cards_not_met',
             });
             return;
         }
@@ -321,17 +368,21 @@ async function endTurn(room, player) {
 
     await flushSaveGameState(reverseRoomMap.get(room));
 
-    broadcastToRoom(room, {
-        type: 'turn_changed',
-        newTurn: nextPlayer.id,
-        previousPlayer: player.id,
-        playerName: nextPlayer.name,
-        cardsPlayedThisTurn: 0,
-        minCardsRequired: minCardsRequired,
-        remainingDeck: room.gameState.deck.length,
-        deckEmpty: deckEmpty,
-        skippedPlayers: attempts - 1
-    }, { includeGameState: true });
+    broadcastToRoom(
+        room,
+        {
+            type: 'turn_changed',
+            newTurn: nextPlayer.id,
+            previousPlayer: player.id,
+            playerName: nextPlayer.name,
+            cardsPlayedThisTurn: 0,
+            minCardsRequired: minCardsRequired,
+            remainingDeck: room.gameState.deck.length,
+            deckEmpty: deckEmpty,
+            skippedPlayers: attempts - 1,
+        },
+        { includeGameState: true }
+    );
 
     checkGameStatus(room);
 }
@@ -342,24 +393,32 @@ async function startGame(room, initialCards = 6) {
 
     try {
         await withTransaction(async (client) => {
-            await client.query(`
+            await client.query(
+                `
                 UPDATE game_states
                 SET game_data = $1,
                     last_activity = NOW()
                 WHERE room_id = $2
-            `, [JSON.stringify({
-                players: room.players.map(toPersistedPlayer),
-                gameState: {
-                    ...room.gameState,
-                    gameStarted: true,
-                    gameFinished: false,
-                    initialCards
-                },
-                history: boardHistory.get(roomId)
-            }), roomId]);
+            `,
+                [
+                    JSON.stringify({
+                        players: room.players.map(toPersistedPlayer),
+                        gameState: {
+                            ...room.gameState,
+                            gameStarted: true,
+                            gameFinished: false,
+                            initialCards,
+                        },
+                        history: boardHistory.get(roomId),
+                    }),
+                    roomId,
+                ]
+            );
 
-            await Promise.all(room.players.map(player =>
-                client.query(`
+            await Promise.all(
+                room.players.map((player) =>
+                    client.query(
+                        `
                     INSERT INTO player_connections 
                     (player_id, room_id, last_ping, connection_status)
                     VALUES ($1, $2, NOW(), $3)
@@ -368,23 +427,32 @@ async function startGame(room, initialCards = 6) {
                         room_id = $2,
                         last_ping = NOW(),
                         connection_status = $3
-                `, [
-                    player.id,
-                    roomId,
-                    player.ws?.readyState === WebSocket.OPEN ? 'connected' : 'disconnected'
-                ])
-            ));
+                `,
+                        [
+                            player.id,
+                            roomId,
+                            player.ws?.readyState === WebSocket.OPEN
+                                ? 'connected'
+                                : 'disconnected',
+                        ]
+                    )
+                )
+            );
         });
 
         room.gameState.gameStarted = true;
         room.gameState.gameFinished = false;
         room.gameState.initialCards = initialCards;
 
-        room.players.forEach(player => {
+        room.players.forEach((player) => {
             player.cards = [];
             resetPlayerTurnState(player);
             player.cardsPlayedThisTurn = 0;
-            for (let i = 0; i < initialCards && room.gameState.deck.length > 0; i++) {
+            for (
+                let i = 0;
+                i < initialCards && room.gameState.deck.length > 0;
+                i++
+            ) {
                 player.cards.push(room.gameState.deck.pop());
             }
         });
@@ -399,27 +467,26 @@ async function startGame(room, initialCards = 6) {
                 currentTurn: room.players[0].id,
                 remainingDeck: room.gameState.deck.length,
                 initialCards: initialCards,
-                players: room.players.map(p => ({
+                players: room.players.map((p) => ({
                     id: p.id,
                     name: p.name,
                     isHost: p.isHost,
                     cardCount: p.cards.length,
-                    cardsPlayedThisTurn: getPlayerTurnCount(p)
-                }))
-            }
+                    cardsPlayedThisTurn: getPlayerTurnCount(p),
+                })),
+            },
         });
 
-        room.players.forEach(player => {
+        room.players.forEach((player) => {
             if (player.ws?.readyState === WebSocket.OPEN) {
                 safeSend(player.ws, {
                     type: 'your_cards',
                     cards: player.cards,
                     playerName: player.name,
-                    currentPlayerId: player.id
+                    currentPlayerId: player.id,
                 });
             }
         });
-
     } catch (error) {
         console.error('Error al iniciar juego:', error);
         throw error;
@@ -437,5 +504,5 @@ module.exports = {
     createTurnState,
     getTurnState,
     getPlayerTurnCount,
-    resetPlayerTurnState
+    resetPlayerTurnState,
 };

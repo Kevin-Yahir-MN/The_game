@@ -15,5 +15,5 @@ module.exports = {
     saveDebounceTimers,
     wsRateLimit,
     emojiRateLimit,
-    validPositions
+    validPositions,
 };

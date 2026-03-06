@@ -1,8 +1,16 @@
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { pool, withTransaction } = require('../db');
+const redis = require('redis');
 
 const TOKEN_TTL_DAYS = 30;
+
+const redisClient = redis.createClient({
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+});
+redisClient
+    .connect()
+    .catch((err) => console.error('Redis connection error:', err));
 
 function normalizeUsername(username) {
     if (typeof username !== 'string') return '';
@@ -15,7 +23,9 @@ function normalizeDisplayName(name) {
 }
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
-    const hashedPassword = crypto.scryptSync(password, salt, 64).toString('hex');
+    const hashedPassword = crypto
+        .scryptSync(password, salt, 64)
+        .toString('hex');
     return `${salt}:${hashedPassword}`;
 }
 
@@ -23,7 +33,9 @@ function verifyPassword(password, storedHash) {
     const [salt, key] = String(storedHash || '').split(':');
     if (!salt || !key) return false;
 
-    const computed = crypto.scryptSync(String(password), salt, 64).toString('hex');
+    const computed = crypto
+        .scryptSync(String(password), salt, 64)
+        .toString('hex');
     const keyBuffer = Buffer.from(key, 'hex');
     const computedBuffer = Buffer.from(computed, 'hex');
 
@@ -36,10 +48,7 @@ function generateSessionToken() {
 }
 
 function getTokenFromRequest(req) {
-    const authHeader = req.headers.authorization || '';
-    const [scheme, token] = authHeader.split(' ');
-    if (scheme !== 'Bearer' || !token) return null;
-    return token;
+    return req.cookies?.authToken || req.headers.authorization?.split(' ')[1];
 }
 
 async function registerUser({ username, password, displayName }) {
@@ -102,7 +111,7 @@ async function loginUser({ username, password }) {
     return {
         id: user.id,
         username: user.username,
-        display_name: user.display_name
+        display_name: user.display_name,
     };
 }
 
@@ -148,6 +157,16 @@ async function getUserFromToken(token) {
 }
 
 async function getAccountById(userId) {
+    const cacheKey = `user:${userId}`;
+    try {
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+            return JSON.parse(cached);
+        }
+    } catch (err) {
+        console.warn('Redis get error:', err);
+    }
+
     const result = await pool.query(
         `SELECT id, username, display_name, games_played, wins, win_streak
          FROM users
@@ -155,7 +174,17 @@ async function getAccountById(userId) {
         [userId]
     );
 
-    return result.rowCount > 0 ? result.rows[0] : null;
+    if (result.rowCount > 0) {
+        const account = result.rows[0];
+        try {
+            await redisClient.setEx(cacheKey, 300, JSON.stringify(account)); // Cache for 5 minutes
+        } catch (err) {
+            console.warn('Redis set error:', err);
+        }
+        return account;
+    }
+
+    return null;
 }
 
 async function updateDisplayName(userId, displayName) {
@@ -181,6 +210,14 @@ async function updateDisplayName(userId, displayName) {
              RETURNING id, username, display_name, games_played, wins, win_streak`,
             [normalizedDisplayName, userId]
         );
+
+        if (result.rowCount > 0) {
+            try {
+                await redisClient.del(`user:${userId}`);
+            } catch (err) {
+                console.warn('Redis del error:', err);
+            }
+        }
 
         return result.rowCount > 0 ? result.rows[0] : null;
     });
@@ -213,10 +250,21 @@ async function changePassword(userId, currentPassword, newPassword) {
          WHERE id = $2`,
         [newHash, userId]
     );
+
+    try {
+        await redisClient.del(`user:${userId}`);
+    } catch (err) {
+        console.warn('Redis del error:', err);
+    }
 }
 
 async function recordUsersGameResult(userIds, didWin) {
-    console.log('[AUTH] recordUsersGameResult called with userIds=' + JSON.stringify(userIds) + ', didWin=' + didWin);
+    console.log(
+        '[AUTH] recordUsersGameResult called with userIds=' +
+        JSON.stringify(userIds) +
+        ', didWin=' +
+        didWin
+    );
 
     if (!Array.isArray(userIds) || userIds.length === 0) {
         console.warn('[AUTH] Invalid or empty userIds array');
@@ -243,6 +291,14 @@ async function recordUsersGameResult(userIds, didWin) {
             [uniqueIds]
         );
         console.log('[AUTH] Win updated for ' + result.rowCount + ' rows');
+        // Invalidate cache
+        for (const id of uniqueIds) {
+            try {
+                await redisClient.del(`user:${id}`);
+            } catch (err) {
+                console.warn('Redis del error:', err);
+            }
+        }
         return;
     }
 
@@ -256,6 +312,14 @@ async function recordUsersGameResult(userIds, didWin) {
         [uniqueIds]
     );
     console.log('[AUTH] Loss updated for ' + result.rowCount + ' rows');
+    // Invalidate cache
+    for (const id of uniqueIds) {
+        try {
+            await redisClient.del(`user:${id}`);
+        } catch (err) {
+            console.warn('Redis del error:', err);
+        }
+    }
 }
 
 async function deleteSession(token) {
@@ -284,5 +348,5 @@ module.exports = {
     changePassword,
     recordUsersGameResult,
     deleteSession,
-    cleanupExpiredSessions
+    cleanupExpiredSessions,
 };

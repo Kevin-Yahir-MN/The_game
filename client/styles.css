@@ -177,7 +177,10 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+    background: linear-gradient(
+        rgba(255, 255, 255, 0.1),
+        rgba(255, 255, 255, 0)
+    );
     opacity: 0;
     transition: opacity 0.3s;
 }
@@ -234,7 +237,7 @@ body {
 
 .separator::before,
 .separator::after {
-    content: "";
+    content: '';
     flex: 1;
     height: 2px;
     background: rgba(255, 255, 255, 0.2);
@@ -447,7 +450,10 @@ body {
     cursor: pointer;
     background: rgba(255, 255, 255, 0.08);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
-    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        background 0.15s ease;
 }
 
 .emoji-button:hover {
@@ -580,7 +586,6 @@ body {
     box-shadow: 0 8px 16px rgba(39, 174, 96, 0.4);
 }
 
-
 #startGame.loading {
     cursor: not-allowed;
 }
@@ -592,7 +597,12 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.4),
+        transparent
+    );
     animation: loadingAnimation 1.5s infinite;
 }
 
@@ -812,7 +822,7 @@ body {
 }
 
 .instructions-panel li:before {
-    content: "•";
+    content: '•';
     color: var(--secondary);
     font-size: 1.8rem;
     margin-right: 12px;
@@ -969,7 +979,6 @@ body {
 .redirect-modal p {
     margin: 10px 0;
 }
-
 
 .notification {
     position: fixed;
@@ -1255,7 +1264,6 @@ body {
 }
 
 @keyframes shake {
-
     0%,
     100% {
         transform: translateX(-50%);
@@ -1342,7 +1350,6 @@ body {
 }
 
 @keyframes pulse-hint {
-
     0%,
     95% {
         transform: scale(1);
@@ -1404,7 +1411,6 @@ body {
 }
 
 @media (max-width: 600px) {
-
     .lobby-container,
     .room-container {
         padding: 1.5rem;
@@ -1451,7 +1457,6 @@ body {
 }
 
 @media (max-width: 480px) {
-
     .game-panel,
     .instructions-panel {
         width: calc(100% - 30px);
@@ -1495,29 +1500,29 @@ body {
 }
 
 /* Colores para victoria */
-.game-over-notification h2[style*="#2ecc71"] {
+.game-over-notification h2[style*='#2ecc71'] {
     text-shadow: 0 2px 4px rgba(46, 204, 113, 0.4);
 }
 
-.game-over-notification [style*="#2ecc71"] {
+.game-over-notification [style*='#2ecc71'] {
     transition: all 0.3s;
 }
 
-.game-over-notification [style*="#2ecc71"]:hover {
+.game-over-notification [style*='#2ecc71']:hover {
     background-color: #27ae60 !important;
     box-shadow: 0 5px 15px rgba(46, 204, 113, 0.4) !important;
 }
 
 /* Colores para derrota */
-.game-over-notification h2[style*="#e74c3c"] {
+.game-over-notification h2[style*='#e74c3c'] {
     text-shadow: 0 2px 4px rgba(231, 76, 60, 0.4);
 }
 
-.game-over-notification [style*="#e74c3c"] {
+.game-over-notification [style*='#e74c3c'] {
     transition: all 0.3s;
 }
 
-.game-over-notification [style*="#e74c3c"]:hover {
+.game-over-notification [style*='#e74c3c']:hover {
     background-color: #c0392b !important;
     box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4) !important;
 }
@@ -1582,7 +1587,6 @@ body {
 }
 
 @keyframes subtlePulse {
-
     0%,
     100% {
         transform: scale(1);

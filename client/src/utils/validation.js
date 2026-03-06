@@ -13,12 +13,14 @@ function isValidRoomId(roomId) {
 
 function validatePlayCardPayload(msg) {
     const requiredFields = ['cardValue', 'position', 'playerId', 'roomId'];
-    const missingFields = requiredFields.filter(field => msg[field] === undefined || msg[field] === null);
+    const missingFields = requiredFields.filter(
+        (field) => msg[field] === undefined || msg[field] === null
+    );
     return { missingFields, isValid: missingFields.length === 0 };
 }
 
 module.exports = {
     sanitizePlayerName,
     isValidRoomId,
-    validatePlayCardPayload
+    validatePlayCardPayload,
 };

@@ -20,19 +20,19 @@ function sendGameState(room, player) {
         y: player.cards,
         i: room.gameState.initialCards,
         d: room.gameState.deck.length,
-        p: room.players.map(p => ({
+        p: room.players.map((p) => ({
             i: p.id,
             n: p.name,
             h: p.isHost,
             c: p.cards.length,
             s: getPlayerTurnCount(p),
-            pt: Number(p.totalCardsPlayed) || 0
-        }))
+            pt: Number(p.totalCardsPlayed) || 0,
+        })),
     };
 
     safeSend(player.ws, {
         type: 'gs',
-        s: state
+        s: state,
     });
 }
 
@@ -44,11 +44,14 @@ function broadcastToRoom(room, message, options = {}) {
         message.remainingDeck = room.gameState.deck.length;
     }
 
-    room.players.forEach(player => {
-        if (player.id !== skipPlayerId && player.ws?.readyState === WebSocket.OPEN) {
+    room.players.forEach((player) => {
+        if (
+            player.id !== skipPlayerId &&
+            player.ws?.readyState === WebSocket.OPEN
+        ) {
             const completeMessage = {
                 ...message,
-                timestamp: Date.now()
+                timestamp: Date.now(),
             };
 
             safeSend(player.ws, completeMessage);
@@ -63,5 +66,5 @@ function broadcastToRoom(room, message, options = {}) {
 module.exports = {
     safeSend,
     sendGameState,
-    broadcastToRoom
+    broadcastToRoom,
 };

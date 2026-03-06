@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const BOARD_POSITION = {
         x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
-        y: canvas.height * 0.3
+        y: canvas.height * 0.3,
     };
     const PLAYER_CARDS_Y = canvas.height * 0.6;
     const BUTTONS_Y = canvas.height * 0.85;
@@ -30,7 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const assetCache = new Map();
     let historyIcon = new Image();
-    let historyIconsAnimation = { interval: null, lastPulseTime: Date.now(), isAnimating: false };
+    let historyIconsAnimation = {
+        interval: null,
+        lastPulseTime: Date.now(),
+        isAnimating: false,
+    };
     let animationFrameId;
     let lastStateUpdate = 0;
     let lastRenderTime = 0;
@@ -49,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentPlayer = {
         id: sanitizeInput(sessionStorage.getItem('playerId')),
         name: sanitizeInput(sessionStorage.getItem('playerName')),
-        isHost: sessionStorage.getItem('isHost') === 'true'
+        isHost: sessionStorage.getItem('isHost') === 'true',
     };
 
     const roomId = sanitizeInput(sessionStorage.getItem('roomId'));
@@ -69,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
         animatingCards: [],
         columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
         boardCards: [],
-        historyIconAreas: []
+        historyIconAreas: [],
     };
 
     const cardPool = {
@@ -88,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         release(card) {
             this.pool.push(card);
-        }
+        },
     };
 
     function sanitizeInput(input) {
@@ -121,24 +125,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         determineColor() {
-            if (!gameState || !gameState.cardsPlayedThisTurn || !gameState.animatingCards) {
+            if (
+                !gameState ||
+                !gameState.cardsPlayedThisTurn ||
+                !gameState.animatingCards
+            ) {
                 return '#FFFFFF';
             }
 
-            const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(move => {
-                return move && move.value === this.value &&
-                    ((move.position === 'asc1' && gameState.board.ascending[0] === this.value) ||
-                        (move.position === 'asc2' && gameState.board.ascending[1] === this.value) ||
-                        (move.position === 'desc1' && gameState.board.descending[0] === this.value) ||
-                        (move.position === 'desc2' && gameState.board.descending[1] === this.value));
+            const isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
+                (move) => {
+                    return (
+                        move &&
+                        move.value === this.value &&
+                        ((move.position === 'asc1' &&
+                            gameState.board.ascending[0] === this.value) ||
+                            (move.position === 'asc2' &&
+                                gameState.board.ascending[1] === this.value) ||
+                            (move.position === 'desc1' &&
+                                gameState.board.descending[0] === this.value) ||
+                            (move.position === 'desc2' &&
+                                gameState.board.descending[1] === this.value))
+                    );
+                }
+            );
+
+            const isAnimatedCard = gameState.animatingCards.some((anim) => {
+                return (
+                    anim &&
+                    anim.card &&
+                    anim.card.value === this.value &&
+                    (anim.card.position === this.position ||
+                        anim.column === this.position)
+                );
             });
 
-            const isAnimatedCard = gameState.animatingCards.some(anim => {
-                return anim && anim.card && anim.card.value === this.value &&
-                    (anim.card.position === this.position || anim.column === this.position);
-            });
-
-            return (isPlayedThisTurn || isAnimatedCard || this.playedThisRound) ? '#99CCFF' : '#FFFFFF';
+            return isPlayedThisTurn || isAnimatedCard || this.playedThisRound
+                ? '#99CCFF'
+                : '#FFFFFF';
         }
 
         updateColor() {
@@ -149,12 +173,21 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.save();
             if (!this.isDragging) ctx.translate(this.shakeOffset, 0);
 
-            ctx.shadowColor = this.isPlayedThisTurn || this.playedThisRound ? 'rgba(0, 100, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)';
+            ctx.shadowColor =
+                this.isPlayedThisTurn || this.playedThisRound
+                    ? 'rgba(0, 100, 255, 0.3)'
+                    : 'rgba(0, 0, 0, 0.2)';
             ctx.shadowBlur = 8;
             ctx.shadowOffsetY = 4;
 
             ctx.beginPath();
-            ctx.roundRect(this.x, this.y - this.hoverOffset, this.width, this.height, this.radius);
+            ctx.roundRect(
+                this.x,
+                this.y - this.hoverOffset,
+                this.width,
+                this.height,
+                this.radius
+            );
             ctx.fillStyle = this.backgroundColor;
             ctx.fill();
 
@@ -167,15 +200,23 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.shadowColor = 'transparent';
-            ctx.fillText(this.value.toString(), this.x + this.width / 2, this.y + this.height / 2 - this.hoverOffset);
+            ctx.fillText(
+                this.value.toString(),
+                this.x + this.width / 2,
+                this.y + this.height / 2 - this.hoverOffset
+            );
 
             ctx.restore();
             markDirty(this.x, this.y, this.width, this.height);
         }
 
         contains(x, y) {
-            return x >= this.x && x <= this.x + this.width &&
-                y >= this.y && y <= this.y + this.height;
+            return (
+                x >= this.x &&
+                x <= this.x + this.width &&
+                y >= this.y &&
+                y <= this.y + this.height
+            );
         }
 
         startDrag(offsetX, offsetY) {
@@ -240,7 +281,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function addToHistory(position, value) {
-        const history = gameState.columnHistory[position] ||
+        const history =
+            gameState.columnHistory[position] ||
             (position.includes('asc') ? [1] : [100]);
         if (history[history.length - 1] !== value) {
             history.push(value);
@@ -253,7 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
             value: cardValue,
             position,
             playerId,
-            previousValue
+            previousValue,
         });
         updateGameInfo();
     }
@@ -263,7 +305,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setNextTurn() {
-        const currentIndex = gameState.players.findIndex(p => p.id === gameState.currentTurn);
+        const currentIndex = gameState.players.findIndex(
+            (p) => p.id === gameState.currentTurn
+        );
         let nextIndex = (currentIndex + 1) % gameState.players.length;
         gameState.currentTurn = gameState.players[nextIndex].id;
     }
@@ -289,7 +333,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function connectWebSocket() {
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            showNotification('No se puede conectar al servidor. Recarga la página.', true);
+            showNotification(
+                'No se puede conectar al servidor. Recarga la página.',
+                true
+            );
             updateConnectionStatus('Desconectado', true);
             return;
         }
@@ -297,13 +344,23 @@ document.addEventListener('DOMContentLoaded', () => {
         updateConnectionStatus('Conectando...');
 
         if (socket) {
-            socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null;
-            if ([WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) {
+            socket.onopen =
+                socket.onmessage =
+                socket.onclose =
+                socket.onerror =
+                    null;
+            if (
+                [WebSocket.OPEN, WebSocket.CONNECTING].includes(
+                    socket.readyState
+                )
+            ) {
                 socket.close();
             }
         }
 
-        socket = new WebSocket(`${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}&playerName=${encodeURIComponent(currentPlayer.name)}`);
+        socket = new WebSocket(
+            `${WS_URL}?roomId=${roomId}&playerId=${currentPlayer.id}&playerName=${encodeURIComponent(currentPlayer.name)}`
+        );
 
         socket.onopen = () => {
             clearTimeout(reconnectTimeout);
@@ -312,26 +369,35 @@ document.addEventListener('DOMContentLoaded', () => {
             showNotification('Conectado al servidor');
             restoreGameState();
 
-            socket.send(JSON.stringify({
-                type: 'get_full_state',
-                playerId: currentPlayer.id,
-                roomId: roomId,
-                requireCurrentState: true
-            }));
+            socket.send(
+                JSON.stringify({
+                    type: 'get_full_state',
+                    playerId: currentPlayer.id,
+                    roomId: roomId,
+                    requireCurrentState: true,
+                })
+            );
 
-            socket.send(JSON.stringify({
-                type: 'get_player_state',
-                playerId: currentPlayer.id,
-                roomId: roomId
-            }));
+            socket.send(
+                JSON.stringify({
+                    type: 'get_player_state',
+                    playerId: currentPlayer.id,
+                    roomId: roomId,
+                })
+            );
         };
 
         socket.onclose = (event) => {
             if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                 reconnectAttempts++;
-                const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1), 30000);
+                const delay = Math.min(
+                    RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1),
+                    30000
+                );
                 reconnectTimeout = setTimeout(connectWebSocket, delay);
-                updateConnectionStatus(`Reconectando (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+                updateConnectionStatus(
+                    `Reconectando (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`
+                );
                 connectionStatus = 'reconnecting';
             } else {
                 updateConnectionStatus('Desconectado', true);
@@ -367,32 +433,77 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // process all gs updates when throttle is 0
-                if (message.type === 'gs' && STATE_UPDATE_THROTTLE > 0 && now - lastStateUpdate < STATE_UPDATE_THROTTLE) {
+                if (
+                    message.type === 'gs' &&
+                    STATE_UPDATE_THROTTLE > 0 &&
+                    now - lastStateUpdate < STATE_UPDATE_THROTTLE
+                ) {
                     return;
                 }
 
                 switch (message.type) {
-                    case 'full_state_update': handleFullStateUpdate(message); break;
-                    case 'init_game': handleInitGame(message); break;
-                    case 'gs': handleGameStateUpdate(message); break;
-                    case 'game_started': handleGameStarted(message); break;
-                    case 'your_cards': updatePlayerCards(message.cards); break;
-                    case 'game_over': handleGameOver(message.message, true); break;
-                    case 'notification': showNotification(message.message, message.isError); break;
-                    case 'column_history': updateColumnHistory(message); break;
-                    case 'column_history_update': updateColumnHistoryUI(message.column, message.history); break;
-                    case 'card_played': handleOpponentCardPlayed(message); break;
-                    case 'card_played_animated': handleAnimatedCardPlay(message); break;
-                    case 'deck_empty': handleDeckEmpty(); break;
-                    case 'deck_updated': handleDeckUpdated(message); break;
-                    case 'turn_changed': handleTurnChanged(message); break;
-                    case 'deck_empty_state': handleDeckEmptyState(message); break;
-                    case 'deck_empty_notification': showNotification(message.message, message.isError); break;
-                    case 'move_undone': handleMoveUndone(message); break;
-                    case 'room_reset': resetGameState(); break;
-                    case 'player_update': handlePlayerUpdate(message); break;
-                    case 'emoji_reaction': renderEmojiReaction(message); break;
-                    default: log('Mensaje no reconocido:', message);
+                    case 'full_state_update':
+                        handleFullStateUpdate(message);
+                        break;
+                    case 'init_game':
+                        handleInitGame(message);
+                        break;
+                    case 'gs':
+                        handleGameStateUpdate(message);
+                        break;
+                    case 'game_started':
+                        handleGameStarted(message);
+                        break;
+                    case 'your_cards':
+                        updatePlayerCards(message.cards);
+                        break;
+                    case 'game_over':
+                        handleGameOver(message.message, true);
+                        break;
+                    case 'notification':
+                        showNotification(message.message, message.isError);
+                        break;
+                    case 'column_history':
+                        updateColumnHistory(message);
+                        break;
+                    case 'column_history_update':
+                        updateColumnHistoryUI(message.column, message.history);
+                        break;
+                    case 'card_played':
+                        handleOpponentCardPlayed(message);
+                        break;
+                    case 'card_played_animated':
+                        handleAnimatedCardPlay(message);
+                        break;
+                    case 'deck_empty':
+                        handleDeckEmpty();
+                        break;
+                    case 'deck_updated':
+                        handleDeckUpdated(message);
+                        break;
+                    case 'turn_changed':
+                        handleTurnChanged(message);
+                        break;
+                    case 'deck_empty_state':
+                        handleDeckEmptyState(message);
+                        break;
+                    case 'deck_empty_notification':
+                        showNotification(message.message, message.isError);
+                        break;
+                    case 'move_undone':
+                        handleMoveUndone(message);
+                        break;
+                    case 'room_reset':
+                        resetGameState();
+                        break;
+                    case 'player_update':
+                        handlePlayerUpdate(message);
+                        break;
+                    case 'emoji_reaction':
+                        renderEmojiReaction(message);
+                        break;
+                    default:
+                        log('Mensaje no reconocido:', message);
                 }
             } catch (error) {
                 log('Error procesando mensaje:', { error, data: event.data });
@@ -408,10 +519,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handlePlayerStateUpdate(message) {
         const progressText = `${message.cardsPlayedThisTurn}/${message.minCardsRequired} carta(s) jugada(s)`;
-        const progressPercentage = (message.cardsPlayedThisTurn / message.minCardsRequired) * 100;
+        const progressPercentage =
+            (message.cardsPlayedThisTurn / message.minCardsRequired) * 100;
 
         document.getElementById('progressText').textContent = progressText;
-        document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+        document.getElementById('progressBar').style.width =
+            `${progressPercentage}%`;
 
         if (message.players) {
             gameState.players = message.players;
@@ -428,14 +541,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleGameStarted(message) {
-        gameState.board = message.board || { ascending: [1, 1], descending: [100, 100] };
+        gameState.board = message.board || {
+            ascending: [1, 1],
+            descending: [100, 100],
+        };
         gameState.currentTurn = message.currentTurn;
         gameState.remainingDeck = message.remainingDeck;
         gameState.initialCards = message.initialCards;
         gameState.gameStarted = true;
 
         if (gameState.players) {
-            gameState.players.forEach(player => {
+            gameState.players.forEach((player) => {
                 player.cardsPlayedThisTurn = 0;
             });
         }
@@ -453,7 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
             asc1: message.history.ascending1 || [1],
             asc2: message.history.ascending2 || [1],
             desc1: message.history.descending1 || [100],
-            desc2: message.history.descending2 || [100]
+            desc2: message.history.descending2 || [100],
         };
     }
 
@@ -465,7 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const rect = panel.getBoundingClientRect();
         msgs.style.position = 'fixed';
         msgs.style.right = '20px';
-        msgs.style.top = (rect.bottom + 5) + 'px';
+        msgs.style.top = rect.bottom + 5 + 'px';
         // keep it above other UI
         msgs.style.zIndex = 21;
     }
@@ -505,7 +621,7 @@ document.addEventListener('DOMContentLoaded', () => {
             proud: '😎',
             angel: '😇',
             demon: '😈',
-            sleep: '😴'
+            sleep: '😴',
         };
 
         const emojiChar = emojiMap[message.emoji];
@@ -561,28 +677,34 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.cardsPlayedThisTurn = [];
         gameState.currentTurn = message.newTurn;
         if (message.deckEmpty !== undefined) {
-            gameState.remainingDeck = message.remainingDeck || gameState.remainingDeck;
-            document.getElementById('remainingDeck').textContent = gameState.remainingDeck;
+            gameState.remainingDeck =
+                message.remainingDeck || gameState.remainingDeck;
+            document.getElementById('remainingDeck').textContent =
+                gameState.remainingDeck;
             const minCardsRequired = message.deckEmpty ? 1 : 2;
-            document.getElementById('progressText').textContent = `0/${minCardsRequired} carta(s) jugada(s)`;
+            document.getElementById('progressText').textContent =
+                `0/${minCardsRequired} carta(s) jugada(s)`;
             document.getElementById('progressBar').style.width = '0%';
         }
-        updatePlayerCards(gameState.yourCards.map(c => c.value));
+        updatePlayerCards(gameState.yourCards.map((c) => c.value));
         if (message.playerName) {
-            const notificationMsg = message.newTurn === currentPlayer.id
-                ? '¡Es tu turno!'
-                : `Turno de ${message.playerName}`;
+            const notificationMsg =
+                message.newTurn === currentPlayer.id
+                    ? '¡Es tu turno!'
+                    : `Turno de ${message.playerName}`;
             showNotification(notificationMsg);
         }
     }
 
     function handleDeckEmptyState(message) {
         gameState.remainingDeck = message.remaining;
-        document.getElementById('remainingDeck').textContent = message.remaining;
+        document.getElementById('remainingDeck').textContent =
+            message.remaining;
         const minCardsRequired = message.minCardsRequired || 1;
-        document.getElementById('progressText').textContent = `0/${minCardsRequired} carta(s) jugada(s)`;
+        document.getElementById('progressText').textContent =
+            `0/${minCardsRequired} carta(s) jugada(s)`;
         document.getElementById('progressBar').style.width = '0%';
-        updatePlayerCards(gameState.yourCards.map(c => c.value));
+        updatePlayerCards(gameState.yourCards.map((c) => c.value));
         updateGameInfo();
     }
 
@@ -603,7 +725,7 @@ document.addEventListener('DOMContentLoaded', () => {
             initialCards: 6,
             cardsPlayedThisTurn: [],
             animatingCards: [],
-            columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] }
+            columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
         };
 
         updateGameInfo();
@@ -615,18 +737,24 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        socket.send(JSON.stringify({
-            type: 'get_player_state',
-            playerId: currentPlayer.id,
-            roomId: roomId
-        }));
+        socket.send(
+            JSON.stringify({
+                type: 'get_player_state',
+                playerId: currentPlayer.id,
+                roomId: roomId,
+            })
+        );
     }
 
     function updateConnectionStatus(status, isError = false) {
         connectionStatus = status;
-        const statusElement = document.getElementById('connectionStatus') || createConnectionStatusElement();
+        const statusElement =
+            document.getElementById('connectionStatus') ||
+            createConnectionStatusElement();
         statusElement.textContent = `Estado: ${status}`;
-        statusElement.className = isError ? 'connection-error' : 'connection-status';
+        statusElement.className = isError
+            ? 'connection-error'
+            : 'connection-status';
     }
 
     function createConnectionStatusElement() {
@@ -634,8 +762,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const statusElement = document.createElement('p');
         statusElement.id = 'connectionStatus';
         statusElement.className = 'connection-status';
-        const remainingDeckElement = document.getElementById('remainingDeck').parentNode;
-        remainingDeckElement.parentNode.insertBefore(statusElement, remainingDeckElement.nextSibling);
+        const remainingDeckElement =
+            document.getElementById('remainingDeck').parentNode;
+        remainingDeckElement.parentNode.insertBefore(
+            statusElement,
+            remainingDeckElement.nextSibling
+        );
         return statusElement;
     }
 
@@ -647,14 +779,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 asc1: message.history.ascending1 || [1],
                 asc2: message.history.ascending2 || [1],
                 desc1: message.history.descending1 || [100],
-                desc2: message.history.descending2 || [100]
+                desc2: message.history.descending2 || [100],
             };
         }
 
         gameState.board = message.gameState.board || gameState.board;
-        gameState.currentTurn = message.gameState.currentTurn || gameState.currentTurn;
-        gameState.remainingDeck = message.gameState.remainingDeck || gameState.remainingDeck;
-        gameState.initialCards = message.gameState.initialCards || gameState.initialCards;
+        gameState.currentTurn =
+            message.gameState.currentTurn || gameState.currentTurn;
+        gameState.remainingDeck =
+            message.gameState.remainingDeck || gameState.remainingDeck;
+        gameState.initialCards =
+            message.gameState.initialCards || gameState.initialCards;
         gameState.players = message.room.players || gameState.players;
 
         updateGameInfo();
@@ -677,11 +812,11 @@ document.addEventListener('DOMContentLoaded', () => {
             asc1: message.history?.ascending1 || [1],
             asc2: message.history?.ascending2 || [1],
             desc1: message.history?.descending1 || [100],
-            desc2: message.history?.descending2 || [100]
+            desc2: message.history?.descending2 || [100],
         };
 
         if (gameState.players) {
-            gameState.players.forEach(player => {
+            gameState.players.forEach((player) => {
                 player.cardsPlayedThisTurn = 0;
             });
         }
@@ -708,10 +843,14 @@ document.addEventListener('DOMContentLoaded', () => {
         notification.style.animation = 'notificationEnter 0.15s forwards';
         document.body.appendChild(notification);
 
-        setTimeout(() => {
-            notification.style.animation = 'notificationExit 0.15s forwards';
-            setTimeout(() => notification.remove(), 300);
-        }, isError || message.includes('GAME OVER') ? 3000 : 3000);
+        setTimeout(
+            () => {
+                notification.style.animation =
+                    'notificationExit 0.15s forwards';
+                setTimeout(() => notification.remove(), 300);
+            },
+            isError || message.includes('GAME OVER') ? 3000 : 3000
+        );
     }
 
     function showColumnHistory(columnId) {
@@ -728,13 +867,15 @@ document.addEventListener('DOMContentLoaded', () => {
             asc1: 'Pila Ascendente 1 (↑)',
             asc2: 'Pila Ascendente 2 (↑)',
             desc1: 'Pila Descendente 1 (↓)',
-            desc2: 'Pila Descendente 2 (↓)'
+            desc2: 'Pila Descendente 2 (↓)',
         };
 
         title.textContent = columnNames[columnId];
         container.innerHTML = '';
 
-        const history = gameState.columnHistory[columnId] || (columnId.includes('asc') ? [1] : [100]);
+        const history =
+            gameState.columnHistory[columnId] ||
+            (columnId.includes('asc') ? [1] : [100]);
 
         history.forEach((card, index) => {
             const cardElement = document.createElement('div');
@@ -758,7 +899,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const index = ['asc1', 'asc2', 'desc1', 'desc2'].indexOf(position);
         return {
             x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * index,
-            y: BOARD_POSITION.y
+            y: BOARD_POSITION.y,
         };
     }
 
@@ -783,8 +924,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            card.shakeOffset = Math.sin(progress * Math.PI * 8) * shakeAmount * (1 - progress);
-            card.x = originalX + Math.sin(progress * Math.PI * 16) * shakeAmount * (1 - progress);
+            card.shakeOffset =
+                Math.sin(progress * Math.PI * 8) * shakeAmount * (1 - progress);
+            card.x =
+                originalX +
+                Math.sin(progress * Math.PI * 16) *
+                    shakeAmount *
+                    (1 - progress);
             markDirty(card.x, card.y, card.width, card.height);
             requestAnimationFrame(shake);
         }
@@ -794,10 +940,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetCardsPlayedProgress() {
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
-        document.getElementById('progressText').textContent = '0/' + minCardsRequired + ' carta(s) jugada(s)';
+        document.getElementById('progressText').textContent =
+            '0/' + minCardsRequired + ' carta(s) jugada(s)';
         document.getElementById('progressBar').style.width = '0%';
 
-        gameState.yourCards.forEach(card => {
+        gameState.yourCards.forEach((card) => {
             card.isPlayedThisTurn = false;
             card.updateColor();
         });
@@ -808,7 +955,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleMoveUndone(message) {
         if (message.playerId === currentPlayer.id) {
             const moveIndex = gameState.cardsPlayedThisTurn.findIndex(
-                move => move.value === message.cardValue && move.position === message.position
+                (move) =>
+                    move.value === message.cardValue &&
+                    move.position === message.position
             );
 
             if (moveIndex !== -1) {
@@ -819,7 +968,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const card = cardPool.get(message.cardValue, 0, 0, true, false);
             gameState.yourCards.push(card);
-            updatePlayerCards(gameState.yourCards.map(c => c.value));
+            updatePlayerCards(gameState.yourCards.map((c) => c.value));
         }
     }
 
@@ -830,7 +979,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const backdrop = document.createElement('div');
         backdrop.className = 'game-over-backdrop';
 
-        const isVictory = !isError || message.includes('Victoria') || message.includes('ganan');
+        const isVictory =
+            !isError ||
+            message.includes('Victoria') ||
+            message.includes('ganan');
 
         const gameOverDiv = document.createElement('div');
         gameOverDiv.className = 'game-over-notification';
@@ -859,23 +1011,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 10);
 
         // Botón de retorno
-        document.getElementById('returnToRoom').addEventListener('click', async () => {
-            const button = document.getElementById('returnToRoom');
-            button.disabled = true;
-            button.textContent = 'Cargando...';
+        document
+            .getElementById('returnToRoom')
+            .addEventListener('click', async () => {
+                const button = document.getElementById('returnToRoom');
+                button.disabled = true;
+                button.textContent = 'Cargando...';
 
-            resetGameState();
+                resetGameState();
 
-            socket.send(JSON.stringify({
-                type: 'reset_room',
-                roomId: roomId,
-                playerId: currentPlayer.id,
-                resetHistory: true
-            }));
+                socket.send(
+                    JSON.stringify({
+                        type: 'reset_room',
+                        roomId: roomId,
+                        playerId: currentPlayer.id,
+                        resetHistory: true,
+                    })
+                );
 
-            await new Promise(resolve => setTimeout(resolve, 500));
-            window.location.href = 'sala.html';
-        });
+                await new Promise((resolve) => setTimeout(resolve, 500));
+                window.location.href = 'sala.html';
+            });
     }
 
     function handleDeckUpdated(message) {
@@ -890,7 +1046,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGameInfo(isDeckEmpty);
 
         if (isDeckEmpty) {
-            showNotification('¡El mazo se ha agotado! Ahora solo necesitas jugar 1 carta por turno');
+            showNotification(
+                '¡El mazo se ha agotado! Ahora solo necesitas jugar 1 carta por turno'
+            );
         }
     }
 
@@ -898,13 +1056,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!newState) return;
 
         if (newState.p) {
-            gameState.players = newState.p.map(player => ({
+            gameState.players = newState.p.map((player) => ({
                 id: player.i,
                 name: player.n || `Jugador_${player.i.slice(0, 4)}`,
                 cardCount: player.c,
                 isHost: player.h,
                 cardsPlayedThisTurn: Number(player.s) || 0,
-                totalCardsPlayed: Number(player.pt) || 0
+                totalCardsPlayed: Number(player.pt) || 0,
             }));
         }
 
@@ -927,22 +1085,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const progressTextElement = document.getElementById('progressText');
         const progressBarElement = document.getElementById('progressBar');
 
-        if (!currentTurnElement || !remainingDeckElement || !progressTextElement || !progressBarElement) {
+        if (
+            !currentTurnElement ||
+            !remainingDeckElement ||
+            !progressTextElement ||
+            !progressBarElement
+        ) {
             setTimeout(() => updateGameInfo(deckEmpty), 100);
             return;
         }
 
-        const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id) || {
+        const currentPlayerObj = gameState.players.find(
+            (p) => p.id === currentPlayer.id
+        ) || {
             cardsPlayedThisTurn: 0,
-            totalCardsPlayed: 0
+            totalCardsPlayed: 0,
         };
 
-        const minCardsRequired = deckEmpty || gameState.remainingDeck === 0 ? 1 : 2;
+        const minCardsRequired =
+            deckEmpty || gameState.remainingDeck === 0 ? 1 : 2;
         const cardsPlayed = currentPlayerObj.cardsPlayedThisTurn || 0;
 
-        currentTurnElement.textContent = gameState.currentTurn === currentPlayer.id
-            ? 'Tu turno'
-            : `Turno de ${gameState.players.find(p => p.id === gameState.currentTurn)?.name || '...'}`;
+        currentTurnElement.textContent =
+            gameState.currentTurn === currentPlayer.id
+                ? 'Tu turno'
+                : `Turno de ${gameState.players.find((p) => p.id === gameState.currentTurn)?.name || '...'}`;
 
         remainingDeckElement.textContent = gameState.remainingDeck;
         progressTextElement.textContent = `${cardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
@@ -951,25 +1118,37 @@ document.addEventListener('DOMContentLoaded', () => {
         if (endTurnButton) {
             endTurnButton.disabled = gameState.currentTurn !== currentPlayer.id;
             const remainingCards = minCardsRequired - cardsPlayed;
-            endTurnButton.title = remainingCards > 0
-                ? `Necesitas jugar ${remainingCards} carta(s) más${deckEmpty ? ' (Mazo vacío)' : ''}`
-                : 'Puedes terminar tu turno';
-            endTurnButton.style.backgroundColor = cardsPlayed >= minCardsRequired ? '#2ecc71' : '#e74c3c';
+            endTurnButton.title =
+                remainingCards > 0
+                    ? `Necesitas jugar ${remainingCards} carta(s) más${deckEmpty ? ' (Mazo vacío)' : ''}`
+                    : 'Puedes terminar tu turno';
+            endTurnButton.style.backgroundColor =
+                cardsPlayed >= minCardsRequired ? '#2ecc71' : '#e74c3c';
         }
     }
 
     function handleOpponentCardPlayed(message) {
         if (message.playerId !== currentPlayer.id) {
             updateStack(message.position, message.cardValue);
-            recordCardPlayed(message.cardValue, message.position, message.playerId, message.previousValue);
+            recordCardPlayed(
+                message.cardValue,
+                message.position,
+                message.playerId,
+                message.previousValue
+            );
             addToHistory(message.position, message.cardValue);
-            showNotification(`${message.playerName || 'Un jugador'} jugó un ${message.cardValue}`);
+            showNotification(
+                `${message.playerName || 'Un jugador'} jugó un ${message.cardValue}`
+            );
         }
 
         if (gameState.currentTurn === currentPlayer.id) {
-            const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
+            const currentPlayerObj = gameState.players.find(
+                (p) => p.id === currentPlayer.id
+            );
             if (currentPlayerObj) {
-                currentPlayerObj.cardsPlayedThisTurn = (currentPlayerObj.cardsPlayedThisTurn || 0) + 1;
+                currentPlayerObj.cardsPlayedThisTurn =
+                    (currentPlayerObj.cardsPlayedThisTurn || 0) + 1;
                 updateGameInfo();
             }
         }
@@ -978,58 +1157,65 @@ document.addEventListener('DOMContentLoaded', () => {
     function updatePlayerCards(cards) {
         const isYourTurn = isMyTurn();
         const deckEmpty = gameState.remainingDeck === 0;
-        const startX = (canvas.width - (cards.length * (CARD_WIDTH + CARD_SPACING))) / 2;
+        const startX =
+            (canvas.width - cards.length * (CARD_WIDTH + CARD_SPACING)) / 2;
         const startY = PLAYER_CARDS_Y;
 
         const newCards = cards.map((cardValue, index) => {
-            const existingCard = gameState.yourCards.find(c =>
-                c.value === cardValue && !c.isDragging
+            const existingCard = gameState.yourCards.find(
+                (c) => c.value === cardValue && !c.isDragging
             );
 
             if (existingCard) {
                 existingCard.x = startX + index * (CARD_WIDTH + CARD_SPACING);
                 existingCard.y = startY;
-                existingCard.isPlayable = isYourTurn && (
-                    deckEmpty
-                        ? (cardValue === gameState.board.ascending[0] - 10 ||
-                            cardValue === gameState.board.ascending[1] - 10 ||
-                            cardValue === gameState.board.descending[0] + 10 ||
-                            cardValue === gameState.board.descending[1] + 10 ||
-                            cardValue > gameState.board.ascending[0] ||
-                            cardValue > gameState.board.ascending[1] ||
-                            cardValue < gameState.board.descending[0] ||
-                            cardValue < gameState.board.descending[1])
-                        : (isValidMove(cardValue, 'asc1') ||
-                            isValidMove(cardValue, 'asc2') ||
-                            isValidMove(cardValue, 'desc1') ||
-                            isValidMove(cardValue, 'desc2'))
-                );
-                existingCard.isPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
-                    move => move.value === cardValue && move.playerId === currentPlayer.id
-                );
+                existingCard.isPlayable =
+                    isYourTurn &&
+                    (deckEmpty
+                        ? cardValue === gameState.board.ascending[0] - 10 ||
+                          cardValue === gameState.board.ascending[1] - 10 ||
+                          cardValue === gameState.board.descending[0] + 10 ||
+                          cardValue === gameState.board.descending[1] + 10 ||
+                          cardValue > gameState.board.ascending[0] ||
+                          cardValue > gameState.board.ascending[1] ||
+                          cardValue < gameState.board.descending[0] ||
+                          cardValue < gameState.board.descending[1]
+                        : isValidMove(cardValue, 'asc1') ||
+                          isValidMove(cardValue, 'asc2') ||
+                          isValidMove(cardValue, 'desc1') ||
+                          isValidMove(cardValue, 'desc2'));
+                existingCard.isPlayedThisTurn =
+                    gameState.cardsPlayedThisTurn.some(
+                        (move) =>
+                            move.value === cardValue &&
+                            move.playerId === currentPlayer.id
+                    );
                 return existingCard;
             } else {
                 return cardPool.get(
                     cardValue,
                     startX + index * (CARD_WIDTH + CARD_SPACING),
                     startY,
-                    isYourTurn && (
-                        deckEmpty
-                            ? (cardValue === gameState.board.ascending[0] - 10 ||
-                                cardValue === gameState.board.ascending[1] - 10 ||
-                                cardValue === gameState.board.descending[0] + 10 ||
-                                cardValue === gameState.board.descending[1] + 10 ||
-                                cardValue > gameState.board.ascending[0] ||
-                                cardValue > gameState.board.ascending[1] ||
-                                cardValue < gameState.board.descending[0] ||
-                                cardValue < gameState.board.descending[1])
-                            : (isValidMove(cardValue, 'asc1') ||
-                                isValidMove(cardValue, 'asc2') ||
-                                isValidMove(cardValue, 'desc1') ||
-                                isValidMove(cardValue, 'desc2'))
-                    ),
+                    isYourTurn &&
+                        (deckEmpty
+                            ? cardValue === gameState.board.ascending[0] - 10 ||
+                              cardValue === gameState.board.ascending[1] - 10 ||
+                              cardValue ===
+                                  gameState.board.descending[0] + 10 ||
+                              cardValue ===
+                                  gameState.board.descending[1] + 10 ||
+                              cardValue > gameState.board.ascending[0] ||
+                              cardValue > gameState.board.ascending[1] ||
+                              cardValue < gameState.board.descending[0] ||
+                              cardValue < gameState.board.descending[1]
+                            : isValidMove(cardValue, 'asc1') ||
+                              isValidMove(cardValue, 'asc2') ||
+                              isValidMove(cardValue, 'desc1') ||
+                              isValidMove(cardValue, 'desc2')),
                     gameState.cardsPlayedThisTurn.some(
-                        move => move.value === cardValue && move.playerId === currentPlayer.id
+                        (move) =>
+                            move.value === cardValue &&
+                            move.playerId === currentPlayer.id
                     )
                 );
             }
@@ -1038,7 +1224,9 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.yourCards = newCards;
 
         if (dragStartCard) {
-            const dragCardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
+            const dragCardIndex = gameState.yourCards.findIndex(
+                (c) => c === dragStartCard
+            );
             if (dragCardIndex === -1) {
                 gameState.yourCards.push(dragStartCard);
             }
@@ -1047,7 +1235,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateColumnHistoryUI(column, history) {
         if (!gameState.columnHistory[column]) {
-            gameState.columnHistory[column] = column.includes('asc') ? [1] : [100];
+            gameState.columnHistory[column] = column.includes('asc')
+                ? [1]
+                : [100];
         }
         gameState.columnHistory[column] = history;
     }
@@ -1061,7 +1251,11 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.historyIconAreas = [];
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
-            const baseX = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2 - 20;
+            const baseX =
+                BOARD_POSITION.x +
+                (CARD_WIDTH + COLUMN_SPACING) * i +
+                CARD_WIDTH / 2 -
+                20;
             const baseY = HISTORY_ICON_Y;
 
             gameState.historyIconAreas.push({
@@ -1069,10 +1263,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 y: baseY,
                 width: 40,
                 height: 40,
-                column: col
+                column: col,
             });
 
-            const scale = shouldAnimate ? (1 + 0.2 * pulseProgress) : 1;
+            const scale = shouldAnimate ? 1 + 0.2 * pulseProgress : 1;
 
             ctx.save();
             ctx.translate(baseX + 20, baseY + 20);
@@ -1094,8 +1288,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (gameState.historyIconAreas) {
             for (const area of gameState.historyIconAreas) {
-                if (x >= area.x && x <= area.x + area.width &&
-                    y >= area.y && y <= area.y + area.height) {
+                if (
+                    x >= area.x &&
+                    x <= area.x + area.width &&
+                    y >= area.y &&
+                    y <= area.y + area.height
+                ) {
                     showColumnHistory(area.column);
                     return;
                 }
@@ -1116,13 +1314,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 clientY: touch.clientY,
                 bubbles: true,
                 cancelable: true,
-                view: window
+                view: window,
             });
 
             if (gameState.historyIconAreas) {
                 for (const area of gameState.historyIconAreas) {
-                    if (x >= area.x && x <= area.x + area.width &&
-                        y >= area.y && y <= area.y + area.height) {
+                    if (
+                        x >= area.x &&
+                        x <= area.x + area.width &&
+                        y >= area.y &&
+                        y <= area.y + area.height
+                    ) {
                         showColumnHistory(area.column);
                         return;
                     }
@@ -1135,9 +1337,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function calculatePulseProgress() {
         const now = Date.now();
-        const timeSinceLastPulse = (now - historyIconsAnimation.lastPulseTime) % HISTORY_ICON_PULSE_INTERVAL;
-        return (isMyTurn() && timeSinceLastPulse < HISTORY_ICON_PULSE_DURATION)
-            ? Math.sin((timeSinceLastPulse / HISTORY_ICON_PULSE_DURATION) * Math.PI)
+        const timeSinceLastPulse =
+            (now - historyIconsAnimation.lastPulseTime) %
+            HISTORY_ICON_PULSE_INTERVAL;
+        return isMyTurn() && timeSinceLastPulse < HISTORY_ICON_PULSE_DURATION
+            ? Math.sin(
+                  (timeSinceLastPulse / HISTORY_ICON_PULSE_DURATION) * Math.PI
+              )
             : 0;
     }
 
@@ -1158,7 +1364,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startDrag(x, y) {
-        const clickedCard = gameState.yourCards.find(card => card.contains(x, y));
+        const clickedCard = gameState.yourCards.find((card) =>
+            card.contains(x, y)
+        );
         if (clickedCard && clickedCard.isPlayable && isMyTurn()) {
             dragStartCard = clickedCard;
             dragStartX = x;
@@ -1199,7 +1407,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.changedTouches.length > 0) {
             const fakeMouseEvent = new MouseEvent('mouseup', {
                 clientX: e.changedTouches[0].clientX,
-                clientY: e.changedTouches[0].clientY
+                clientY: e.changedTouches[0].clientY,
             });
             endDrag(fakeMouseEvent);
         }
@@ -1246,13 +1454,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetCardPosition() {
         if (!dragStartCard) return;
 
-        let cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
+        let cardIndex = gameState.yourCards.findIndex(
+            (c) => c === dragStartCard
+        );
         if (cardIndex === -1) {
             gameState.yourCards.push(dragStartCard);
             cardIndex = gameState.yourCards.length - 1;
         }
 
-        const startX = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 + cardIndex * (CARD_WIDTH + CARD_SPACING);
+        const startX =
+            (canvas.width -
+                gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING)) /
+                2 +
+            cardIndex * (CARD_WIDTH + CARD_SPACING);
 
         if (!dragStartCard) return;
 
@@ -1270,24 +1484,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     dragStartCard.y = PLAYER_CARDS_Y;
                     dragStartCard.isDragging = false;
                 }
-                updatePlayerCards(gameState.yourCards.map(c => c.value));
-            }
+                updatePlayerCards(gameState.yourCards.map((c) => c.value));
+            },
         };
 
         gameState.animatingCards.push(animation);
     }
 
     function getClickedColumn(x, y) {
-        if (y < BOARD_POSITION.y || y > BOARD_POSITION.y + CARD_HEIGHT) return null;
+        if (y < BOARD_POSITION.y || y > BOARD_POSITION.y + CARD_HEIGHT)
+            return null;
 
         const columns = [
             { x: BOARD_POSITION.x, id: 'asc1' },
             { x: BOARD_POSITION.x + CARD_WIDTH + COLUMN_SPACING, id: 'asc2' },
-            { x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2, id: 'desc1' },
-            { x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3, id: 'desc2' }
+            {
+                x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 2,
+                id: 'desc1',
+            },
+            {
+                x: BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * 3,
+                id: 'desc2',
+            },
         ];
 
-        const column = columns.find(col => x >= col.x && x <= col.x + CARD_WIDTH);
+        const column = columns.find(
+            (col) => x >= col.x && x <= col.x + CARD_WIDTH
+        );
         return column ? column.id : null;
     }
 
@@ -1298,20 +1521,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateStack(position, cardValue);
 
-        const cardIndex = gameState.yourCards.findIndex(c => c === dragStartCard);
+        const cardIndex = gameState.yourCards.findIndex(
+            (c) => c === dragStartCard
+        );
         if (cardIndex !== -1) {
             gameState.yourCards.splice(cardIndex, 1);
         }
 
-        socket.send(JSON.stringify({
-            type: 'play_card',
-            playerId: currentPlayer.id,
-            roomId: roomId,
-            cardValue: cardValue,
-            position: position,
-            previousValue: previousValue,
-            isFirstMove: gameState.cardsPlayedThisTurn.length === 0
-        }));
+        socket.send(
+            JSON.stringify({
+                type: 'play_card',
+                playerId: currentPlayer.id,
+                roomId: roomId,
+                cardValue: cardValue,
+                position: position,
+                previousValue: previousValue,
+                isFirstMove: gameState.cardsPlayedThisTurn.length === 0,
+            })
+        );
 
         updateGameInfo();
         updateCardsPlayedUI();
@@ -1319,27 +1546,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateCardsPlayedUI() {
         const currentPlayerCardsPlayed = gameState.cardsPlayedThisTurn.filter(
-            card => card.playerId === currentPlayer.id
+            (card) => card.playerId === currentPlayer.id
         ).length;
 
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
         document.getElementById('progressText').textContent =
             `${currentPlayerCardsPlayed}/${minCardsRequired} carta(s) jugada(s)`;
 
-        const progressPercentage = Math.min((currentPlayerCardsPlayed / minCardsRequired) * 100, 100);
-        document.getElementById('progressBar').style.width = `${progressPercentage}%`;
+        const progressPercentage = Math.min(
+            (currentPlayerCardsPlayed / minCardsRequired) * 100,
+            100
+        );
+        document.getElementById('progressBar').style.width =
+            `${progressPercentage}%`;
     }
 
     function hasValidMoves(cards, board) {
-        return cards.some(card => {
-            return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+        return cards.some((card) => {
+            return ['asc1', 'asc2', 'desc1', 'desc2'].some((pos) => {
                 const posValue = pos.includes('asc')
-                    ? (pos === 'asc1' ? board.ascending[0] : board.ascending[1])
-                    : (pos === 'desc1' ? board.descending[0] : board.descending[1]);
+                    ? pos === 'asc1'
+                        ? board.ascending[0]
+                        : board.ascending[1]
+                    : pos === 'desc1'
+                      ? board.descending[0]
+                      : board.descending[1];
 
                 const isValid = pos.includes('asc')
-                    ? (card.value > posValue || card.value === posValue - 10)
-                    : (card.value < posValue || card.value === posValue + 10);
+                    ? card.value > posValue || card.value === posValue - 10
+                    : card.value < posValue || card.value === posValue + 10;
 
                 return isValid;
             });
@@ -1347,26 +1582,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function endTurn() {
-        const currentPlayerObj = gameState.players.find(p => p.id === currentPlayer.id);
+        const currentPlayerObj = gameState.players.find(
+            (p) => p.id === currentPlayer.id
+        );
         const cardsPlayed = currentPlayerObj?.cardsPlayedThisTurn || 0;
         const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
 
         if (cardsPlayed < minCardsRequired) {
             const remainingCards = minCardsRequired - cardsPlayed;
-            showNotification(`Necesitas jugar ${remainingCards} carta(s) más para terminar tu turno`, true);
+            showNotification(
+                `Necesitas jugar ${remainingCards} carta(s) más para terminar tu turno`,
+                true
+            );
             return;
         }
 
-        gameState.yourCards.forEach(card => {
+        gameState.yourCards.forEach((card) => {
             card.isPlayedThisTurn = false;
             card.updateColor();
         });
 
-        socket.send(JSON.stringify({
-            type: 'end_turn',
-            playerId: currentPlayer.id,
-            roomId: roomId
-        }));
+        socket.send(
+            JSON.stringify({
+                type: 'end_turn',
+                playerId: currentPlayer.id,
+                roomId: roomId,
+            })
+        );
 
         updateGameInfo();
     }
@@ -1395,7 +1637,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isValid = isValidMove(dragStartCard.value, col);
                 const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i;
 
-                ctx.fillStyle = isValid ? 'rgb(67, 64, 250)' : 'rgb(248, 51, 51)';
+                ctx.fillStyle = isValid
+                    ? 'rgb(67, 64, 250)'
+                    : 'rgb(248, 51, 51)';
                 ctx.beginPath();
                 ctx.roundRect(
                     x - 5,
@@ -1417,19 +1661,27 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.shadowOffsetY = 2;
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
-            const x = BOARD_POSITION.x + (CARD_WIDTH + COLUMN_SPACING) * i + CARD_WIDTH / 2;
+            const x =
+                BOARD_POSITION.x +
+                (CARD_WIDTH + COLUMN_SPACING) * i +
+                CARD_WIDTH / 2;
             ctx.fillText(i < 2 ? '↑' : '↓', x, BOARD_POSITION.y - 25);
         });
 
         ctx.shadowColor = 'transparent';
 
         ['asc1', 'asc2', 'desc1', 'desc2'].forEach((col, i) => {
-            const isColumnAnimating = gameState.animatingCards.some(anim => anim.column === col);
+            const isColumnAnimating = gameState.animatingCards.some(
+                (anim) => anim.column === col
+            );
 
             if (!isColumnAnimating) {
-                const value = i < 2 ? gameState.board.ascending[i % 2] : gameState.board.descending[i % 2];
+                const value =
+                    i < 2
+                        ? gameState.board.ascending[i % 2]
+                        : gameState.board.descending[i % 2];
                 const wasPlayedThisTurn = gameState.cardsPlayedThisTurn.some(
-                    move => move.value === value && move.position === col
+                    (move) => move.value === value && move.position === col
                 );
 
                 const card = cardPool.get(
@@ -1447,7 +1699,7 @@ document.addEventListener('DOMContentLoaded', () => {
         drawHistoryIcons();
 
         if (gameState.specialCards) {
-            gameState.specialCards.forEach(card => {
+            gameState.specialCards.forEach((card) => {
                 if (!card.isAnimating) {
                     card.draw();
                 }
@@ -1457,7 +1709,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function drawPlayerCards() {
         const backgroundHeight = CARD_HEIGHT + 30;
-        const backgroundWidth = gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 40;
+        const backgroundWidth =
+            gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 40;
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
         ctx.beginPath();
@@ -1469,11 +1722,21 @@ document.addEventListener('DOMContentLoaded', () => {
             15
         );
         ctx.fill();
-        markDirty((canvas.width - backgroundWidth) / 2, PLAYER_CARDS_Y - 15, backgroundWidth, backgroundHeight);
+        markDirty(
+            (canvas.width - backgroundWidth) / 2,
+            PLAYER_CARDS_Y - 15,
+            backgroundWidth,
+            backgroundHeight
+        );
 
         gameState.yourCards.forEach((card, index) => {
             if (card && card !== dragStartCard) {
-                card.x = (canvas.width - (gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING))) / 2 + index * (CARD_WIDTH + CARD_SPACING);
+                card.x =
+                    (canvas.width -
+                        gameState.yourCards.length *
+                            (CARD_WIDTH + CARD_SPACING)) /
+                        2 +
+                    index * (CARD_WIDTH + CARD_SPACING);
                 card.y = PLAYER_CARDS_Y;
                 card.draw();
             }
@@ -1489,16 +1752,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updatePlayersPanel() {
-        const panel = document.getElementById('playersPanel') || createPlayersPanel();
+        const panel =
+            document.getElementById('playersPanel') || createPlayersPanel();
 
         panel.innerHTML = `
             <h3>Jugadores (${gameState.players.length})</h3>
             <ul>
-                ${gameState.players.map(player => {
-            const displayName = player.name || `Jugador_${player.id.slice(0, 4)}`;
-            const cardCount = player.cardCount || (player.cards ? player.cards.length : 0);
+                ${gameState.players
+                    .map((player) => {
+                        const displayName =
+                            player.name || `Jugador_${player.id.slice(0, 4)}`;
+                        const cardCount =
+                            player.cardCount ||
+                            (player.cards ? player.cards.length : 0);
 
-            return `
+                        return `
                         <li class="${player.id === currentPlayer.id ? 'you' : ''} 
                                    ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
                             <span class="player-name">${displayName}</span>
@@ -1506,7 +1774,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${player.isHost ? ' <span class="host-tag">(Host)</span>' : ''}
                         </li>
                     `;
-        }).join('')}
+                    })
+                    .join('')}
             </ul>
         `;
 
@@ -1531,7 +1800,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const easedProgress = progress * progress;
 
-            anim.newCard.y = -CARD_HEIGHT + (anim.targetY - (-CARD_HEIGHT)) * easedProgress;
+            anim.newCard.y =
+                -CARD_HEIGHT + (anim.targetY - -CARD_HEIGHT) * easedProgress;
 
             ctx.save();
 
@@ -1564,8 +1834,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const targetPos = getColumnPosition(position);
 
             const animation = {
-                newCard: cardPool.get(value, targetPos.x, -CARD_HEIGHT, false, true),
-                currentCard: cardPool.get(previousValue, targetPos.x, targetPos.y, false, false),
+                newCard: cardPool.get(
+                    value,
+                    targetPos.x,
+                    -CARD_HEIGHT,
+                    false,
+                    true
+                ),
+                currentCard: cardPool.get(
+                    previousValue,
+                    targetPos.x,
+                    targetPos.y,
+                    false,
+                    false
+                ),
                 startTime: Date.now(),
                 duration: 150,
                 targetX: targetPos.x,
@@ -1574,7 +1856,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 column: position,
                 onComplete: () => {
                     showNotification(`${message.playerName} jugó un ${value}`);
-                }
+                },
             };
 
             gameState.animatingCards.push(animation);
@@ -1582,21 +1864,30 @@ document.addEventListener('DOMContentLoaded', () => {
             // Nueva verificación de condición de derrota local
             const minCardsRequired = gameState.remainingDeck > 0 ? 2 : 1;
             if (minCardsRequired === 2 && message.cardsPlayedThisTurn === 1) {
-                const playableCards = gameState.yourCards.filter(card => {
-                    return ['asc1', 'asc2', 'desc1', 'desc2'].some(pos => {
+                const playableCards = gameState.yourCards.filter((card) => {
+                    return ['asc1', 'asc2', 'desc1', 'desc2'].some((pos) => {
                         const posValue = pos.includes('asc')
-                            ? (pos === 'asc1' ? gameState.board.ascending[0] : gameState.board.ascending[1])
-                            : (pos === 'desc1' ? gameState.board.descending[0] : gameState.board.descending[1]);
+                            ? pos === 'asc1'
+                                ? gameState.board.ascending[0]
+                                : gameState.board.ascending[1]
+                            : pos === 'desc1'
+                              ? gameState.board.descending[0]
+                              : gameState.board.descending[1];
 
                         return pos.includes('asc')
-                            ? (card.value > posValue || card.value === posValue - 10)
-                            : (card.value < posValue || card.value === posValue + 10);
+                            ? card.value > posValue ||
+                                  card.value === posValue - 10
+                            : card.value < posValue ||
+                                  card.value === posValue + 10;
                     });
                 });
 
                 if (playableCards.length === 0) {
                     // Mostrar mensaje de advertencia mientras el servidor procesa la condición
-                    showNotification('¡No puedes jugar la segunda carta requerida!', true);
+                    showNotification(
+                        '¡No puedes jugar la segunda carta requerida!',
+                        true
+                    );
                 }
             }
         }
@@ -1656,7 +1947,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Close WebSocket properly
         if (socket) {
-            socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null;
+            socket.onopen =
+                socket.onmessage =
+                socket.onclose =
+                socket.onerror =
+                    null;
             if (socket.readyState === WebSocket.OPEN) {
                 socket.close(1000, 'Juego terminado');
             }
@@ -1672,7 +1967,7 @@ document.addEventListener('DOMContentLoaded', () => {
             mouseleave: handleMouseUp,
             touchstart: handleTouchStart,
             touchmove: handleTouchMove,
-            touchend: handleTouchEnd
+            touchend: handleTouchEnd,
         };
 
         Object.entries(events).forEach(([event, handler]) => {
@@ -1680,16 +1975,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Remove UI event listeners
-        document.getElementById('endTurnBtn')?.removeEventListener('click', endTurn);
-        document.getElementById('modalBackdrop')?.removeEventListener('click', closeHistoryModal);
+        document
+            .getElementById('endTurnBtn')
+            ?.removeEventListener('click', endTurn);
+        document
+            .getElementById('modalBackdrop')
+            ?.removeEventListener('click', closeHistoryModal);
 
         // Remove emoji button listeners
         if (emojiButtonsContainer) {
-            emojiButtonsContainer.removeEventListener('click', (event) => { });
+            emojiButtonsContainer.removeEventListener('click', (event) => {});
         }
 
         // Remove all temporary DOM elements
-        document.querySelectorAll('.notification, .game-over-backdrop').forEach(el => el.remove());
+        document
+            .querySelectorAll('.notification, .game-over-backdrop')
+            .forEach((el) => el.remove());
 
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1712,84 +2013,102 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         Promise.all([
-            loadAsset('cards-icon.png').then(img => { if (img) historyIcon = img; }).catch(err => {
-                log('Error loading history icon', err);
-                return null; // continuar aunque falle
-            })
-        ]).then(() => {
-            canvas.width = 800;
-            canvas.height = 700;
+            loadAsset('cards-icon.png')
+                .then((img) => {
+                    if (img) historyIcon = img;
+                })
+                .catch((err) => {
+                    log('Error loading history icon', err);
+                    return null; // continuar aunque falle
+                }),
+        ])
+            .then(() => {
+                canvas.width = 800;
+                canvas.height = 700;
 
-            canvas.addEventListener('click', handleCanvasClick);
-            canvas.addEventListener('mousedown', handleMouseDown);
-            canvas.addEventListener('mousemove', handleMouseMove);
-            canvas.addEventListener('mouseup', handleMouseUp);
-            canvas.addEventListener('mouseleave', handleMouseUp);
+                canvas.addEventListener('click', handleCanvasClick);
+                canvas.addEventListener('mousedown', handleMouseDown);
+                canvas.addEventListener('mousemove', handleMouseMove);
+                canvas.addEventListener('mouseup', handleMouseUp);
+                canvas.addEventListener('mouseleave', handleMouseUp);
 
-            canvas.addEventListener('touchstart', handleTouchAsClick, { passive: false });
-            canvas.addEventListener('touchmove', handleTouchMove);
-            canvas.addEventListener('touchend', handleTouchEnd);
-
-            endTurnButton.addEventListener('click', endTurn);
-            document.getElementById('modalBackdrop').addEventListener('click', closeHistoryModal);
-            window.addEventListener('beforeunload', cleanup);
-
-            const controlsDiv = document.querySelector('.game-controls');
-            if (controlsDiv) {
-                controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
-            }
-
-            historyIconsAnimation = {
-                interval: null,
-                lastPulseTime: Date.now(),
-                pulseDuration: 500,
-                pulseInterval: 20000
-            };
-
-            // configurar botones de emoji si existen
-            if (emojiButtonsContainer) {
-                emojiButtonsContainer.addEventListener('click', (event) => {
-                    const target = event.target;
-                    if (!(target instanceof HTMLElement)) return;
-                    const emojiCode = target.dataset.emoji;
-                    if (!emojiCode) return;
-                    if (!socket || socket.readyState !== WebSocket.OPEN) {
-                        showNotification('No hay conexión para enviar reacción', true);
-                        return;
-                    }
-
-                    socket.send(JSON.stringify({
-                        type: 'emoji_reaction',
-                        emoji: emojiCode,
-                        roomId,
-                        playerId: currentPlayer.id
-                    }));
+                canvas.addEventListener('touchstart', handleTouchAsClick, {
+                    passive: false,
                 });
-            }
+                canvas.addEventListener('touchmove', handleTouchMove);
+                canvas.addEventListener('touchend', handleTouchEnd);
 
-            connectWebSocket();
+                endTurnButton.addEventListener('click', endTurn);
+                document
+                    .getElementById('modalBackdrop')
+                    .addEventListener('click', closeHistoryModal);
+                window.addEventListener('beforeunload', cleanup);
 
-            setTimeout(() => {
-                updatePlayersPanel();
-            }, 1000);
-            gameLoop();
+                const controlsDiv = document.querySelector('.game-controls');
+                if (controlsDiv) {
+                    controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
+                }
 
-            // Ocultar la pantalla de carga después de 5 segundos
-            setTimeout(() => {
+                historyIconsAnimation = {
+                    interval: null,
+                    lastPulseTime: Date.now(),
+                    pulseDuration: 500,
+                    pulseInterval: 20000,
+                };
+
+                // configurar botones de emoji si existen
+                if (emojiButtonsContainer) {
+                    emojiButtonsContainer.addEventListener('click', (event) => {
+                        const target = event.target;
+                        if (!(target instanceof HTMLElement)) return;
+                        const emojiCode = target.dataset.emoji;
+                        if (!emojiCode) return;
+                        if (!socket || socket.readyState !== WebSocket.OPEN) {
+                            showNotification(
+                                'No hay conexión para enviar reacción',
+                                true
+                            );
+                            return;
+                        }
+
+                        socket.send(
+                            JSON.stringify({
+                                type: 'emoji_reaction',
+                                emoji: emojiCode,
+                                roomId,
+                                playerId: currentPlayer.id,
+                            })
+                        );
+                    });
+                }
+
+                connectWebSocket();
+
+                setTimeout(() => {
+                    updatePlayersPanel();
+                }, 1000);
+                gameLoop();
+
+                // Ocultar la pantalla de carga después de 5 segundos
+                setTimeout(() => {
+                    if (loadingScreen) {
+                        loadingScreen.classList.add('hidden');
+                    }
+                }, 5000);
+            })
+            .catch((err) => {
+                log('Error initializing game', err);
+                showNotification(
+                    'Error al cargar los recursos del juego',
+                    true
+                );
+                // Ocultar pantalla de carga en caso de error
                 if (loadingScreen) {
                     loadingScreen.classList.add('hidden');
                 }
-            }, 5000);
-        }).catch(err => {
-            log('Error initializing game', err);
-            showNotification('Error al cargar los recursos del juego', true);
-            // Ocultar pantalla de carga en caso de error
-            if (loadingScreen) {
-                loadingScreen.classList.add('hidden');
-            }
-            // Intentar conectar de todas formas
-            connectWebSocket();
-        });
+                // Intentar conectar de todas formas
+                connectWebSocket();
+            });
     }
 
     initGame();

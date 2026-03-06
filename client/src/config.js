@@ -2,9 +2,12 @@
 require('dotenv').config();
 
 const PORT = process.env.PORT || 3000;
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://the-game-2xks.onrender.com,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5500,http://127.0.0.1:5500')
+const allowedOrigins = (
+    process.env.ALLOWED_ORIGINS ||
+    'https://the-game-2xks.onrender.com,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5500,http://127.0.0.1:5500'
+)
     .split(',')
-    .map(origin => origin.trim())
+    .map((origin) => origin.trim())
     .filter(Boolean);
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const ROOM_ID_REGEX = /^\d{4}$/;
@@ -20,5 +23,5 @@ module.exports = {
     ROOM_ID_REGEX,
     PLAYER_NAME_REGEX,
     RATE_LIMIT_WINDOW_MS,
-    RATE_LIMIT_MAX_EVENTS
+    RATE_LIMIT_MAX_EVENTS,
 };
