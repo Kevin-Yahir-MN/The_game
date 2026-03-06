@@ -72,12 +72,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // click handler on entire list item
-        c.querySelectorAll('li[data-friend-id]').forEach(li => {
-            li.addEventListener('click', () => {
-                const fid = li.dataset.friendId;
-                if (fid) showFriendModal(fid);
-            });
+        // use delegation for row clicks
+        c.addEventListener('click', (e) => {
+            const li = e.target.closest('li[data-friend-id]');
+            if (!li) return;
+            const fid = li.dataset.friendId;
+            if (fid) showFriendModal(fid);
         });
     }
 
@@ -149,29 +149,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // funciones para el modal de información de amigo
     function showFriendModal(friendId) {
-        fetchWithAuth(`${API_URL}/users/${friendId}`)
-            .then(resp => resp.json())
-            .then(data => {
-                if (data.success && data.account) {
-                    modalFriendName.textContent = data.account.displayName;
-                    modalGamesPlayed.textContent = data.account.stats.gamesPlayed;
-                    modalWins.textContent = data.account.stats.wins;
-                    modalWinStreak.textContent = data.account.stats.winStreak;
+        const friendData = friends.find(f => String(f.id) === String(friendId));
+        const name = friendData ? friendData.displayName : '';
+        const token = getAuthToken();
+        if (token) {
+            fetchWithAuth(`${API_URL}/users/${friendId}`)
+                .then(resp => resp.json())
+                .then(data => {
+                    if (data.success && data.account) {
+                        modalFriendName.textContent = data.account.displayName;
+                        modalGamesPlayed.textContent = data.account.stats.gamesPlayed;
+                        modalWins.textContent = data.account.stats.wins;
+                        modalWinStreak.textContent = data.account.stats.winStreak;
+                        friendModal.classList.remove('hidden');
+                        friendModal.dataset.currentId = friendId;
+                    } else {
+                        showNotification('No se pudo cargar información del amigo', true);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching friend info', err);
+                    // fallback show name only
+                    modalFriendName.textContent = name || 'Amigo';
+                    modalGamesPlayed.textContent = '-';
+                    modalWins.textContent = '-';
+                    modalWinStreak.textContent = '-';
                     friendModal.classList.remove('hidden');
                     friendModal.dataset.currentId = friendId;
-                } else {
-                    showNotification('No se pudo cargar información del amigo', true);
-                }
-            })
-            .catch(err => {
-                console.error('Error fetching friend info', err);
-                showNotification('Error cargando información', true);
-            });
+                });
+        } else {
+            modalFriendName.textContent = name || 'Amigo';
+            modalGamesPlayed.textContent = '-';
+            modalWins.textContent = '-';
+            modalWinStreak.textContent = '-';
+            removeFriendBtn.style.display = 'none';
+            friendModal.classList.remove('hidden');
+            friendModal.dataset.currentId = friendId;
+        }
     }
 
     function closeFriendModal() {
         friendModal.classList.add('hidden');
         delete friendModal.dataset.currentId;
+        if (removeFriendBtn) removeFriendBtn.style.display = '';
     }
 
     removeFriendBtn.addEventListener('click', () => {

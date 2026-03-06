@@ -94,40 +94,66 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // make rows clickable to open modal
-        container.querySelectorAll('li[data-friend-id]').forEach(li => {
-            li.addEventListener('click', () => {
-                const fid = li.dataset.friendId;
-                if (fid) showFriendModal(fid);
-            });
+        // event delegation: handle click on any row
+        container.addEventListener('click', (e) => {
+            const li = e.target.closest('li[data-friend-id]');
+            if (!li) return;
+            const fid = li.dataset.friendId;
+            console.log('row clicked (delegated)', fid);
+            if (fid) showFriendModal(fid);
         });
     }
 
     // friend modal functions
     function showFriendModal(friendId) {
-        fetchWithAuth(`${API_URL}/users/${friendId}`)
-            .then(resp => resp.json())
-            .then(data => {
-                if (data.success && data.account) {
-                    modalFriendName.textContent = data.account.displayName;
-                    modalGamesPlayed.textContent = data.account.stats.gamesPlayed;
-                    modalWins.textContent = data.account.stats.wins;
-                    modalWinStreak.textContent = data.account.stats.winStreak;
+        // find displayName from local list as fallback
+        const friendData = friends.find(f => String(f.id) === String(friendId));
+        const name = friendData ? friendData.displayName : '';
+
+        const token = getAuthToken();
+        if (token) {
+            // attempt to fetch full account info
+            fetchWithAuth(`${API_URL}/users/${friendId}`)
+                .then(resp => resp.json())
+                .then(data => {
+                    if (data.success && data.account) {
+                        modalFriendName.textContent = data.account.displayName;
+                        modalGamesPlayed.textContent = data.account.stats.gamesPlayed;
+                        modalWins.textContent = data.account.stats.wins;
+                        modalWinStreak.textContent = data.account.stats.winStreak;
+                        friendModal.classList.remove('hidden');
+                        friendModal.dataset.currentId = friendId;
+                    } else {
+                        showNotification('No se pudo cargar información del amigo', true);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching friend info', err);
+                    // fallback: show modal with name only
+                    modalFriendName.textContent = friendData ? friendData.displayName : 'Amigo';
+                    modalGamesPlayed.textContent = '-';
+                    modalWins.textContent = '-';
+                    modalWinStreak.textContent = '-';
                     friendModal.classList.remove('hidden');
                     friendModal.dataset.currentId = friendId;
-                } else {
-                    showNotification('No se pudo cargar información del amigo', true);
-                }
-            })
-            .catch(err => {
-                console.error('Error fetching friend info', err);
-                showNotification('Error cargando información', true);
-            });
+                });
+        } else {
+            // unauthenticated: show only name and hide remove button/stats
+            modalFriendName.textContent = name || 'Amigo';
+            modalGamesPlayed.textContent = '-';
+            modalWins.textContent = '-';
+            modalWinStreak.textContent = '-';
+            removeFriendBtn.style.display = 'none';
+            friendModal.classList.remove('hidden');
+            friendModal.dataset.currentId = friendId;
+        }
     }
 
     function closeFriendModal() {
         friendModal.classList.add('hidden');
         delete friendModal.dataset.currentId;
+        // show remove button again for next open
+        if (removeFriendBtn) removeFriendBtn.style.display = '';
     }
 
     removeFriendBtn.addEventListener('click', () => {
@@ -512,9 +538,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         refreshIdentityUI();
-        // si seguimos con token válido, cargamos datos de amigos y abrimos socket
+        // siempre intentamos cargar la lista de amigos (API devolverá vacío/401 si no está autenticado)
+        await loadFriends();
+        // abrir socket sólo si seguimos autenticados
         if (token && getAuthUser()) {
-            await loadFriends();
             setupLobbyWebSocket();
         }
     }
