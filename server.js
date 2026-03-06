@@ -29,6 +29,8 @@ redisClient
     .connect()
     .catch((err) => logger.error('Redis connection error:', err));
 
+let hasInitialized = false;
+
 const app = express();
 const server = http.createServer(app);
 
