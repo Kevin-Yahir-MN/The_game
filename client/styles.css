@@ -434,8 +434,9 @@ body {
 }
 
 .emoji-buttons {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    /* 2 emojis por fila */
     gap: 0.5rem;
     margin-bottom: 0.75rem;
 }
@@ -452,6 +453,10 @@ body {
         transform 0.15s ease,
         box-shadow 0.15s ease,
         background 0.15s ease;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .emoji-button:hover {
