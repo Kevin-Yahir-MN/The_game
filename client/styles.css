@@ -754,6 +754,12 @@ body {
     text-align: left;
 }
 
+.game-emoji-panel {
+    top: 25px;
+    right: 25px;
+    margin-bottom: 0;
+}
+
 .info-panel p {
     margin: 14px 0;
     display: block;
