@@ -539,29 +539,7 @@ function setupWebSocket(server) {
                             reason: 'self_blocked',
                         });
                         break;
-                    case 'leave_room':
-                        // El jugador abandona intencionalmente la sala
-                        if (player.isHost) {
-                            // Si el host abandona, notificar a todos los otros jugadores
-                            // (NO al host) para que se redirijan a index.html
-                            room.players.forEach((p) => {
-                                if (
-                                    p.id !== playerId &&
-                                    p.ws?.readyState === WebSocket.OPEN
-                                ) {
-                                    safeSend(p.ws, {
-                                        type: 'host_left_room',
-                                        message: 'El host abandonó la sala',
-                                    });
-                                }
-                            });
-                            console.log(
-                                `[ROOM] Host ${player.name} abandonó la sala`
-                            );
-                        }
-                        // Proceder con el cierre normal
-                        ws.close();
-                        break;
+                    // leave_room handling consolidated later in this switch (see subsequent case)
                     case 'reset_room':
                         if (player.isHost) {
                             // mark the room as "in the middle of a reset" so that

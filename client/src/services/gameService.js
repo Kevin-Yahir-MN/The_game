@@ -18,20 +18,7 @@ const { broadcastToRoom, safeSend } = require('./communication');
 const { scheduleSaveGameState, flushSaveGameState } = require('./persistence');
 const { recordUsersGameResult } = require('./authService');
 
-function toPersistedPlayer(player) {
-    return {
-        id: player.id,
-        name: player.name,
-        userId: player.userId || null,
-        cards: player.cards,
-        isHost: player.isHost,
-        connected: player.ws?.readyState === WebSocket.OPEN,
-        cardsPlayedThisTurn: getPlayerTurnCount(player),
-        movesThisTurn: getTurnState(player).moves,
-        totalCardsPlayed: Number(player.totalCardsPlayed) || 0,
-        lastActivity: player.lastActivity,
-    };
-}
+const { toPersistedPlayer } = require('../utils/serializers');
 
 function updateBoardHistory(room, position, newValue) {
     const roomId = reverseRoomMap.get(room);
@@ -74,11 +61,11 @@ function finalizeGame(room, { result, message, reason }) {
     if (!require('../config').IS_PRODUCTION) {
         console.log(
             '[GAME] Finalizing: result=' +
-                result +
-                ', players=' +
-                room.players.length +
-                ', validUserIds=' +
-                userIds.length
+            result +
+            ', players=' +
+            room.players.length +
+            ', validUserIds=' +
+            userIds.length
         );
     }
 
@@ -159,8 +146,8 @@ async function handlePlayCard(room, player, msg) {
             ? 0
             : 1
         : msg.position === 'desc1'
-          ? 0
-          : 1;
+            ? 0
+            : 1;
     const { isValid, targetValue } = isValidMove(
         msg.cardValue,
         msg.position,
@@ -501,8 +488,5 @@ module.exports = {
     handleUndoMove,
     endTurn,
     startGame,
-    createTurnState,
-    getTurnState,
-    getPlayerTurnCount,
-    resetPlayerTurnState,
+    // NOTE: utilities from turnState should be imported directly from utils/turnState
 };

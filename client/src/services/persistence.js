@@ -14,18 +14,9 @@ async function saveGameState(roomId) {
     if (!room) return false;
 
     try {
+        const { toPersistedPlayer } = require('../utils/serializers');
         const gameData = {
-            players: room.players.map((p) => ({
-                id: p.id,
-                name: p.name,
-                cards: p.cards,
-                isHost: p.isHost,
-                connected: p.ws !== null,
-                cardsPlayedThisTurn: getPlayerTurnCount(p),
-                movesThisTurn: getTurnState(p).moves,
-                totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
-                lastActivity: p.lastActivity,
-            })),
+            players: room.players.map((p) => toPersistedPlayer(p)),
             gameState: {
                 deck: room.gameState.deck,
                 board: room.gameState.board,
