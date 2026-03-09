@@ -6,36 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Partida - The Game</title>
     <link rel="stylesheet" href="styles.css" />
-    <style>
-        .game-extra-panels {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .info-table,
-        .emoji-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .info-table td {
-            padding: 6px 0;
-            vertical-align: middle;
-        }
-
-        .emoji-table td {
-            width: 50%;
-            padding: 6px;
-        }
-
-        .emoji-table .emoji-button {
-            width: 100%;
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-        }
-    </style>
 </head>
 
 <body>
@@ -53,111 +23,64 @@
         <div class="game-controls">
             <button id="endTurnBtn">Terminar Turno</button>
         </div>
-    </div>
-
-    <div class="game-extra-panels">
-        <!-- Tabla de información del jugador/juego -->
-        <div class="game-panel info-panel">
-            <h3>Información del Juego</h3>
-            <div class="panel-content">
-                <table class="info-table" aria-label="Información del juego">
-                    <tbody>
-                        <tr>
-                            <td><strong>Turno actual:</strong></td>
-                            <td>
-                                <span id="currentTurn">Esperando...</span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td><strong>Cartas restantes:</strong></td>
-                            <td><span id="remainingDeck">98</span></td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <!-- El estado de conexión se insertará aquí automáticamente -->
-                <div class="progress-container">
-                    <span id="progressText">0/2 carta(s) jugada(s)</span>
-                    <div class="progress-bar" id="progressBar"></div>
-                </div>
+        <!-- Emoji bar debajo de la mano del jugador (fuera del canvas) -->
+        <div class="room-emoji-chat">
+            <h3>Reacciones rápidas</h3>
+            <div class="emoji-buttons" id="emojiButtons">
+                <button type="button" class="emoji-button" data-emoji="sad" aria-label="Triste">
+                    😢
+                </button>
+                <button type="button" class="emoji-button" data-emoji="angry" aria-label="Enojado">
+                    😡
+                </button>
+                <button type="button" class="emoji-button" data-emoji="poop" aria-label="Popó">
+                    💩
+                </button>
+                <button type="button" class="emoji-button" data-emoji="love" aria-label="Amor">
+                    😍
+                </button>
+                <button type="button" class="emoji-button" data-emoji="wow" aria-label="Sorpresa">
+                    😮
+                </button>
+                <button type="button" class="emoji-button" data-emoji="middle" aria-label="Dedo grosero">
+                    🖕
+                </button>
+                <button type="button" class="emoji-button" data-emoji="cry" aria-label="Llorando mucho">
+                    😭
+                </button>
+                <button type="button" class="emoji-button" data-emoji="proud" aria-label="Orgulloso">
+                    😎
+                </button>
+                <button type="button" class="emoji-button" data-emoji="angel" aria-label="Ángel">
+                    😇
+                </button>
+                <button type="button" class="emoji-button" data-emoji="demon" aria-label="Demonio">
+                    😈
+                </button>
+                <button type="button" class="emoji-button" data-emoji="sleep" aria-label="Dormido">
+                    😴
+                </button>
             </div>
         </div>
+    </div>
 
-        <!-- Tabla de emojis separada y debajo de la tabla de información -->
-        <div class="game-panel room-emoji-chat">
-            <h3>Reacciones rápidas</h3>
-            <table class="emoji-table" id="emojiButtons" aria-label="Tabla de emojis">
-                <tbody>
-                    <tr>
-                        <td>
-                            <button type="button" class="emoji-button" data-emoji="sad" aria-label="Triste">
-                                😢
-                            </button>
-                        </td>
-                        <td>
-                            <button type="button" class="emoji-button" data-emoji="angry" aria-label="Enojado">
-                                😡
-                            </button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <button type="button" class="emoji-button" data-emoji="poop" aria-label="Popó">
-                                💩
-                            </button>
-                        </td>
-                        <td>
-                            <button type="button" class="emoji-button" data-emoji="love" aria-label="Amor">
-                                😍
-                            </button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <button type="button" class="emoji-button" data-emoji="wow" aria-label="Sorpresa">
-                                😮
-                            </button>
-                        </td>
-                        <td>
-                            <button type="button" class="emoji-button" data-emoji="middle" aria-label="Dedo grosero">
-                                🖕
-                            </button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <button type="button" class="emoji-button" data-emoji="cry" aria-label="Llorando mucho">
-                                😭
-                            </button>
-                        </td>
-                        <td>
-                            <button type="button" class="emoji-button" data-emoji="proud" aria-label="Orgulloso">
-                                😎
-                            </button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <button type="button" class="emoji-button" data-emoji="angel" aria-label="Ángel">
-                                😇
-                            </button>
-                        </td>
-                        <td>
-                            <button type="button" class="emoji-button" data-emoji="demon" aria-label="Demonio">
-                                😈
-                            </button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <button type="button" class="emoji-button" data-emoji="sleep" aria-label="Dormido">
-                                😴
-                            </button>
-                        </td>
-                        <td></td>
-                    </tr>
-                </tbody>
-            </table>
+    <!-- Panel de Información -->
+    <div class="game-panel info-panel">
+        <h3>Información del Juego</h3>
+        <div class="panel-content">
+            <p>
+                <strong>Turno actual:</strong>
+                <span id="currentTurn">Esperando...</span>
+            </p>
+            <p>
+                <strong>Cartas restantes:</strong>
+                <span id="remainingDeck">98</span>
+            </p>
+            <!-- El estado de conexión se insertará aquí automáticamente -->
+            <div class="progress-container">
+                <span id="progressText">0/2 carta(s) jugada(s)</span>
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
         </div>
     </div>
 
