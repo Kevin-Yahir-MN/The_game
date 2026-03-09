@@ -1,18 +1,21 @@
 :root {
-    --primary: #3498db;
+    --primary: #2aa4c7;
+    /* cooler blue */
     --secondary: #2ecc71;
-    --accent: #e74c3c;
-    --dark: #2c3e50;
-    --darker: #1a252f;
-    --light: #ecf0f1;
-    --gray: #95a5a6;
+    /* green */
+    --accent: #f39c12;
+    /* warm accent */
+    --dark: #23323b;
+    --darker: #1b2a30;
+    --light: #eef2f5;
+    --gray: #9aa8ae;
     --success: #27ae60;
     --warning: #f39c12;
     --danger: #e74c3c;
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     min-height: 100vh;
     margin: 0;
     padding: 0;
@@ -21,47 +24,64 @@ body {
     line-height: 1.6;
 }
 
-.lobby-container {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    padding: 2rem;
+.room-emoji-chat {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 0.6rem 0.8rem;
+    margin-top: 1rem;
+    width: 100%;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
-.lobby-header {
-    text-align: center;
-    margin-bottom: 2.5rem;
-    animation: fadeIn 0.8s ease-out;
-}
-
-.lobby-header h1 {
-    font-size: 3.5rem;
-    font-weight: 800;
-    margin-bottom: 0.5rem;
-    background: linear-gradient(to right, var(--primary), var(--secondary));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    letter-spacing: 1px;
-}
-
-/* lista de amigos en el lobby */
-.friends-container {
-    position: absolute;
-    top: 1rem;
-    left: 1rem;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 1rem;
-    border-radius: 8px;
-    max-width: 280px;
-}
-
-.friends-container h3 {
-    margin: 0 0 0.5rem;
-    font-size: 1.1rem;
+.room-emoji-chat h3 {
+    margin: 0 0 0.6rem;
+    font-size: 0.95rem;
     color: var(--light);
+}
+
+.emoji-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+.room-emoji-chat.moved .emoji-buttons {
+    /* when moved into the info panel show vertical column */
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.emoji-button {
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+    color: var(--dark);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.emoji-button:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+}
+
+.emoji-button:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
+}
+
+font-size: 1.1rem;
+color: var(--light);
 }
 
 .friends-container ul {
@@ -177,10 +197,8 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(
-        rgba(255, 255, 255, 0.1),
-        rgba(255, 255, 255, 0)
-    );
+    background: linear-gradient(rgba(255, 255, 255, 0.1),
+            rgba(255, 255, 255, 0));
     opacity: 0;
     transition: opacity 0.3s;
 }
@@ -597,12 +615,10 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(255, 255, 255, 0.4),
-        transparent
-    );
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, 0.4),
+            transparent);
     animation: loadingAnimation 1.5s infinite;
 }
 
@@ -650,12 +666,12 @@ body {
 }
 
 #gameCanvas {
-    background-color: #1a6b1a;
+    background: linear-gradient(180deg, #16621a 0%, #1b8a2a 100%);
     display: block;
     margin: 140px auto 0;
-    border: 4px solid #34495e;
+    border: 3px solid rgba(30, 60, 40, 0.7);
     border-radius: 12px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45), inset 0 8px 16px rgba(0, 0, 0, 0.08);
     position: relative;
     z-index: 1;
     height: 700px;
@@ -1264,6 +1280,7 @@ body {
 }
 
 @keyframes shake {
+
     0%,
     100% {
         transform: translateX(-50%);
@@ -1350,6 +1367,7 @@ body {
 }
 
 @keyframes pulse-hint {
+
     0%,
     95% {
         transform: scale(1);
@@ -1411,6 +1429,7 @@ body {
 }
 
 @media (max-width: 600px) {
+
     .lobby-container,
     .room-container {
         padding: 1.5rem;
@@ -1457,6 +1476,7 @@ body {
 }
 
 @media (max-width: 480px) {
+
     .game-panel,
     .instructions-panel {
         width: calc(100% - 30px);
@@ -1587,6 +1607,7 @@ body {
 }
 
 @keyframes subtlePulse {
+
     0%,
     100% {
         transform: scale(1);
