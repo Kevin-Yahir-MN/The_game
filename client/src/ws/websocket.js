@@ -22,11 +22,15 @@ const {
     handleUndoMove,
     endTurn,
     startGame,
-    getPlayerTurnCount,
-    getTurnState,
-    resetPlayerTurnState,
     finalizeGame,
 } = require('../services/gameService');
+const {
+    createTurnState,
+    getTurnState,
+    getPlayerTurnCount,
+    incrementPlayerTurnState,
+    resetPlayerTurnState,
+} = require('../utils/turnState');
 const {
     safeSend,
     broadcastToRoom,
