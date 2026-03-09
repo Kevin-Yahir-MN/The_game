@@ -1836,8 +1836,9 @@ body {
         transform: rotate(360deg);
     }
 }
+
 .game-emoji-panel {
-  left: 25px;
-  right: auto;
-  top: 280px;
+    left: 25px;
+    right: auto;
+    top: 400px;
 }
