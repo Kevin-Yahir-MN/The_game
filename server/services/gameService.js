@@ -2,6 +2,7 @@
 const WebSocket = require('ws');
 const { withTransaction } = require('../db');
 const { validPositions, reverseRoomMap, boardHistory } = require('../state');
+const { createDefaultHistory, HISTORY_COLUMN_MAP } = require('../utils/history');
 const {
     getPlayableCards,
     isValidMove,
@@ -24,19 +25,8 @@ function updateBoardHistory(room, position, newValue) {
     const roomId = reverseRoomMap.get(room);
     if (!roomId) return;
 
-    const history = boardHistory.get(roomId) || {
-        ascending1: [1],
-        ascending2: [1],
-        descending1: [100],
-        descending2: [100],
-    };
-
-    const historyKey = {
-        asc1: 'ascending1',
-        asc2: 'ascending2',
-        desc1: 'descending1',
-        desc2: 'descending2',
-    }[position];
+    const history = boardHistory.get(roomId) || createDefaultHistory();
+    const historyKey = HISTORY_COLUMN_MAP[position];
 
     if (history[historyKey].slice(-1)[0] !== newValue) {
         history[historyKey].push(newValue);
@@ -175,7 +165,6 @@ async function handlePlayCard(room, player, msg) {
         position: msg.position,
         previousValue,
     });
-    player.cardsPlayedThisTurn = getPlayerTurnCount(player);
     player.totalCardsPlayed = (Number(player.totalCardsPlayed) || 0) + 1;
     player.cards = player.cards.filter((c) => c !== msg.cardValue);
 
@@ -332,7 +321,6 @@ async function endTurn(room, player) {
 
     room.gameState.currentTurn = nextPlayer.id;
     resetPlayerTurnState(player);
-    player.cardsPlayedThisTurn = 0;
 
     if (!deckEmpty) {
         const playableCards = getPlayableCards(
@@ -434,7 +422,6 @@ async function startGame(room, initialCards = 6) {
         room.players.forEach((player) => {
             player.cards = [];
             resetPlayerTurnState(player);
-            player.cardsPlayedThisTurn = 0;
             for (
                 let i = 0;
                 i < initialCards && room.gameState.deck.length > 0;

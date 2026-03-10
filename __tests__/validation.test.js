@@ -1,7 +1,7 @@
 const {
     sanitizePlayerName,
     isValidRoomId,
-} = require('../client/src/utils/validation');
+} = require('../server/utils/validation');
 
 describe('Validation Utils', () => {
     test('sanitizePlayerName should clean input', () => {

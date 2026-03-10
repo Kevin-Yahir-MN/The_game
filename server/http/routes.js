@@ -5,6 +5,8 @@ const { rooms, reverseRoomMap, boardHistory } = require('../state');
 const { sanitizePlayerName, isValidRoomId } = require('../utils/validation');
 const { initializeDeck } = require('../utils/gameRules');
 const { createTurnState } = require('../utils/turnState');
+const friendService = require('../services/friendService');
+const { createDefaultHistory, normalizeHistory } = require('../utils/history');
 const { flushSaveGameState } = require('../services/persistence');
 const { broadcastToRoom } = require('../services/communication');
 const {
@@ -349,8 +351,7 @@ function registerHttpRoutes(app) {
                     .status(401)
                     .json({ success: false, message: 'No autenticado' });
             }
-            const friends =
-                await require('../services/friendService').getFriends(user.id);
+            const friends = await friendService.getFriends(user.id);
             return res.json({ success: true, friends });
         } catch (error) {
             console.error('Error obteniendo lista de amigos:', error);
@@ -378,10 +379,7 @@ function registerHttpRoutes(app) {
                     .json({ success: false, message: 'friendId requerido' });
             }
 
-            await require('../services/friendService').addFriend(
-                user.id,
-                friendId
-            );
+            await friendService.addFriend(user.id, friendId);
             return res.json({ success: true });
         } catch (error) {
             console.error('Error agregando amigo:', error);
@@ -428,10 +426,7 @@ function registerHttpRoutes(app) {
                     .json({ success: false, message: 'friendId requerido' });
             }
 
-            await require('../services/friendService').removeFriend(
-                user.id,
-                friendId
-            );
+            await friendService.removeFriend(user.id, friendId);
             return res.json({ success: true });
         } catch (error) {
             console.error('Error eliminando amigo:', error);
@@ -508,6 +503,7 @@ function registerHttpRoutes(app) {
 
         try {
             const roomId = await generateUniqueRoomId();
+            const initialDeck = initializeDeck();
             await withTransaction(async (client) => {
                 await client.query(
                     `
@@ -520,7 +516,7 @@ function registerHttpRoutes(app) {
                         JSON.stringify({
                             players: [],
                             gameState: {
-                                deck: initializeDeck(),
+                                deck: initialDeck,
                                 board: {
                                     ascending: [1, 1],
                                     descending: [100, 100],
@@ -529,12 +525,7 @@ function registerHttpRoutes(app) {
                                 gameStarted: false,
                                 initialCards: 6,
                             },
-                            history: {
-                                ascending1: [1],
-                                ascending2: [1],
-                                descending1: [100],
-                                descending2: [100],
-                            },
+                            history: createDefaultHistory(),
                         }),
                     ]
                 );
@@ -558,13 +549,12 @@ function registerHttpRoutes(app) {
                         userId: authUser?.id || null,
                         ws: null,
                         cards: [],
-                        cardsPlayedThisTurn: 0,
                         turnState: createTurnState(),
                         lastActivity: Date.now(),
                     },
                 ],
                 gameState: {
-                    deck: initializeDeck(),
+                    deck: initialDeck,
                     board: { ascending: [1, 1], descending: [100, 100] },
                     currentTurn: playerId,
                     gameStarted: false,
@@ -580,12 +570,7 @@ function registerHttpRoutes(app) {
 
             rooms.set(roomId, room);
             reverseRoomMap.set(room, roomId);
-            boardHistory.set(roomId, {
-                ascending1: [1],
-                ascending2: [1],
-                descending1: [100],
-                descending2: [100],
-            });
+            boardHistory.set(roomId, createDefaultHistory());
 
             res.json({ success: true, roomId, playerId, playerName });
         } catch (error) {
@@ -666,7 +651,6 @@ function registerHttpRoutes(app) {
                 userId: authUser?.id || null,
                 ws: null,
                 cards: [],
-                cardsPlayedThisTurn: 0,
                 turnState: createTurnState(),
                 lastActivity: Date.now(),
             };
@@ -780,12 +764,7 @@ function registerHttpRoutes(app) {
                     .status(400)
                     .json({ success: false, error: 'roomId inválido' });
             }
-            const history = boardHistory.get(roomId) || {
-                ascending1: [1],
-                ascending2: [1],
-                descending1: [100],
-                descending2: [100],
-            };
+            const history = normalizeHistory(boardHistory.get(roomId));
 
             res.json({
                 success: true,

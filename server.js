@@ -7,19 +7,19 @@ const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const redis = require('redis');
 
-const { PORT, allowedOrigins } = require('./client/src/config.js');
+const { PORT, allowedOrigins } = require('./server/config.js');
 const {
     pool,
     initializeDatabase,
     cleanupOldGames,
     isTransientConnectionError,
-} = require('./client/src/db.js');
-const { registerHttpRoutes } = require('./client/src/http/routes.js');
-const { restoreActiveGames } = require('./client/src/services/persistence.js');
-const { setupWebSocket } = require('./client/src/ws/websocket.js');
+} = require('./server/db.js');
+const { registerHttpRoutes } = require('./server/http/routes.js');
+const { restoreActiveGames } = require('./server/services/persistence.js');
+const { setupWebSocket } = require('./server/ws/websocket.js');
 const {
     cleanupExpiredSessions,
-} = require('./client/src/services/authService.js');
+} = require('./server/services/authService.js');
 const logger = require('./src/logger.js');
 
 const redisClient = redis.createClient({

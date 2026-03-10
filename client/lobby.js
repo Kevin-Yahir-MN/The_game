@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const API_URL = window.location.origin;
+    const API_URL =
+        window.APP_CONFIG?.API_URL || window.location.origin;
     const AUTH_TOKEN_KEY = 'authToken';
     const AUTH_USER_KEY = 'authUser';
     const GUEST_USER_KEY = 'guestUser';
@@ -62,16 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let friends = [];
     let lobbyWs = null;
 
-    // modal elements for lobby
-    const friendModal = document.getElementById('friendModal');
-    const modalFriendName = document.getElementById('modalFriendName');
-    const modalGamesPlayed = document.getElementById('modalGamesPlayed');
-    const modalWins = document.getElementById('modalWins');
-    const modalWinStreak = document.getElementById('modalWinStreak');
-    const removeFriendBtn = document.getElementById('removeFriendBtn');
-    const closeFriendModalBtn = document.querySelector(
-        '[data-close-friend-modal]'
-    );
+    // modal elements are handled by FriendsUI
 
     async function loadFriends() {
         friends = [];
@@ -91,138 +83,60 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderFriendList() {
         const container = document.getElementById('friendList');
-        if (!container) return;
+        if (!container || !window.FriendsUI) return;
         const isMain =
             window.location.pathname === '/' ||
             window.location.pathname.endsWith('index.html');
 
-        if (friends.length === 0) {
-            container.innerHTML = '<li>(sin amigos)</li>';
-            return;
-        }
-
-        if (isMain) {
-            // En la pantalla principal NO mostrar botones de invitar
-            container.innerHTML = friends
-                .map((f) => `<li data-friend-id="${f.id}"><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span></li>`)
-                .join('');
-
-            // allow opening friend modal by clicking the row
-            container.querySelectorAll('li[data-friend-id]').forEach((li) => {
-                li.addEventListener('click', () => {
-                    const fid = li.dataset.friendId;
-                    if (fid) showFriendModal(fid);
-                });
-            });
-            return;
-        }
-
-        // En otras páginas (ej. sala) mostrar botón de invitar
-        container.innerHTML = friends
-            .map((f) => {
-                const inviteBtn = `<button class="invite-friend-btn" data-friend-id="${f.id}">Invitar</button>`;
-                return `<li data-friend-id="${f.id}"><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span> ${inviteBtn}</li>`;
-            })
-            .join('');
-
-        // attach click handlers for invite buttons
-        container.querySelectorAll('.invite-friend-btn').forEach((btn) => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const fid = btn.dataset.friendId;
-                attemptInvite(fid);
-            });
-        });
-
-        // event delegation: handle click on any row
-        container.querySelectorAll('li[data-friend-id]').forEach((li) => {
-            li.addEventListener('click', (e) => {
-                const fid = li.dataset.friendId;
-                if (fid) showFriendModal(fid);
-            });
+        window.FriendsUI.renderFriendList({
+            container,
+            friends,
+            showInvite: !isMain,
+            onInvite: (friendId) => attemptInvite(friendId),
+            onSelectFriend: (friendId) => showFriendModal(friendId),
         });
     }
 
     // friend modal functions
-    function showFriendModal(friendId) {
-        // find displayName from local list as fallback
-        const friendData = friends.find((f) => String(f.id) === String(friendId));
-        const name = friendData ? friendData.displayName : '';
-
-        // attempt to fetch full account info if authenticated
-        const identity = getCurrentIdentity();
-        if (identity && !identity.isGuest) {
-            fetchWithAuth(`${API_URL}/users/${friendId}`)
-                .then((resp) => resp.json())
-                .then((data) => {
-                    if (data.success && data.account) {
-                        const stats = data.account.stats || {};
-                        modalFriendName.textContent = data.account.displayName;
-                        modalGamesPlayed.textContent = stats.gamesPlayed ?? '-';
-                        modalWins.textContent = stats.wins ?? '-';
-                        modalWinStreak.textContent = stats.winStreak ?? '-';
-                        friendModal.classList.remove('hidden');
-                        friendModal.dataset.currentId = friendId;
-                    } else {
-                        showError('No se pudo cargar información del amigo');
-                    }
-                })
-                .catch((err) => {
-                    console.error('Error fetching friend info', err);
-                    modalFriendName.textContent = name || 'Amigo';
-                    modalGamesPlayed.textContent = '-';
-                    modalWins.textContent = '-';
-                    modalWinStreak.textContent = '-';
-                    friendModal.classList.remove('hidden');
-                    friendModal.dataset.currentId = friendId;
-                });
-        } else {
-            modalFriendName.textContent = name || 'Amigo';
-            modalGamesPlayed.textContent = '-';
-            modalWins.textContent = '-';
-            modalWinStreak.textContent = '-';
-            if (removeFriendBtn) removeFriendBtn.style.display = 'none';
-            friendModal.classList.remove('hidden');
-            friendModal.dataset.currentId = friendId;
-        }
-    }
-
-    function closeFriendModal() {
-        friendModal.classList.add('hidden');
-        delete friendModal.dataset.currentId;
-        if (removeFriendBtn) removeFriendBtn.style.display = '';
-    }
-
-    if (removeFriendBtn) {
-        removeFriendBtn.addEventListener('click', () => {
-            const fid = friendModal.dataset.currentId;
-            if (!fid) return;
-            fetchWithAuth(`${API_URL}/friends/${fid}`, { method: 'DELETE' })
-                .then((resp) => resp.json())
-                .then((json) => {
-                    if (json.success) {
-                        showSuccess('Amigo eliminado');
-                        closeFriendModal();
-                        loadFriends();
-                    } else {
-                        showError('Error eliminando amigo');
-                    }
-                })
-                .catch((err) => {
-                    console.error('Error deleting friend', err);
+    const friendModalController = window.FriendsUI
+        ? window.FriendsUI.createFriendModalController({
+            canRemove: () => {
+                const identity = getCurrentIdentity();
+                return !!identity && !identity.isGuest;
+            },
+            fetchAccount: async (friendId) => {
+                const response = await fetchWithAuth(
+                    `${API_URL}/users/${friendId}`
+                );
+                const data = await response.json();
+                return data && data.success ? data.account : null;
+            },
+            onFetchError: () => {
+                showError('No se pudo cargar información del amigo');
+            },
+            onRemove: async (friendId) => {
+                const resp = await fetchWithAuth(
+                    `${API_URL}/friends/${friendId}`,
+                    { method: 'DELETE' }
+                );
+                const json = await resp.json();
+                if (!json.success) {
                     showError('Error eliminando amigo');
-                });
-        });
-    }
+                    throw new Error('remove_failed');
+                }
+                showSuccess('Amigo eliminado');
+                loadFriends();
+            },
+        })
+        : null;
 
-    friendModal.addEventListener('click', (e) => {
-        if (e.target === friendModal) {
-            closeFriendModal();
-        }
-    });
-
-    if (closeFriendModalBtn) {
-        closeFriendModalBtn.addEventListener('click', closeFriendModal);
+    function showFriendModal(friendId) {
+        if (!friendModalController) return;
+        const friendData = friends.find(
+            (f) => String(f.id) === String(friendId)
+        );
+        const name = friendData ? friendData.displayName : '';
+        friendModalController.showFriendModal(friendId, name);
     }
 
     function setupLobbyWebSocket() {
@@ -555,7 +469,12 @@ document.addEventListener('DOMContentLoaded', () => {
             showError('Ingresa el código de sala');
             return false;
         }
-        if (!/^\d{4}$/.test(code)) {
+        if (!window.APP_VALIDATION) {
+            showError('Validación no disponible');
+            return false;
+        }
+        const isRoomCodeValid = window.APP_VALIDATION.isValidRoomCode(code);
+        if (!isRoomCodeValid) {
             showError('El código debe tener 4 dígitos');
             return false;
         }
@@ -567,7 +486,12 @@ document.addEventListener('DOMContentLoaded', () => {
             showError('El usuario es obligatorio');
             return false;
         }
-        if (!/^[\p{L}\p{N}_\-\s]{2,24}$/u.test(username.trim())) {
+        if (!window.APP_VALIDATION) {
+            showError('Validación no disponible');
+            return false;
+        }
+        const isUsernameValid = window.APP_VALIDATION.isValidName(username);
+        if (!isUsernameValid) {
             showError(
                 'El usuario debe tener entre 2 y 24 caracteres, solo letras, números, espacios, guiones y guiones bajos'
             );
@@ -587,7 +511,12 @@ document.addEventListener('DOMContentLoaded', () => {
             showError('El nombre visible es obligatorio');
             return false;
         }
-        if (!/^[\p{L}\p{N}_\-\s]{2,24}$/u.test(displayName.trim())) {
+        if (!window.APP_VALIDATION) {
+            showError('Validación no disponible');
+            return false;
+        }
+        const isDisplayNameValid = window.APP_VALIDATION.isValidName(displayName);
+        if (!isDisplayNameValid) {
             showError(
                 'El nombre visible debe tener entre 2 y 24 caracteres, solo letras, números, espacios, guiones y guiones bajos'
             );

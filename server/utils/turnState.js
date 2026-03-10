@@ -19,6 +19,8 @@ function getTurnState(player) {
     }
     if (!Array.isArray(player.turnState.moves)) player.turnState.moves = [];
     player.turnState.count = Number(player.turnState.count) || 0;
+    // keep legacy field in sync for downstream consumers
+    player.cardsPlayedThisTurn = player.turnState.count;
     return player.turnState;
 }
 
@@ -30,10 +32,12 @@ function incrementPlayerTurnState(player, move) {
     const turnState = getTurnState(player);
     turnState.count += 1;
     if (move) turnState.moves.push(move);
+    player.cardsPlayedThisTurn = turnState.count;
 }
 
 function resetPlayerTurnState(player) {
     player.turnState = createTurnState();
+    player.cardsPlayedThisTurn = 0;
 }
 
 module.exports = {

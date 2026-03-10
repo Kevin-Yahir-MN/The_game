@@ -1,8 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const WS_URL = 'wss://the-game-2xks.onrender.com';
+    const WS_URL =
+        window.APP_CONFIG?.PROD_WS_URL ||
+        'wss://the-game-2xks.onrender.com';
     const endTurnButton = document.getElementById('endTurnBtn');
+    const GAME_RULES = window.GAME_RULES;
     const emojiButtonsContainer = document.getElementById('emojiButtons');
     // throttle for incoming full-state updates (ms). set to 0 to process every message immediately
     const STATE_UPDATE_THROTTLE = 0;
@@ -269,6 +272,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function isValidMove(cardValue, position) {
+        if (GAME_RULES && typeof GAME_RULES.isValidMove === 'function') {
+            return GAME_RULES.isValidMove(
+                cardValue,
+                position,
+                gameState.board
+            ).isValid;
+        }
         const currentValue = getStackValue(position);
         const isAscending = position.includes('asc');
         const exactDifference = isAscending
@@ -1563,6 +1573,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function hasValidMoves(cards, board) {
+        if (GAME_RULES && typeof GAME_RULES.getPlayableCards === 'function') {
+            const values = cards.map((card) => card.value);
+            return GAME_RULES.getPlayableCards(values, board).length > 0;
+        }
         return cards.some((card) => {
             return ['asc1', 'asc2', 'desc1', 'desc2'].some((pos) => {
                 const posValue = pos.includes('asc')

@@ -13,8 +13,10 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const ROOM_ID_REGEX = /^\d{4}$/;
 const PLAYER_NAME_REGEX = /^[\p{L}\p{N}_\- ]{2,24}$/u;
 
-const RATE_LIMIT_WINDOW_MS = 1000;
-const RATE_LIMIT_MAX_EVENTS = 30;
+const {
+    RATE_LIMIT_WINDOW_MS,
+    RATE_LIMIT_MAX_EVENTS,
+} = require('../shared/config');
 
 module.exports = {
     PORT,

@@ -1,6 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const API_URL = 'https://the-game-2xks.onrender.com';
-    const WS_URL = 'wss://the-game-2xks.onrender.com';
+    const API_URL =
+        window.APP_CONFIG?.PROD_API_URL ||
+        'https://the-game-2xks.onrender.com';
+    const WS_URL =
+        window.APP_CONFIG?.PROD_WS_URL ||
+        'wss://the-game-2xks.onrender.com';
     const PLAYER_UPDATE_INTERVAL = 5000;
 
     // --- autenticación ligera para manejo de amigos ---
@@ -48,34 +52,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function renderFriendList() {
         const c = document.getElementById('friendList');
-        if (!c) return;
-        if (friends.length === 0) {
-            c.innerHTML = '<li>(sin amigos)</li>';
-            return;
-        }
-        c.innerHTML = friends
-            .map((f) => {
-                const alreadyInRoom = currentPlayers.some(
-                    (p) =>
-                        p &&
-                        p.userId != null &&
-                        String(p.userId) === String(f.id)
-                );
-                const disabledAttr = alreadyInRoom ? 'disabled' : '';
-                const titleAttr = alreadyInRoom
-                    ? 'title="Ya está en la sala"'
-                    : '';
-                const inviteBtn = `<button class="invite-friend-btn" ${disabledAttr} ${titleAttr} data-friend-id="${f.id}" data-friend-name="${f.displayName}">Invitar</button>`;
-                return `<li data-friend-id="${f.id}"><span class="friend-name" data-friend-id="${f.id}">${f.displayName}</span> ${inviteBtn}</li>`;
-            })
-            .join('');
+        if (!c || !window.FriendsUI) return;
 
-        // attach click handlers for invite buttons (stop propagation)
-        c.querySelectorAll('.invite-friend-btn').forEach((btn) => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const friendId = btn.dataset.friendId;
-                const friendName = btn.dataset.friendName;
+        window.FriendsUI.renderFriendList({
+            container: c,
+            friends,
+            showInvite: true,
+            onInvite: (friendId, friendName) => {
                 if (
                     !friendId ||
                     !socket ||
@@ -97,19 +80,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.error('Error enviando invitación:', e);
                     showNotification('Error enviando invitación', true);
                 }
-            });
+            },
+            onSelectFriend: (friendId) => showFriendModal(friendId),
+            isInviteDisabled: (friend) =>
+                currentPlayers.some(
+                    (p) =>
+                        p &&
+                        p.userId != null &&
+                        String(p.userId) === String(friend.id)
+                ),
         });
-
-        // use delegation for row clicks
-        if (!c.dataset.clickBound) {
-            c.addEventListener('click', (e) => {
-                const li = e.target.closest('li[data-friend-id]');
-                if (!li) return;
-                const fid = li.dataset.friendId;
-                if (fid) showFriendModal(fid);
-            });
-            c.dataset.clickBound = 'true';
-        }
     }
 
     const MAX_RECONNECT_ATTEMPTS = 10;
@@ -135,15 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const backToMenuBtn = document.getElementById('backToMenu');
     const emojiButtonsContainer = document.getElementById('emojiButtons');
     const emojiPopinsContainer = document.getElementById('emojiPopins');
-    const friendModal = document.getElementById('friendModal');
-    const modalFriendName = document.getElementById('modalFriendName');
-    const modalGamesPlayed = document.getElementById('modalGamesPlayed');
-    const modalWins = document.getElementById('modalWins');
-    const modalWinStreak = document.getElementById('modalWinStreak');
-    const removeFriendBtn = document.getElementById('removeFriendBtn');
-    const closeFriendModalBtn = document.querySelector(
-        '[data-close-friend-modal]'
-    );
+    // modal elements are handled by FriendsUI
 
     // Mostrar notificación
     function showNotification(message, isError = false) {
@@ -180,89 +152,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 10);
     }
 
-    // funciones para el modal de información de amigo
+    const friendModalController = window.FriendsUI
+        ? window.FriendsUI.createFriendModalController({
+            canRemove: () => !!getAuthUser(),
+            fetchAccount: async (friendId) => {
+                const resp = await fetchWithAuth(
+                    `${API_URL}/users/${friendId}`
+                );
+                const data = await resp.json();
+                return data && data.success ? data.account : null;
+            },
+            onFetchError: () => {
+                showNotification(
+                    'No se pudo cargar información del amigo',
+                    true
+                );
+            },
+            onRemove: async (friendId) => {
+                const resp = await fetchWithAuth(
+                    `${API_URL}/friends/${friendId}`,
+                    { method: 'DELETE' }
+                );
+                const json = await resp.json();
+                if (!json.success) {
+                    showNotification('Error eliminando amigo', true);
+                    throw new Error('remove_failed');
+                }
+                showNotification('Amigo eliminado');
+                loadFriends();
+            },
+        })
+        : null;
+
     function showFriendModal(friendId) {
+        if (!friendModalController) return;
         const friendData = friends.find(
             (f) => String(f.id) === String(friendId)
         );
         const name = friendData ? friendData.displayName : '';
-        const authUser = getAuthUser();
-        if (authUser) {
-            fetchWithAuth(`${API_URL}/users/${friendId}`)
-                .then((resp) => resp.json())
-                .then((data) => {
-                    if (data.success && data.account) {
-                        const stats = data.account.stats || {};
-                        modalFriendName.textContent = data.account.displayName;
-                        modalGamesPlayed.textContent =
-                            stats.gamesPlayed ?? '-';
-                        modalWins.textContent = stats.wins ?? '-';
-                        modalWinStreak.textContent =
-                            stats.winStreak ?? '-';
-                        friendModal.classList.remove('hidden');
-                        friendModal.dataset.currentId = friendId;
-                    } else {
-                        showNotification(
-                            'No se pudo cargar información del amigo',
-                            true
-                        );
-                    }
-                })
-                .catch((err) => {
-                    console.error('Error fetching friend info', err);
-                    // fallback show name only
-                    modalFriendName.textContent = name || 'Amigo';
-                    modalGamesPlayed.textContent = '-';
-                    modalWins.textContent = '-';
-                    modalWinStreak.textContent = '-';
-                    friendModal.classList.remove('hidden');
-                    friendModal.dataset.currentId = friendId;
-                });
-        } else {
-            modalFriendName.textContent = name || 'Amigo';
-            modalGamesPlayed.textContent = '-';
-            modalWins.textContent = '-';
-            modalWinStreak.textContent = '-';
-            removeFriendBtn.style.display = 'none';
-            friendModal.classList.remove('hidden');
-            friendModal.dataset.currentId = friendId;
-        }
-    }
-
-    function closeFriendModal() {
-        friendModal.classList.add('hidden');
-        delete friendModal.dataset.currentId;
-        if (removeFriendBtn) removeFriendBtn.style.display = '';
-    }
-
-    removeFriendBtn.addEventListener('click', () => {
-        const fid = friendModal.dataset.currentId;
-        if (!fid) return;
-        fetchWithAuth(`${API_URL}/friends/${fid}`, { method: 'DELETE' })
-            .then((resp) => resp.json())
-            .then((json) => {
-                if (json.success) {
-                    showNotification('Amigo eliminado');
-                    closeFriendModal();
-                    loadFriends();
-                } else {
-                    showNotification('Error eliminando amigo', true);
-                }
-            })
-            .catch((err) => {
-                console.error('Error deleting friend', err);
-                showNotification('Error eliminando amigo', true);
-            });
-    });
-
-    friendModal.addEventListener('click', (e) => {
-        if (e.target === friendModal) {
-            closeFriendModal();
-        }
-    });
-
-    if (closeFriendModalBtn) {
-        closeFriendModalBtn.addEventListener('click', closeFriendModal);
+        friendModalController.showFriendModal(friendId, name);
     }
 
     // Actualizar estado de conexión en UI

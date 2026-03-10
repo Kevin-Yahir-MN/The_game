@@ -53,6 +53,20 @@ A multiplayer card game built with Node.js, Express, WebSockets, and PostgreSQL.
 - `npm run lint` - Run ESLint
 - `npm run format` - Format with Prettier
 - `npm test` - Run tests
+- `npm run migrate` - Run database migrations
+
+## Migrations
+
+This project uses SQL migrations stored in `server/migrations`.
+
+How it works:
+- Each `.sql` file is applied once and recorded in `schema_migrations`.
+- Migrations run automatically during server startup.
+- You can also run them manually with `npm run migrate`.
+
+Guidelines:
+- Add new migrations as new files with an incrementing prefix (e.g. `0005_feature.sql`).
+- Never edit existing migration files that were already applied.
 
 ## Architecture
 

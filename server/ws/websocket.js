@@ -1,7 +1,8 @@
 // src/ws/websocket.js
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
-const { pool, isTransientConnectionError } = require('../db');
+const { pool } = require('../db');
+const { isTransientConnectionError } = require('../utils/errors');
 const { allowedOrigins } = require('../config');
 const {
     rooms,
@@ -39,44 +40,11 @@ const {
 const { flushSaveGameState } = require('../services/persistence');
 // necesitamos autenticación para conexiones de lobby
 const { getUserFromToken } = require('../services/authService');
+const { createDefaultHistory, normalizeHistory } = require('../utils/history');
+const { parseWsMessage } = require('../utils/ws');
 
 // mapa simple para clientes en el lobby (no en una sala)
 const lobbyClients = new Map(); // key = userId or lobbyId -> { ws, userId, displayName }
-
-function defaultHistory() {
-    return {
-        ascending1: [1],
-        ascending2: [1],
-        descending1: [100],
-        descending2: [100],
-    };
-}
-
-function parseWsMessage(message) {
-    const rawMessage =
-        typeof message === 'string' ? message : message.toString();
-    if (rawMessage.length > 8 * 1024) {
-        const error = new Error('Payload demasiado grande');
-        error.code = 'PAYLOAD_TOO_LARGE';
-        throw error;
-    }
-
-    try {
-        const parsed = JSON.parse(rawMessage);
-        // Validate that message has a type field
-        if (!parsed.type || typeof parsed.type !== 'string') {
-            const error = new Error('Mensaje debe contener un campo "type"');
-            error.code = 'INVALID_MESSAGE_TYPE';
-            throw error;
-        }
-        return parsed;
-    } catch (error) {
-        if (error.code === 'INVALID_MESSAGE_TYPE') throw error;
-        const parseError = new Error('JSON inválido');
-        parseError.code = 'INVALID_JSON';
-        throw parseError;
-    }
-}
 
 // Using isTransientConnectionError from db.js module
 
@@ -329,7 +297,7 @@ function setupWebSocket(server) {
                     userId: p.userId || null,
                 })),
             },
-            history: boardHistory.get(roomId) || defaultHistory(),
+            history: normalizeHistory(boardHistory.get(roomId)),
             isYourTurn: room.gameState.currentTurn === player.id,
         };
 
@@ -567,7 +535,7 @@ function setupWebSocket(server) {
                                 gameFinished: false,
                             };
 
-                            boardHistory.set(roomId, defaultHistory());
+                            boardHistory.set(roomId, createDefaultHistory());
 
                             // restaurar el estado de host: solo el host original puede ser host
                             const originalHostId =
@@ -575,7 +543,6 @@ function setupWebSocket(server) {
                             room.players.forEach((currentPlayer) => {
                                 currentPlayer.cards = [];
                                 resetPlayerTurnState(currentPlayer);
-                                currentPlayer.cardsPlayedThisTurn = 0;
                                 // restaurar host original
                                 currentPlayer.isHost =
                                     currentPlayer.id === originalHostId;

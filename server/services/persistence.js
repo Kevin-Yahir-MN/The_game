@@ -7,14 +7,15 @@ const {
     saveDebounceTimers,
 } = require('../state');
 const { getPlayerTurnCount, getTurnState } = require('../utils/turnState');
+const { toPersistedPlayer } = require('../utils/serializers');
 const { initializeDeck } = require('../utils/gameRules');
+const { createDefaultHistory, normalizeHistory } = require('../utils/history');
 
 async function saveGameState(roomId) {
     const room = rooms.get(roomId);
     if (!room) return false;
 
     try {
-        const { toPersistedPlayer } = require('../utils/serializers');
         const gameData = {
             players: room.players.map((p) => toPersistedPlayer(p)),
             gameState: {
@@ -100,14 +101,7 @@ async function restoreActiveGames() {
                     continue;
                 }
 
-                if (!gameData.history) {
-                    gameData.history = {
-                        ascending1: [1],
-                        ascending2: [1],
-                        descending1: [100],
-                        descending2: [100],
-                    };
-                }
+                gameData.history = normalizeHistory(gameData.history);
 
                 const originalHostId =
                     gameData.originalHostId ||
@@ -121,10 +115,15 @@ async function restoreActiveGames() {
                             cardsPlayedThisTurn:
                                 Number(p.cardsPlayedThisTurn) || 0,
                             turnState: {
-                                count: Number(p.cardsPlayedThisTurn) || 0,
-                                moves: Array.isArray(p.movesThisTurn)
-                                    ? p.movesThisTurn
-                                    : [],
+                                count:
+                                    typeof p.turnState?.count === 'number'
+                                        ? p.turnState.count
+                                        : Number(p.cardsPlayedThisTurn) || 0,
+                                moves: Array.isArray(p.turnState?.moves)
+                                    ? p.turnState.moves
+                                    : Array.isArray(p.movesThisTurn)
+                                        ? p.movesThisTurn
+                                        : [],
                             },
                             totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
                             lastActivity: Date.now(),
