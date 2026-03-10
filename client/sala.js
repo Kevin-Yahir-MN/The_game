@@ -135,6 +135,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalWins = document.getElementById('modalWins');
     const modalWinStreak = document.getElementById('modalWinStreak');
     const removeFriendBtn = document.getElementById('removeFriendBtn');
+    const closeFriendModalBtn = document.querySelector(
+        '[data-close-friend-modal]'
+    );
 
     // Mostrar notificación
     function showNotification(message, isError = false) {
@@ -250,6 +253,10 @@ document.addEventListener('DOMContentLoaded', () => {
             closeFriendModal();
         }
     });
+
+    if (closeFriendModalBtn) {
+        closeFriendModalBtn.addEventListener('click', closeFriendModal);
+    }
 
     // Actualizar estado de conexión en UI
     function updateConnectionStatus(status, isError = false) {

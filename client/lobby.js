@@ -65,6 +65,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalWins = document.getElementById('modalWins');
     const modalWinStreak = document.getElementById('modalWinStreak');
     const removeFriendBtn = document.getElementById('removeFriendBtn');
+    const closeFriendModalBtn = document.querySelector(
+        '[data-close-friend-modal]'
+    );
 
     async function loadFriends() {
         friends = [];
@@ -212,6 +215,10 @@ document.addEventListener('DOMContentLoaded', () => {
             closeFriendModal();
         }
     });
+
+    if (closeFriendModalBtn) {
+        closeFriendModalBtn.addEventListener('click', closeFriendModal);
+    }
 
     function setupLobbyWebSocket() {
         if (lobbyWs) {

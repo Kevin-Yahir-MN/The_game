@@ -943,28 +943,117 @@ body {
 }
 
 .modal-content {
-    background: var(--light);
-    color: var(--dark);
-    border-radius: 10px;
-    padding: 20px 30px;
-    max-width: 320px;
-    width: 90%;
-    text-align: center;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04)),
+        linear-gradient(135deg, #203347, #15202b 65%, #0f1720);
+    color: var(--light);
+    border-radius: 24px;
+    padding: 1.5rem;
+    max-width: 430px;
+    width: min(92vw, 430px);
     position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+    animation: inviteModalEnter 0.28s ease-out;
 }
 
 .modal-content h2 {
-    margin-top: 0;
+    margin: 0.9rem 0 0.6rem;
+    font-size: 1.7rem;
+    line-height: 1.15;
 }
 
 .modal-content .danger-button {
-    background: var(--danger);
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
     color: white;
     border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
+    padding: 0.95rem 1rem;
+    border-radius: 14px;
     cursor: pointer;
-    margin-top: 1rem;
+    width: 100%;
+    font-size: 0.98rem;
+    font-weight: 700;
+    box-shadow: 0 12px 24px rgba(192, 57, 43, 0.28);
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        background-color 0.2s ease;
+}
+
+.modal-content .danger-button:hover {
+    transform: translateY(-2px);
+}
+
+.modal-close-button {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 38px;
+    height: 38px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--light);
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.modal-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(46, 204, 113, 0.14);
+    color: #9af0bc;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.modal-subtitle {
+    margin: 0;
+    color: rgba(236, 240, 241, 0.82);
+    font-size: 1rem;
+}
+
+.friend-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+    margin-top: 1.25rem;
+}
+
+.friend-stat-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 1rem;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.friend-stat-card--wide {
+    grid-column: 1 / -1;
+}
+
+.friend-stat-label {
+    color: rgba(236, 240, 241, 0.7);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.friend-stat-value {
+    font-size: 1.9rem;
+    font-weight: 800;
+    color: white;
+}
+
+.modal-actions {
+    margin-top: 1.4rem;
 }
 
 /* clickable friend name style */
@@ -1501,6 +1590,10 @@ body {
     }
 
     .invite-modal__actions {
+        grid-template-columns: 1fr;
+    }
+
+    .friend-stats-grid {
         grid-template-columns: 1fr;
     }
 

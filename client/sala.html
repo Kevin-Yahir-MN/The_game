@@ -78,15 +78,36 @@
     <!-- Modal para información de amigo -->
     <div id="friendModal" class="modal hidden">
         <div class="modal-content">
-            <h2 id="modalFriendName"></h2>
-            <p>Partidas jugadas: <span id="modalGamesPlayed">0</span></p>
-            <p>Victorias: <span id="modalWins">0</span></p>
-            <p>
-                Victorias consecutivas: <span id="modalWinStreak">0</span>
-            </p>
-            <button id="removeFriendBtn" class="danger-button">
-                Eliminar amigo
+            <button
+                type="button"
+                class="modal-close-button"
+                data-close-friend-modal
+                aria-label="Cerrar modal"
+            >
+                ×
             </button>
+            <div class="modal-badge">Perfil de amigo</div>
+            <h2 id="modalFriendName"></h2>
+            <p class="modal-subtitle">Resumen rapido de su historial en The Game.</p>
+            <div class="friend-stats-grid">
+                <div class="friend-stat-card">
+                    <span class="friend-stat-label">Partidas jugadas</span>
+                    <span id="modalGamesPlayed" class="friend-stat-value">0</span>
+                </div>
+                <div class="friend-stat-card">
+                    <span class="friend-stat-label">Victorias</span>
+                    <span id="modalWins" class="friend-stat-value">0</span>
+                </div>
+                <div class="friend-stat-card friend-stat-card--wide">
+                    <span class="friend-stat-label">Racha de victorias</span>
+                    <span id="modalWinStreak" class="friend-stat-value">0</span>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="removeFriendBtn" class="danger-button">
+                    Eliminar amigo
+                </button>
+            </div>
         </div>
     </div>
 
