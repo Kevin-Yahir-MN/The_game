@@ -24,12 +24,7 @@
         <!-- Modal para información de amigo -->
         <div id="friendModal" class="modal hidden">
             <div class="modal-content">
-                <button
-                    type="button"
-                    class="modal-close-button"
-                    data-close-friend-modal
-                    aria-label="Cerrar modal"
-                >
+                <button type="button" class="modal-close-button" data-close-friend-modal aria-label="Cerrar modal">
                     ×
                 </button>
                 <div class="modal-badge">Perfil de amigo</div>
@@ -193,19 +188,16 @@
 
                 <div id="joinRoomModal" class="invite-modal join-room-modal" style="display: none">
                     <div id="joinRoomBackdrop" class="invite-modal__backdrop join-room-backdrop"></div>
-                    <div class="invite-modal__dialog join-room-dialog" role="dialog" aria-modal="true" aria-labelledby="joinRoomModalTitle">
-                        <button
-                            type="button"
-                            class="modal-close-button join-room-close"
-                            id="closeJoinRoomBtn"
-                            aria-label="Cerrar modal"
-                        >
+                    <div class="invite-modal__dialog join-room-dialog" role="dialog" aria-modal="true"
+                        aria-labelledby="joinRoomModalTitle">
+                        <button type="button" class="modal-close-button join-room-close" id="closeJoinRoomBtn"
+                            aria-label="Cerrar modal">
                             ×
                         </button>
                         <div class="invite-modal__badge">Unirse a sala</div>
-                        <h3 id="joinRoomModalTitle">Aporta el codigo de 4 digitos</h3>
+                        <h3 id="joinRoomModalTitle">Ingresa el codigo de 4 digitos</h3>
                         <p class="invite-modal__message">
-                            Te conectamos rapido a tu sala. Si no lo recuerdas, pide el codigo al host.
+                            Pide el codigo al lider de la sala.
                         </p>
                         <div class="form-group join-room-form-group">
                             <label for="joinRoomCodeInput">Código de sala</label>
@@ -214,17 +206,21 @@
                                 id="joinRoomCodeInput"
                                 placeholder="Ej: 1234"
                                 maxlength="4"
+                                inputmode="numeric"
+                                pattern="[0-9]*"
                                 autofocus
                             />
                         </div>
                         <div class="join-room-guidance">
-                            <span>Solo admite numeros y no distingue mayusculas.</span>
+                            <span>Solo admite numeros</span>
                         </div>
                         <div class="invite-modal__actions join-room-actions">
-                            <button id="confirmJoinRoomBtn" class="invite-modal__button invite-modal__button--primary" type="button">
+                            <button id="confirmJoinRoomBtn" class="invite-modal__button invite-modal__button--primary"
+                                type="button">
                                 Unirse
                             </button>
-                            <button id="cancelJoinRoomBtn" class="invite-modal__button invite-modal__button--ghost" type="button">
+                            <button id="cancelJoinRoomBtn" class="invite-modal__button invite-modal__button--ghost"
+                                type="button">
                                 Cancelar
                             </button>
                         </div>

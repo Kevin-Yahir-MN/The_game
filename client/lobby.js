@@ -1024,6 +1024,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    joinRoomCodeInput.addEventListener('input', () => {
+        joinRoomCodeInput.value = joinRoomCodeInput.value.replace(/\D/g, '');
+    });
+
     guestNameInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             acceptGuestBtn.click();
