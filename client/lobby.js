@@ -887,15 +887,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     logoutBtn.addEventListener('click', async () => {
-        const token = getAuthToken();
-        if (token) {
-            try {
-                await fetchWithAuth(`${API_URL}/auth/logout`, {
-                    method: 'POST',
-                });
-            } catch (error) {
-                console.error('Error al cerrar sesión:', error);
-            }
+        try {
+            await fetchWithAuth(`${API_URL}/auth/logout`, {
+                method: 'POST',
+            });
+        } catch (error) {
+            console.error('Error al cerrar sesión:', error);
         }
 
         clearIdentity();
