@@ -2061,6 +2061,12 @@ body.modal-open {
     backdrop-filter: blur(8px);
 }
 
+/* Igualar difuminado con el modal de "Mi cuenta" */
+.join-room-backdrop {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: none;
+}
+
 .invite-modal__dialog {
     position: relative;
     width: min(92vw, 430px);
