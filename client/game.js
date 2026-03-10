@@ -11,25 +11,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const STATE_UPDATE_THROTTLE = 0;
     // reposition floating emoji messages when the window resizes
     window.addEventListener('resize', () => {
+        applyResponsiveCanvasSizing();
         positionEmojiMessages();
     });
     const TARGET_FPS = 60;
     const MAX_RECONNECT_ATTEMPTS = 5;
     const RECONNECT_BASE_DELAY = 2000;
-    const CARD_WIDTH = 80;
-    const CARD_HEIGHT = 120;
-    const COLUMN_SPACING = 60;
-    const CARD_SPACING = 15;
+    let CARD_WIDTH = 80;
+    let CARD_HEIGHT = 120;
+    let COLUMN_SPACING = 60;
+    let CARD_SPACING = 15;
     const HISTORY_ICON_PULSE_INTERVAL = 20000;
     const HISTORY_ICON_PULSE_DURATION = 500;
 
-    const BOARD_POSITION = {
+    let BOARD_POSITION = {
         x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
         y: canvas.height * 0.3,
     };
-    const PLAYER_CARDS_Y = canvas.height * 0.6;
-    const BUTTONS_Y = canvas.height * 0.85;
-    const HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
+    let PLAYER_CARDS_Y = canvas.height * 0.6;
+    let BUTTONS_Y = canvas.height * 0.85;
+    let HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
 
     const assetCache = new Map();
     let historyIcon = new Image();
@@ -100,6 +101,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function sanitizeInput(input) {
         return input ? input.replace(/[^a-zA-Z0-9-_]/g, '') : '';
+    }
+
+    function applyResponsiveCanvasSizing() {
+        const viewportWidth = window.innerWidth || 800;
+        const viewportHeight = window.innerHeight || 700;
+        const maxWidth = Math.min(900, viewportWidth - 32);
+        const targetWidth = Math.max(320, maxWidth);
+        const targetHeight = Math.min(
+            Math.max(520, Math.floor(targetWidth * 0.85)),
+            Math.floor(viewportHeight * 0.9)
+        );
+
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+
+        const scale = Math.min(targetWidth / 800, targetHeight / 700);
+        CARD_WIDTH = Math.round(80 * scale);
+        CARD_HEIGHT = Math.round(120 * scale);
+        COLUMN_SPACING = Math.round(60 * scale);
+        CARD_SPACING = Math.max(10, Math.round(15 * scale));
+
+        BOARD_POSITION = {
+            x:
+                canvas.width / 2 -
+                (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
+            y: Math.round(canvas.height * 0.3),
+        };
+        PLAYER_CARDS_Y = Math.round(canvas.height * 0.6);
+        BUTTONS_Y = Math.round(canvas.height * 0.85);
+        HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
+
+        needsRedraw = true;
     }
 
     function log(message, data) {
@@ -2038,8 +2071,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }),
         ])
             .then(() => {
-                canvas.width = 800;
-                canvas.height = 700;
+                applyResponsiveCanvasSizing();
 
                 canvas.addEventListener('click', handleCanvasClick);
                 canvas.addEventListener('mousedown', handleMouseDown);

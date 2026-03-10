@@ -9,6 +9,14 @@
     --success: #27ae60;
     --warning: #f39c12;
     --danger: #e74c3c;
+    --space-1: 0.5rem;
+    --space-2: 1rem;
+    --space-3: 1.5rem;
+    --space-4: 2.5rem;
+    --radius-1: 8px;
+    --radius-2: 12px;
+    --radius-3: 16px;
+    --content-max: 1100px;
 }
 
 body {
@@ -19,6 +27,14 @@ body {
     background: linear-gradient(135deg, var(--dark), var(--darker));
     color: var(--light);
     line-height: 1.6;
+    font-size: clamp(0.95rem, 0.85rem + 0.3vw, 1.05rem);
+}
+
+button,
+input,
+select,
+textarea {
+    touch-action: manipulation;
 }
 
 body.modal-open {
@@ -31,12 +47,14 @@ body.modal-open {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    padding: 2rem;
+    padding: var(--space-4);
+    max-width: var(--content-max);
+    margin: 0 auto;
 }
 
 .lobby-header {
     text-align: center;
-    margin-bottom: 2.5rem;
+    margin-bottom: var(--space-4);
     animation: fadeIn 0.8s ease-out;
 }
 
@@ -57,8 +75,8 @@ body.modal-open {
     top: 1rem;
     left: 1rem;
     background: rgba(0, 0, 0, 0.3);
-    padding: 1rem;
-    border-radius: 8px;
+    padding: var(--space-2);
+    border-radius: var(--radius-1);
     max-width: 280px;
 }
 
@@ -82,6 +100,10 @@ body.modal-open {
     justify-content: space-between;
     align-items: center;
     gap: 0.5rem;
+}
+
+.friends-container li .friend-name {
+    padding: 0.2rem 0;
 }
 
 .invite-friend-btn {
@@ -114,8 +136,8 @@ body.modal-open {
 .lobby-card {
     background: rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(10px);
-    border-radius: 16px;
-    padding: 2.5rem;
+    border-radius: var(--radius-3);
+    padding: var(--space-4);
     width: 100%;
     max-width: 500px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
@@ -123,10 +145,22 @@ body.modal-open {
     animation: fadeIn 0.6s ease-out;
 }
 
+.auth-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-3);
+}
+
+.lobby-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
 .login-form {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: var(--space-3);
 }
 
 .form-group {
@@ -142,9 +176,9 @@ body.modal-open {
 
 .form-group input {
     width: 100%;
-    padding: 1rem;
+    padding: var(--space-2);
     border: none;
-    border-radius: 8px;
+    border-radius: var(--radius-1);
     background: rgba(255, 255, 255, 0.9);
     font-size: 1rem;
     transition: all 0.3s;
@@ -156,9 +190,9 @@ body.modal-open {
 }
 
 .btn {
-    padding: 1.5rem 1rem;
+    padding: var(--space-3) var(--space-2);
     border: none;
-    border-radius: 12px;
+    border-radius: var(--radius-2);
     font-size: 1.1rem;
     font-weight: 600;
     cursor: pointer;
@@ -172,6 +206,16 @@ body.modal-open {
     justify-content: center;
     gap: 0.8rem;
     min-height: 60px;
+}
+
+.btn,
+#startGame,
+.room-secondary-button,
+.invite-modal__button,
+.modal-close-button,
+.invite-friend-btn,
+.add-friend-btn {
+    min-height: 44px;
 }
 
 .btn::after {
@@ -253,8 +297,8 @@ body.modal-open {
 }
 
 .auth-card {
-    padding: 1rem;
-    border-radius: 12px;
+    padding: var(--space-2);
+    border-radius: var(--radius-2);
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -346,7 +390,7 @@ body.modal-open {
 
 .room-container {
     min-height: 100vh;
-    padding: 2rem;
+    padding: var(--space-4);
     max-width: 800px;
     margin: 0 auto;
 }
@@ -376,6 +420,12 @@ body.modal-open {
     border-radius: 12px;
     padding: 1.5rem;
     margin-bottom: 2rem;
+}
+
+.room-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
 }
 
 .players-section h3 {
@@ -618,6 +668,7 @@ body.modal-open {
     /* botones ligeramente separados */
     justify-content: center;
     margin-bottom: 1rem;
+    flex-wrap: wrap;
 }
 
 .button-row button {
@@ -629,6 +680,38 @@ body.modal-open {
     padding: 1.5rem;
     border-radius: 12px;
     margin-bottom: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .room-container {
+        padding: var(--space-3);
+    }
+
+    .room-header h1 {
+        font-size: 2rem;
+    }
+
+    .players-section {
+        padding: var(--space-2);
+    }
+
+    .room-emoji-chat {
+        padding: var(--space-2);
+    }
+
+    .emoji-buttons {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .button-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #startGame,
+    .room-secondary-button {
+        width: 100%;
+    }
 }
 
 .game-settings h3 {
@@ -647,8 +730,8 @@ body.modal-open {
 
 #gameContainer {
     position: relative;
-    width: 800px;
-    height: 800px;
+    width: min(90vw, 900px);
+    height: min(90vw, 900px);
     margin: 20px auto;
     overflow: visible;
     background: transparent;
@@ -663,7 +746,9 @@ body.modal-open {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     position: relative;
     z-index: 1;
-    height: 700px;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 800/700;
     cursor: pointer;
 }
 
@@ -853,8 +938,9 @@ body.modal-open {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 1001;
-    max-height: 80vh;
+    max-height: 85vh;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .history-modal h3 {
@@ -918,7 +1004,7 @@ body.modal-open {
     padding: 30px 40px;
     border-radius: 10px;
     text-align: center;
-    max-width: 80%;
+    max-width: min(90vw, 520px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     font-size: 1.1rem;
     color: #333;
@@ -939,6 +1025,7 @@ body.modal-open {
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease;
+    padding: var(--space-2);
 }
 
 .modal:not(.hidden) {
@@ -959,6 +1046,9 @@ body.modal-open {
     border: 1px solid rgba(255, 255, 255, 0.16);
     box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
     animation: inviteModalEnter 0.28s ease-out;
+    max-height: 90vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .account-modal {
@@ -1241,6 +1331,7 @@ body.modal-open {
     opacity: 1;
     transition: opacity 0.3s ease;
     animation: slideIn 0.3s ease-out;
+    max-width: min(92vw, 540px);
 }
 
 .notification.error {
@@ -1627,9 +1718,6 @@ body.modal-open {
     }
 
     #gameCanvas {
-        width: 100%;
-        height: auto;
-        aspect-ratio: 800/700;
         margin-top: 120px;
     }
 
@@ -1657,6 +1745,17 @@ body.modal-open {
         right: 15px;
         bottom: 15px;
     }
+
+    .game-emoji-panel {
+        right: 15px;
+        top: 360px;
+    }
+}
+
+.players-panel,
+.history-modal,
+.modal-content {
+    scrollbar-width: thin;
 }
 
 @media (max-width: 600px) {
@@ -1702,7 +1801,61 @@ body.modal-open {
     }
 
     #gameCanvas {
-        margin-top: 100px;
+        margin-top: 90px;
+    }
+
+    .game-panel {
+        position: static;
+        width: 100%;
+        max-width: 100%;
+        margin: 0 0 var(--space-3);
+    }
+
+    .info-panel,
+    .game-emoji-panel,
+    .instructions-panel {
+        position: static;
+        width: 100%;
+    }
+
+    .game-controls {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .friends-container {
+        position: static;
+        width: 100%;
+        max-width: 100%;
+        margin-bottom: var(--space-3);
+    }
+
+    .lobby-card {
+        padding: var(--space-3);
+    }
+
+    .auth-tabs {
+        grid-template-columns: 1fr;
+    }
+
+    .action-buttons {
+        gap: var(--space-2);
+    }
+
+    .modal-content {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .history-modal {
+        width: 95%;
+        max-width: 95%;
+        padding: 1.5rem;
+    }
+
+    .notification {
+        top: 12px;
+        padding: 10px 16px;
     }
 }
 
@@ -1710,14 +1863,14 @@ body.modal-open {
 
     .game-panel,
     .instructions-panel {
-        width: calc(100% - 30px);
-        left: 15px;
-        right: 15px;
+        width: 100%;
+        left: auto;
+        right: auto;
     }
 
     .instructions-panel {
         top: auto;
-        bottom: 15px;
+        bottom: auto;
     }
 }
 
@@ -1754,6 +1907,10 @@ body.modal-open {
 
     #gameCanvas {
         margin-top: 80px;
+    }
+
+    .redirect-modal {
+        padding: 20px 24px;
     }
 }
 
@@ -1922,9 +2079,9 @@ body.modal-open {
 
 .guest-card,
 .active-user-card {
-    margin-top: 1rem;
-    padding: 1rem;
-    border-radius: 12px;
+    margin-top: var(--space-2);
+    padding: var(--space-2);
+    border-radius: var(--radius-2);
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
