@@ -478,6 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
             angel: '😇',
             demon: '😈',
             sleep: '😴',
+            crazy: '🤪',
         };
 
         const emojiChar = emojiMap[message.emoji];

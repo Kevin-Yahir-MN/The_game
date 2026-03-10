@@ -1,185 +1,99 @@
 <!doctype html>
 <html lang="es">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Sala de Juego - The Game</title>
-        <link rel="stylesheet" href="styles.css" />
-    </head>
 
-    <body>
-        <div id="loadingScreen" class="loading-screen">
-            <div class="loading-content">
-                <div class="loading-spinner"></div>
-                <h2>Cargando Sala</h2>
-                <p>Por favor espera...</p>
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sala de Juego - The Game</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h2>Cargando Sala</h2>
+            <p>Por favor espera...</p>
+        </div>
+    </div>
+
+    <div class="room-container">
+        <div class="room-header">
+            <h1>Código de Sala: <span id="roomIdDisplay"></span></h1>
+            <div class="room-code"></div>
+        </div>
+        <!-- lista de amigos dentro de la sala -->
+        <div id="friendsContainer" class="friends-container">
+            <h3>Amigos</h3>
+            <ul id="friendList"></ul>
+        </div>
+
+        <div class="players-section">
+            <h3>Jugadores:</h3>
+            <ul id="playersList"></ul>
+        </div>
+
+        <div class="room-emoji-chat game-panel game-emoji-panel">
+            <h3>Reacciones rápidas</h3>
+
+            <div class="emoji-buttons" id="emojiButtons">
+                <button type="button" class="emoji-button" data-emoji="sad">😢</button>
+                <button type="button" class="emoji-button" data-emoji="angry">😡</button>
+                <button type="button" class="emoji-button" data-emoji="poop">💩</button>
+                <button type="button" class="emoji-button" data-emoji="love">😍</button>
+                <button type="button" class="emoji-button" data-emoji="wow">😮</button>
+                <button type="button" class="emoji-button" data-emoji="middle">🖕</button>
+                <button type="button" class="emoji-button" data-emoji="cry">😭</button>
+                <button type="button" class="emoji-button" data-emoji="proud">😎</button>
+                <button type="button" class="emoji-button" data-emoji="angel">😇</button>
+                <button type="button" class="emoji-button" data-emoji="demon">😈</button>
+                <button type="button" class="emoji-button" data-emoji="sleep">😴</button>
+                <button type="button" class="emoji-button" data-emoji="crazy">🤪</button>
+
             </div>
         </div>
 
-        <div class="room-container">
-            <div class="room-header">
-                <h1>Código de Sala: <span id="roomIdDisplay"></span></h1>
-                <div class="room-code"></div>
-            </div>
-            <!-- lista de amigos dentro de la sala -->
-            <div id="friendsContainer" class="friends-container">
-                <h3>Amigos</h3>
-                <ul id="friendList"></ul>
-            </div>
-
-            <div class="players-section">
-                <h3>Jugadores:</h3>
-                <ul id="playersList"></ul>
-            </div>
-
-            <div class="room-emoji-chat">
-                <h3>Reacciones rápidas</h3>
-                <div class="emoji-buttons" id="emojiButtons">
-                    <button
-                        type="button"
-                        class="emoji-button"
-                        data-emoji="sad"
-                        aria-label="Triste"
-                    >
-                        😢
-                    </button>
-                    <button
-                        type="button"
-                        class="emoji-button"
-                        data-emoji="angry"
-                        aria-label="Enojado"
-                    >
-                        😡
-                    </button>
-                    <button
-                        type="button"
-                        class="emoji-button"
-                        data-emoji="poop"
-                        aria-label="Popó"
-                    >
-                        💩
-                    </button>
-                    <button
-                        type="button"
-                        class="emoji-button"
-                        data-emoji="love"
-                        aria-label="Amor"
-                    >
-                        😍
-                    </button>
-                    <button
-                        type="button"
-                        class="emoji-button"
-                        data-emoji="wow"
-                        aria-label="Sorpresa"
-                    >
-                        😮
-                    </button>
-                    <button
-                        type="button"
-                        class="emoji-button"
-                        data-emoji="middle"
-                        aria-label="Dedo grosero"
-                    >
-                        🖕
-                    </button>
-                    <button
-                        type="button"
-                        class="emoji-button"
-                        data-emoji="cry"
-                        aria-label="Llorando mucho"
-                    >
-                        😭
-                    </button>
-                    <button
-                        type="button"
-                        class="emoji-button"
-                        data-emoji="proud"
-                        aria-label="Orgulloso"
-                    >
-                        😎
-                    </button>
-                    <button
-                        type="button"
-                        class="emoji-button"
-                        data-emoji="angel"
-                        aria-label="Ángel"
-                    >
-                        😇
-                    </button>
-                    <button
-                        type="button"
-                        class="emoji-button"
-                        data-emoji="demon"
-                        aria-label="Demonio"
-                    >
-                        😈
-                    </button>
-                    <button
-                        type="button"
-                        class="emoji-button"
-                        data-emoji="sleep"
-                        aria-label="Dormido"
-                    >
-                        😴
-                    </button>
-                </div>
-            </div>
-
-            <div class="game-settings" id="gameSettings" style="display: none">
-                <h3>Configuración del Juego</h3>
-                <div class="form-group">
-                    <label for="initialCards"
-                        >Cartas iniciales por jugador:</label
-                    >
-                    <select id="initialCards" class="form-control">
-                        <option value="8">8 cartas</option>
-                        <option value="7">7 cartas</option>
-                        <option value="6" selected>6 cartas</option>
-                        <option value="5">5 cartas</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="button-row">
-                <button id="startGame">Iniciar Juego</button>
-                <button
-                    id="backToMenu"
-                    class="room-secondary-button"
-                    type="button"
-                >
-                    Volver al menú
-                </button>
+        <div class="game-settings" id="gameSettings" style="display: none">
+            <h3>Configuración del Juego</h3>
+            <div class="form-group">
+                <label for="initialCards">Cartas iniciales por jugador:</label>
+                <select id="initialCards" class="form-control">
+                    <option value="8">8 cartas</option>
+                    <option value="7">7 cartas</option>
+                    <option value="6" selected>6 cartas</option>
+                    <option value="5">5 cartas</option>
+                </select>
             </div>
         </div>
 
-        <div
-            id="emojiPopins"
-            class="emoji-popins"
-            aria-live="polite"
-            aria-atomic="false"
-        ></div>
-
-        <!-- Modal para información de amigo -->
-        <div id="friendModal" class="modal hidden">
-            <div class="modal-content">
-                <h2 id="modalFriendName"></h2>
-                <p>Partidas jugadas: <span id="modalGamesPlayed">0</span></p>
-                <p>Victorias: <span id="modalWins">0</span></p>
-                <p>
-                    Victorias consecutivas: <span id="modalWinStreak">0</span>
-                </p>
-                <button id="removeFriendBtn" class="danger-button">
-                    Eliminar amigo
-                </button>
-            </div>
+        <div class="button-row">
+            <button id="startGame">Iniciar Juego</button>
+            <button id="backToMenu" class="room-secondary-button" type="button">
+                Volver al menú
+            </button>
         </div>
+    </div>
 
-        <script src="sala.js"></script>
-        <script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
-        <script
-            src="https://files.bpcontent.cloud/2025/10/08/22/20251008223632-UHCQQDWQ.js"
-            defer
-        ></script>
-    </body>
+    <div id="emojiPopins" class="emoji-popins" aria-live="polite" aria-atomic="false"></div>
+
+    <!-- Modal para información de amigo -->
+    <div id="friendModal" class="modal hidden">
+        <div class="modal-content">
+            <h2 id="modalFriendName"></h2>
+            <p>Partidas jugadas: <span id="modalGamesPlayed">0</span></p>
+            <p>Victorias: <span id="modalWins">0</span></p>
+            <p>
+                Victorias consecutivas: <span id="modalWinStreak">0</span>
+            </p>
+            <button id="removeFriendBtn" class="danger-button">
+                Eliminar amigo
+            </button>
+        </div>
+    </div>
+
+    <script src="sala.js"></script>
+    <script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
+    <script src="https://files.bpcontent.cloud/2025/10/08/22/20251008223632-UHCQQDWQ.js" defer></script>
+</body>
+
 </html>

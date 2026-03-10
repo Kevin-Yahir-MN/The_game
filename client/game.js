@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 socket.onmessage =
                 socket.onclose =
                 socket.onerror =
-                    null;
+                null;
             if (
                 [WebSocket.OPEN, WebSocket.CONNECTING].includes(
                     socket.readyState
@@ -622,6 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
             angel: '😇',
             demon: '😈',
             sleep: '😴',
+            crazy: '🤪',
         };
 
         const emojiChar = emojiMap[message.emoji];
@@ -929,8 +930,8 @@ document.addEventListener('DOMContentLoaded', () => {
             card.x =
                 originalX +
                 Math.sin(progress * Math.PI * 16) *
-                    shakeAmount *
-                    (1 - progress);
+                shakeAmount *
+                (1 - progress);
             markDirty(card.x, card.y, card.width, card.height);
             requestAnimationFrame(shake);
         }
@@ -1173,17 +1174,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     isYourTurn &&
                     (deckEmpty
                         ? cardValue === gameState.board.ascending[0] - 10 ||
-                          cardValue === gameState.board.ascending[1] - 10 ||
-                          cardValue === gameState.board.descending[0] + 10 ||
-                          cardValue === gameState.board.descending[1] + 10 ||
-                          cardValue > gameState.board.ascending[0] ||
-                          cardValue > gameState.board.ascending[1] ||
-                          cardValue < gameState.board.descending[0] ||
-                          cardValue < gameState.board.descending[1]
+                        cardValue === gameState.board.ascending[1] - 10 ||
+                        cardValue === gameState.board.descending[0] + 10 ||
+                        cardValue === gameState.board.descending[1] + 10 ||
+                        cardValue > gameState.board.ascending[0] ||
+                        cardValue > gameState.board.ascending[1] ||
+                        cardValue < gameState.board.descending[0] ||
+                        cardValue < gameState.board.descending[1]
                         : isValidMove(cardValue, 'asc1') ||
-                          isValidMove(cardValue, 'asc2') ||
-                          isValidMove(cardValue, 'desc1') ||
-                          isValidMove(cardValue, 'desc2'));
+                        isValidMove(cardValue, 'asc2') ||
+                        isValidMove(cardValue, 'desc1') ||
+                        isValidMove(cardValue, 'desc2'));
                 existingCard.isPlayedThisTurn =
                     gameState.cardsPlayedThisTurn.some(
                         (move) =>
@@ -1197,21 +1198,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     startX + index * (CARD_WIDTH + CARD_SPACING),
                     startY,
                     isYourTurn &&
-                        (deckEmpty
-                            ? cardValue === gameState.board.ascending[0] - 10 ||
-                              cardValue === gameState.board.ascending[1] - 10 ||
-                              cardValue ===
-                                  gameState.board.descending[0] + 10 ||
-                              cardValue ===
-                                  gameState.board.descending[1] + 10 ||
-                              cardValue > gameState.board.ascending[0] ||
-                              cardValue > gameState.board.ascending[1] ||
-                              cardValue < gameState.board.descending[0] ||
-                              cardValue < gameState.board.descending[1]
-                            : isValidMove(cardValue, 'asc1') ||
-                              isValidMove(cardValue, 'asc2') ||
-                              isValidMove(cardValue, 'desc1') ||
-                              isValidMove(cardValue, 'desc2')),
+                    (deckEmpty
+                        ? cardValue === gameState.board.ascending[0] - 10 ||
+                        cardValue === gameState.board.ascending[1] - 10 ||
+                        cardValue ===
+                        gameState.board.descending[0] + 10 ||
+                        cardValue ===
+                        gameState.board.descending[1] + 10 ||
+                        cardValue > gameState.board.ascending[0] ||
+                        cardValue > gameState.board.ascending[1] ||
+                        cardValue < gameState.board.descending[0] ||
+                        cardValue < gameState.board.descending[1]
+                        : isValidMove(cardValue, 'asc1') ||
+                        isValidMove(cardValue, 'asc2') ||
+                        isValidMove(cardValue, 'desc1') ||
+                        isValidMove(cardValue, 'desc2')),
                     gameState.cardsPlayedThisTurn.some(
                         (move) =>
                             move.value === cardValue &&
@@ -1342,8 +1343,8 @@ document.addEventListener('DOMContentLoaded', () => {
             HISTORY_ICON_PULSE_INTERVAL;
         return isMyTurn() && timeSinceLastPulse < HISTORY_ICON_PULSE_DURATION
             ? Math.sin(
-                  (timeSinceLastPulse / HISTORY_ICON_PULSE_DURATION) * Math.PI
-              )
+                (timeSinceLastPulse / HISTORY_ICON_PULSE_DURATION) * Math.PI
+            )
             : 0;
     }
 
@@ -1465,7 +1466,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const startX =
             (canvas.width -
                 gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING)) /
-                2 +
+            2 +
             cardIndex * (CARD_WIDTH + CARD_SPACING);
 
         if (!dragStartCard) return;
@@ -1569,8 +1570,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         ? board.ascending[0]
                         : board.ascending[1]
                     : pos === 'desc1'
-                      ? board.descending[0]
-                      : board.descending[1];
+                        ? board.descending[0]
+                        : board.descending[1];
 
                 const isValid = pos.includes('asc')
                     ? card.value > posValue || card.value === posValue - 10
@@ -1734,8 +1735,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.x =
                     (canvas.width -
                         gameState.yourCards.length *
-                            (CARD_WIDTH + CARD_SPACING)) /
-                        2 +
+                        (CARD_WIDTH + CARD_SPACING)) /
+                    2 +
                     index * (CARD_WIDTH + CARD_SPACING);
                 card.y = PLAYER_CARDS_Y;
                 card.draw();
@@ -1759,14 +1760,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <h3>Jugadores (${gameState.players.length})</h3>
             <ul>
                 ${gameState.players
-                    .map((player) => {
-                        const displayName =
-                            player.name || `Jugador_${player.id.slice(0, 4)}`;
-                        const cardCount =
-                            player.cardCount ||
-                            (player.cards ? player.cards.length : 0);
+                .map((player) => {
+                    const displayName =
+                        player.name || `Jugador_${player.id.slice(0, 4)}`;
+                    const cardCount =
+                        player.cardCount ||
+                        (player.cards ? player.cards.length : 0);
 
-                        return `
+                    return `
                         <li class="${player.id === currentPlayer.id ? 'you' : ''} 
                                    ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
                             <span class="player-name">${displayName}</span>
@@ -1774,8 +1775,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             ${player.isHost ? ' <span class="host-tag">(Host)</span>' : ''}
                         </li>
                     `;
-                    })
-                    .join('')}
+                })
+                .join('')}
             </ul>
         `;
 
@@ -1871,14 +1872,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ? gameState.board.ascending[0]
                                 : gameState.board.ascending[1]
                             : pos === 'desc1'
-                              ? gameState.board.descending[0]
-                              : gameState.board.descending[1];
+                                ? gameState.board.descending[0]
+                                : gameState.board.descending[1];
 
                         return pos.includes('asc')
                             ? card.value > posValue ||
-                                  card.value === posValue - 10
+                            card.value === posValue - 10
                             : card.value < posValue ||
-                                  card.value === posValue + 10;
+                            card.value === posValue + 10;
                     });
                 });
 
@@ -1951,7 +1952,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 socket.onmessage =
                 socket.onclose =
                 socket.onerror =
-                    null;
+                null;
             if (socket.readyState === WebSocket.OPEN) {
                 socket.close(1000, 'Juego terminado');
             }
@@ -1984,7 +1985,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Remove emoji button listeners
         if (emojiButtonsContainer) {
-            emojiButtonsContainer.removeEventListener('click', (event) => {});
+            emojiButtonsContainer.removeEventListener('click', (event) => { });
         }
 
         // Remove all temporary DOM elements
