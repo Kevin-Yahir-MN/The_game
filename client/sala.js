@@ -101,12 +101,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // use delegation for row clicks
-        c.addEventListener('click', (e) => {
-            const li = e.target.closest('li[data-friend-id]');
-            if (!li) return;
-            const fid = li.dataset.friendId;
-            if (fid) showFriendModal(fid);
-        });
+        if (!c.dataset.clickBound) {
+            c.addEventListener('click', (e) => {
+                const li = e.target.closest('li[data-friend-id]');
+                if (!li) return;
+                const fid = li.dataset.friendId;
+                if (fid) showFriendModal(fid);
+            });
+            c.dataset.clickBound = 'true';
+        }
     }
 
     const MAX_RECONNECT_ATTEMPTS = 10;
