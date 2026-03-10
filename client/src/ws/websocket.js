@@ -115,7 +115,7 @@ async function safePersistOnDisconnect(roomId, playerId) {
 }
 
 const ALLOWED_EMOJI_REACTIONS = [
-    'sad',
+    'happy',
     'angry',
     'poop',
     'love',

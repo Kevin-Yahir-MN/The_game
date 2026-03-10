@@ -611,7 +611,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!msgs) return;
 
         const emojiMap = {
-            sad: '😢',
+            happy: '😄',
             angry: '😡',
             poop: '💩',
             love: '😍',
