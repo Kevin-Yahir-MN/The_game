@@ -1998,10 +1998,16 @@ body.modal-open {
 
 .join-room-modal {
     display: none;
+    position: fixed;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
 }
 
 .join-room-dialog {
     width: min(92vw, 460px);
+    margin: 0;
+    align-self: center;
 }
 
 .join-room-form-group label {
