@@ -268,20 +268,74 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function displayInvite(invite) {
-        const popup = document.createElement('div');
-        popup.className = 'invite-popup';
-        popup.innerHTML = `
-            <p><strong>${invite.fromDisplayName}</strong> te invita a su sala.</p>
-            <button id="acceptInviteBtn">Aceptar</button>
-            <button id="declineInviteBtn">Declinar</button>
+        const existingInvite = document.querySelector('.invite-modal');
+        if (existingInvite) {
+            existingInvite.remove();
+        }
+
+        const modal = document.createElement('div');
+        modal.className = 'invite-modal';
+        modal.innerHTML = `
+            <div class="invite-modal__backdrop"></div>
+            <section class="invite-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="inviteModalTitle">
+                <div class="invite-modal__badge">Invitacion a partida</div>
+                <h3 id="inviteModalTitle">Unete a la sala de ${invite.fromDisplayName}</h3>
+                <p class="invite-modal__message">
+                    <strong>${invite.fromDisplayName}</strong> quiere que te sumes ahora mismo.
+                </p>
+                <div class="invite-modal__meta">
+                    <span class="invite-modal__room">Sala ${invite.roomId}</span>
+                    <span class="invite-modal__timer" data-invite-countdown>Expira en 10s</span>
+                </div>
+                <div class="invite-modal__progress">
+                    <span class="invite-modal__progress-bar" data-invite-progress></span>
+                </div>
+                <div class="invite-modal__actions">
+                    <button type="button" class="invite-modal__button invite-modal__button--primary" data-action="accept">Aceptar</button>
+                    <button type="button" class="invite-modal__button invite-modal__button--ghost" data-action="decline">Declinar</button>
+                </div>
+            </section>
         `;
-        document.body.appendChild(popup);
-        const remove = () => popup.remove();
-        const timer = setTimeout(remove, 10000);
-        popup
-            .querySelector('#acceptInviteBtn')
+        document.body.appendChild(modal);
+
+        const remove = () => modal.remove();
+        const countdownElement = modal.querySelector('[data-invite-countdown]');
+        const progressElement = modal.querySelector('[data-invite-progress]');
+        const durationMs = 10000;
+        const startedAt = Date.now();
+
+        const countdownInterval = setInterval(() => {
+            const elapsed = Date.now() - startedAt;
+            const remainingMs = Math.max(durationMs - elapsed, 0);
+            const remainingSeconds = Math.ceil(remainingMs / 1000);
+
+            if (countdownElement) {
+                countdownElement.textContent = `Expira en ${remainingSeconds}s`;
+            }
+
+            if (progressElement) {
+                const progress = Math.max(
+                    100 - (elapsed / durationMs) * 100,
+                    0
+                );
+                progressElement.style.width = `${progress}%`;
+            }
+
+            if (remainingMs <= 0) {
+                clearInterval(countdownInterval);
+            }
+        }, 250);
+
+        const timer = setTimeout(() => {
+            clearInterval(countdownInterval);
+            remove();
+        }, durationMs);
+
+        modal
+            .querySelector('[data-action="accept"]')
             .addEventListener('click', async () => {
                 clearTimeout(timer);
+                clearInterval(countdownInterval);
                 remove();
                 const identity = getCurrentIdentity();
                 if (!identity || !identity.displayName) return;
@@ -308,10 +362,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     showError('Error al unirse a la sala');
                 }
             });
-        popup
-            .querySelector('#declineInviteBtn')
+        modal
+            .querySelector('[data-action="decline"]')
             .addEventListener('click', () => {
                 clearTimeout(timer);
+                clearInterval(countdownInterval);
                 remove();
                 if (lobbyWs && lobbyWs.readyState === WebSocket.OPEN) {
                     lobbyWs.send(
@@ -325,25 +380,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
     }
-
-    // inyectar estilos rápidos
-    const style = document.createElement('style');
-    style.textContent = `
-        .invite-popup {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.85);
-            color: white;
-            padding: 1rem;
-            border-radius: 8px;
-            z-index: 1000;
-        }
-        .invite-popup button {
-            margin: 0.25rem;
-        }
-    `;
-    document.head.appendChild(style);
 
     function showError(message) {
         const errorElement = document.createElement('div');
