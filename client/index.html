@@ -52,6 +52,62 @@
             </div>
         </div>
 
+        <!-- Modal para mi cuenta -->
+        <div id="myAccountModal" class="modal hidden" aria-hidden="true">
+            <div class="modal-content account-modal" role="dialog" aria-modal="true" aria-labelledby="myAccountTitle">
+                <button type="button" class="modal-close-button" data-close-account-modal aria-label="Cerrar modal">
+                    ×
+                </button>
+                <div class="account-modal__badge">Mi cuenta</div>
+                <h2 id="myAccountTitle" class="account-modal__title">Mi cuenta</h2>
+
+                <div class="account-modal__stats">
+                    <div class="account-modal__stat">
+                        <span>Partidas jugadas</span>
+                        <strong id="statGamesPlayed">0</strong>
+                    </div>
+                    <div class="account-modal__stat">
+                        <span>Victorias</span>
+                        <strong id="statWins">0</strong>
+                    </div>
+                    <div class="account-modal__stat">
+                        <span>Victorias consecutivas</span>
+                        <strong id="statWinStreak">0</strong>
+                    </div>
+                </div>
+
+                <div class="account-modal__section">
+                    <label for="accountDisplayName">Cambiar nombre visible</label>
+                    <input type="text" id="accountDisplayName" placeholder="Nuevo nombre visible" />
+                    <button id="saveDisplayNameBtn" class="btn account-modal__button account-modal__button--primary" type="button">
+                        Guardar nombre
+                    </button>
+                </div>
+
+                <div class="account-modal__separator">
+                    <span>Seguridad</span>
+                </div>
+
+                <div class="account-modal__section">
+                    <label for="currentPassword">Contraseña actual</label>
+                    <input type="password" id="currentPassword" placeholder="Contraseña actual" />
+                </div>
+                <div class="account-modal__section">
+                    <label for="newPassword">Nueva contraseña</label>
+                    <input type="password" id="newPassword" placeholder="Nueva contraseña" />
+                    <button id="changePasswordBtn" class="btn account-modal__button account-modal__button--success" type="button">
+                        Cambiar contraseña
+                    </button>
+                </div>
+
+                <div class="account-modal__footer">
+                    <button id="backToMenuBtn" class="btn account-modal__button account-modal__button--danger" type="button">
+                        Volver al menú
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div class="lobby-card">
             <div class="login-form">
                 <div id="authOptionsContainer">
@@ -128,51 +184,6 @@
                     </button>
                     <button id="logoutBtn" class="btn btn-ghost" type="button">
                         Cerrar sesión
-                    </button>
-                </div>
-
-                <div id="myAccountPanel" class="account-panel" style="display: none">
-                    <h3>Mi cuenta</h3>
-
-                    <div class="account-stats">
-                        <p>
-                            <strong>Partidas jugadas:</strong>
-                            <span id="statGamesPlayed">0</span>
-                        </p>
-                        <p>
-                            <strong>Victorias:</strong>
-                            <span id="statWins">0</span>
-                        </p>
-                        <p>
-                            <strong>Victorias consecutivas:</strong>
-                            <span id="statWinStreak">0</span>
-                        </p>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="accountDisplayName">Cambiar nombre visible</label>
-                        <input type="text" id="accountDisplayName" placeholder="Nuevo nombre visible" />
-                    </div>
-                    <button id="saveDisplayNameBtn" class="btn btn-primary" type="button">
-                        Guardar nombre
-                    </button>
-
-                    <div class="separator"><span>seguridad</span></div>
-
-                    <div class="form-group">
-                        <label for="currentPassword">Contraseña actual</label>
-                        <input type="password" id="currentPassword" placeholder="Contraseña actual" />
-                    </div>
-                    <div class="form-group">
-                        <label for="newPassword">Nueva contraseña</label>
-                        <input type="password" id="newPassword" placeholder="Nueva contraseña" />
-                    </div>
-                    <button id="changePasswordBtn" class="btn btn-secondary" type="button">
-                        Cambiar contraseña
-                    </button>
-
-                    <button id="backToMenuBtn" class="btn btn-danger btn-back-menu" type="button">
-                        Volver al menú
                     </button>
                 </div>
 

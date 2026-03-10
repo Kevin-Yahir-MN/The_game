@@ -41,7 +41,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeUserLabel = document.getElementById('activeUserLabel');
 
     const myAccountBtn = document.getElementById('myAccountBtn');
-    const myAccountPanel = document.getElementById('myAccountPanel');
+    const myAccountModal = document.getElementById('myAccountModal');
+    const closeAccountModalBtn = document.querySelector(
+        '[data-close-account-modal]'
+    );
     const backToMenuBtn = document.getElementById('backToMenuBtn');
     const mainActions = document.getElementById('mainActions');
     const accountDisplayNameInput =
@@ -484,9 +487,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function toggleAccountView(showAccount) {
-        myAccountPanel.style.display = showAccount ? 'block' : 'none';
+        if (!myAccountModal) return;
+        myAccountModal.classList.toggle('hidden', !showAccount);
+        myAccountModal.setAttribute('aria-hidden', showAccount ? 'false' : 'true');
+        document.body.classList.toggle('modal-open', showAccount);
         if (mainActions) {
-            mainActions.style.display = showAccount ? 'none' : 'flex';
+            mainActions.style.display = 'flex';
         }
     }
 
@@ -775,18 +781,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     myAccountBtn.addEventListener('click', async () => {
-        const isHidden = myAccountPanel.style.display === 'none';
-        if (isHidden) {
-            toggleAccountView(true);
-            await loadMyAccount();
-            return;
-        }
-
-        toggleAccountView(false);
+        toggleAccountView(true);
+        await loadMyAccount();
     });
 
     backToMenuBtn.addEventListener('click', () => {
         toggleAccountView(false);
+    });
+
+    if (myAccountModal) {
+        myAccountModal.addEventListener('click', (e) => {
+            if (e.target === myAccountModal) {
+                toggleAccountView(false);
+            }
+        });
+    }
+
+    if (closeAccountModalBtn) {
+        closeAccountModalBtn.addEventListener('click', () => {
+            toggleAccountView(false);
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (myAccountModal && !myAccountModal.classList.contains('hidden')) {
+            toggleAccountView(false);
+        }
     });
 
     saveDisplayNameBtn.addEventListener('click', async () => {
