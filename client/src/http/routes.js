@@ -44,6 +44,18 @@ function registerHttpRoutes(app) {
         });
     });
 
+    const buildAuthCookieOptions = (req) => {
+        const isHttps =
+            req.secure || req.headers['x-forwarded-proto'] === 'https';
+        const sameSite = isHttps ? 'none' : 'lax';
+        return {
+            httpOnly: true,
+            secure: isHttps,
+            sameSite,
+            maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        };
+    };
+
     app.post('/auth/register', async (req, res) => {
         const { username, password, displayName } = req.body || {};
 
@@ -69,12 +81,7 @@ function registerHttpRoutes(app) {
             });
             const token = await createSession(user.id);
 
-            res.cookie('authToken', token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-            });
+            res.cookie('authToken', token, buildAuthCookieOptions(req));
 
             return res.status(201).json({
                 success: true,
@@ -146,12 +153,7 @@ function registerHttpRoutes(app) {
             }
 
             const token = await createSession(user.id);
-            res.cookie('authToken', token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-            });
+            res.cookie('authToken', token, buildAuthCookieOptions(req));
             return res.json({
                 success: true,
                 user: {
@@ -209,7 +211,12 @@ function registerHttpRoutes(app) {
             } else if (token) {
                 await deleteSession(token);
             }
-            res.clearCookie('authToken');
+            const cookieOptions = buildAuthCookieOptions(req);
+            res.clearCookie('authToken', {
+                httpOnly: cookieOptions.httpOnly,
+                secure: cookieOptions.secure,
+                sameSite: cookieOptions.sameSite,
+            });
             return res.json({ success: true });
         } catch (error) {
             console.error('Error en logout:', error);

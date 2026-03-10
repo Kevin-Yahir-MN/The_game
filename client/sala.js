@@ -5,7 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- autenticación ligera para manejo de amigos ---
     function getAuthToken() {
-        return localStorage.getItem('authToken');
+        // Tokens are httpOnly cookies and cannot be read from JS
+        return null;
     }
     function getAuthUser() {
         const raw = localStorage.getItem('authUser');
@@ -17,14 +18,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     async function fetchWithAuth(url, options = {}) {
-        const token = getAuthToken();
         const headers = {
             'Content-Type': 'application/json',
             Accept: 'application/json',
             ...(options.headers || {}),
         };
-        if (token) headers.Authorization = `Bearer ${token}`;
-        return fetch(url, { ...options, headers });
+        return fetch(url, {
+            ...options,
+            credentials: 'include',
+            headers,
+        });
     }
 
     // estado de amigos en sala
@@ -180,8 +183,8 @@ document.addEventListener('DOMContentLoaded', () => {
             (f) => String(f.id) === String(friendId)
         );
         const name = friendData ? friendData.displayName : '';
-        const token = getAuthToken();
-        if (token) {
+        const authUser = getAuthUser();
+        if (authUser) {
             fetchWithAuth(`${API_URL}/users/${friendId}`)
                 .then((resp) => resp.json())
                 .then((data) => {
