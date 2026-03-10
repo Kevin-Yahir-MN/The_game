@@ -126,6 +126,7 @@ const ALLOWED_EMOJI_REACTIONS = [
     'angel',
     'demon',
     'sleep',
+    'crazy',
 ];
 const EMOJI_WINDOW_MS = 10_000;
 const EMOJI_MAX_PER_WINDOW = 3;
