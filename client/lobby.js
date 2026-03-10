@@ -153,10 +153,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 .then((resp) => resp.json())
                 .then((data) => {
                     if (data.success && data.account) {
+                        const stats = data.account.stats || {};
                         modalFriendName.textContent = data.account.displayName;
-                        modalGamesPlayed.textContent = data.account.stats.gamesPlayed || '-';
-                        modalWins.textContent = data.account.stats.wins || '-';
-                        modalWinStreak.textContent = data.account.stats.winStreak || '-';
+                        modalGamesPlayed.textContent = stats.gamesPlayed ?? '-';
+                        modalWins.textContent = stats.wins ?? '-';
+                        modalWinStreak.textContent = stats.winStreak ?? '-';
                         friendModal.classList.remove('hidden');
                         friendModal.dataset.currentId = friendId;
                     } else {
