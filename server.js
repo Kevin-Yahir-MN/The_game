@@ -51,6 +51,7 @@ app.use(cookieParser());
 app.use(compression());
 app.use(express.json({ limit: '64kb' }));
 app.use(express.static(path.join(__dirname, 'client')));
+app.use('/shared', express.static(path.join(__dirname, 'shared')));
 
 // Rate limiting for HTTP routes
 const limiter = rateLimit({
