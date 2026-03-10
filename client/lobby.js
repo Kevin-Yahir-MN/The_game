@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const joinRoomCodeInput = document.getElementById('joinRoomCodeInput');
     const confirmJoinRoomBtn = document.getElementById('confirmJoinRoomBtn');
     const cancelJoinRoomBtn = document.getElementById('cancelJoinRoomBtn');
+    const closeJoinRoomBtn = document.getElementById('closeJoinRoomBtn');
 
     const authStatus = document.getElementById('authStatus');
     const loginPanel = document.getElementById('loginPanel');
@@ -1010,6 +1011,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cancelJoinRoomBtn.addEventListener('click', closeJoinRoomModal);
     joinRoomBackdrop.addEventListener('click', closeJoinRoomModal);
+    if (closeJoinRoomBtn) {
+        closeJoinRoomBtn.addEventListener('click', closeJoinRoomModal);
+    }
 
     joinRoomCodeInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
