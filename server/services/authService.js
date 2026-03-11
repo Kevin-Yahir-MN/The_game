@@ -1,6 +1,11 @@
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { pool, withTransaction } = require('../db');
+const {
+    isValidUsername,
+    isValidDisplayName,
+    isValidPassword,
+} = require('../utils/validation');
 const redis = require('redis');
 
 const TOKEN_TTL_DAYS = 30;
@@ -57,6 +62,21 @@ function getTokenFromRequest(req) {
 async function registerUser({ username, password, displayName }) {
     const normalizedUsername = normalizeUsername(username);
     const normalizedDisplayName = normalizeDisplayName(displayName);
+    if (!isValidUsername(normalizedUsername)) {
+        const error = new Error('Nombre de usuario inválido');
+        error.code = 'INVALID_USERNAME';
+        throw error;
+    }
+    if (!isValidDisplayName(normalizedDisplayName)) {
+        const error = new Error('Nombre visible inválido');
+        error.code = 'INVALID_DISPLAY_NAME';
+        throw error;
+    }
+    if (!isValidPassword(password)) {
+        const error = new Error('Contraseña inválida');
+        error.code = 'INVALID_PASSWORD';
+        throw error;
+    }
 
     return withTransaction(async (client) => {
         const existingUsername = await client.query(
@@ -196,6 +216,11 @@ async function getAccountById(userId) {
 
 async function updateDisplayName(userId, displayName) {
     const normalizedDisplayName = normalizeDisplayName(displayName);
+    if (!isValidDisplayName(normalizedDisplayName)) {
+        const error = new Error('Nombre visible inválido');
+        error.code = 'INVALID_DISPLAY_NAME';
+        throw error;
+    }
 
     return withTransaction(async (client) => {
         const existing = await client.query(
@@ -233,6 +258,12 @@ async function updateDisplayName(userId, displayName) {
 }
 
 async function changePassword(userId, currentPassword, newPassword) {
+    if (!isValidPassword(newPassword)) {
+        const error = new Error('Contraseña inválida');
+        error.code = 'INVALID_PASSWORD';
+        throw error;
+    }
+
     const result = await pool.query(
         'SELECT password_hash FROM users WHERE id = $1',
         [userId]

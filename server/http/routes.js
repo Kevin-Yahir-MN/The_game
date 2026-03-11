@@ -102,6 +102,15 @@ function registerHttpRoutes(app) {
                     .status(409)
                     .json({ success: false, message: error.message });
             }
+            if (
+                error.code === 'INVALID_USERNAME' ||
+                error.code === 'INVALID_DISPLAY_NAME' ||
+                error.code === 'INVALID_PASSWORD'
+            ) {
+                return res
+                    .status(400)
+                    .json({ success: false, message: error.message });
+            }
 
             if (error.code === '23505') {
                 const message = String(error.constraint || '').includes(
@@ -325,6 +334,14 @@ function registerHttpRoutes(app) {
             if (error.code === 'DISPLAY_NAME_EXISTS') {
                 return res
                     .status(409)
+                    .json({ success: false, message: error.message });
+            }
+            if (
+                error.code === 'INVALID_DISPLAY_NAME' ||
+                error.code === 'INVALID_PASSWORD'
+            ) {
+                return res
+                    .status(400)
                     .json({ success: false, message: error.message });
             }
             if (error.code === 'INVALID_CURRENT_PASSWORD') {
