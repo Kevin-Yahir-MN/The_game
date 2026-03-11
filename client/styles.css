@@ -509,23 +509,23 @@ body.modal-open {
     margin-bottom: 1.5rem;
 }
 
-/* align emoji panel with friends list in sala */
+/* sala: keep friends + emoji panels fixed on the left */
 .room-container .friends-container {
-    position: static;
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
     max-width: 320px;
-    width: 100%;
-    margin-bottom: var(--space-2);
+    width: min(88vw, 320px);
+    z-index: 40;
 }
 
 .room-container .room-emoji-chat.game-panel.game-emoji-panel {
-    position: static;
-    left: auto;
+    position: fixed;
+    left: 1rem;
     right: auto;
-    top: auto;
-    width: 100%;
-    max-width: 320px;
-    align-self: flex-start;
-    margin-top: var(--space-2);
+    top: 12rem;
+    width: min(88vw, 320px);
+    z-index: 35;
 }
 
 .room-emoji-chat h3 {
@@ -1879,10 +1879,12 @@ body.modal-open {
     }
 
     .friends-container {
-        position: static;
-        width: 100%;
-        max-width: 100%;
-        margin-bottom: var(--space-3);
+        position: fixed;
+        width: min(92vw, 320px);
+        max-width: 320px;
+        left: 0.75rem;
+        top: 0.75rem;
+        margin-bottom: 0;
     }
 
     .lobby-card {

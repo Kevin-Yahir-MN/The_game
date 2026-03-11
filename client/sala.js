@@ -90,6 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         String(p.userId) === String(friend.id)
                 ),
         });
+        updateEmojiPanelPosition();
     }
 
     const MAX_RECONNECT_ATTEMPTS = 10;
@@ -115,6 +116,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const backToMenuBtn = document.getElementById('backToMenu');
     const emojiButtonsContainer = document.getElementById('emojiButtons');
     const emojiPopinsContainer = document.getElementById('emojiPopins');
+    const friendsContainer = document.getElementById('friendsContainer');
+    const emojiPanel = document.querySelector(
+        '.room-emoji-chat.game-panel.game-emoji-panel'
+    );
     // modal elements are handled by FriendsUI
 
     let startButtonBound = false;
@@ -218,6 +223,19 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         const name = friendData ? friendData.displayName : '';
         friendModalController.showFriendModal(friendId, name);
+    }
+
+    function updateEmojiPanelPosition() {
+        if (!friendsContainer || !emojiPanel) return;
+        const gap = 16;
+        const rect = friendsContainer.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) {
+            emojiPanel.style.top = '1rem';
+            emojiPanel.style.left = '1rem';
+            return;
+        }
+        emojiPanel.style.top = `${Math.round(rect.bottom + gap)}px`;
+        emojiPanel.style.left = `${Math.round(rect.left)}px`;
     }
 
     // Actualizar estado de conexión en UI
@@ -706,6 +724,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // también renderizamos la lista de amigos ahora que may have loaded
         renderFriendList();
+        updateEmojiPanelPosition();
     }
 
     // Inicializar la aplicación
@@ -742,6 +761,10 @@ document.addEventListener('DOMContentLoaded', () => {
         clearInterval(playerUpdateInterval);
         clearTimeout(reconnectTimeout);
         if (socket) socket.close();
+    });
+
+    window.addEventListener('resize', () => {
+        updateEmojiPanelPosition();
     });
 
     // Iniciar
