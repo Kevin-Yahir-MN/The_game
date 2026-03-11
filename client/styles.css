@@ -760,6 +760,26 @@ body.modal-open {
         width: 100%;
     }
 
+    .collapsible-panel h3 {
+        cursor: pointer;
+        position: relative;
+        padding-right: 1.6rem;
+    }
+
+    .collapsible-panel h3::after {
+        content: '▾';
+        position: absolute;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 1rem;
+        color: rgba(236, 240, 241, 0.7);
+    }
+
+    .collapsible-panel.collapsed h3::after {
+        content: '▸';
+    }
+
     .collapsible-panel.collapsed .panel-content,
     .collapsible-panel.collapsed .emoji-buttons,
     .collapsible-panel.collapsed ul {
@@ -881,25 +901,6 @@ body.modal-open {
     font-size: 1.1rem;
 }
 
-.collapsible-panel h3 {
-    cursor: pointer;
-    position: relative;
-    padding-right: 1.6rem;
-}
-
-.collapsible-panel h3::after {
-    content: '▾';
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 1rem;
-    color: rgba(236, 240, 241, 0.7);
-}
-
-.collapsible-panel.collapsed h3::after {
-    content: '▸';
-}
 
 .game-panel h3 {
     color: var(--primary);

@@ -14,6 +14,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateOrientationState();
         applyResponsiveCanvasSizing();
         applyMobilePanelState();
+        if (!isMobileUI()) {
+            positionEmojiMessages();
+        }
     });
     const TARGET_FPS = 60;
     const MAX_RECONNECT_ATTEMPTS = 5;
@@ -105,8 +108,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return input ? input.replace(/[^a-zA-Z0-9-_]/g, '') : '';
     }
 
+    function isMobileUI() {
+        return (
+            window.matchMedia('(max-width: 900px)').matches &&
+            window.matchMedia('(pointer: coarse)').matches
+        );
+    }
+
     function updateOrientationState() {
-        const isMobile = window.matchMedia('(max-width: 900px)').matches;
+        const isMobile = isMobileUI();
         const isLandscape = window.matchMedia('(orientation: landscape)').matches;
         document.body.classList.toggle(
             'mobile-portrait',
@@ -130,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyMobilePanelState() {
-        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        const isMobile = isMobileUI();
         const panels = document.querySelectorAll('.collapsible-panel');
         panels.forEach((panel) => {
             if (!isMobile) {
@@ -154,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function applyResponsiveCanvasSizing() {
         const viewportWidth = window.innerWidth || 800;
         const viewportHeight = window.innerHeight || 700;
-        const isMobile = window.matchMedia('(max-width: 900px)').matches;
+        const isMobile = isMobileUI();
         const isLandscape = window.matchMedia('(orientation: landscape)').matches;
 
         let targetWidth;
@@ -774,7 +784,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const emojiChar = emojiMap[message.emoji];
         if (!emojiChar) return;
-        addCanvasEmoji(emojiChar);
+
+        if (isMobileUI()) {
+            addCanvasEmoji(emojiChar);
+            return;
+        }
+
+        const msgs = ensureEmojiMessagesContainer();
+        if (!msgs) return;
+
+        const item = document.createElement('li');
+        item.className = 'emoji-message';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'emoji-message-name';
+        nameSpan.textContent = message.fromPlayerName || 'Jugador';
+
+        const emojiSpan = document.createElement('span');
+        emojiSpan.className = 'emoji-message-emoji';
+        emojiSpan.textContent = emojiChar;
+
+        item.appendChild(nameSpan);
+        item.appendChild(emojiSpan);
+
+        msgs.appendChild(item);
+        msgs.style.display = 'block';
+        positionEmojiMessages();
+
+        setTimeout(() => {
+            if (msgs.contains(item)) {
+                msgs.removeChild(item);
+            }
+            if (msgs.children.length === 0) {
+                msgs.style.display = 'none';
+            }
+        }, 3500);
     }
 
     function handleDeckEmpty() {
@@ -1906,6 +1950,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         attachCollapsible(panel);
         applyMobilePanelState();
+
+        if (!isMobileUI()) {
+            ensureEmojiMessagesContainer();
+            positionEmojiMessages();
+        }
     }
 
     function handleCardAnimations() {
@@ -2150,6 +2199,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateOrientationState();
                 setupCollapsiblePanels();
                 applyResponsiveCanvasSizing();
+                if (!isMobileUI()) {
+                    positionEmojiMessages();
+                }
 
                 canvas.addEventListener('click', handleCanvasClick);
                 canvas.addEventListener('mousedown', handleMouseDown);
