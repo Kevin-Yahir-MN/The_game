@@ -759,6 +759,16 @@ body.modal-open {
     .room-secondary-button {
         width: 100%;
     }
+
+    .collapsible-panel.collapsed .panel-content,
+    .collapsible-panel.collapsed .emoji-buttons,
+    .collapsible-panel.collapsed ul {
+        display: none;
+    }
+
+    .collapsible-panel.collapsed {
+        padding-bottom: 0.75rem;
+    }
 }
 
 .game-settings h3 {
@@ -869,6 +879,26 @@ body.modal-open {
     backdrop-filter: blur(10px);
     z-index: 10;
     font-size: 1.1rem;
+}
+
+.collapsible-panel h3 {
+    cursor: pointer;
+    position: relative;
+    padding-right: 1.6rem;
+}
+
+.collapsible-panel h3::after {
+    content: '▾';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1rem;
+    color: rgba(236, 240, 241, 0.7);
+}
+
+.collapsible-panel.collapsed h3::after {
+    content: '▸';
 }
 
 .game-panel h3 {
@@ -1580,6 +1610,50 @@ body.modal-open {
 .players-panel .current-turn .card-count {
     color: var(--secondary);
     animation: pulse 1.5s infinite;
+}
+
+.rotate-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background:
+        radial-gradient(circle at top, rgba(52, 152, 219, 0.2), transparent 45%),
+        rgba(10, 15, 22, 0.92);
+    color: var(--light);
+    z-index: 2000;
+    padding: 1.5rem;
+}
+
+.rotate-overlay__content {
+    max-width: 420px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+}
+
+.rotate-overlay__content h2 {
+    margin: 0 0 0.6rem;
+    font-size: 1.6rem;
+}
+
+.rotate-overlay__content p {
+    margin: 0;
+    color: rgba(236, 240, 241, 0.8);
+}
+
+body.mobile-portrait .rotate-overlay {
+    display: flex;
+}
+
+body.mobile-portrait #gameContainer,
+body.mobile-portrait .game-panel,
+body.mobile-portrait .players-panel {
+    filter: blur(2px);
 }
 
 /* when the messages container was inside the panel we added a top margin; no longer needed */
