@@ -9,14 +9,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const emojiButtonsContainer = document.getElementById('emojiButtons');
     // throttle for incoming full-state updates (ms). set to 0 to process every message immediately
     const STATE_UPDATE_THROTTLE = 0;
-    // refresh layout when the window resizes
+    // reposition floating emoji messages when the window resizes
     window.addEventListener('resize', () => {
-        updateOrientationState();
         applyResponsiveCanvasSizing();
-        applyMobilePanelState();
-        if (!isMobileUI()) {
-            positionEmojiMessages();
-        }
+        positionEmojiMessages();
     });
     const TARGET_FPS = 60;
     const MAX_RECONNECT_ATTEMPTS = 5;
@@ -57,7 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let animationQueue = [];
     let dirtyAreas = [];
     let needsRedraw = true;
-    const canvasEmojiBursts = [];
 
     const currentPlayer = {
         id: sanitizeInput(sessionStorage.getItem('playerId')),
@@ -108,137 +103,34 @@ document.addEventListener('DOMContentLoaded', () => {
         return input ? input.replace(/[^a-zA-Z0-9-_]/g, '') : '';
     }
 
-    function isMobileUI() {
-        return (
-            window.matchMedia('(max-width: 900px)').matches &&
-            window.matchMedia('(pointer: coarse)').matches
-        );
-    }
-
-    function isMobilePortrait() {
-        return (
-            isMobileUI() &&
-            !window.matchMedia('(orientation: landscape)').matches
-        );
-    }
-
-    function updateOrientationState() {
-        const isMobile = isMobileUI();
-        const isLandscape = window.matchMedia('(orientation: landscape)').matches;
-        document.body.classList.toggle(
-            'mobile-portrait',
-            isMobile && !isLandscape
-        );
-        document.body.classList.toggle(
-            'mobile-landscape',
-            isMobile && isLandscape
-        );
-    }
-
-    function attachCollapsible(panel) {
-        if (!panel || panel.dataset.collapsibleBound) return;
-        const header = panel.querySelector('h3');
-        if (!header) return;
-        header.addEventListener('click', () => {
-            panel.classList.toggle('collapsed');
-            panel.dataset.userToggled = 'true';
-        });
-        panel.dataset.collapsibleBound = 'true';
-    }
-
-    function applyMobilePanelState() {
-        const isMobile = isMobileUI();
-        const panels = document.querySelectorAll('.collapsible-panel');
-        panels.forEach((panel) => {
-            if (!isMobile) {
-                panel.classList.remove('collapsed');
-                panel.dataset.userToggled = '';
-                return;
-            }
-            if (!panel.dataset.userToggled) {
-                panel.classList.add('collapsed');
-            }
-        });
-    }
-
-    function setupCollapsiblePanels() {
-        document
-            .querySelectorAll('.collapsible-panel')
-            .forEach((panel) => attachCollapsible(panel));
-        applyMobilePanelState();
-    }
-
     function applyResponsiveCanvasSizing() {
         const viewportWidth = window.innerWidth || 800;
         const viewportHeight = window.innerHeight || 700;
-        const isMobile = isMobileUI();
-        const isLandscape = window.matchMedia('(orientation: landscape)').matches;
-
-        let targetWidth;
-        let targetHeight;
-        if (isMobile) {
-            const buttonReserve = 90;
-            targetWidth = Math.max(320, viewportWidth);
-            targetHeight = Math.max(320, viewportHeight - buttonReserve);
-        } else if (isLandscape) {
-            const maxWidth = Math.min(1000, viewportWidth - 24);
-            targetWidth = Math.max(480, maxWidth);
-            targetHeight = Math.min(
-                Math.floor(targetWidth * 0.72),
-                Math.floor(viewportHeight - 24)
-            );
-        } else {
-            const maxWidth = Math.min(900, viewportWidth - 32);
-            targetWidth = Math.max(320, maxWidth);
-            targetHeight = Math.min(
-                Math.max(520, Math.floor(targetWidth * 0.85)),
-                Math.floor(viewportHeight * 0.9)
-            );
-        }
+        const maxWidth = Math.min(900, viewportWidth - 32);
+        const targetWidth = Math.max(320, maxWidth);
+        const targetHeight = Math.min(
+            Math.max(520, Math.floor(targetWidth * 0.85)),
+            Math.floor(viewportHeight * 0.9)
+        );
 
         canvas.width = targetWidth;
         canvas.height = targetHeight;
 
-        let scaleBase = Math.min(targetWidth / 800, targetHeight / 700);
-        if (isMobile) {
-            const availableWidth = Math.max(280, targetWidth - 16);
-            const widthForBoard = 4 * 80 + 3 * 60;
-            const widthForHand = 8 * 80 + 7 * 12;
-            const scaleWidth = Math.min(
-                availableWidth / widthForBoard,
-                availableWidth / widthForHand
-            );
-            const reservedHeightRatio = isMobilePortrait() ? 0.4 : 0.34;
-            const scaleHeight =
-                (targetHeight * (1 - reservedHeightRatio)) /
-                (isMobilePortrait() ? 3 * 120 : 2 * 120);
-            scaleBase = Math.min(scaleWidth, scaleHeight);
-        }
-        const scale = isMobile
-            ? Math.max(0.5, Math.min(0.98, scaleBase * 0.92))
-            : scaleBase;
+        const scale = Math.min(targetWidth / 800, targetHeight / 700);
         CARD_WIDTH = Math.round(80 * scale);
         CARD_HEIGHT = Math.round(120 * scale);
-        COLUMN_SPACING = Math.max(18, Math.round(60 * scale));
-        CARD_SPACING = Math.max(6, Math.round(12 * scale));
+        COLUMN_SPACING = Math.round(60 * scale);
+        CARD_SPACING = Math.max(10, Math.round(15 * scale));
 
-        const boardTop = Math.round(canvas.height * (isMobilePortrait() ? 0.12 : isMobile ? 0.18 : 0.3));
-        const playerGap = Math.round(canvas.height * (isMobilePortrait() ? 0.06 : isMobile ? 0.08 : 0.06));
         BOARD_POSITION = {
             x:
                 canvas.width / 2 -
                 (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
-            y: boardTop,
+            y: Math.round(canvas.height * 0.3),
         };
-        PLAYER_CARDS_Y = Math.round(
-            isMobilePortrait()
-                ? boardTop + CARD_HEIGHT + playerGap
-                : isMobile
-                    ? boardTop + CARD_HEIGHT + playerGap
-                    : canvas.height * 0.6
-        );
-        BUTTONS_Y = Math.round(canvas.height * (isMobile ? 0.9 : 0.85));
-        HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 12;
+        PLAYER_CARDS_Y = Math.round(canvas.height * 0.6);
+        BUTTONS_Y = Math.round(canvas.height * 0.85);
+        HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
 
         needsRedraw = true;
     }
@@ -756,51 +648,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return msgs;
     }
 
-    function addCanvasEmoji(emojiChar) {
-        const padding = Math.max(30, Math.round(canvas.width * 0.05));
-        const baseY = Math.max(40, Math.round(BOARD_POSITION.y - 30));
-        const x =
-            padding + Math.random() * Math.max(20, canvas.width - padding * 2);
-        const y = baseY + Math.random() * 40;
-        const size = Math.max(22, Math.round(canvas.width * 0.05));
-        const drift = (Math.random() - 0.5) * 60;
-        canvasEmojiBursts.push({
-            emoji: emojiChar,
-            x,
-            y,
-            size,
-            drift,
-            start: Date.now(),
-            duration: 2000,
-        });
-        needsRedraw = true;
-    }
-
-    function drawCanvasEmojis() {
-        const now = Date.now();
-        for (let i = canvasEmojiBursts.length - 1; i >= 0; i--) {
-            const burst = canvasEmojiBursts[i];
-            const elapsed = now - burst.start;
-            const progress = Math.min(elapsed / burst.duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 2);
-            const alpha = 1 - progress;
-            const y = burst.y - eased * 40;
-            const x = burst.x + eased * burst.drift;
-
-            ctx.save();
-            ctx.globalAlpha = Math.max(0, alpha);
-            ctx.font = `${burst.size}px "Segoe UI", sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(burst.emoji, x, y);
-            ctx.restore();
-
-            if (progress >= 1) {
-                canvasEmojiBursts.splice(i, 1);
-            }
-        }
-    }
-
     // Muestra un mensaje con el emoji enviado por otro jugador
     function renderEmojiReaction(message) {
         const emojiMap = {
@@ -820,11 +667,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const emojiChar = emojiMap[message.emoji];
         if (!emojiChar) return;
-
-        if (isMobileUI()) {
-            addCanvasEmoji(emojiChar);
-            return;
-        }
 
         const msgs = ensureEmojiMessagesContainer();
         if (!msgs) return;
@@ -854,7 +696,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (msgs.children.length === 0) {
                 msgs.style.display = 'none';
             }
-        }, 3500);
+        }, 3500); // mostrar 3.5 segundos
     }
 
     function handleDeckEmpty() {
@@ -1913,76 +1755,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawPlayerCards() {
-        const cardCount = gameState.yourCards.length;
-        const availableWidth = canvas.width - 20;
         const backgroundHeight = CARD_HEIGHT + 30;
-
-        if (isMobilePortrait() && cardCount > 0) {
-            const row1Count = Math.ceil(cardCount / 2);
-            const row2Count = cardCount - row1Count;
-            const rowGap = Math.max(10, Math.round(CARD_HEIGHT * 0.22));
-            const row1Spacing =
-                row1Count > 1
-                    ? (availableWidth - row1Count * CARD_WIDTH) /
-                      (row1Count - 1)
-                    : 0;
-            const row2Spacing =
-                row2Count > 1
-                    ? (availableWidth - row2Count * CARD_WIDTH) /
-                      (row2Count - 1)
-                    : 0;
-            const row1Start =
-                (canvas.width -
-                    (row1Count * CARD_WIDTH +
-                        (row1Count - 1) * row1Spacing)) /
-                2;
-            const row2Start =
-                (canvas.width -
-                    (row2Count * CARD_WIDTH +
-                        (row2Count - 1) * row2Spacing)) /
-                2;
-            const row1Y = PLAYER_CARDS_Y;
-            const row2Y = PLAYER_CARDS_Y + CARD_HEIGHT + rowGap;
-            const totalHeight = CARD_HEIGHT * (row2Count > 0 ? 2 : 1) +
-                rowGap + 30;
-            const backgroundWidth = canvas.width - 20;
-
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-            ctx.beginPath();
-            ctx.roundRect(
-                10,
-                PLAYER_CARDS_Y - 15,
-                backgroundWidth,
-                totalHeight,
-                15
-            );
-            ctx.fill();
-            markDirty(10, PLAYER_CARDS_Y - 15, backgroundWidth, totalHeight);
-
-            gameState.yourCards.forEach((card, index) => {
-                if (card && card !== dragStartCard) {
-                    if (index < row1Count) {
-                        card.x = row1Start + index * (CARD_WIDTH + row1Spacing);
-                        card.y = row1Y;
-                    } else {
-                        const rowIndex = index - row1Count;
-                        card.x = row2Start + rowIndex * (CARD_WIDTH + row2Spacing);
-                        card.y = row2Y;
-                    }
-                    card.draw();
-                }
-            });
-            return;
-        }
-
-        const maxSpacing =
-            cardCount > 1
-                ? (availableWidth - cardCount * CARD_WIDTH) /
-                  (cardCount - 1)
-                : CARD_SPACING;
-        const spacing = Math.max(4, maxSpacing);
         const backgroundWidth =
-            cardCount * (CARD_WIDTH + spacing) + 40;
+            gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 40;
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
         ctx.beginPath();
@@ -2005,10 +1780,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (card && card !== dragStartCard) {
                 card.x =
                     (canvas.width -
-                        cardCount *
-                        (CARD_WIDTH + spacing)) /
+                        gameState.yourCards.length *
+                        (CARD_WIDTH + CARD_SPACING)) /
                     2 +
-                    index * (CARD_WIDTH + spacing);
+                    index * (CARD_WIDTH + CARD_SPACING);
                 card.y = PLAYER_CARDS_Y;
                 card.draw();
             }
@@ -2018,7 +1793,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createPlayersPanel() {
         const panel = document.createElement('div');
         panel.id = 'playersPanel';
-        panel.className = 'players-panel collapsible-panel';
+        panel.className = 'players-panel';
         document.body.appendChild(panel);
         return panel;
     }
@@ -2051,13 +1826,10 @@ document.addEventListener('DOMContentLoaded', () => {
             </ul>
         `;
 
-        attachCollapsible(panel);
-        applyMobilePanelState();
-
-        if (!isMobileUI()) {
-            ensureEmojiMessagesContainer();
-            positionEmojiMessages();
-        }
+        // asegurarse de que el contenedor de mensajes de emoji exista
+        ensureEmojiMessagesContainer();
+        // reposicionar por si el panel cambió de tamaño
+        positionEmojiMessages();
     }
 
     function handleCardAnimations() {
@@ -2194,7 +1966,6 @@ document.addEventListener('DOMContentLoaded', () => {
         drawHistoryIcons();
         handleCardAnimations();
         drawPlayerCards();
-        drawCanvasEmojis();
 
         if (isDragging && dragStartCard) {
             dragStartCard.draw();
@@ -2299,12 +2070,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }),
         ])
             .then(() => {
-                updateOrientationState();
-                setupCollapsiblePanels();
                 applyResponsiveCanvasSizing();
-                if (!isMobileUI()) {
-                    positionEmojiMessages();
-                }
 
                 canvas.addEventListener('click', handleCanvasClick);
                 canvas.addEventListener('mousedown', handleMouseDown);
