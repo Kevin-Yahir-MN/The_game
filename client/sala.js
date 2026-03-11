@@ -75,7 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             roomId,
                         })
                     );
-                    showNotification(`Invitación enviada a ${friendName}`);
                 } catch (e) {
                     console.error('Error enviando invitación:', e);
                     showNotification('Error enviando invitación', true);
