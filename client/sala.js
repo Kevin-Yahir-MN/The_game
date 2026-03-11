@@ -104,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomId = sessionStorage.getItem('roomId');
     const playerId = sessionStorage.getItem('playerId');
     const playerName = sessionStorage.getItem('playerName');
-    const isHost = sessionStorage.getItem('isHost') === 'true';
+    let isHost = sessionStorage.getItem('isHost') === 'true';
 
     // Elementos UI
     const roomIdDisplay = document.getElementById('roomIdDisplay');
@@ -116,6 +116,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const emojiButtonsContainer = document.getElementById('emojiButtons');
     const emojiPopinsContainer = document.getElementById('emojiPopins');
     // modal elements are handled by FriendsUI
+
+    let startButtonBound = false;
+
+    function setHostStatus(nextIsHost) {
+        if (typeof nextIsHost !== 'boolean') return;
+        isHost = nextIsHost;
+        sessionStorage.setItem('isHost', nextIsHost ? 'true' : 'false');
+    }
+
+    function setupStartButton() {
+        if (!startBtn || startButtonBound) return;
+        startBtn.addEventListener('click', handleStartGame);
+        startButtonBound = true;
+    }
+
+    function setHostUI() {
+        if (gameSettings) {
+            gameSettings.style.display = isHost ? 'block' : 'none';
+        }
+        if (startBtn) {
+            if (isHost) {
+                startBtn.classList.add('visible');
+            } else {
+                startBtn.classList.remove('visible');
+            }
+        }
+    }
 
     // Mostrar notificación
     function showNotification(message, isError = false) {
@@ -355,11 +382,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // asegurarse de que el sessionStorage está sincronizado con el servidor
                 // así cuando se reconecta el cliente obtiene el estado correcto de host
                 if (message.isHost !== undefined) {
-                    sessionStorage.setItem(
-                        'isHost',
-                        message.isHost ? 'true' : 'false'
-                    );
+                    setHostStatus(!!message.isHost);
                 }
+                setHostUI();
             } else if (message.type === 'full_state_update') {
                 // Actualizar UI con el estado completo del servidor
                 updatePlayersUI(message.room.players);
@@ -374,10 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     })
                 );
 
-                if (isHost) {
-                    gameSettings.style.display = 'block';
-                    startBtn.classList.add('visible');
-                }
+                setHostUI();
             } else if (message.type === 'game_started') {
                 handleGameStart();
             } else if (message.type === 'room_update') {
@@ -454,6 +476,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!players || !Array.isArray(players)) return;
         currentPlayers = players; // guardar referencia global
         const me = getAuthUser();
+        const mePlayer = players.find(
+            (player) => String(player.id) === String(playerId)
+        );
+        if (mePlayer && mePlayer.isHost !== undefined) {
+            setHostStatus(!!mePlayer.isHost);
+        }
         playersList.innerHTML = players
             .map((player) => {
                 const isMe = player.id === playerId;
@@ -516,6 +544,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Re-render friends list to update disabled/enabled state of invite buttons
         renderFriendList();
+
+        setHostUI();
     }
 
     function backToMenu() {
@@ -639,13 +669,8 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePlayersList();
         loadFriends();
 
-        if (isHost) {
-            gameSettings.style.display = 'block';
-            startBtn.classList.add('visible');
-            startBtn.addEventListener('click', handleStartGame);
-        } else {
-            startBtn.remove();
-        }
+        setupStartButton();
+        setHostUI();
 
         if (backToMenuBtn) {
             backToMenuBtn.addEventListener('click', backToMenu);
