@@ -1657,6 +1657,29 @@ body.mobile-portrait .players-panel {
     filter: blur(2px);
 }
 
+body.mobile-landscape #gameContainer {
+    margin: 0;
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+}
+
+body.mobile-landscape .game-panel,
+body.mobile-landscape .players-panel,
+body.mobile-landscape .game-controls,
+body.mobile-landscape #emojiMessages,
+body.mobile-landscape .history-modal,
+body.mobile-landscape .modal-backdrop {
+    display: none !important;
+}
+
+body.mobile-portrait .game-panel,
+body.mobile-portrait .players-panel,
+body.mobile-portrait .game-controls,
+body.mobile-portrait #emojiMessages {
+    display: none !important;
+}
+
 /* when the messages container was inside the panel we added a top margin; no longer needed */
 .players-panel .emoji-messages {
     margin-top: 0;

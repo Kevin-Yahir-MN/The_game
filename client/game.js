@@ -169,7 +169,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let targetWidth;
         let targetHeight;
-        if (isMobile && isLandscape) {
+        if (isMobile) {
+            const padding = 8;
+            targetWidth = Math.max(320, viewportWidth - padding * 2);
+            targetHeight = Math.max(320, viewportHeight - padding * 2);
+        } else if (isLandscape) {
             const maxWidth = Math.min(1000, viewportWidth - 24);
             targetWidth = Math.max(480, maxWidth);
             targetHeight = Math.min(
