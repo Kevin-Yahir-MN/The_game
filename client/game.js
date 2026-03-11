@@ -115,6 +115,13 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
+    function isMobilePortrait() {
+        return (
+            isMobileUI() &&
+            !window.matchMedia('(orientation: landscape)').matches
+        );
+    }
+
     function updateOrientationState() {
         const isMobile = isMobileUI();
         const isLandscape = window.matchMedia('(orientation: landscape)').matches;
@@ -170,8 +177,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let targetWidth;
         let targetHeight;
         if (isMobile) {
+            const buttonReserve = 90;
             targetWidth = Math.max(320, viewportWidth);
-            targetHeight = Math.max(320, viewportHeight);
+            targetHeight = Math.max(320, viewportHeight - buttonReserve);
         } else if (isLandscape) {
             const maxWidth = Math.min(1000, viewportWidth - 24);
             targetWidth = Math.max(480, maxWidth);
@@ -200,19 +208,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 availableWidth / widthForBoard,
                 availableWidth / widthForHand
             );
-            const reservedHeightRatio = 0.34;
+            const reservedHeightRatio = isMobilePortrait() ? 0.4 : 0.34;
             const scaleHeight =
-                (targetHeight * (1 - reservedHeightRatio)) / (2 * 120);
+                (targetHeight * (1 - reservedHeightRatio)) /
+                (isMobilePortrait() ? 3 * 120 : 2 * 120);
             scaleBase = Math.min(scaleWidth, scaleHeight);
         }
-        const scale = isMobile ? Math.max(0.5, Math.min(1.02, scaleBase * 0.95)) : scaleBase;
+        const scale = isMobile
+            ? Math.max(0.5, Math.min(0.98, scaleBase * 0.92))
+            : scaleBase;
         CARD_WIDTH = Math.round(80 * scale);
         CARD_HEIGHT = Math.round(120 * scale);
         COLUMN_SPACING = Math.max(18, Math.round(60 * scale));
         CARD_SPACING = Math.max(6, Math.round(12 * scale));
 
-        const boardTop = Math.round(canvas.height * (isMobile ? 0.18 : 0.3));
-        const playerGap = Math.round(canvas.height * (isMobile ? 0.08 : 0.06));
+        const boardTop = Math.round(canvas.height * (isMobilePortrait() ? 0.12 : isMobile ? 0.18 : 0.3));
+        const playerGap = Math.round(canvas.height * (isMobilePortrait() ? 0.06 : isMobile ? 0.08 : 0.06));
         BOARD_POSITION = {
             x:
                 canvas.width / 2 -
@@ -220,7 +231,11 @@ document.addEventListener('DOMContentLoaded', () => {
             y: boardTop,
         };
         PLAYER_CARDS_Y = Math.round(
-            isMobile ? boardTop + CARD_HEIGHT + playerGap : canvas.height * 0.6
+            isMobilePortrait()
+                ? boardTop + CARD_HEIGHT + playerGap
+                : isMobile
+                    ? boardTop + CARD_HEIGHT + playerGap
+                    : canvas.height * 0.6
         );
         BUTTONS_Y = Math.round(canvas.height * (isMobile ? 0.9 : 0.85));
         HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 12;
@@ -1900,13 +1915,72 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawPlayerCards() {
         const cardCount = gameState.yourCards.length;
         const availableWidth = canvas.width - 20;
+        const backgroundHeight = CARD_HEIGHT + 30;
+
+        if (isMobilePortrait() && cardCount > 0) {
+            const row1Count = Math.ceil(cardCount / 2);
+            const row2Count = cardCount - row1Count;
+            const rowGap = Math.max(10, Math.round(CARD_HEIGHT * 0.22));
+            const row1Spacing =
+                row1Count > 1
+                    ? (availableWidth - row1Count * CARD_WIDTH) /
+                      (row1Count - 1)
+                    : 0;
+            const row2Spacing =
+                row2Count > 1
+                    ? (availableWidth - row2Count * CARD_WIDTH) /
+                      (row2Count - 1)
+                    : 0;
+            const row1Start =
+                (canvas.width -
+                    (row1Count * CARD_WIDTH +
+                        (row1Count - 1) * row1Spacing)) /
+                2;
+            const row2Start =
+                (canvas.width -
+                    (row2Count * CARD_WIDTH +
+                        (row2Count - 1) * row2Spacing)) /
+                2;
+            const row1Y = PLAYER_CARDS_Y;
+            const row2Y = PLAYER_CARDS_Y + CARD_HEIGHT + rowGap;
+            const totalHeight = CARD_HEIGHT * (row2Count > 0 ? 2 : 1) +
+                rowGap + 30;
+            const backgroundWidth = canvas.width - 20;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.beginPath();
+            ctx.roundRect(
+                10,
+                PLAYER_CARDS_Y - 15,
+                backgroundWidth,
+                totalHeight,
+                15
+            );
+            ctx.fill();
+            markDirty(10, PLAYER_CARDS_Y - 15, backgroundWidth, totalHeight);
+
+            gameState.yourCards.forEach((card, index) => {
+                if (card && card !== dragStartCard) {
+                    if (index < row1Count) {
+                        card.x = row1Start + index * (CARD_WIDTH + row1Spacing);
+                        card.y = row1Y;
+                    } else {
+                        const rowIndex = index - row1Count;
+                        card.x = row2Start + rowIndex * (CARD_WIDTH + row2Spacing);
+                        card.y = row2Y;
+                    }
+                    card.draw();
+                }
+            });
+            return;
+        }
+
         const maxSpacing =
             cardCount > 1
                 ? (availableWidth - cardCount * CARD_WIDTH) /
                   (cardCount - 1)
                 : CARD_SPACING;
         const spacing = Math.max(4, maxSpacing);
-        const backgroundHeight = CARD_HEIGHT + 30;
         const backgroundWidth =
             cardCount * (CARD_WIDTH + spacing) + 40;
 

@@ -1647,7 +1647,7 @@ body.modal-open {
     color: rgba(236, 240, 241, 0.8);
 }
 
-body.mobile-portrait .rotate-overlay {
+body.mobile-landscape .rotate-overlay {
     display: flex;
 }
 
@@ -1666,7 +1666,6 @@ body.mobile-landscape #gameContainer {
 
 body.mobile-landscape .game-panel,
 body.mobile-landscape .players-panel,
-body.mobile-landscape .game-controls,
 body.mobile-landscape #emojiMessages,
 body.mobile-landscape .history-modal,
 body.mobile-landscape .modal-backdrop {
@@ -1675,9 +1674,19 @@ body.mobile-landscape .modal-backdrop {
 
 body.mobile-portrait .game-panel,
 body.mobile-portrait .players-panel,
-body.mobile-portrait .game-controls,
 body.mobile-portrait #emojiMessages {
     display: none !important;
+}
+
+body.mobile-portrait .game-controls {
+    display: flex !important;
+    position: fixed;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    width: calc(100% - 24px);
+    justify-content: center;
+    background: rgba(42, 52, 65, 0.9);
 }
 
 /* when the messages container was inside the panel we added a top margin; no longer needed */
