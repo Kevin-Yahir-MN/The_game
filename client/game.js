@@ -205,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 (targetHeight * (1 - reservedHeightRatio)) / (2 * 120);
             scaleBase = Math.min(scaleWidth, scaleHeight);
         }
-        const scale = isMobile ? Math.max(0.5, Math.min(1.15, scaleBase)) : scaleBase;
+        const scale = isMobile ? Math.max(0.5, Math.min(1.02, scaleBase * 0.95)) : scaleBase;
         CARD_WIDTH = Math.round(80 * scale);
         CARD_HEIGHT = Math.round(120 * scale);
         COLUMN_SPACING = Math.max(18, Math.round(60 * scale));
@@ -1905,7 +1905,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? (availableWidth - cardCount * CARD_WIDTH) /
                   (cardCount - 1)
                 : CARD_SPACING;
-        const spacing = Math.max(4, Math.min(CARD_SPACING, maxSpacing));
+        const spacing = Math.max(4, maxSpacing);
         const backgroundHeight = CARD_HEIGHT + 30;
         const backgroundWidth =
             cardCount * (CARD_WIDTH + spacing) + 40;
