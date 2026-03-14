@@ -2060,7 +2060,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         Promise.all([
-            loadAsset('cards-icon.png')
+            loadAsset('/assets/cards-icon.png')
                 .then((img) => {
                     if (img) historyIcon = img;
                 })

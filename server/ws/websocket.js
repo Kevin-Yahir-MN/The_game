@@ -41,7 +41,7 @@ const { flushSaveGameState } = require('../services/persistence');
 // necesitamos autenticación para conexiones de lobby
 const { getUserFromToken } = require('../services/authService');
 const { createDefaultHistory, normalizeHistory } = require('../utils/history');
-const { parseWsMessage } = require('../utils/ws');
+const { parseWsMessage } = require('./messageParser');
 
 // mapa simple para clientes en el lobby (no en una sala)
 const lobbyClients = new Map(); // key = userId or lobbyId -> { ws, userId, displayName }

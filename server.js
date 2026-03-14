@@ -20,7 +20,7 @@ const { setupWebSocket } = require('./server/ws/websocket.js');
 const {
     cleanupExpiredSessions,
 } = require('./server/services/authService.js');
-const logger = require('./src/logger.js');
+const logger = require('./server/utils/logger.js');
 
 const redisClient = redis.createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -51,7 +51,31 @@ app.use(cookieParser());
 app.use(compression());
 app.use(express.json({ limit: '64kb' }));
 app.use(express.static(path.join(__dirname, 'client')));
+app.use('/assets', express.static(path.join(__dirname, 'client/assets')));
 app.use('/shared', express.static(path.join(__dirname, 'shared')));
+
+const pagesDir = path.join(__dirname, 'client/pages');
+const assetsDir = path.join(__dirname, 'client/assets');
+
+app.get(['/', '/index.html'], (req, res) => {
+    res.sendFile(path.join(pagesDir, 'index.html'));
+});
+
+app.get('/sala.html', (req, res) => {
+    res.sendFile(path.join(pagesDir, 'sala.html'));
+});
+
+app.get('/game.html', (req, res) => {
+    res.sendFile(path.join(pagesDir, 'game.html'));
+});
+
+app.get('/sitemap.xml', (req, res) => {
+    res.sendFile(path.join(assetsDir, 'sitemap.xml'));
+});
+
+app.get('/google5bea87fead3cc824.html', (req, res) => {
+    res.sendFile(path.join(assetsDir, 'google5bea87fead3cc824.html'));
+});
 
 // Rate limiting for HTTP routes
 const limiter = rateLimit({
