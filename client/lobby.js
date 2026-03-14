@@ -58,6 +58,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const statGamesPlayed = document.getElementById('statGamesPlayed');
     const statWins = document.getElementById('statWins');
     const statWinStreak = document.getElementById('statWinStreak');
+    const avatarCurrent = document.getElementById('avatarCurrent');
+    const avatarOptions = document.getElementById('avatarOptions');
+
+    const AVATARS = window.APP_AVATARS?.AVATARS || [];
+    const DEFAULT_AVATAR_ID =
+        window.APP_AVATARS?.DEFAULT_AVATAR_ID || (AVATARS[0]?.id ?? '');
 
     // ---- estado y lógica de amigos ----
     let friends = [];
@@ -363,7 +369,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function saveAuth(token, user) {
         // Token is set in httpOnly cookie by server; we store user for UI
-        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+        const normalizedUser = {
+            ...user,
+            avatarId: user?.avatarId || DEFAULT_AVATAR_ID,
+        };
+        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(normalizedUser));
         localStorage.removeItem(GUEST_USER_KEY);
         refreshIdentityUI();
     }
@@ -376,6 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
             JSON.stringify({
                 displayName: name,
                 username: `guest_${name}`,
+                avatarId: DEFAULT_AVATAR_ID,
                 isGuest: true,
             })
         );
@@ -427,7 +438,10 @@ document.addEventListener('DOMContentLoaded', () => {
         activeUserContainer.style.display = isLoggedIn ? 'block' : 'none';
 
         if (isLoggedIn) {
-            activeUserLabel.textContent = identity.displayName;
+            const emoji = getAvatarEmoji(identity.avatarId);
+            activeUserLabel.textContent = emoji
+                ? `${emoji} ${identity.displayName}`
+                : identity.displayName;
             myAccountBtn.style.display = identity.isGuest ? 'none' : 'flex';
         } else {
             activeUserLabel.textContent = '-';
@@ -539,6 +553,70 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function getAvatarEmoji(avatarId) {
+        const found = AVATARS.find((avatar) => avatar.id === avatarId);
+        return found ? found.emoji : '';
+    }
+
+    function setCurrentAvatar(avatarId) {
+        if (!avatarCurrent) return;
+        const emoji = getAvatarEmoji(avatarId);
+        avatarCurrent.textContent = emoji || '🙂';
+        avatarCurrent.dataset.avatarId = avatarId || '';
+    }
+
+    function renderAvatarOptions(selectedId) {
+        if (!avatarOptions) return;
+        if (!AVATARS.length) {
+            avatarOptions.innerHTML = '<span>(sin avatares)</span>';
+            return;
+        }
+        avatarOptions.innerHTML = AVATARS.map((avatar) => {
+            const isSelected = avatar.id === selectedId;
+            return `
+                <button type="button"
+                    class="avatar-option ${isSelected ? 'is-selected' : ''}"
+                    data-avatar-id="${avatar.id}"
+                    aria-label="Avatar ${avatar.label}">
+                    ${avatar.emoji}
+                </button>
+            `;
+        }).join('');
+    }
+
+    async function updateAvatar(avatarId) {
+        if (!avatarId) return;
+        try {
+            const response = await fetchWithAuth(`${API_URL}/auth/account`, {
+                method: 'PATCH',
+                body: JSON.stringify({ avatarId }),
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success || !data.account) {
+                showError(data.message || 'No se pudo actualizar el avatar');
+                return;
+            }
+
+            const existingAuth = getAuthUser();
+            if (existingAuth) {
+                localStorage.setItem(
+                    AUTH_USER_KEY,
+                    JSON.stringify({
+                        ...existingAuth,
+                        avatarId: data.account.avatarId,
+                    })
+                );
+            }
+            setCurrentAvatar(data.account.avatarId);
+            renderAvatarOptions(data.account.avatarId);
+            refreshIdentityUI();
+            showSuccess('Avatar actualizado');
+        } catch (error) {
+            console.error('Error actualizando avatar:', error);
+            showError('Error actualizando avatar');
+        }
+    }
+
     async function loadMyAccount() {
         try {
             const response = await fetchWithAuth(`${API_URL}/auth/account`, {
@@ -558,6 +636,8 @@ document.addEventListener('DOMContentLoaded', () => {
             );
             statWins.textContent = String(account.stats?.wins || 0);
             statWinStreak.textContent = String(account.stats?.winStreak || 0);
+            setCurrentAvatar(account.avatarId || DEFAULT_AVATAR_ID);
+            renderAvatarOptions(account.avatarId || DEFAULT_AVATAR_ID);
         } catch (error) {
             console.error('Error cargando cuenta:', error);
             showError('Error cargando Mi cuenta');
@@ -591,6 +671,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         id: data.user.id,
                         username: data.user.username,
                         displayName: data.user.displayName,
+                        avatarId: data.user.avatarId || DEFAULT_AVATAR_ID,
                     };
                     localStorage.setItem(
                         AUTH_USER_KEY,
@@ -730,6 +811,17 @@ document.addEventListener('DOMContentLoaded', () => {
         closeAccountModalBtn.addEventListener('click', () => {
             toggleAccountView(false);
         });
+    }
+
+    if (avatarOptions && !avatarOptions.dataset.clickBound) {
+        avatarOptions.addEventListener('click', (event) => {
+            const target = event.target.closest('.avatar-option');
+            if (!target) return;
+            const selectedId = target.dataset.avatarId;
+            if (!selectedId) return;
+            updateAvatar(selectedId);
+        });
+        avatarOptions.dataset.clickBound = 'true';
     }
 
     document.addEventListener('keydown', (e) => {

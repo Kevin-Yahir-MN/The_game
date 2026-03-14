@@ -1234,6 +1234,63 @@ body.modal-open {
     margin-top: 0.6rem;
 }
 
+.avatar-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.avatar-current {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+    gap: 10px;
+}
+
+.avatar-option {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 22px;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.avatar-option:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.45);
+}
+
+.avatar-option.is-selected {
+    border-color: #3a86ff;
+    background: rgba(58, 134, 255, 0.2);
+}
+
+.avatar-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    margin-right: 8px;
+    font-size: 16px;
+    background: rgba(255, 255, 255, 0.12);
+}
+
 .account-modal__button--danger {
     min-height: 40px;
     padding: 0.5rem 0.9rem;

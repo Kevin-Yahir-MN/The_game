@@ -18,9 +18,11 @@ const {
     getUserFromToken,
     getAccountById,
     updateDisplayName,
+    updateAvatar,
     changePassword,
     deleteSession,
 } = require('../services/authService');
+const { DEFAULT_AVATAR_ID } = require('../../shared/avatars');
 
 const MAX_PLAYERS_PER_ROOM = 6;
 
@@ -59,7 +61,7 @@ function registerHttpRoutes(app) {
     };
 
     app.post('/auth/register', async (req, res) => {
-        const { username, password, displayName } = req.body || {};
+        const { username, password, displayName, avatarId } = req.body || {};
 
         if (
             !hasContent(username) ||
@@ -80,6 +82,7 @@ function registerHttpRoutes(app) {
                 username,
                 password,
                 displayName,
+                avatarId,
             });
             const token = await createSession(user.id);
 
@@ -91,6 +94,7 @@ function registerHttpRoutes(app) {
                     id: user.id,
                     username: user.username,
                     displayName: user.display_name,
+                    avatarId: user.avatar_id,
                 },
             });
         } catch (error) {
@@ -171,6 +175,7 @@ function registerHttpRoutes(app) {
                     id: user.id,
                     username: user.username,
                     displayName: user.display_name,
+                    avatarId: user.avatar_id,
                 },
             });
         } catch (error) {
@@ -199,6 +204,7 @@ function registerHttpRoutes(app) {
                     id: user.id,
                     username: user.username,
                     displayName: user.display_name,
+                    avatarId: user.avatar_id,
                 },
             });
         } catch (error) {
@@ -262,6 +268,7 @@ function registerHttpRoutes(app) {
                     id: account.id,
                     username: account.username,
                     displayName: account.display_name,
+                    avatarId: account.avatar_id,
                     stats: {
                         gamesPlayed: Number(account.games_played) || 0,
                         wins: Number(account.wins) || 0,
@@ -289,12 +296,16 @@ function registerHttpRoutes(app) {
                     .json({ success: false, message: 'No autenticado' });
             }
 
-            const { displayName, currentPassword, newPassword } =
+            const { displayName, currentPassword, newPassword, avatarId } =
                 req.body || {};
             let updatedAccount = null;
 
             if (hasContent(displayName)) {
                 updatedAccount = await updateDisplayName(user.id, displayName);
+            }
+
+            if (hasContent(avatarId)) {
+                updatedAccount = await updateAvatar(user.id, avatarId);
             }
 
             if (hasContent(currentPassword) || hasContent(newPassword)) {
@@ -323,6 +334,7 @@ function registerHttpRoutes(app) {
                     id: account.id,
                     username: account.username,
                     displayName: account.display_name,
+                    avatarId: account.avatar_id,
                     stats: {
                         gamesPlayed: Number(account.games_played) || 0,
                         wins: Number(account.wins) || 0,
@@ -338,7 +350,8 @@ function registerHttpRoutes(app) {
             }
             if (
                 error.code === 'INVALID_DISPLAY_NAME' ||
-                error.code === 'INVALID_PASSWORD'
+                error.code === 'INVALID_PASSWORD' ||
+                error.code === 'INVALID_AVATAR'
             ) {
                 return res
                     .status(400)
@@ -479,6 +492,7 @@ function registerHttpRoutes(app) {
                     id: account.id,
                     username: account.username,
                     displayName: account.display_name,
+                    avatarId: account.avatar_id,
                     stats: {
                         gamesPlayed: Number(account.games_played) || 0,
                         wins: Number(account.wins) || 0,
@@ -506,6 +520,7 @@ function registerHttpRoutes(app) {
         );
         const requestedName = sanitizePlayerName(req.body?.playerName);
         const playerName = requestedName || authUser?.display_name;
+        const avatarId = authUser?.avatar_id || DEFAULT_AVATAR_ID;
 
         if (!playerName) {
             return res
@@ -564,6 +579,7 @@ function registerHttpRoutes(app) {
                         name: playerName,
                         isHost: true,
                         userId: authUser?.id || null,
+                        avatarId,
                         ws: null,
                         cards: [],
                         turnState: createTurnState(),
@@ -607,6 +623,7 @@ function registerHttpRoutes(app) {
         );
         const requestedName = sanitizePlayerName(req.body?.playerName);
         const playerName = requestedName || authUser?.display_name;
+        const avatarId = authUser?.avatar_id || DEFAULT_AVATAR_ID;
         const roomId = req.body?.roomId;
 
         if (!playerName || !isValidRoomId(roomId)) {
@@ -666,6 +683,7 @@ function registerHttpRoutes(app) {
                 name: playerName,
                 isHost: false,
                 userId: authUser?.id || null,
+                avatarId,
                 ws: null,
                 cards: [],
                 turnState: createTurnState(),
@@ -766,6 +784,7 @@ function registerHttpRoutes(app) {
                 cardCount: p.cards.length,
                 connected: p.ws !== null,
                 userId: p.userId || null,
+                avatarId: p.avatarId || null,
             })),
             gameStarted: room.gameState.gameStarted,
             currentTurn: room.gameState.currentTurn,

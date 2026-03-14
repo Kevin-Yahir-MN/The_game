@@ -7,6 +7,10 @@ const {
     isValidPassword,
 } = require('../utils/validation');
 const redis = require('redis');
+const {
+    DEFAULT_AVATAR_ID,
+    isValidAvatarId,
+} = require('../../shared/avatars');
 
 const TOKEN_TTL_DAYS = 30;
 
@@ -62,9 +66,12 @@ function getTokenFromRequest(req) {
     return req.cookies?.authToken || req.headers.authorization?.split(' ')[1];
 }
 
-async function registerUser({ username, password, displayName }) {
+async function registerUser({ username, password, displayName, avatarId }) {
     const normalizedUsername = normalizeUsername(username);
     const normalizedDisplayName = normalizeDisplayName(displayName);
+    const normalizedAvatarId = isValidAvatarId(avatarId)
+        ? avatarId
+        : DEFAULT_AVATAR_ID;
     if (!isValidUsername(normalizedUsername)) {
         const error = new Error('Nombre de usuario inválido');
         error.code = 'INVALID_USERNAME';
@@ -106,10 +113,16 @@ async function registerUser({ username, password, displayName }) {
 
         const passwordHash = hashPassword(password);
         const insertResult = await client.query(
-            `INSERT INTO users (id, username, password_hash, display_name, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, NOW(), NOW())
-             RETURNING id, username, display_name, created_at`,
-            [uuidv4(), normalizedUsername, passwordHash, normalizedDisplayName]
+            `INSERT INTO users (id, username, password_hash, display_name, avatar_id, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+             RETURNING id, username, display_name, avatar_id, created_at`,
+            [
+                uuidv4(),
+                normalizedUsername,
+                passwordHash,
+                normalizedDisplayName,
+                normalizedAvatarId,
+            ]
         );
 
         return insertResult.rows[0];
@@ -119,7 +132,7 @@ async function registerUser({ username, password, displayName }) {
 async function loginUser({ username, password }) {
     const normalizedUsername = normalizeUsername(username);
     const result = await pool.query(
-        `SELECT id, username, display_name, password_hash
+        `SELECT id, username, display_name, avatar_id, password_hash
          FROM users
          WHERE username = $1`,
         [normalizedUsername]
@@ -138,6 +151,7 @@ async function loginUser({ username, password }) {
         id: user.id,
         username: user.username,
         display_name: user.display_name,
+        avatar_id: user.avatar_id,
     };
 }
 
@@ -172,7 +186,7 @@ async function getUserFromToken(token) {
     if (!token) return null;
 
     const result = await pool.query(
-        `SELECT u.id, u.username, u.display_name
+        `SELECT u.id, u.username, u.display_name, u.avatar_id
          FROM user_sessions s
          INNER JOIN users u ON u.id = s.user_id
          WHERE s.token = $1 AND s.expires_at > NOW()`,
@@ -196,7 +210,7 @@ async function getAccountById(userId) {
     }
 
     const result = await pool.query(
-        `SELECT id, username, display_name, games_played, wins, win_streak
+        `SELECT id, username, display_name, avatar_id, games_played, wins, win_streak
          FROM users
          WHERE id = $1`,
         [userId]
@@ -206,7 +220,7 @@ async function getAccountById(userId) {
         const account = result.rows[0];
         if (redisConnected) {
             try {
-                await redisClient.setEx(cacheKey, 300, JSON.stringify(account)); // Cache for 5 minutes
+            await redisClient.setEx(cacheKey, 300, JSON.stringify(account)); // Cache for 5 minutes
             } catch (err) {
                 console.warn('Redis set error:', err);
             }
@@ -242,7 +256,7 @@ async function updateDisplayName(userId, displayName) {
              SET display_name = $1,
                  updated_at = NOW()
              WHERE id = $2
-             RETURNING id, username, display_name, games_played, wins, win_streak`,
+             RETURNING id, username, display_name, avatar_id, games_played, wins, win_streak`,
             [normalizedDisplayName, userId]
         );
 
@@ -258,6 +272,33 @@ async function updateDisplayName(userId, displayName) {
 
         return result.rowCount > 0 ? result.rows[0] : null;
     });
+}
+
+async function updateAvatar(userId, avatarId) {
+    if (!isValidAvatarId(avatarId)) {
+        const error = new Error('Avatar inválido');
+        error.code = 'INVALID_AVATAR';
+        throw error;
+    }
+
+    const result = await pool.query(
+        `UPDATE users
+         SET avatar_id = $1,
+             updated_at = NOW()
+         WHERE id = $2
+         RETURNING id, username, display_name, avatar_id, games_played, wins, win_streak`,
+        [avatarId, userId]
+    );
+
+    if (result.rowCount > 0 && redisConnected) {
+        try {
+            await redisClient.del(`user:${userId}`);
+        } catch (err) {
+            console.warn('Redis del error:', err);
+        }
+    }
+
+    return result.rowCount > 0 ? result.rows[0] : null;
 }
 
 async function changePassword(userId, currentPassword, newPassword) {
@@ -394,6 +435,7 @@ module.exports = {
     getUserFromToken,
     getAccountById,
     updateDisplayName,
+    updateAvatar,
     changePassword,
     recordUsersGameResult,
     deleteSession,

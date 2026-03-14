@@ -295,6 +295,7 @@ function setupWebSocket(server) {
                     cardCount: p.cards.length,
                     connected: p.ws?.readyState === WebSocket.OPEN,
                     userId: p.userId || null,
+                    avatarId: p.avatarId || null,
                 })),
             },
             history: normalizeHistory(boardHistory.get(roomId)),
@@ -310,7 +311,8 @@ function setupWebSocket(server) {
                 cardCount: p.cards.length,
                 cardsPlayedThisTurn: getPlayerTurnCount(p),
                 connected: p.ws?.readyState === WebSocket.OPEN,
-                userId: p.userId || null,
+                    userId: p.userId || null,
+                    avatarId: p.avatarId || null,
             }));
         }
 
@@ -324,7 +326,8 @@ function setupWebSocket(server) {
                 name: p.name,
                 isHost: p.isHost,
                 connected: p.ws?.readyState === WebSocket.OPEN,
-                userId: p.userId || null,
+                    userId: p.userId || null,
+                    avatarId: p.avatarId || null,
             })),
         });
 
@@ -382,6 +385,7 @@ function setupWebSocket(server) {
                             players: room.players.map((p) => ({
                                 id: p.id,
                                 name: p.name,
+                                avatarId: p.avatarId || null,
                                 isHost: p.isHost,
                                 cardCount: p.cards?.length || 0,
                                 cardsPlayedThisTurn: getPlayerTurnCount(p),
@@ -600,6 +604,7 @@ function setupWebSocket(server) {
                             players: room.players.map((p) => ({
                                 id: p.id,
                                 name: p.name,
+                                avatarId: p.avatarId || null,
                                 isHost: p.isHost,
                                 cardCount: p.cards.length,
                             })),
@@ -711,6 +716,7 @@ function setupWebSocket(server) {
                                 players: room.players.map((p) => ({
                                     id: p.id,
                                     name: p.name,
+                                    avatarId: p.avatarId || null,
                                     isHost: p.isHost,
                                     cards: p.cards,
                                     cardsPlayedThisTurn: getPlayerTurnCount(p),
@@ -811,6 +817,7 @@ function setupWebSocket(server) {
                         isHost: p.isHost,
                         connected: p.ws?.readyState === WebSocket.OPEN,
                         userId: p.userId || null,
+                        avatarId: p.avatarId || null,
                     })),
                 });
             }

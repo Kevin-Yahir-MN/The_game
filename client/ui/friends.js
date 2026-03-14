@@ -1,4 +1,10 @@
 (() => {
+    function getAvatarEmoji(avatarId) {
+        const avatars = window.APP_AVATARS?.AVATARS || [];
+        const found = avatars.find((avatar) => avatar.id === avatarId);
+        return found ? found.emoji : '';
+    }
+
     function renderFriendList({
         container,
         friends,
@@ -24,7 +30,11 @@
                 const inviteBtn = showInvite
                     ? `<button class="invite-friend-btn" ${disabledAttr} ${titleAttr} data-friend-id="${friend.id}" data-friend-name="${friend.displayName}">Invitar</button>`
                     : '';
-                return `<li data-friend-id="${friend.id}"><span class="friend-name" data-friend-id="${friend.id}">${friend.displayName}</span> ${inviteBtn}</li>`;
+                const avatarEmoji = getAvatarEmoji(friend.avatarId);
+                const avatarSpan = avatarEmoji
+                    ? `<span class="avatar-chip" aria-hidden="true">${avatarEmoji}</span>`
+                    : '';
+                return `<li data-friend-id="${friend.id}">${avatarSpan}<span class="friend-name" data-friend-id="${friend.id}">${friend.displayName}</span> ${inviteBtn}</li>`;
             })
             .join('');
 
@@ -100,8 +110,11 @@
                             return;
                         }
                         const stats = account.stats || {};
-                        modalFriendName.textContent =
-                            account.displayName || fallbackName || 'Amigo';
+                        const name = account.displayName || fallbackName || 'Amigo';
+                        const avatarEmoji = getAvatarEmoji(account.avatarId);
+                        modalFriendName.textContent = avatarEmoji
+                            ? `${avatarEmoji} ${name}`
+                            : name;
                         modalGamesPlayed.textContent =
                             stats.gamesPlayed ?? '-';
                         modalWins.textContent = stats.wins ?? '-';

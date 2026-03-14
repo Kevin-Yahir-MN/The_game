@@ -4,7 +4,7 @@ const { pool, withTransaction } = require('../db');
 async function getFriends(userId) {
     if (!userId) return [];
     const result = await pool.query(
-        `SELECT u.id, u.username, u.display_name
+        `SELECT u.id, u.username, u.display_name, u.avatar_id
          FROM friends f
          JOIN users u ON u.id = f.friend_id
          WHERE f.user_id = $1
@@ -15,6 +15,7 @@ async function getFriends(userId) {
         id: r.id,
         username: r.username,
         displayName: r.display_name,
+        avatarId: r.avatar_id,
     }));
 }
 

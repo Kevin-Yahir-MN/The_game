@@ -6,6 +6,14 @@ document.addEventListener('DOMContentLoaded', () => {
         window.APP_CONFIG?.PROD_WS_URL ||
         'wss://the-game-2xks.onrender.com';
     const PLAYER_UPDATE_INTERVAL = 5000;
+    const AVATARS = window.APP_AVATARS?.AVATARS || [];
+    const DEFAULT_AVATAR_ID =
+        window.APP_AVATARS?.DEFAULT_AVATAR_ID || (AVATARS[0]?.id ?? '');
+
+    function getAvatarEmoji(avatarId) {
+        const found = AVATARS.find((avatar) => avatar.id === avatarId);
+        return found ? found.emoji : '';
+    }
 
     // --- autenticación ligera para manejo de amigos ---
     function getAuthToken() {
@@ -511,9 +519,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         extraButton = ` <button class="add-friend-btn" data-userid="${player.userId}">Agregar amigo</button>`;
                     }
                 }
+                const avatarEmoji = getAvatarEmoji(player.avatarId);
+                const avatarSpan = avatarEmoji
+                    ? `<span class="avatar-chip" aria-hidden="true">${avatarEmoji}</span>`
+                    : '';
                 return `
-            <li class="${player.isHost ? 'host' : ''} ${isMe ? 'you' : ''}">
-                <span class="player-name">${player.name || 'Jugador'}</span>
+            <li class="${player.isHost ? 'host' : ''} ${isMe ? 'you' : ''}" data-avatar-id="${player.avatarId || ''}">
+                ${avatarSpan}<span class="player-name">${player.name || 'Jugador'}</span>
                 ${player.isHost ? '<span class="host-tag">(Host)</span>' : ''}
                 ${isMe ? '<span class="you-tag">(Tú)</span>' : ''}
                 <span class="connection-status">${player.connected ? '🟢' : '🔴'}</span>
@@ -541,6 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             displayName: btn
                                 .closest('li')
                                 .querySelector('.player-name').textContent,
+                            avatarId: btn.closest('li').dataset.avatarId || null,
                         });
                         renderFriendList();
                         updatePlayersUI(currentPlayers); // rerender to remove button

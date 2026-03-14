@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const endTurnButton = document.getElementById('endTurnBtn');
     const GAME_RULES = window.GAME_RULES;
     const emojiButtonsContainer = document.getElementById('emojiButtons');
+    const AVATARS = window.APP_AVATARS?.AVATARS || [];
     // throttle for incoming full-state updates (ms). set to 0 to process every message immediately
     const STATE_UPDATE_THROTTLE = 0;
     // reposition floating emoji messages when the window resizes
@@ -137,6 +138,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function log(message, data) {
         console.log(`[${new Date().toISOString()}] ${message}`, data);
+    }
+
+    function getAvatarEmoji(avatarId) {
+        const found = AVATARS.find((avatar) => avatar.id === avatarId);
+        return found ? found.emoji : '';
     }
 
     class Card {
@@ -1812,11 +1818,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const cardCount =
                         player.cardCount ||
                         (player.cards ? player.cards.length : 0);
+                    const avatarEmoji = getAvatarEmoji(player.avatarId);
+                    const avatarSpan = avatarEmoji
+                        ? `<span class="avatar-chip" aria-hidden="true">${avatarEmoji}</span>`
+                        : '';
 
                     return `
                         <li class="${player.id === currentPlayer.id ? 'you' : ''} 
                                    ${player.id === gameState.currentTurn ? 'current-turn' : ''}">
-                            <span class="player-name">${displayName}</span>
+                            ${avatarSpan}<span class="player-name">${displayName}</span>
                             <span class="card-count">🃏 ${cardCount}</span>
                             ${player.isHost ? ' <span class="host-tag">(Host)</span>' : ''}
                         </li>
