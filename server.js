@@ -5,7 +5,6 @@ const compression = require('compression');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
-const redis = require('redis');
 
 const { PORT, allowedOrigins } = require('./server/config.js');
 const {
@@ -21,13 +20,6 @@ const {
     cleanupExpiredSessions,
 } = require('./server/services/authService.js');
 const logger = require('./server/utils/logger.js');
-
-const redisClient = redis.createClient({
-    url: process.env.REDIS_URL || 'redis://localhost:6379',
-});
-redisClient
-    .connect()
-    .catch((err) => logger.error('Redis connection error:', err));
 
 let hasInitialized = false;
 

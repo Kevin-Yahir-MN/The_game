@@ -10,15 +10,18 @@ const redis = require('redis');
 
 const TOKEN_TTL_DAYS = 30;
 
-const redisClient = redis.createClient({
-    url: process.env.REDIS_URL || 'redis://localhost:6379',
-});
+const redisUrl = process.env.REDIS_URL;
+let redisClient = null;
 let redisConnected = false;
-redisClient
-    .connect()
-    .then(() => { redisConnected = true; })
-    .catch((err) => console.error('Redis connection error:', err));
-redisClient.on('error', () => { redisConnected = false; });
+
+if (redisUrl) {
+    redisClient = redis.createClient({ url: redisUrl });
+    redisClient
+        .connect()
+        .then(() => { redisConnected = true; })
+        .catch((err) => console.error('Redis connection error:', err));
+    redisClient.on('error', () => { redisConnected = false; });
+}
 
 function normalizeUsername(username) {
     if (typeof username !== 'string') return '';
