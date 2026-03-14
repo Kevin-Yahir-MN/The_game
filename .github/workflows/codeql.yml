@@ -2,9 +2,9 @@ name: CodeQL
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
   schedule:
     - cron: "0 3 * * 0"
 
@@ -12,6 +12,7 @@ jobs:
   analyze:
     name: Analyze (javascript)
     runs-on: ubuntu-latest
+    if: ${{ github.event.repository.private == false || vars.CODEQL_ENABLED == 'true' }}
     permissions:
       actions: read
       contents: read
