@@ -663,7 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (!response.ok || !data.success || !data.account) {
                 showError(data.message || 'No se pudo subir el avatar');
-                return;
+                return null;
             }
 
             const existingAuth = getAuthUser();
@@ -685,9 +685,11 @@ document.addEventListener('DOMContentLoaded', () => {
             renderAvatarOptions(data.account.avatarId || DEFAULT_AVATAR_ID);
             refreshIdentityUI();
             showSuccess('Avatar actualizado');
+            return data.account;
         } catch (error) {
             console.error('Error subiendo avatar:', error);
             showError('Error subiendo avatar');
+            return null;
         } finally {
             setButtonLoading(uploadAvatarBtn, false, 'Subiendo...', 'Subir imagen');
             if (avatarUploadInput) avatarUploadInput.value = '';
@@ -950,11 +952,13 @@ document.addEventListener('DOMContentLoaded', () => {
         avatarUploadInput.addEventListener('change', () => {
             const file = avatarUploadInput.files?.[0];
             if (!file) return;
+            const existingAuth = getAuthUser();
+            const previousAvatarId = existingAuth?.avatarId || DEFAULT_AVATAR_ID;
+            const previousAvatarUrl = existingAuth?.avatarUrl || null;
             let previewUrl = '';
             try {
                 previewUrl = URL.createObjectURL(file);
                 setCurrentAvatar(DEFAULT_AVATAR_ID, previewUrl);
-                const existingAuth = getAuthUser();
                 if (existingAuth) {
                     localStorage.setItem(
                         AUTH_USER_KEY,
@@ -968,7 +972,22 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (err) {
                 console.warn('No se pudo previsualizar el avatar', err);
             }
-            uploadAvatarFile(file).finally(() => {
+            uploadAvatarFile(file).then((account) => {
+                if (!account) {
+                    setCurrentAvatar(previousAvatarId, previousAvatarUrl);
+                    if (existingAuth) {
+                        localStorage.setItem(
+                            AUTH_USER_KEY,
+                            JSON.stringify({
+                                ...existingAuth,
+                                avatarId: previousAvatarId,
+                                avatarUrl: previousAvatarUrl,
+                            })
+                        );
+                    }
+                    refreshIdentityUI();
+                }
+            }).finally(() => {
                 if (previewUrl) {
                     URL.revokeObjectURL(previewUrl);
                 }
