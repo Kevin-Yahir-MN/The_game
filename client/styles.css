@@ -1518,7 +1518,7 @@ body.modal-open {
     background: #2ecc71;
     color: white;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    z-index: 1300;
+    z-index: 5000;
     opacity: 1;
     transition: opacity 0.3s ease;
     animation: slideIn 0.3s ease-out;
