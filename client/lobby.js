@@ -950,13 +950,29 @@ document.addEventListener('DOMContentLoaded', () => {
         avatarUploadInput.addEventListener('change', () => {
             const file = avatarUploadInput.files?.[0];
             if (!file) return;
+            let previewUrl = '';
             try {
-                const previewUrl = URL.createObjectURL(file);
+                previewUrl = URL.createObjectURL(file);
                 setCurrentAvatar(DEFAULT_AVATAR_ID, previewUrl);
+                const existingAuth = getAuthUser();
+                if (existingAuth) {
+                    localStorage.setItem(
+                        AUTH_USER_KEY,
+                        JSON.stringify({
+                            ...existingAuth,
+                            avatarUrl: previewUrl,
+                        })
+                    );
+                }
+                refreshIdentityUI();
             } catch (err) {
                 console.warn('No se pudo previsualizar el avatar', err);
             }
-            uploadAvatarFile(file);
+            uploadAvatarFile(file).finally(() => {
+                if (previewUrl) {
+                    URL.revokeObjectURL(previewUrl);
+                }
+            });
         });
     }
 
