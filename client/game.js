@@ -145,6 +145,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return found ? found.emoji : '';
     }
 
+    function getAvatarMarkup(avatarId, avatarUrl) {
+        if (avatarUrl) {
+            return `<img class="avatar-img" src="${avatarUrl}" alt="" />`;
+        }
+        const emoji = getAvatarEmoji(avatarId);
+        return emoji
+            ? `<span class="avatar-chip" aria-hidden="true">${emoji}</span>`
+            : '';
+    }
+
     class Card {
         constructor(value, x, y, isPlayable = false, isPlayedThisTurn = false) {
             this.value = typeof value === 'number' ? value : 0;
@@ -1818,10 +1828,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const cardCount =
                         player.cardCount ||
                         (player.cards ? player.cards.length : 0);
-                    const avatarEmoji = getAvatarEmoji(player.avatarId);
-                    const avatarSpan = avatarEmoji
-                        ? `<span class="avatar-chip" aria-hidden="true">${avatarEmoji}</span>`
-                        : '';
+                    const avatarSpan = getAvatarMarkup(
+                        player.avatarId,
+                        player.avatarUrl
+                    );
 
                     return `
                         <li class="${player.id === currentPlayer.id ? 'you' : ''} 

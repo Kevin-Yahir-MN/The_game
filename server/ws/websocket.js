@@ -296,6 +296,7 @@ function setupWebSocket(server) {
                     connected: p.ws?.readyState === WebSocket.OPEN,
                     userId: p.userId || null,
                     avatarId: p.avatarId || null,
+                    avatarUrl: p.avatarUrl || null,
                 })),
             },
             history: normalizeHistory(boardHistory.get(roomId)),
@@ -313,6 +314,7 @@ function setupWebSocket(server) {
                 connected: p.ws?.readyState === WebSocket.OPEN,
                     userId: p.userId || null,
                     avatarId: p.avatarId || null,
+                    avatarUrl: p.avatarUrl || null,
             }));
         }
 
@@ -328,6 +330,7 @@ function setupWebSocket(server) {
                 connected: p.ws?.readyState === WebSocket.OPEN,
                     userId: p.userId || null,
                     avatarId: p.avatarId || null,
+                    avatarUrl: p.avatarUrl || null,
             })),
         });
 
@@ -386,6 +389,7 @@ function setupWebSocket(server) {
                                 id: p.id,
                                 name: p.name,
                                 avatarId: p.avatarId || null,
+                                avatarUrl: p.avatarUrl || null,
                                 isHost: p.isHost,
                                 cardCount: p.cards?.length || 0,
                                 cardsPlayedThisTurn: getPlayerTurnCount(p),
@@ -605,6 +609,7 @@ function setupWebSocket(server) {
                                 id: p.id,
                                 name: p.name,
                                 avatarId: p.avatarId || null,
+                                avatarUrl: p.avatarUrl || null,
                                 isHost: p.isHost,
                                 cardCount: p.cards.length,
                             })),
@@ -717,6 +722,7 @@ function setupWebSocket(server) {
                                     id: p.id,
                                     name: p.name,
                                     avatarId: p.avatarId || null,
+                                    avatarUrl: p.avatarUrl || null,
                                     isHost: p.isHost,
                                     cards: p.cards,
                                     cardsPlayedThisTurn: getPlayerTurnCount(p),
@@ -818,6 +824,7 @@ function setupWebSocket(server) {
                         connected: p.ws?.readyState === WebSocket.OPEN,
                         userId: p.userId || null,
                         avatarId: p.avatarId || null,
+                        avatarUrl: p.avatarUrl || null,
                     })),
                 });
             }

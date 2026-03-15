@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 const compression = require('compression');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -45,6 +46,14 @@ app.use(express.json({ limit: '64kb' }));
 app.use(express.static(path.join(__dirname, 'client')));
 app.use('/assets', express.static(path.join(__dirname, 'client/assets')));
 app.use('/shared', express.static(path.join(__dirname, 'shared')));
+
+const uploadsRoot =
+    process.env.UPLOADS_DIR
+        ? path.resolve(__dirname, process.env.UPLOADS_DIR)
+        : path.join(__dirname, 'uploads');
+const uploadsAvatarsDir = path.join(uploadsRoot, 'avatars');
+fs.mkdirSync(uploadsAvatarsDir, { recursive: true });
+app.use('/uploads', express.static(uploadsRoot));
 
 const pagesDir = path.join(__dirname, 'client/pages');
 const assetsDir = path.join(__dirname, 'client/assets');

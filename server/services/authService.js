@@ -113,9 +113,9 @@ async function registerUser({ username, password, displayName, avatarId }) {
 
         const passwordHash = hashPassword(password);
         const insertResult = await client.query(
-            `INSERT INTO users (id, username, password_hash, display_name, avatar_id, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-             RETURNING id, username, display_name, avatar_id, created_at`,
+            `INSERT INTO users (id, username, password_hash, display_name, avatar_id, avatar_url, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, NULL, NOW(), NOW())
+             RETURNING id, username, display_name, avatar_id, avatar_url, created_at`,
             [
                 uuidv4(),
                 normalizedUsername,
@@ -132,7 +132,7 @@ async function registerUser({ username, password, displayName, avatarId }) {
 async function loginUser({ username, password }) {
     const normalizedUsername = normalizeUsername(username);
     const result = await pool.query(
-        `SELECT id, username, display_name, avatar_id, password_hash
+        `SELECT id, username, display_name, avatar_id, avatar_url, password_hash
          FROM users
          WHERE username = $1`,
         [normalizedUsername]
@@ -152,6 +152,7 @@ async function loginUser({ username, password }) {
         username: user.username,
         display_name: user.display_name,
         avatar_id: user.avatar_id,
+        avatar_url: user.avatar_url,
     };
 }
 
@@ -186,7 +187,7 @@ async function getUserFromToken(token) {
     if (!token) return null;
 
     const result = await pool.query(
-        `SELECT u.id, u.username, u.display_name, u.avatar_id
+        `SELECT u.id, u.username, u.display_name, u.avatar_id, u.avatar_url
          FROM user_sessions s
          INNER JOIN users u ON u.id = s.user_id
          WHERE s.token = $1 AND s.expires_at > NOW()`,
@@ -210,7 +211,7 @@ async function getAccountById(userId) {
     }
 
     const result = await pool.query(
-        `SELECT id, username, display_name, avatar_id, games_played, wins, win_streak
+        `SELECT id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak
          FROM users
          WHERE id = $1`,
         [userId]
@@ -256,7 +257,7 @@ async function updateDisplayName(userId, displayName) {
              SET display_name = $1,
                  updated_at = NOW()
              WHERE id = $2
-             RETURNING id, username, display_name, avatar_id, games_played, wins, win_streak`,
+             RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak`,
             [normalizedDisplayName, userId]
         );
 
@@ -284,10 +285,59 @@ async function updateAvatar(userId, avatarId) {
     const result = await pool.query(
         `UPDATE users
          SET avatar_id = $1,
+             avatar_url = NULL,
              updated_at = NOW()
          WHERE id = $2
-         RETURNING id, username, display_name, avatar_id, games_played, wins, win_streak`,
+         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak`,
         [avatarId, userId]
+    );
+
+    if (result.rowCount > 0 && redisConnected) {
+        try {
+            await redisClient.del(`user:${userId}`);
+        } catch (err) {
+            console.warn('Redis del error:', err);
+        }
+    }
+
+    return result.rowCount > 0 ? result.rows[0] : null;
+}
+
+async function updateAvatarUrl(userId, avatarUrl) {
+    if (!avatarUrl || typeof avatarUrl !== 'string') {
+        const error = new Error('Avatar inválido');
+        error.code = 'INVALID_AVATAR';
+        throw error;
+    }
+
+    const result = await pool.query(
+        `UPDATE users
+         SET avatar_url = $1,
+             updated_at = NOW()
+         WHERE id = $2
+         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak`,
+        [avatarUrl, userId]
+    );
+
+    if (result.rowCount > 0 && redisConnected) {
+        try {
+            await redisClient.del(`user:${userId}`);
+        } catch (err) {
+            console.warn('Redis del error:', err);
+        }
+    }
+
+    return result.rowCount > 0 ? result.rows[0] : null;
+}
+
+async function clearAvatarUrl(userId) {
+    const result = await pool.query(
+        `UPDATE users
+         SET avatar_url = NULL,
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak`,
+        [userId]
     );
 
     if (result.rowCount > 0 && redisConnected) {
@@ -436,6 +486,8 @@ module.exports = {
     getAccountById,
     updateDisplayName,
     updateAvatar,
+    updateAvatarUrl,
+    clearAvatarUrl,
     changePassword,
     recordUsersGameResult,
     deleteSession,

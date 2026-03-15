@@ -1258,6 +1258,17 @@ body.modal-open {
     gap: 10px;
 }
 
+.avatar-upload {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.avatar-upload input[type='file'] {
+    max-width: 240px;
+}
+
 .avatar-option {
     width: 44px;
     height: 44px;
@@ -1289,6 +1300,22 @@ body.modal-open {
     margin-right: 8px;
     font-size: 16px;
     background: rgba(255, 255, 255, 0.12);
+}
+
+.avatar-img {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    margin-right: 8px;
+    object-fit: cover;
+    display: inline-block;
+}
+
+.avatar-current .avatar-img {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    margin-right: 0;
 }
 
 .account-modal__button--danger {

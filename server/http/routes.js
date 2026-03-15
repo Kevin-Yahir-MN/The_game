@@ -1,5 +1,9 @@
 // src/http/routes.js
 const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const sharp = require('sharp');
 const { pool, withTransaction, generateUniqueRoomId } = require('../db');
 const { rooms, reverseRoomMap, boardHistory } = require('../state');
 const { sanitizePlayerName, isValidRoomId } = require('../utils/validation');
@@ -19,12 +23,44 @@ const {
     getAccountById,
     updateDisplayName,
     updateAvatar,
+    updateAvatarUrl,
+    clearAvatarUrl,
     changePassword,
     deleteSession,
 } = require('../services/authService');
 const { DEFAULT_AVATAR_ID } = require('../../shared/avatars');
 
 const MAX_PLAYERS_PER_ROOM = 6;
+const uploadsRoot = process.env.UPLOADS_DIR
+    ? path.resolve(__dirname, '../../', process.env.UPLOADS_DIR)
+    : path.join(__dirname, '../../uploads');
+const avatarsDir = path.join(uploadsRoot, 'avatars');
+fs.mkdirSync(avatarsDir, { recursive: true });
+const MAX_AVATAR_BYTES = Number(process.env.AVATAR_MAX_BYTES) || 1024 * 1024;
+const AVATAR_SIZE_PX = 256;
+
+const avatarStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, avatarsDir),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname || '').toLowerCase() || '.png';
+        const safeExt = ['.png', '.jpg', '.jpeg', '.webp'].includes(ext)
+            ? ext
+            : '.png';
+        const userId = req.user?.id || 'user';
+        cb(null, `${userId}_${Date.now()}${safeExt}`);
+    },
+});
+
+const avatarUpload = multer({
+    storage: avatarStorage,
+    limits: { fileSize: MAX_AVATAR_BYTES },
+    fileFilter: (req, file, cb) => {
+        const ok = ['image/png', 'image/jpeg', 'image/webp'].includes(
+            file.mimetype
+        );
+        cb(ok ? null : new Error('INVALID_AVATAR_TYPE'), ok);
+    },
+});
 
 function hasContent(value) {
     return typeof value === 'string' && value.trim().length > 0;
@@ -95,6 +131,7 @@ function registerHttpRoutes(app) {
                     username: user.username,
                     displayName: user.display_name,
                     avatarId: user.avatar_id,
+                    avatarUrl: user.avatar_url,
                 },
             });
         } catch (error) {
@@ -176,6 +213,7 @@ function registerHttpRoutes(app) {
                     username: user.username,
                     displayName: user.display_name,
                     avatarId: user.avatar_id,
+                    avatarUrl: user.avatar_url,
                 },
             });
         } catch (error) {
@@ -205,6 +243,7 @@ function registerHttpRoutes(app) {
                     username: user.username,
                     displayName: user.display_name,
                     avatarId: user.avatar_id,
+                    avatarUrl: user.avatar_url,
                 },
             });
         } catch (error) {
@@ -269,6 +308,7 @@ function registerHttpRoutes(app) {
                     username: account.username,
                     displayName: account.display_name,
                     avatarId: account.avatar_id,
+                    avatarUrl: account.avatar_url,
                     stats: {
                         gamesPlayed: Number(account.games_played) || 0,
                         wins: Number(account.wins) || 0,
@@ -335,6 +375,7 @@ function registerHttpRoutes(app) {
                     username: account.username,
                     displayName: account.display_name,
                     avatarId: account.avatar_id,
+                    avatarUrl: account.avatar_url,
                     stats: {
                         gamesPlayed: Number(account.games_played) || 0,
                         wins: Number(account.wins) || 0,
@@ -369,6 +410,144 @@ function registerHttpRoutes(app) {
                     success: false,
                     message: 'Error interno actualizando cuenta',
                 });
+        }
+    });
+
+    app.post('/auth/avatar/upload', async (req, res) => {
+        try {
+            const user = await getAuthenticatedUser(req);
+            if (!user) {
+                return res
+                    .status(401)
+                    .json({ success: false, message: 'No autenticado' });
+            }
+
+            req.user = user;
+
+            avatarUpload.single('avatar')(req, res, async (err) => {
+                if (err) {
+                    if (err.code === 'LIMIT_FILE_SIZE') {
+                        return res.status(413).json({
+                            success: false,
+                            message: 'El avatar supera el tamaño permitido',
+                        });
+                    }
+                    if (err.message === 'INVALID_AVATAR_TYPE') {
+                        return res.status(400).json({
+                            success: false,
+                            message: 'Tipo de archivo no permitido',
+                        });
+                    }
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Error subiendo avatar',
+                    });
+                }
+
+                if (!req.file) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Archivo requerido',
+                    });
+                }
+
+                const processedName = `${user.id}_${Date.now()}.webp`;
+                const processedPath = path.join(avatarsDir, processedName);
+                try {
+                    await sharp(req.file.path)
+                        .resize(AVATAR_SIZE_PX, AVATAR_SIZE_PX, { fit: 'cover' })
+                        .webp({ quality: 80 })
+                        .toFile(processedPath);
+                } finally {
+                    fs.unlink(req.file.path, () => {});
+                }
+
+                const avatarUrl = `/uploads/avatars/${processedName}`;
+                const previous = await getAccountById(user.id);
+                const account = await updateAvatarUrl(user.id, avatarUrl);
+
+                if (
+                    previous?.avatar_url &&
+                    previous.avatar_url.startsWith('/uploads/avatars/')
+                ) {
+                    const oldPath = path.join(
+                        uploadsRoot,
+                        previous.avatar_url.replace('/uploads/', '')
+                    );
+                    if (oldPath !== path.join(uploadsRoot, avatarUrl.replace('/uploads/', ''))) {
+                        fs.unlink(oldPath, () => {});
+                    }
+                }
+
+                return res.json({
+                    success: true,
+                    account: {
+                        id: account.id,
+                        username: account.username,
+                        displayName: account.display_name,
+                        avatarId: account.avatar_id,
+                        avatarUrl: account.avatar_url,
+                        stats: {
+                            gamesPlayed: Number(account.games_played) || 0,
+                            wins: Number(account.wins) || 0,
+                            winStreak: Number(account.win_streak) || 0,
+                        },
+                    },
+                });
+            });
+        } catch (error) {
+            console.error('Error subiendo avatar:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Error interno subiendo avatar',
+            });
+        }
+    });
+
+    app.post('/auth/avatar/remove', async (req, res) => {
+        try {
+            const user = await getAuthenticatedUser(req);
+            if (!user) {
+                return res
+                    .status(401)
+                    .json({ success: false, message: 'No autenticado' });
+            }
+
+            const previous = await getAccountById(user.id);
+            const account = await clearAvatarUrl(user.id);
+
+            if (
+                previous?.avatar_url &&
+                previous.avatar_url.startsWith('/uploads/avatars/')
+            ) {
+                const oldPath = path.join(
+                    uploadsRoot,
+                    previous.avatar_url.replace('/uploads/', '')
+                );
+                fs.unlink(oldPath, () => {});
+            }
+
+            return res.json({
+                success: true,
+                account: {
+                    id: account.id,
+                    username: account.username,
+                    displayName: account.display_name,
+                    avatarId: account.avatar_id,
+                    avatarUrl: account.avatar_url,
+                    stats: {
+                        gamesPlayed: Number(account.games_played) || 0,
+                        wins: Number(account.wins) || 0,
+                        winStreak: Number(account.win_streak) || 0,
+                    },
+                },
+            });
+        } catch (error) {
+            console.error('Error removiendo avatar:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Error interno removiendo avatar',
+            });
         }
     });
 
@@ -493,6 +672,7 @@ function registerHttpRoutes(app) {
                     username: account.username,
                     displayName: account.display_name,
                     avatarId: account.avatar_id,
+                    avatarUrl: account.avatar_url,
                     stats: {
                         gamesPlayed: Number(account.games_played) || 0,
                         wins: Number(account.wins) || 0,
@@ -521,6 +701,7 @@ function registerHttpRoutes(app) {
         const requestedName = sanitizePlayerName(req.body?.playerName);
         const playerName = requestedName || authUser?.display_name;
         const avatarId = authUser?.avatar_id || DEFAULT_AVATAR_ID;
+        const avatarUrl = authUser?.avatar_url || null;
 
         if (!playerName) {
             return res
@@ -580,6 +761,7 @@ function registerHttpRoutes(app) {
                         isHost: true,
                         userId: authUser?.id || null,
                         avatarId,
+                        avatarUrl,
                         ws: null,
                         cards: [],
                         turnState: createTurnState(),
@@ -624,6 +806,7 @@ function registerHttpRoutes(app) {
         const requestedName = sanitizePlayerName(req.body?.playerName);
         const playerName = requestedName || authUser?.display_name;
         const avatarId = authUser?.avatar_id || DEFAULT_AVATAR_ID;
+        const avatarUrl = authUser?.avatar_url || null;
         const roomId = req.body?.roomId;
 
         if (!playerName || !isValidRoomId(roomId)) {
@@ -684,6 +867,7 @@ function registerHttpRoutes(app) {
                 isHost: false,
                 userId: authUser?.id || null,
                 avatarId,
+                avatarUrl,
                 ws: null,
                 cards: [],
                 turnState: createTurnState(),
@@ -785,6 +969,7 @@ function registerHttpRoutes(app) {
                 connected: p.ws !== null,
                 userId: p.userId || null,
                 avatarId: p.avatarId || null,
+                avatarUrl: p.avatarUrl || null,
             })),
             gameStarted: room.gameState.gameStarted,
             currentTurn: room.gameState.currentTurn,

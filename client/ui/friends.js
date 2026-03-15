@@ -5,6 +5,16 @@
         return found ? found.emoji : '';
     }
 
+    function getAvatarMarkup(avatarId, avatarUrl) {
+        if (avatarUrl) {
+            return `<img class="avatar-img" src="${avatarUrl}" alt="" />`;
+        }
+        const emoji = getAvatarEmoji(avatarId);
+        return emoji
+            ? `<span class="avatar-chip" aria-hidden="true">${emoji}</span>`
+            : '';
+    }
+
     function renderFriendList({
         container,
         friends,
@@ -30,11 +40,11 @@
                 const inviteBtn = showInvite
                     ? `<button class="invite-friend-btn" ${disabledAttr} ${titleAttr} data-friend-id="${friend.id}" data-friend-name="${friend.displayName}">Invitar</button>`
                     : '';
-                const avatarEmoji = getAvatarEmoji(friend.avatarId);
-                const avatarSpan = avatarEmoji
-                    ? `<span class="avatar-chip" aria-hidden="true">${avatarEmoji}</span>`
-                    : '';
-                return `<li data-friend-id="${friend.id}">${avatarSpan}<span class="friend-name" data-friend-id="${friend.id}">${friend.displayName}</span> ${inviteBtn}</li>`;
+                const avatarMarkup = getAvatarMarkup(
+                    friend.avatarId,
+                    friend.avatarUrl
+                );
+                return `<li data-friend-id="${friend.id}">${avatarMarkup}<span class="friend-name" data-friend-id="${friend.id}">${friend.displayName}</span> ${inviteBtn}</li>`;
             })
             .join('');
 

@@ -7,6 +7,7 @@ function toPersistedPlayer(player) {
         name: player.name,
         userId: player.userId || null,
         avatarId: player.avatarId || null,
+        avatarUrl: player.avatarUrl || null,
         cards: player.cards,
         isHost: player.isHost,
         connected: player.ws?.readyState === WebSocket.OPEN,

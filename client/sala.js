@@ -15,6 +15,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return found ? found.emoji : '';
     }
 
+    function getAvatarMarkup(avatarId, avatarUrl) {
+        if (avatarUrl) {
+            return `<img class="avatar-img" src="${avatarUrl}" alt="" />`;
+        }
+        const emoji = getAvatarEmoji(avatarId);
+        return emoji
+            ? `<span class="avatar-chip" aria-hidden="true">${emoji}</span>`
+            : '';
+    }
+
     // --- autenticación ligera para manejo de amigos ---
     function getAuthToken() {
         // Tokens are httpOnly cookies and cannot be read from JS
@@ -519,12 +529,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         extraButton = ` <button class="add-friend-btn" data-userid="${player.userId}">Agregar amigo</button>`;
                     }
                 }
-                const avatarEmoji = getAvatarEmoji(player.avatarId);
-                const avatarSpan = avatarEmoji
-                    ? `<span class="avatar-chip" aria-hidden="true">${avatarEmoji}</span>`
-                    : '';
+                const avatarSpan = getAvatarMarkup(
+                    player.avatarId,
+                    player.avatarUrl
+                );
                 return `
-            <li class="${player.isHost ? 'host' : ''} ${isMe ? 'you' : ''}" data-avatar-id="${player.avatarId || ''}">
+            <li class="${player.isHost ? 'host' : ''} ${isMe ? 'you' : ''}" data-avatar-id="${player.avatarId || ''}" data-avatar-url="${player.avatarUrl || ''}">
                 ${avatarSpan}<span class="player-name">${player.name || 'Jugador'}</span>
                 ${player.isHost ? '<span class="host-tag">(Host)</span>' : ''}
                 ${isMe ? '<span class="you-tag">(Tú)</span>' : ''}
@@ -554,6 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 .closest('li')
                                 .querySelector('.player-name').textContent,
                             avatarId: btn.closest('li').dataset.avatarId || null,
+                            avatarUrl: btn.closest('li').dataset.avatarUrl || null,
                         });
                         renderFriendList();
                         updatePlayersUI(currentPlayers); // rerender to remove button

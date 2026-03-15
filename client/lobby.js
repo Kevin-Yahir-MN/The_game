@@ -60,6 +60,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const statWinStreak = document.getElementById('statWinStreak');
     const avatarCurrent = document.getElementById('avatarCurrent');
     const avatarOptions = document.getElementById('avatarOptions');
+    const avatarUploadInput = document.getElementById('avatarUploadInput');
+    const uploadAvatarBtn = document.getElementById('uploadAvatarBtn');
+    const removeAvatarBtn = document.getElementById('removeAvatarBtn');
 
     const AVATARS = window.APP_AVATARS?.AVATARS || [];
     const DEFAULT_AVATAR_ID =
@@ -372,6 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const normalizedUser = {
             ...user,
             avatarId: user?.avatarId || DEFAULT_AVATAR_ID,
+            avatarUrl: user?.avatarUrl || null,
         };
         localStorage.setItem(AUTH_USER_KEY, JSON.stringify(normalizedUser));
         localStorage.removeItem(GUEST_USER_KEY);
@@ -438,10 +442,22 @@ document.addEventListener('DOMContentLoaded', () => {
         activeUserContainer.style.display = isLoggedIn ? 'block' : 'none';
 
         if (isLoggedIn) {
-            const emoji = getAvatarEmoji(identity.avatarId);
-            activeUserLabel.textContent = emoji
-                ? `${emoji} ${identity.displayName}`
-                : identity.displayName;
+            activeUserLabel.textContent = '';
+            if (identity.avatarUrl) {
+                const img = document.createElement('img');
+                img.className = 'avatar-img';
+                img.alt = '';
+                img.src = identity.avatarUrl;
+                activeUserLabel.appendChild(img);
+                activeUserLabel.appendChild(
+                    document.createTextNode(` ${identity.displayName}`)
+                );
+            } else {
+                const emoji = getAvatarEmoji(identity.avatarId);
+                activeUserLabel.textContent = emoji
+                    ? `${emoji} ${identity.displayName}`
+                    : identity.displayName;
+            }
             myAccountBtn.style.display = identity.isGuest ? 'none' : 'flex';
         } else {
             activeUserLabel.textContent = '-';
@@ -558,11 +574,23 @@ document.addEventListener('DOMContentLoaded', () => {
         return found ? found.emoji : '';
     }
 
-    function setCurrentAvatar(avatarId) {
+    function setCurrentAvatar(avatarId, avatarUrl) {
         if (!avatarCurrent) return;
+        avatarCurrent.textContent = '';
+        avatarCurrent.dataset.avatarId = avatarId || '';
+        avatarCurrent.dataset.avatarUrl = avatarUrl || '';
+
+        if (avatarUrl) {
+            const img = document.createElement('img');
+            img.className = 'avatar-img';
+            img.alt = '';
+            img.src = avatarUrl;
+            avatarCurrent.appendChild(img);
+            return;
+        }
+
         const emoji = getAvatarEmoji(avatarId);
         avatarCurrent.textContent = emoji || '🙂';
-        avatarCurrent.dataset.avatarId = avatarId || '';
     }
 
     function renderAvatarOptions(selectedId) {
@@ -604,16 +632,106 @@ document.addEventListener('DOMContentLoaded', () => {
                     JSON.stringify({
                         ...existingAuth,
                         avatarId: data.account.avatarId,
+                        avatarUrl: data.account.avatarUrl || null,
                     })
                 );
             }
-            setCurrentAvatar(data.account.avatarId);
+            setCurrentAvatar(data.account.avatarId, data.account.avatarUrl);
             renderAvatarOptions(data.account.avatarId);
             refreshIdentityUI();
             showSuccess('Avatar actualizado');
         } catch (error) {
             console.error('Error actualizando avatar:', error);
             showError('Error actualizando avatar');
+        }
+    }
+
+    async function uploadAvatarFile(file) {
+        if (!file) return;
+        if (!uploadAvatarBtn) return;
+
+        const formData = new FormData();
+        formData.append('avatar', file);
+
+        setButtonLoading(uploadAvatarBtn, true, 'Subiendo...', 'Subir imagen');
+        try {
+            const response = await fetch(`${API_URL}/auth/avatar/upload`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include',
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success || !data.account) {
+                showError(data.message || 'No se pudo subir el avatar');
+                return;
+            }
+
+            const existingAuth = getAuthUser();
+            if (existingAuth) {
+                localStorage.setItem(
+                    AUTH_USER_KEY,
+                    JSON.stringify({
+                        ...existingAuth,
+                        avatarId: data.account.avatarId,
+                        avatarUrl: data.account.avatarUrl || null,
+                    })
+                );
+            }
+
+            setCurrentAvatar(
+                data.account.avatarId || DEFAULT_AVATAR_ID,
+                data.account.avatarUrl || null
+            );
+            renderAvatarOptions(data.account.avatarId || DEFAULT_AVATAR_ID);
+            refreshIdentityUI();
+            showSuccess('Avatar actualizado');
+        } catch (error) {
+            console.error('Error subiendo avatar:', error);
+            showError('Error subiendo avatar');
+        } finally {
+            setButtonLoading(uploadAvatarBtn, false, 'Subiendo...', 'Subir imagen');
+            if (avatarUploadInput) avatarUploadInput.value = '';
+        }
+    }
+
+    async function removeAvatarImage() {
+        if (!removeAvatarBtn) return;
+        setButtonLoading(removeAvatarBtn, true, 'Quitando...', 'Quitar imagen');
+        try {
+            const response = await fetch(`${API_URL}/auth/avatar/remove`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success || !data.account) {
+                showError(data.message || 'No se pudo quitar el avatar');
+                return;
+            }
+
+            const existingAuth = getAuthUser();
+            if (existingAuth) {
+                localStorage.setItem(
+                    AUTH_USER_KEY,
+                    JSON.stringify({
+                        ...existingAuth,
+                        avatarId: data.account.avatarId,
+                        avatarUrl: null,
+                    })
+                );
+            }
+
+            setCurrentAvatar(
+                data.account.avatarId || DEFAULT_AVATAR_ID,
+                null
+            );
+            renderAvatarOptions(data.account.avatarId || DEFAULT_AVATAR_ID);
+            refreshIdentityUI();
+            showSuccess('Avatar eliminado');
+        } catch (error) {
+            console.error('Error quitando avatar:', error);
+            showError('Error quitando avatar');
+        } finally {
+            setButtonLoading(removeAvatarBtn, false, 'Quitando...', 'Quitar imagen');
         }
     }
 
@@ -636,7 +754,10 @@ document.addEventListener('DOMContentLoaded', () => {
             );
             statWins.textContent = String(account.stats?.wins || 0);
             statWinStreak.textContent = String(account.stats?.winStreak || 0);
-            setCurrentAvatar(account.avatarId || DEFAULT_AVATAR_ID);
+            setCurrentAvatar(
+                account.avatarId || DEFAULT_AVATAR_ID,
+                account.avatarUrl || null
+            );
             renderAvatarOptions(account.avatarId || DEFAULT_AVATAR_ID);
         } catch (error) {
             console.error('Error cargando cuenta:', error);
@@ -672,6 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         username: data.user.username,
                         displayName: data.user.displayName,
                         avatarId: data.user.avatarId || DEFAULT_AVATAR_ID,
+                        avatarUrl: data.user.avatarUrl || null,
                     };
                     localStorage.setItem(
                         AUTH_USER_KEY,
@@ -822,6 +944,37 @@ document.addEventListener('DOMContentLoaded', () => {
             updateAvatar(selectedId);
         });
         avatarOptions.dataset.clickBound = 'true';
+    }
+
+    if (avatarUploadInput) {
+        avatarUploadInput.addEventListener('change', () => {
+            const file = avatarUploadInput.files?.[0];
+            if (!file) return;
+            try {
+                const previewUrl = URL.createObjectURL(file);
+                setCurrentAvatar(DEFAULT_AVATAR_ID, previewUrl);
+            } catch (err) {
+                console.warn('No se pudo previsualizar el avatar', err);
+            }
+            uploadAvatarFile(file);
+        });
+    }
+
+    if (uploadAvatarBtn) {
+        uploadAvatarBtn.addEventListener('click', () => {
+            const file = avatarUploadInput?.files?.[0];
+            if (!file) {
+                showError('Selecciona una imagen primero');
+                return;
+            }
+            uploadAvatarFile(file);
+        });
+    }
+
+    if (removeAvatarBtn) {
+        removeAvatarBtn.addEventListener('click', () => {
+            removeAvatarImage();
+        });
     }
 
     document.addEventListener('keydown', (e) => {
