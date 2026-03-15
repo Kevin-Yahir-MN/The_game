@@ -17,7 +17,6 @@
         { id: 'owl', label: 'Owl', emoji: '🦉' },
         { id: 'dragon', label: 'Dragon', emoji: '🐉' },
         { id: 'ninja', label: 'Ninja', emoji: '🥷' },
-        { id: 'star', label: 'Star', emoji: '⭐' },
     ];
     const DEFAULT_AVATAR_ID = AVATARS[0].id;
 
