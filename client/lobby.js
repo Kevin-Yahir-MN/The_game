@@ -46,6 +46,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeAccountModalBtn = document.querySelector(
         '[data-close-account-modal]'
     );
+    const avatarModal = document.getElementById('avatarModal');
+    const nameModal = document.getElementById('nameModal');
+    const passwordModal = document.getElementById('passwordModal');
+    const openAvatarModalBtn = document.getElementById('openAvatarModal');
+    const openNameModalBtn = document.getElementById('openNameModal');
+    const openPasswordModalBtn = document.getElementById('openPasswordModal');
+    const closeAvatarModalBtn = document.querySelector(
+        '[data-close-avatar-modal]'
+    );
+    const closeNameModalBtn = document.querySelector(
+        '[data-close-name-modal]'
+    );
+    const closePasswordModalBtn = document.querySelector(
+        '[data-close-password-modal]'
+    );
     const backToMenuBtn = document.getElementById('backToMenuBtn');
     const mainActions = document.getElementById('mainActions');
     const accountDisplayNameInput =
@@ -401,8 +416,8 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem(AUTH_USER_KEY);
         localStorage.removeItem(GUEST_USER_KEY);
         closeJoinRoomModal();
-        toggleAccountView(false);
-        refreshIdentityUI();
+            closeAllAccountModals();
+            refreshIdentityUI();
     }
 
     function getCurrentIdentity() {
@@ -415,14 +430,38 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
     }
 
-    function toggleAccountView(showAccount) {
-        if (!myAccountModal) return;
-        myAccountModal.classList.toggle('hidden', !showAccount);
-        myAccountModal.setAttribute('aria-hidden', showAccount ? 'false' : 'true');
-        document.body.classList.toggle('modal-open', showAccount);
+    const accountModals = [
+        myAccountModal,
+        avatarModal,
+        nameModal,
+        passwordModal,
+    ].filter(Boolean);
+
+    function setModalVisibility(modal, show) {
+        if (!modal) return;
+        modal.classList.toggle('hidden', !show);
+        modal.setAttribute('aria-hidden', show ? 'false' : 'true');
+    }
+
+    function closeAllAccountModals() {
+        accountModals.forEach((modal) => setModalVisibility(modal, false));
+        document.body.classList.remove('modal-open');
+    }
+
+    function openAccountModal(modal) {
+        if (!modal) return;
+        closeAllAccountModals();
+        setModalVisibility(modal, true);
+        document.body.classList.add('modal-open');
         if (mainActions) {
             mainActions.style.display = 'flex';
         }
+    }
+
+    function returnToMainAccountModal() {
+        if (!myAccountModal) return;
+        closeAllAccountModals();
+        openAccountModal(myAccountModal);
     }
 
     function refreshIdentityUI() {
@@ -462,7 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             activeUserLabel.textContent = '-';
             myAccountBtn.style.display = 'none';
-            toggleAccountView(false);
+            closeAllAccountModals();
         }
     }
 
@@ -915,26 +954,42 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     myAccountBtn.addEventListener('click', async () => {
-        toggleAccountView(true);
+        openAccountModal(myAccountModal);
         await loadMyAccount();
     });
 
     backToMenuBtn.addEventListener('click', () => {
-        toggleAccountView(false);
+        closeAllAccountModals();
     });
 
-    if (myAccountModal) {
-        myAccountModal.addEventListener('click', (e) => {
-            if (e.target === myAccountModal) {
-                toggleAccountView(false);
+    accountModals.forEach((modal) => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                if (modal === myAccountModal) {
+                    closeAllAccountModals();
+                } else {
+                    returnToMainAccountModal();
+                }
             }
         });
-    }
+    });
 
     if (closeAccountModalBtn) {
         closeAccountModalBtn.addEventListener('click', () => {
-            toggleAccountView(false);
+            closeAllAccountModals();
         });
+    }
+
+    if (closeAvatarModalBtn) {
+        closeAvatarModalBtn.addEventListener('click', returnToMainAccountModal);
+    }
+
+    if (closeNameModalBtn) {
+        closeNameModalBtn.addEventListener('click', returnToMainAccountModal);
+    }
+
+    if (closePasswordModalBtn) {
+        closePasswordModalBtn.addEventListener('click', returnToMainAccountModal);
     }
 
     if (avatarOptions && !avatarOptions.dataset.clickBound) {
@@ -947,6 +1002,32 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         avatarOptions.dataset.clickBound = 'true';
     }
+
+    if (openAvatarModalBtn) {
+        openAvatarModalBtn.addEventListener('click', () => {
+            openAccountModal(avatarModal);
+            loadMyAccount();
+        });
+    }
+
+    if (openNameModalBtn) {
+        openNameModalBtn.addEventListener('click', () => {
+            openAccountModal(nameModal);
+            loadMyAccount();
+        });
+    }
+
+    if (openPasswordModalBtn) {
+        openPasswordModalBtn.addEventListener('click', () => {
+            openAccountModal(passwordModal);
+        });
+    }
+
+    document.querySelectorAll('[data-back-account]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            returnToMainAccountModal();
+        });
+    });
 
     if (avatarUploadInput) {
         avatarUploadInput.addEventListener('change', () => {
@@ -1014,8 +1095,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        if (myAccountModal && !myAccountModal.classList.contains('hidden')) {
-            toggleAccountView(false);
+        const isAnyAccountModalOpen = accountModals.some(
+            (modal) => !modal.classList.contains('hidden')
+        );
+        if (isAnyAccountModalOpen) {
+            closeAllAccountModals();
         }
     });
 
@@ -1262,6 +1346,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    toggleAccountView(false);
+    closeAllAccountModals();
     hydrateSession();
 });

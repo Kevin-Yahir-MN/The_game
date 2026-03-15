@@ -1158,6 +1158,12 @@ body.modal-open {
     margin-bottom: 0.9rem;
 }
 
+.account-hub {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+}
+
 .account-modal__section label {
     font-weight: 600;
     color: rgba(236, 240, 241, 0.9);
@@ -1379,6 +1385,17 @@ body.modal-open {
 .account-modal__button--danger:hover {
     background: #c0392b;
     transform: translateY(-2px);
+}
+
+.account-modal__button--ghost {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #e8eef5;
+}
+
+.account-modal__button--ghost:hover {
+    background: rgba(255, 255, 255, 0.16);
+    transform: translateY(-1px);
 }
 
 .modal-content h2 {

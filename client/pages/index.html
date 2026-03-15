@@ -52,7 +52,7 @@
             </div>
         </div>
 
-        <!-- Modal para mi cuenta -->
+        <!-- Modal principal de mi cuenta -->
         <div id="myAccountModal" class="modal hidden" aria-hidden="true">
             <div class="modal-content account-modal" role="dialog" aria-modal="true" aria-labelledby="myAccountTitle">
                 <button type="button" class="modal-close-button" data-close-account-modal aria-label="Cerrar modal">
@@ -76,16 +76,37 @@
                     </div>
                 </div>
 
-                <div class="account-modal__section">
-                    <label for="accountDisplayName">Cambiar nombre visible</label>
-                    <input type="text" id="accountDisplayName" placeholder="Nuevo nombre visible" />
-                    <button id="saveDisplayNameBtn" class="btn account-modal__button account-modal__button--primary" type="button">
-                        Guardar nombre
+                <div class="account-modal__section account-hub">
+                    <button id="openAvatarModal" class="btn account-modal__button account-modal__button--primary" type="button">
+                        Avatar
+                    </button>
+                    <button id="openNameModal" class="btn account-modal__button account-modal__button--primary" type="button">
+                        Nombre visible
+                    </button>
+                    <button id="openPasswordModal" class="btn account-modal__button account-modal__button--success" type="button">
+                        Contraseña
                     </button>
                 </div>
 
+                <div class="account-modal__footer">
+                    <button id="backToMenuBtn" class="btn account-modal__button account-modal__button--danger" type="button">
+                        Volver al menú
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal avatar -->
+        <div id="avatarModal" class="modal hidden" aria-hidden="true">
+            <div class="modal-content account-modal" role="dialog" aria-modal="true" aria-labelledby="avatarModalTitle">
+                <button type="button" class="modal-close-button" data-close-avatar-modal aria-label="Cerrar modal">
+                    ×
+                </button>
+                <div class="account-modal__badge">Avatar</div>
+                <h2 id="avatarModalTitle" class="account-modal__title">Avatar</h2>
+
                 <div class="account-modal__section">
-                    <label>Avatar</label>
+                    <label>Selecciona tu avatar</label>
                     <div class="avatar-picker">
                         <div id="avatarCurrent" class="avatar-current" aria-hidden="true"></div>
                         <div id="avatarOptions" class="avatar-grid" role="listbox" aria-label="Selecciona un avatar"></div>
@@ -101,10 +122,46 @@
                         </button>
                     </div>
                 </div>
-
-                <div class="account-modal__separator">
-                    <span>Seguridad</span>
+                <div class="account-modal__footer">
+                    <button class="btn account-modal__button account-modal__button--ghost" type="button" data-back-account>
+                        Volver
+                    </button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Modal nombre -->
+        <div id="nameModal" class="modal hidden" aria-hidden="true">
+            <div class="modal-content account-modal" role="dialog" aria-modal="true" aria-labelledby="nameModalTitle">
+                <button type="button" class="modal-close-button" data-close-name-modal aria-label="Cerrar modal">
+                    ×
+                </button>
+                <div class="account-modal__badge">Nombre visible</div>
+                <h2 id="nameModalTitle" class="account-modal__title">Nombre visible</h2>
+
+                <div class="account-modal__section">
+                    <label for="accountDisplayName">Cambiar nombre visible</label>
+                    <input type="text" id="accountDisplayName" placeholder="Nuevo nombre visible" />
+                    <button id="saveDisplayNameBtn" class="btn account-modal__button account-modal__button--primary" type="button">
+                        Guardar nombre
+                    </button>
+                </div>
+                <div class="account-modal__footer">
+                    <button class="btn account-modal__button account-modal__button--ghost" type="button" data-back-account>
+                        Volver
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal contraseña -->
+        <div id="passwordModal" class="modal hidden" aria-hidden="true">
+            <div class="modal-content account-modal" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
+                <button type="button" class="modal-close-button" data-close-password-modal aria-label="Cerrar modal">
+                    ×
+                </button>
+                <div class="account-modal__badge">Contraseña</div>
+                <h2 id="passwordModalTitle" class="account-modal__title">Contraseña</h2>
 
                 <div class="account-modal__section">
                     <label for="currentPassword">Contraseña actual</label>
@@ -117,10 +174,9 @@
                         Cambiar contraseña
                     </button>
                 </div>
-
                 <div class="account-modal__footer">
-                    <button id="backToMenuBtn" class="btn account-modal__button account-modal__button--danger" type="button">
-                        Volver al menú
+                    <button class="btn account-modal__button account-modal__button--ghost" type="button" data-back-account>
+                        Volver
                     </button>
                 </div>
             </div>
