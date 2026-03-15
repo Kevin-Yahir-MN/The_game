@@ -1115,6 +1115,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!newState) return;
 
         if (newState.p) {
+            const existingById = new Map(
+                (gameState.players || []).map((p) => [p.id, p])
+            );
             gameState.players = newState.p.map((player) => ({
                 id: player.i,
                 name: player.n || `Jugador_${player.i.slice(0, 4)}`,
@@ -1122,6 +1125,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 isHost: player.h,
                 cardsPlayedThisTurn: Number(player.s) || 0,
                 totalCardsPlayed: Number(player.pt) || 0,
+                avatarId:
+                    player.a || existingById.get(player.i)?.avatarId || null,
+                avatarUrl:
+                    player.au || existingById.get(player.i)?.avatarUrl || null,
             }));
         }
 

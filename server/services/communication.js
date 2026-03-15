@@ -27,6 +27,8 @@ function sendGameState(room, player) {
             c: p.cards.length,
             s: getPlayerTurnCount(p),
             pt: Number(p.totalCardsPlayed) || 0,
+            a: p.avatarId || null,
+            au: p.avatarUrl || null,
         })),
     };
 
