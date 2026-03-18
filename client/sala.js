@@ -327,6 +327,8 @@ document.addEventListener('DOMContentLoaded', () => {
             sendPlayerUpdate();
 
             if (connectionStatus === 'reconnecting') {
+                gameAudio?.play('chatmessage');
+
                 socket.send(
                     JSON.stringify({
                         type: 'get_full_state',
@@ -619,6 +621,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // para que pueda transferir el host si es necesario
         if (socket && socket.readyState === WebSocket.OPEN) {
             try {
+                gameAudio?.play('chatmessage');
+
                 socket.send(
                     JSON.stringify({
                         type: 'leave_room',
@@ -755,6 +759,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     );
                     return;
                 }
+
+                gameAudio?.play('chatmessage');
 
                 socket.send(
                     JSON.stringify({
