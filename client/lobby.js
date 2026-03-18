@@ -87,6 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let friends = [];
     let lobbyWs = null;
     const gameAudio = window.GameAudio || null;
+    const ROOM_AUTH_ERROR_COOLDOWN_MS = 4000;
+    let lastRoomAuthErrorNotificationAt = 0;
 
     // modal elements are handled by FriendsUI
 
@@ -342,6 +344,19 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             errorElement.remove();
         }, 3000);
+    }
+
+    function showRoomAuthRequiredError() {
+        const now = Date.now();
+        if (
+            now - lastRoomAuthErrorNotificationAt <
+            ROOM_AUTH_ERROR_COOLDOWN_MS
+        ) {
+            return;
+        }
+
+        lastRoomAuthErrorNotificationAt = now;
+        showError('Primero inicia sesión, crea usuario o usa invitado');
     }
 
     function showSuccess(message) {
@@ -1228,7 +1243,7 @@ document.addEventListener('DOMContentLoaded', () => {
     createRoomBtn.addEventListener('click', async () => {
         const identity = getCurrentIdentity();
         if (!identity || !identity.displayName) {
-            showError('Primero inicia sesión, crea usuario o usa invitado');
+            showRoomAuthRequiredError();
             return;
         }
 
@@ -1270,7 +1285,7 @@ document.addEventListener('DOMContentLoaded', () => {
     joinRoomBtn.addEventListener('click', () => {
         const identity = getCurrentIdentity();
         if (!identity || !identity.displayName) {
-            showError('Primero inicia sesión, crea usuario o usa invitado');
+            showRoomAuthRequiredError();
             return;
         }
 
@@ -1280,7 +1295,7 @@ document.addEventListener('DOMContentLoaded', () => {
     confirmJoinRoomBtn.addEventListener('click', async () => {
         const identity = getCurrentIdentity();
         if (!identity || !identity.displayName) {
-            showError('Primero inicia sesión, crea usuario o usa invitado');
+            showRoomAuthRequiredError();
             return;
         }
 

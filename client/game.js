@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let CARD_SPACING = 15;
     const HISTORY_ICON_PULSE_INTERVAL = 20000;
     const HISTORY_ICON_PULSE_DURATION = 500;
+    const EMOJI_ERROR_COOLDOWN_MS = 4000;
 
     let BOARD_POSITION = {
         x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
@@ -56,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let animationQueue = [];
     let dirtyAreas = [];
     let needsRedraw = true;
+    let lastEmojiErrorNotificationAt = 0;
 
     const currentPlayer = {
         id: sanitizeInput(sessionStorage.getItem('playerId')),
@@ -704,6 +706,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const emojiChar = emojiMap[message.emoji];
         if (!emojiChar) return;
 
+        const emojiSenderId = String(
+            message.fromPlayerId ?? message.playerId ?? ''
+        );
+        if (emojiSenderId && emojiSenderId !== String(currentPlayer.id)) {
+            gameAudio?.play('chatmessage');
+        }
+
         const msgs = ensureEmojiMessagesContainer();
         if (!msgs) return;
 
@@ -940,6 +949,16 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             isError || message.includes('GAME OVER') ? 3000 : 3000
         );
+    }
+
+    function showEmojiSendErrorNotification() {
+        const now = Date.now();
+        if (now - lastEmojiErrorNotificationAt < EMOJI_ERROR_COOLDOWN_MS) {
+            return;
+        }
+
+        lastEmojiErrorNotificationAt = now;
+        showNotification('No hay conexión para enviar reacción', true);
     }
 
     function showColumnHistory(columnId) {
@@ -1629,8 +1648,6 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.yourCards.splice(cardIndex, 1);
         }
 
-        playBoardMoveSound(cardValue, position, previousValue);
-
         socket.send(
             JSON.stringify({
                 type: 'play_card',
@@ -2176,14 +2193,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         const emojiCode = target.dataset.emoji;
                         if (!emojiCode) return;
                         if (!socket || socket.readyState !== WebSocket.OPEN) {
-                            showNotification(
-                                'No hay conexión para enviar reacción',
-                                true
-                            );
+                            showEmojiSendErrorNotification();
                             return;
                         }
-
-                        gameAudio?.play('chatmessage');
 
                         socket.send(
                             JSON.stringify({

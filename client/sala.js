@@ -112,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const MAX_RECONNECT_ATTEMPTS = 10;
     const RECONNECT_BASE_DELAY = 2000;
+    const EMOJI_ERROR_COOLDOWN_MS = 4000;
 
     let socket;
     let reconnectAttempts = 0;
@@ -120,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let connectionStatus = 'disconnected';
     const gameAudio = window.GameAudio || null;
     let hasRenderedPlayersOnce = false;
+    let lastEmojiErrorNotificationAt = 0;
 
     const roomId = sessionStorage.getItem('roomId');
     const playerId = sessionStorage.getItem('playerId');
@@ -179,6 +181,16 @@ document.addEventListener('DOMContentLoaded', () => {
             notification.classList.add('fade-out');
             setTimeout(() => notification.remove(), 300);
         }, 3000);
+    }
+
+    function showEmojiSendErrorNotification() {
+        const now = Date.now();
+        if (now - lastEmojiErrorNotificationAt < EMOJI_ERROR_COOLDOWN_MS) {
+            return;
+        }
+
+        lastEmojiErrorNotificationAt = now;
+        showNotification('No hay conexión para enviar reacción', true);
     }
 
     // Mostrar un modal simple con mensaje y texto de redirección
@@ -485,6 +497,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const emojiChar = emojiMap[message.emoji];
         if (!emojiChar) return;
 
+        const emojiSenderId = String(
+            message.fromPlayerId ?? message.playerId ?? ''
+        );
+        if (emojiSenderId && emojiSenderId !== String(playerId)) {
+            gameAudio?.play('chatmessage');
+        }
+
         const item = document.createElement('div');
         item.className = 'emoji-popin emoji-message';
 
@@ -749,14 +768,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const emojiCode = target.dataset.emoji;
                 if (!emojiCode) return;
                 if (!socket || socket.readyState !== WebSocket.OPEN) {
-                    showNotification(
-                        'No hay conexión para enviar reacción',
-                        true
-                    );
+                    showEmojiSendErrorNotification();
                     return;
                 }
-
-                gameAudio?.play('chatmessage');
 
                 socket.send(
                     JSON.stringify({
