@@ -2047,6 +2047,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // update board immediately for everyone
         updateStack(position, value);
+        playBoardMoveSound(value, position, previousValue);
         registerSpecialMoveFlash(value, position, previousValue);
 
         if (message.playerId !== currentPlayer.id && !isMyTurn()) {
