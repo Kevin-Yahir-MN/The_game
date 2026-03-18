@@ -366,14 +366,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function isSpecialMove(cardValue, position, previousValue) {
-        if (!Number.isFinite(Number(previousValue))) {
+        const numericCardValue = Number(cardValue);
+        const numericPreviousValue = Number(previousValue);
+
+        if (
+            !Number.isFinite(numericCardValue) ||
+            !Number.isFinite(numericPreviousValue)
+        ) {
             return false;
         }
 
-        const numericPreviousValue = Number(previousValue);
         return position.includes('asc')
-            ? cardValue === numericPreviousValue - 10
-            : cardValue === numericPreviousValue + 10;
+            ? numericCardValue === numericPreviousValue - 10
+            : numericCardValue === numericPreviousValue + 10;
     }
 
     function playBoardMoveSound(cardValue, position, previousValue) {
