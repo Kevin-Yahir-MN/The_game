@@ -2048,7 +2048,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleAnimatedCardPlay(message) {
         const position = message.position;
         const value = message.cardValue;
-        const previousValue = getStackValue(position);
+        const previousValue =
+            message.previousValue ?? getStackValue(position);
 
         // update board immediately for everyone
         updateStack(position, value);
