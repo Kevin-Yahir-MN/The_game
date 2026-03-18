@@ -46,6 +46,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let reconnectAttempts = 0;
     let reconnectTimeout;
     let connectionStatus = 'disconnected';
+    const gameAudio = window.GameAudio || null;
+    let lastTurnSoundTurnId = null;
     let dragStartCard = null;
     let dragStartX = 0;
     let dragStartY = 0;
@@ -357,6 +359,24 @@ document.addEventListener('DOMContentLoaded', () => {
             previousValue,
         });
         updateGameInfo();
+    }
+
+    function isSpecialMove(cardValue, position, previousValue) {
+        if (!Number.isFinite(Number(previousValue))) {
+            return false;
+        }
+
+        const numericPreviousValue = Number(previousValue);
+        return position.includes('asc')
+            ? cardValue === numericPreviousValue - 10
+            : cardValue === numericPreviousValue + 10;
+    }
+
+    function playBoardMoveSound(cardValue, position, previousValue) {
+        const soundName = isSpecialMove(cardValue, position, previousValue)
+            ? 'specialmove'
+            : 'put';
+        gameAudio?.play(soundName);
     }
 
     function isMyTurn() {
@@ -752,6 +772,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? '¡Es tu turno!'
                     : `Turno de ${message.playerName}`;
             showNotification(notificationMsg);
+        }
+
+        if (
+            message.newTurn === currentPlayer.id &&
+            lastTurnSoundTurnId !== message.newTurn
+        ) {
+            gameAudio?.play('myturn');
+            lastTurnSoundTurnId = message.newTurn;
+        } else if (message.newTurn !== currentPlayer.id) {
+            lastTurnSoundTurnId = null;
         }
     }
 
@@ -1203,6 +1233,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 message.previousValue
             );
             addToHistory(message.position, message.cardValue);
+            playBoardMoveSound(
+                message.cardValue,
+                message.position,
+                message.previousValue
+            );
             showNotification(
                 `${message.playerName || 'Un jugador'} jugó un ${message.cardValue}`
             );
@@ -1594,6 +1629,8 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.yourCards.splice(cardIndex, 1);
         }
 
+        playBoardMoveSound(cardValue, position, previousValue);
+
         socket.send(
             JSON.stringify({
                 type: 'play_card',
@@ -1671,6 +1708,8 @@ document.addEventListener('DOMContentLoaded', () => {
             card.isPlayedThisTurn = false;
             card.updateColor();
         });
+
+        gameAudio?.play('draw');
 
         socket.send(
             JSON.stringify({
@@ -2143,6 +2182,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             );
                             return;
                         }
+
+                        gameAudio?.play('chatmessage');
 
                         socket.send(
                             JSON.stringify({

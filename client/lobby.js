@@ -86,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---- estado y lógica de amigos ----
     let friends = [];
     let lobbyWs = null;
+    const gameAudio = window.GameAudio || null;
 
     // modal elements are handled by FriendsUI
 
@@ -218,6 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function displayInvite(invite) {
+        gameAudio?.play('invitation');
         const existingInvite = document.querySelector('.invite-modal');
         if (existingInvite) {
             existingInvite.remove();
@@ -1349,3 +1351,4 @@ document.addEventListener('DOMContentLoaded', () => {
     closeAllAccountModals();
     hydrateSession();
 });
+

@@ -118,6 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let playerUpdateInterval;
     let reconnectTimeout;
     let connectionStatus = 'disconnected';
+    const gameAudio = window.GameAudio || null;
+    let hasRenderedPlayersOnce = false;
 
     const roomId = sessionStorage.getItem('roomId');
     const playerId = sessionStorage.getItem('playerId');
@@ -509,7 +511,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // Actualizar lista de jugadores en UI
     function updatePlayersUI(players) {
         if (!players || !Array.isArray(players)) return;
+        const previousPlayers = Array.isArray(currentPlayers)
+            ? currentPlayers
+            : [];
+        const previousPlayerIds = new Set(
+            previousPlayers.map((player) => String(player.id))
+        );
+        const joinedPlayers = players.filter(
+            (player) => !previousPlayerIds.has(String(player.id))
+        );
+
+        if (hasRenderedPlayersOnce) {
+            const joinedOtherPlayer = joinedPlayers.find(
+                (player) => String(player.id) !== String(playerId)
+            );
+            if (joinedOtherPlayer) {
+                gameAudio?.play('playerenter');
+                showNotification(
+                    (joinedOtherPlayer.name || 'Un jugador') + ' se unió a la sala'
+                );
+            }
+        }
+
         currentPlayers = players; // guardar referencia global
+        hasRenderedPlayersOnce = true;
         const me = getAuthUser();
         const mePlayer = players.find(
             (player) => String(player.id) === String(playerId)
