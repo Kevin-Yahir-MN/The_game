@@ -27,6 +27,9 @@ let hasInitialized = false;
 const app = express();
 const server = http.createServer(app);
 
+// Render and similar hosts sit behind a single reverse proxy, so trust the first hop for IP-based rate limiting.
+app.set('trust proxy', 1);
+
 app.disable('x-powered-by');
 app.use(
     helmet({
