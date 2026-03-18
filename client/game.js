@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let CARD_SPACING = 15;
     const HISTORY_ICON_PULSE_INTERVAL = 20000;
     const HISTORY_ICON_PULSE_DURATION = 500;
+    const SPECIAL_MOVE_FLASH_DURATION = 900;
     const EMOJI_ERROR_COOLDOWN_MS = 4000;
 
     let BOARD_POSITION = {
@@ -83,6 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
         columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
         boardCards: [],
         historyIconAreas: [],
+        specialMoveFlashes: [],
     };
 
     const cardPool = {
@@ -381,6 +383,83 @@ document.addEventListener('DOMContentLoaded', () => {
         gameAudio?.play(soundName);
     }
 
+    function registerSpecialMoveFlash(cardValue, position, previousValue) {
+        if (!isSpecialMove(cardValue, position, previousValue)) {
+            return;
+        }
+
+        const flashes = Array.isArray(gameState.specialMoveFlashes)
+            ? gameState.specialMoveFlashes
+            : [];
+        gameState.specialMoveFlashes = flashes.filter(
+            (flash) =>
+                !(
+                    flash &&
+                    flash.position === position &&
+                    flash.value === cardValue
+                )
+        );
+        gameState.specialMoveFlashes.push({
+            value: cardValue,
+            position,
+            startedAt: Date.now(),
+            duration: SPECIAL_MOVE_FLASH_DURATION,
+        });
+        needsRedraw = true;
+    }
+
+    function getSpecialMoveFlash(cardValue, position) {
+        if (!Array.isArray(gameState.specialMoveFlashes)) {
+            return null;
+        }
+
+        const now = Date.now();
+        gameState.specialMoveFlashes = gameState.specialMoveFlashes.filter(
+            (flash) => flash && now - flash.startedAt < flash.duration
+        );
+
+        return (
+            gameState.specialMoveFlashes.find(
+                (flash) =>
+                    flash.position === position && flash.value === cardValue
+            ) || null
+        );
+    }
+
+    function renderSpecialMoveFlash(card, position) {
+        const flash = getSpecialMoveFlash(card.value, position);
+        if (!flash) {
+            return;
+        }
+
+        const progress = Math.min(
+            (Date.now() - flash.startedAt) / flash.duration,
+            1
+        );
+        const alpha = 1 - progress;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(
+            card.x,
+            card.y - card.hoverOffset,
+            card.width,
+            card.height,
+            card.radius
+        );
+        ctx.fillStyle = 'rgba(255, 224, 82, ' + 0.5 * alpha + ')';
+        ctx.shadowColor = 'rgba(255, 214, 51, ' + 0.9 * alpha + ')';
+        ctx.shadowBlur = 24 * alpha;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 245, 166, ' + 0.95 * alpha + ')';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.restore();
+
+        if (alpha > 0) {
+            needsRedraw = true;
+        }
+    }
     function isMyTurn() {
         return gameState.currentTurn === currentPlayer.id;
     }
@@ -824,6 +903,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cardsPlayedThisTurn: [],
             animatingCards: [],
             columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
+            specialMoveFlashes: [],
         };
 
         updateGameInfo();
@@ -1243,6 +1323,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleOpponentCardPlayed(message) {
+        playBoardMoveSound(
+            message.cardValue,
+            message.position,
+            message.previousValue
+        );
+        registerSpecialMoveFlash(
+            message.cardValue,
+            message.position,
+            message.previousValue
+        );
+
         if (message.playerId !== currentPlayer.id) {
             updateStack(message.position, message.cardValue);
             recordCardPlayed(
@@ -1252,11 +1343,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 message.previousValue
             );
             addToHistory(message.position, message.cardValue);
-            playBoardMoveSound(
-                message.cardValue,
-                message.position,
-                message.previousValue
-            );
             showNotification(
                 `${message.playerName || 'Un jugador'} jugó un ${message.cardValue}`
             );
@@ -1818,6 +1904,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     wasPlayedThisTurn
                 );
                 card.draw();
+                renderSpecialMoveFlash(card, col);
             }
         });
 
@@ -1941,6 +2028,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.shadowBlur = 10;
             ctx.shadowOffsetY = 5;
             anim.newCard.draw();
+            renderSpecialMoveFlash(anim.newCard, anim.column);
 
             ctx.restore();
 
@@ -1959,6 +2047,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // update board immediately for everyone
         updateStack(position, value);
+        registerSpecialMoveFlash(value, position, previousValue);
 
         if (message.playerId !== currentPlayer.id && !isMyTurn()) {
             const targetPos = getColumnPosition(position);
