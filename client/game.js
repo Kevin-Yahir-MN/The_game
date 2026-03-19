@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const HISTORY_ICON_PULSE_DURATION = 500;
     const SPECIAL_MOVE_EFFECT_DURATION = 900;
     const EMOJI_ERROR_COOLDOWN_MS = 4000;
+    const MAX_VISIBLE_EMOJI_REACTIONS = 9;
 
     let BOARD_POSITION = {
         x: canvas.width / 2 - (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
@@ -749,6 +750,50 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Position the floating emoji messages list so it appears below the players panel
+    function setupEmojiPanelToggle() {
+        const panel = document.querySelector('.game-emoji-panel');
+        if (!panel || panel.dataset.toggleBound === 'true') {
+            return;
+        }
+
+        const title = panel.querySelector('h3');
+        const buttons = panel.querySelector('.emoji-buttons');
+        if (!title || !buttons) {
+            return;
+        }
+
+        const header = document.createElement('div');
+        header.className = 'emoji-panel-header';
+        title.parentNode.insertBefore(header, title);
+        header.appendChild(title);
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'emoji-panel-toggle';
+        toggle.setAttribute('aria-expanded', 'true');
+        toggle.setAttribute('aria-label', 'Minimizar reacciones rápidas');
+        toggle.title = 'Minimizar reacciones rápidas';
+        toggle.textContent = '−';
+        header.appendChild(toggle);
+
+        toggle.addEventListener('click', () => {
+            const isCollapsed = panel.classList.toggle('is-collapsed');
+            toggle.setAttribute('aria-expanded', String(!isCollapsed));
+            toggle.setAttribute(
+                'aria-label',
+                isCollapsed
+                    ? 'Mostrar reacciones rápidas'
+                    : 'Minimizar reacciones rápidas'
+            );
+            toggle.title = isCollapsed
+                ? 'Mostrar reacciones rápidas'
+                : 'Minimizar reacciones rápidas';
+            toggle.textContent = isCollapsed ? '' : '−';
+        });
+
+        panel.dataset.toggleBound = 'true';
+    }
+
     function positionEmojiMessages() {
         const msgs = document.getElementById('emojiMessages');
         const panel = document.getElementById('playersPanel');
@@ -823,6 +868,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         item.appendChild(nameSpan);
         item.appendChild(emojiSpan);
+
+        while (msgs.children.length >= MAX_VISIBLE_EMOJI_REACTIONS) {
+            msgs.removeChild(msgs.firstElementChild);
+        }
 
         msgs.appendChild(item);
         msgs.style.display = 'block';
@@ -2291,6 +2340,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     pulseDuration: 500,
                     pulseInterval: 20000,
                 };
+
+                setupEmojiPanelToggle();
 
                 // configurar botones de emoji si existen
                 if (emojiButtonsContainer) {

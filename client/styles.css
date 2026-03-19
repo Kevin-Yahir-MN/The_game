@@ -2682,3 +2682,98 @@ body.modal-open {
     right: auto;
     top: 400px;
 }
+
+.emoji-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.8rem;
+}
+
+.emoji-panel-header h3 {
+    margin: 0;
+}
+
+.emoji-panel-toggle {
+    width: 2rem;
+    height: 2rem;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--light);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+    transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.emoji-panel-toggle:hover {
+    transform: translateY(-1px) scale(1.04);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.emoji-panel-toggle:active {
+    transform: scale(0.98);
+}
+
+.game-emoji-panel {
+    position: relative;
+    overflow: hidden;
+    transition:
+        width 0.22s ease,
+        min-width 0.22s ease,
+        height 0.22s ease,
+        padding 0.22s ease,
+        border-radius 0.22s ease,
+        background 0.22s ease,
+        box-shadow 0.22s ease;
+}
+
+.game-emoji-panel.is-collapsed {
+    width: 26px !important;
+    min-width: 26px;
+    height: 26px;
+    min-height: 26px;
+    padding: 0;
+    border-radius: 999px;
+    background: rgba(255, 224, 82, 0.95);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
+}
+
+.game-emoji-panel.is-collapsed .emoji-panel-header h3,
+.game-emoji-panel.is-collapsed .emoji-buttons {
+    display: none;
+}
+
+.game-emoji-panel.is-collapsed .emoji-panel-header {
+    margin: 0;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.game-emoji-panel.is-collapsed .emoji-panel-toggle {
+    width: 12px;
+    height: 12px;
+    min-width: 12px;
+    min-height: 12px;
+    padding: 0;
+    font-size: 0;
+    background: #fff6bf;
+    box-shadow: 0 0 0 2px rgba(34, 34, 34, 0.15);
+}
+
+.game-emoji-panel.is-collapsed .emoji-panel-toggle::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #d97706;
+    display: block;
+}

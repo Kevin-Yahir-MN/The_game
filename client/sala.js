@@ -113,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const MAX_RECONNECT_ATTEMPTS = 10;
     const RECONNECT_BASE_DELAY = 2000;
     const EMOJI_ERROR_COOLDOWN_MS = 4000;
+    const MAX_VISIBLE_EMOJI_REACTIONS = 9;
 
     let socket;
     let reconnectAttempts = 0;
@@ -254,6 +255,49 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         const name = friendData ? friendData.displayName : '';
         friendModalController.showFriendModal(friendId, name);
+    }
+
+    function setupEmojiPanelToggle() {
+        if (!emojiPanel || emojiPanel.dataset.toggleBound === 'true') {
+            return;
+        }
+
+        const title = emojiPanel.querySelector('h3');
+        const buttons = emojiPanel.querySelector('.emoji-buttons');
+        if (!title || !buttons) {
+            return;
+        }
+
+        const header = document.createElement('div');
+        header.className = 'emoji-panel-header';
+        title.parentNode.insertBefore(header, title);
+        header.appendChild(title);
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'emoji-panel-toggle';
+        toggle.setAttribute('aria-expanded', 'true');
+        toggle.setAttribute('aria-label', 'Minimizar reacciones rápidas');
+        toggle.title = 'Minimizar reacciones rápidas';
+        toggle.textContent = '−';
+        header.appendChild(toggle);
+
+        toggle.addEventListener('click', () => {
+            const isCollapsed = emojiPanel.classList.toggle('is-collapsed');
+            toggle.setAttribute('aria-expanded', String(!isCollapsed));
+            toggle.setAttribute(
+                'aria-label',
+                isCollapsed
+                    ? 'Mostrar reacciones rápidas'
+                    : 'Minimizar reacciones rápidas'
+            );
+            toggle.title = isCollapsed
+                ? 'Mostrar reacciones rápidas'
+                : 'Minimizar reacciones rápidas';
+            toggle.textContent = isCollapsed ? '' : '−';
+        });
+
+        emojiPanel.dataset.toggleBound = 'true';
     }
 
     function updateEmojiPanelPosition() {
@@ -517,6 +561,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         item.appendChild(nameSpan);
         item.appendChild(emojiSpan);
+
+        while (emojiPopinsContainer.children.length >= MAX_VISIBLE_EMOJI_REACTIONS) {
+            emojiPopinsContainer.removeChild(emojiPopinsContainer.firstElementChild);
+        }
 
         emojiPopinsContainer.appendChild(item);
 
@@ -785,6 +833,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         createConnectionStatusElement();
         updateConnectionStatus('Conectando...');
+
+        setupEmojiPanelToggle();
 
         // también renderizamos la lista de amigos ahora que may have loaded
         renderFriendList();
