@@ -381,36 +381,25 @@ document.addEventListener('DOMContentLoaded', () => {
             : numericCardValue === numericPreviousValue + 10;
     }
 
-    function playBoardMoveSound(cardValue, position, previousValue) {
-        const soundName = isSpecialMove(cardValue, position, previousValue)
-            ? 'specialmove'
-            : 'put';
+    function playBoardMoveSound(
+        cardValue,
+        position,
+        previousValue,
+        isSpecialMoveOverride = null
+    ) {
+        const soundName =
+            typeof isSpecialMoveOverride === 'boolean'
+                ? isSpecialMoveOverride
+                    ? 'specialmove'
+                    : 'put'
+                : isSpecialMove(cardValue, position, previousValue)
+                    ? 'specialmove'
+                    : 'put';
         gameAudio?.play(soundName);
     }
 
-    function registerSpecialMoveFlash(cardValue, position, previousValue) {
-        if (!isSpecialMove(cardValue, position, previousValue)) {
-            return;
-        }
-
-        const flashes = Array.isArray(gameState.specialMoveFlashes)
-            ? gameState.specialMoveFlashes
-            : [];
-        gameState.specialMoveFlashes = flashes.filter(
-            (flash) =>
-                !(
-                    flash &&
-                    flash.position === position &&
-                    flash.value === cardValue
-                )
-        );
-        gameState.specialMoveFlashes.push({
-            value: cardValue,
-            position,
-            startedAt: Date.now(),
-            duration: SPECIAL_MOVE_FLASH_DURATION,
-        });
-        needsRedraw = true;
+    function registerSpecialMoveFlash() {
+        return;
     }
 
     function getSpecialMoveFlash(cardValue, position) {
@@ -431,39 +420,8 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
-    function renderSpecialMoveFlash(card, position) {
-        const flash = getSpecialMoveFlash(card.value, position);
-        if (!flash) {
-            return;
-        }
-
-        const progress = Math.min(
-            (Date.now() - flash.startedAt) / flash.duration,
-            1
-        );
-        const alpha = 1 - progress;
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.roundRect(
-            card.x,
-            card.y - card.hoverOffset,
-            card.width,
-            card.height,
-            card.radius
-        );
-        ctx.fillStyle = 'rgba(255, 224, 82, ' + 0.5 * alpha + ')';
-        ctx.shadowColor = 'rgba(255, 214, 51, ' + 0.9 * alpha + ')';
-        ctx.shadowBlur = 24 * alpha;
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 245, 166, ' + 0.95 * alpha + ')';
-        ctx.lineWidth = 4;
-        ctx.stroke();
-        ctx.restore();
-
-        if (alpha > 0) {
-            needsRedraw = true;
-        }
+    function renderSpecialMoveFlash() {
+        return;
     }
     function isMyTurn() {
         return gameState.currentTurn === currentPlayer.id;
@@ -2053,7 +2011,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // update board immediately for everyone
         updateStack(position, value);
-        playBoardMoveSound(value, position, previousValue);
+        playBoardMoveSound(
+            value,
+            position,
+            previousValue,
+            typeof message.isSpecialMove === 'boolean'
+                ? message.isSpecialMove
+                : null
+        );
         registerSpecialMoveFlash(value, position, previousValue);
 
         if (message.playerId !== currentPlayer.id && !isMyTurn()) {

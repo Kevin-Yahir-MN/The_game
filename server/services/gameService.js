@@ -153,6 +153,9 @@ async function handlePlayCard(room, player, msg) {
     }
 
     const previousValue = targetValue;
+    const isSpecialMove = msg.position.includes('asc')
+        ? Number(msg.cardValue) === Number(previousValue) - 10
+        : Number(msg.cardValue) === Number(previousValue) + 10;
 
     if (msg.position.includes('asc')) {
         board.ascending[targetIdx] = msg.cardValue;
@@ -197,6 +200,7 @@ async function handlePlayCard(room, player, msg) {
             cardValue: msg.cardValue,
             position: msg.position,
             previousValue: targetValue,
+            isSpecialMove,
             persistColor: true,
             cardsPlayedThisTurn: getPlayerTurnCount(player),
             remainingDeck: room.gameState.deck.length,
