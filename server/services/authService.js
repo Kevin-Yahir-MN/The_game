@@ -83,7 +83,7 @@ async function registerUser({ username, password, displayName, avatarId }) {
         throw error;
     }
     if (!isValidPassword(password)) {
-        const error = new Error('Contraseña inválida');
+        const error = new Error('Contraseña inválida, minimo 8 caracteres, al menos una letra y un número');
         error.code = 'INVALID_PASSWORD';
         throw error;
     }
@@ -221,7 +221,7 @@ async function getAccountById(userId) {
         const account = result.rows[0];
         if (redisConnected) {
             try {
-            await redisClient.setEx(cacheKey, 300, JSON.stringify(account)); // Cache for 5 minutes
+                await redisClient.setEx(cacheKey, 300, JSON.stringify(account)); // Cache for 5 minutes
             } catch (err) {
                 console.warn('Redis set error:', err);
             }
@@ -353,7 +353,7 @@ async function clearAvatarUrl(userId) {
 
 async function changePassword(userId, currentPassword, newPassword) {
     if (!isValidPassword(newPassword)) {
-        const error = new Error('Contraseña inválida');
+        const error = new Error('Contraseña inválida, minimo 8 caracteres, al menos una letra y un número');
         error.code = 'INVALID_PASSWORD';
         throw error;
     }
@@ -488,7 +488,7 @@ module.exports = {
     updateAvatar,
     updateAvatarUrl,
     clearAvatarUrl,
-    changePassword,    recordUsersGameResult,
+    changePassword, recordUsersGameResult,
     deleteSession,
     cleanupExpiredSessions,
 };
