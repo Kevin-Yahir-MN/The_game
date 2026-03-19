@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let CARD_SPACING = 15;
     const HISTORY_ICON_PULSE_INTERVAL = 20000;
     const HISTORY_ICON_PULSE_DURATION = 500;
-    const SPECIAL_MOVE_FLASH_DURATION = 900;
     const EMOJI_ERROR_COOLDOWN_MS = 4000;
 
     let BOARD_POSITION = {
@@ -84,7 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
         columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
         boardCards: [],
         historyIconAreas: [],
-        specialMoveFlashes: [],
     };
 
     const cardPool = {
@@ -398,31 +396,6 @@ document.addEventListener('DOMContentLoaded', () => {
         gameAudio?.play(soundName);
     }
 
-    function registerSpecialMoveFlash() {
-        return;
-    }
-
-    function getSpecialMoveFlash(cardValue, position) {
-        if (!Array.isArray(gameState.specialMoveFlashes)) {
-            return null;
-        }
-
-        const now = Date.now();
-        gameState.specialMoveFlashes = gameState.specialMoveFlashes.filter(
-            (flash) => flash && now - flash.startedAt < flash.duration
-        );
-
-        return (
-            gameState.specialMoveFlashes.find(
-                (flash) =>
-                    flash.position === position && flash.value === cardValue
-            ) || null
-        );
-    }
-
-    function renderSpecialMoveFlash() {
-        return;
-    }
     function isMyTurn() {
         return gameState.currentTurn === currentPlayer.id;
     }
@@ -866,7 +839,6 @@ document.addEventListener('DOMContentLoaded', () => {
             cardsPlayedThisTurn: [],
             animatingCards: [],
             columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
-            specialMoveFlashes: [],
         };
 
         updateGameInfo();
@@ -1291,12 +1263,6 @@ document.addEventListener('DOMContentLoaded', () => {
             message.position,
             message.previousValue
         );
-        registerSpecialMoveFlash(
-            message.cardValue,
-            message.position,
-            message.previousValue
-        );
-
         if (message.playerId !== currentPlayer.id) {
             updateStack(message.position, message.cardValue);
             recordCardPlayed(
@@ -1867,20 +1833,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     wasPlayedThisTurn
                 );
                 card.draw();
-                renderSpecialMoveFlash(card, col);
             }
         });
 
         handleCardAnimations();
         drawHistoryIcons();
 
-        if (gameState.specialCards) {
-            gameState.specialCards.forEach((card) => {
-                if (!card.isAnimating) {
-                    card.draw();
-                }
-            });
-        }
     }
 
     function drawPlayerCards() {
@@ -1991,7 +1949,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.shadowBlur = 10;
             ctx.shadowOffsetY = 5;
             anim.newCard.draw();
-            renderSpecialMoveFlash(anim.newCard, anim.column);
 
             ctx.restore();
 
@@ -2019,8 +1976,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? message.isSpecialMove
                 : null
         );
-        registerSpecialMoveFlash(value, position, previousValue);
-
         if (message.playerId !== currentPlayer.id && !isMyTurn()) {
             const targetPos = getColumnPosition(position);
 
