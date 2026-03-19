@@ -313,7 +313,6 @@ function registerHttpRoutes(app) {
                         gamesPlayed: Number(account.games_played) || 0,
                         wins: Number(account.wins) || 0,
                         winStreak: Number(account.win_streak) || 0,
-                        specialMoves: Number(account.special_moves) || 0,
                     },
                 },
             });
@@ -381,7 +380,6 @@ function registerHttpRoutes(app) {
                         gamesPlayed: Number(account.games_played) || 0,
                         wins: Number(account.wins) || 0,
                         winStreak: Number(account.win_streak) || 0,
-                        specialMoves: Number(account.special_moves) || 0,
                     },
                 },
             });
@@ -493,7 +491,6 @@ function registerHttpRoutes(app) {
                             gamesPlayed: Number(account.games_played) || 0,
                             wins: Number(account.wins) || 0,
                             winStreak: Number(account.win_streak) || 0,
-                        specialMoves: Number(account.special_moves) || 0,
                         },
                     },
                 });
@@ -542,7 +539,6 @@ function registerHttpRoutes(app) {
                         gamesPlayed: Number(account.games_played) || 0,
                         wins: Number(account.wins) || 0,
                         winStreak: Number(account.win_streak) || 0,
-                        specialMoves: Number(account.special_moves) || 0,
                     },
                 },
             });
@@ -681,7 +677,6 @@ function registerHttpRoutes(app) {
                         gamesPlayed: Number(account.games_played) || 0,
                         wins: Number(account.wins) || 0,
                         winStreak: Number(account.win_streak) || 0,
-                        specialMoves: Number(account.special_moves) || 0,
                     },
                 },
             });
