@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let CARD_SPACING = 15;
     const HISTORY_ICON_PULSE_INTERVAL = 20000;
     const HISTORY_ICON_PULSE_DURATION = 500;
+    const SPECIAL_MOVE_EFFECT_DURATION = 900;
     const EMOJI_ERROR_COOLDOWN_MS = 4000;
 
     let BOARD_POSITION = {
@@ -83,6 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
         columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
         boardCards: [],
         historyIconAreas: [],
+        specialMoveEffects: [],
     };
 
     const cardPool = {
@@ -394,6 +396,83 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? 'specialmove'
                     : 'put';
         gameAudio?.play(soundName);
+    }
+
+    function registerSpecialMoveEffect(position, cardValue) {
+        const numericCardValue = Number(cardValue);
+        if (!Number.isFinite(numericCardValue)) {
+            return;
+        }
+
+        const effects = Array.isArray(gameState.specialMoveEffects)
+            ? gameState.specialMoveEffects
+            : [];
+        gameState.specialMoveEffects = effects.filter(
+            (effect) => !(effect.position === position && effect.cardValue === numericCardValue)
+        );
+        gameState.specialMoveEffects.push({
+            position,
+            cardValue: numericCardValue,
+            startedAt: Date.now(),
+            duration: SPECIAL_MOVE_EFFECT_DURATION,
+        });
+        needsRedraw = true;
+    }
+
+    function getSpecialMoveEffect(position, cardValue) {
+        if (!Array.isArray(gameState.specialMoveEffects)) {
+            return null;
+        }
+
+        const numericCardValue = Number(cardValue);
+        const now = Date.now();
+        gameState.specialMoveEffects = gameState.specialMoveEffects.filter(
+            (effect) => now - effect.startedAt < effect.duration
+        );
+
+        return (
+            gameState.specialMoveEffects.find(
+                (effect) =>
+                    effect.position === position &&
+                    effect.cardValue === numericCardValue
+            ) || null
+        );
+    }
+
+    function renderSpecialMoveEffect(card, position) {
+        const effect = getSpecialMoveEffect(position, card.value);
+        if (!effect) {
+            return;
+        }
+
+        const progress = Math.min(
+            (Date.now() - effect.startedAt) / effect.duration,
+            1
+        );
+        const alpha = 1 - progress;
+        const expand = 8 + 8 * alpha;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(
+            card.x - expand / 2,
+            card.y - card.hoverOffset - expand / 2,
+            card.width + expand,
+            card.height + expand,
+            card.radius + 4
+        );
+        ctx.fillStyle = 'rgba(255, 214, 64, ' + 0.18 * alpha + ')';
+        ctx.shadowColor = 'rgba(255, 215, 0, ' + 0.95 * alpha + ')';
+        ctx.shadowBlur = 28 * alpha;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 244, 179, ' + 0.95 * alpha + ')';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.restore();
+
+        if (alpha > 0) {
+            needsRedraw = true;
+        }
     }
 
     function isMyTurn() {
@@ -839,6 +918,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cardsPlayedThisTurn: [],
             animatingCards: [],
             columnHistory: { asc1: [1], asc2: [1], desc1: [100], desc2: [100] },
+            specialMoveEffects: [],
         };
 
         updateGameInfo();
@@ -1261,8 +1341,14 @@ document.addEventListener('DOMContentLoaded', () => {
         playBoardMoveSound(
             message.cardValue,
             message.position,
-            message.previousValue
+            message.previousValue,
+            typeof message.isSpecialMove === 'boolean'
+                ? message.isSpecialMove
+                : null
         );
+        if (message.isSpecialMove === true) {
+            registerSpecialMoveEffect(message.position, message.cardValue);
+        }
         if (message.playerId !== currentPlayer.id) {
             updateStack(message.position, message.cardValue);
             recordCardPlayed(
@@ -1833,6 +1919,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     wasPlayedThisTurn
                 );
                 card.draw();
+                renderSpecialMoveEffect(card, col);
             }
         });
 
@@ -1949,6 +2036,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.shadowBlur = 10;
             ctx.shadowOffsetY = 5;
             anim.newCard.draw();
+            renderSpecialMoveEffect(anim.newCard, anim.column);
 
             ctx.restore();
 
@@ -1976,6 +2064,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? message.isSpecialMove
                 : null
         );
+        if (message.isSpecialMove === true) {
+            registerSpecialMoveEffect(position, value);
+        }
         if (message.playerId !== currentPlayer.id && !isMyTurn()) {
             const targetPos = getColumnPosition(position);
 
