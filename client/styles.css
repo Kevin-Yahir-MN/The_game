@@ -2795,6 +2795,21 @@ body.modal-open {
     border-bottom: none;
 }
 
+.players-panel,
+.players-section {
+    overflow: hidden;
+    transition:
+        width 0.22s ease,
+        min-width 0.22s ease,
+        height 0.22s ease,
+        min-height 0.22s ease,
+        max-height 0.22s ease,
+        padding 0.22s ease,
+        border-radius 0.22s ease,
+        background 0.22s ease,
+        box-shadow 0.22s ease;
+}
+
 .players-panel.is-collapsed {
     width: 32px !important;
     min-width: 32px;
@@ -2804,6 +2819,8 @@ body.modal-open {
     padding: 0;
     overflow: hidden;
     border-radius: 999px;
+    background: rgba(255, 224, 82, 0.95);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
 }
 
 .players-panel.is-collapsed .players-panel-header h3,
@@ -2842,6 +2859,8 @@ body.modal-open {
     margin-bottom: 0;
     overflow: hidden;
     border-radius: 999px;
+    background: rgba(255, 224, 82, 0.95);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
     z-index: 24;
 }
 
