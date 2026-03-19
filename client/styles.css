@@ -2721,7 +2721,7 @@ body.modal-open {
 }
 
 .game-emoji-panel {
-    position: relative;
+    position: fixed;
     overflow: hidden;
     transition:
         width 0.22s ease,

@@ -302,11 +302,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateEmojiPanelPosition() {
         if (!friendsContainer || !emojiPanel) return;
+
+        if (window.getComputedStyle(emojiPanel).position !== 'fixed') {
+            emojiPanel.style.top = '';
+            emojiPanel.style.left = '';
+            emojiPanel.style.right = '';
+            return;
+        }
+
         const gap = 16;
         const rect = friendsContainer.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) {
             emojiPanel.style.top = '1rem';
             emojiPanel.style.left = '1rem';
+            emojiPanel.style.right = 'auto';
             return;
         }
         emojiPanel.style.top = `${Math.round(rect.bottom + gap)}px`;

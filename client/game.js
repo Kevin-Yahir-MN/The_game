@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // reposition floating emoji messages when the window resizes
     window.addEventListener('resize', () => {
         applyResponsiveCanvasSizing();
+        updateEmojiPanelPosition();
         positionEmojiMessages();
     });
     const TARGET_FPS = 60;
@@ -794,6 +795,22 @@ document.addEventListener('DOMContentLoaded', () => {
         panel.dataset.toggleBound = 'true';
     }
 
+    function updateEmojiPanelPosition() {
+        const panel = document.querySelector('.game-emoji-panel');
+        const infoPanel = document.querySelector('.info-panel');
+        if (!panel || !infoPanel) return;
+        if (window.getComputedStyle(panel).position !== 'fixed') {
+            panel.style.top = '';
+            panel.style.left = '';
+            panel.style.right = '';
+            return;
+        }
+        const gap = 16;
+        const rect = infoPanel.getBoundingClientRect();
+        panel.style.top = `${Math.round(rect.bottom + gap)}px`;
+        panel.style.left = `${Math.round(rect.left)}px`;
+        panel.style.right = 'auto';
+    }
     function positionEmojiMessages() {
         const msgs = document.getElementById('emojiMessages');
         const panel = document.getElementById('playersPanel');
@@ -2342,6 +2359,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
 
                 setupEmojiPanelToggle();
+                updateEmojiPanelPosition();
 
                 // configurar botones de emoji si existen
                 if (emojiButtonsContainer) {
