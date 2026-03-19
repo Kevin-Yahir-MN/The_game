@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const HISTORY_ICON_PULSE_DURATION = 500;
     const SPECIAL_MOVE_EFFECT_DURATION = 900;
     const EMOJI_ERROR_COOLDOWN_MS = 4000;
+    const NOTIFICATION_COOLDOWN_MS = 4000;
     const MAX_VISIBLE_EMOJI_REACTIONS = 9;
 
     let BOARD_POSITION = {
@@ -52,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let connectionStatus = 'disconnected';
     const gameAudio = window.GameAudio || null;
     let lastTurnSoundTurnId = null;
+    let lastNotificationAt = 0;
     let isPlayersPanelCollapsed = false;
     let dragStartCard = null;
     let dragStartX = 0;
@@ -1091,6 +1093,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showNotification(message, isError = false) {
+        const now = Date.now();
+        if (now - lastNotificationAt < NOTIFICATION_COOLDOWN_MS) {
+            return;
+        }
+
+        lastNotificationAt = now;
         const existing = document.querySelector('.notification');
         if (existing) {
             existing.style.animation = 'notificationExit 0.15s forwards';
@@ -1103,14 +1111,10 @@ document.addEventListener('DOMContentLoaded', () => {
         notification.style.animation = 'notificationEnter 0.15s forwards';
         document.body.appendChild(notification);
 
-        setTimeout(
-            () => {
-                notification.style.animation =
-                    'notificationExit 0.15s forwards';
-                setTimeout(() => notification.remove(), 300);
-            },
-            isError || message.includes('GAME OVER') ? 3000 : 3000
-        );
+        setTimeout(() => {
+            notification.style.animation = 'notificationExit 0.15s forwards';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
     }
 
     function showEmojiSendErrorNotification() {

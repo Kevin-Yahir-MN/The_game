@@ -113,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const MAX_RECONNECT_ATTEMPTS = 10;
     const RECONNECT_BASE_DELAY = 2000;
     const EMOJI_ERROR_COOLDOWN_MS = 4000;
+    const NOTIFICATION_COOLDOWN_MS = 4000;
     const MAX_VISIBLE_EMOJI_REACTIONS = 9;
 
     let socket;
@@ -123,6 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameAudio = window.GameAudio || null;
     let hasRenderedPlayersOnce = false;
     let lastEmojiErrorNotificationAt = 0;
+    let lastNotificationAt = 0;
     let isPlayersSectionCollapsed = false;
 
     const roomId = sessionStorage.getItem('roomId');
@@ -176,9 +178,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Mostrar notificación
     function showNotification(message, isError = false) {
+        const now = Date.now();
+        if (now - lastNotificationAt < NOTIFICATION_COOLDOWN_MS) {
+            return;
+        }
+
+        lastNotificationAt = now;
+        const existing = document.querySelector('.notification');
+        if (existing) {
+            existing.style.animation = 'notificationExit 0.15s forwards';
+            setTimeout(() => existing.remove(), 300);
+        }
+
         const notification = document.createElement('div');
         notification.className = `notification ${isError ? 'error' : ''}`;
         notification.textContent = message;
+        
         document.body.appendChild(notification);
 
         setTimeout(() => {
