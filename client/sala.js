@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const gap = 28;
+        const gap = 84;
         const rect = friendsContainer.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) {
             emojiPanel.style.top = '1rem';

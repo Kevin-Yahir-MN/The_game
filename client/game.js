@@ -805,7 +805,7 @@ document.addEventListener('DOMContentLoaded', () => {
             panel.style.right = '';
             return;
         }
-        const gap = 28;
+        const gap = 84;
         const rect = infoPanel.getBoundingClientRect();
         panel.style.top = `${Math.round(rect.bottom + gap)}px`;
         panel.style.left = `${Math.round(rect.left)}px`;
