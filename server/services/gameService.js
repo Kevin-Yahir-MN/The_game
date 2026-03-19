@@ -169,8 +169,7 @@ async function handlePlayCard(room, player, msg) {
         previousValue,
     });
     player.totalCardsPlayed = (Number(player.totalCardsPlayed) || 0) + 1;
-    player.cards = player.cards.filter((c) => c !== msg.cardValue););
-    }
+    player.cards = player.cards.filter((c) => c !== msg.cardValue);
 
     if (room.gameState.deck.length > 0 && getPlayerTurnCount(player) === 1) {
         const playableCards = getPlayableCards(
