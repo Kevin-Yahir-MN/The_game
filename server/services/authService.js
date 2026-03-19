@@ -211,7 +211,7 @@ async function getAccountById(userId) {
     }
 
     const result = await pool.query(
-        `SELECT id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak
+        `SELECT id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak, special_moves
          FROM users
          WHERE id = $1`,
         [userId]
@@ -257,7 +257,7 @@ async function updateDisplayName(userId, displayName) {
              SET display_name = $1,
                  updated_at = NOW()
              WHERE id = $2
-             RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak`,
+             RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak, special_moves`,
             [normalizedDisplayName, userId]
         );
 
@@ -288,7 +288,7 @@ async function updateAvatar(userId, avatarId) {
              avatar_url = NULL,
              updated_at = NOW()
          WHERE id = $2
-         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak`,
+         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak, special_moves`,
         [avatarId, userId]
     );
 
@@ -315,7 +315,7 @@ async function updateAvatarUrl(userId, avatarUrl) {
          SET avatar_url = $1,
              updated_at = NOW()
          WHERE id = $2
-         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak`,
+         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak, special_moves`,
         [avatarUrl, userId]
     );
 
@@ -336,7 +336,7 @@ async function clearAvatarUrl(userId) {
          SET avatar_url = NULL,
              updated_at = NOW()
          WHERE id = $1
-         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak`,
+         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak, special_moves`,
         [userId]
     );
 
@@ -386,6 +386,27 @@ async function changePassword(userId, currentPassword, newPassword) {
     );
 
     if (redisConnected) {
+        try {
+            await redisClient.del(`user:${userId}`);
+        } catch (err) {
+            console.warn('Redis del error:', err);
+        }
+    }
+}
+
+async function incrementUserSpecialMoves(userId) {
+    if (!userId) return;
+
+    const result = await pool.query(
+        `UPDATE users
+         SET special_moves = special_moves + 1,
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING id, special_moves`,
+        [userId]
+    );
+
+    if (result.rowCount > 0 && redisConnected) {
         try {
             await redisClient.del(`user:${userId}`);
         } catch (err) {
@@ -489,6 +510,7 @@ module.exports = {
     updateAvatarUrl,
     clearAvatarUrl,
     changePassword,
+    incrementUserSpecialMoves,
     recordUsersGameResult,
     deleteSession,
     cleanupExpiredSessions,

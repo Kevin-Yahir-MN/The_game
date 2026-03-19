@@ -17,7 +17,7 @@ const {
 } = require('../utils/turnState');
 const { broadcastToRoom, safeSend } = require('./communication');
 const { scheduleSaveGameState, flushSaveGameState } = require('./persistence');
-const { recordUsersGameResult } = require('./authService');
+const { incrementUserSpecialMoves, recordUsersGameResult } = require('./authService');
 
 const { toPersistedPlayer } = require('../utils/serializers');
 
@@ -170,6 +170,12 @@ async function handlePlayCard(room, player, msg) {
     });
     player.totalCardsPlayed = (Number(player.totalCardsPlayed) || 0) + 1;
     player.cards = player.cards.filter((c) => c !== msg.cardValue);
+
+    if (isSpecialMove && player.userId) {
+        incrementUserSpecialMoves(player.userId).catch((error) => {
+            console.error('[GAME] Error updating special move stats:', error);
+        });
+    }
 
     if (room.gameState.deck.length > 0 && getPlayerTurnCount(player) === 1) {
         const playableCards = getPlayableCards(
