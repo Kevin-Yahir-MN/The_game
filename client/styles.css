@@ -2759,21 +2759,102 @@ body.modal-open {
 }
 
 .game-emoji-panel.is-collapsed .emoji-panel-toggle {
-    width: 12px;
-    height: 12px;
-    min-width: 12px;
-    min-height: 12px;
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    min-height: 26px;
     padding: 0;
-    font-size: 0;
-    background: #fff6bf;
-    box-shadow: 0 0 0 2px rgba(34, 34, 34, 0.15);
+    font-size: 16px;
+    line-height: 1;
+    background: transparent;
+    box-shadow: none;
 }
 
 .game-emoji-panel.is-collapsed .emoji-panel-toggle::before {
-    content: '';
-    width: 6px;
-    height: 6px;
+    content: none;
+    width: 0;
+    height: 0;
+    border-radius: 0;
+    background: transparent;
+    display: none;
+}
+
+.players-panel-header,
+.players-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.8rem;
+}
+
+.players-panel-header h3,
+.players-section-header h3 {
+    margin: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.players-panel.is-collapsed {
+    width: 32px !important;
+    min-width: 32px;
+    max-height: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+    overflow: hidden;
     border-radius: 999px;
-    background: #d97706;
-    display: block;
+}
+
+.players-panel.is-collapsed .players-panel-header h3,
+.players-panel.is-collapsed ul {
+    display: none;
+}
+
+.players-panel.is-collapsed .players-panel-header {
+    margin: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.players-panel.is-collapsed .players-panel-toggle,
+.players-section.is-collapsed .players-panel-toggle {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0;
+    font-size: 16px;
+    line-height: 1;
+    background: transparent;
+    box-shadow: none;
+}
+
+.players-section.is-collapsed {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+    margin-bottom: 0;
+    overflow: hidden;
+    border-radius: 999px;
+    z-index: 24;
+}
+
+.players-section.is-collapsed .players-section-header h3,
+.players-section.is-collapsed ul {
+    display: none;
+}
+
+.players-section.is-collapsed .players-section-header {
+    margin: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }

@@ -123,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameAudio = window.GameAudio || null;
     let hasRenderedPlayersOnce = false;
     let lastEmojiErrorNotificationAt = 0;
+    let isPlayersSectionCollapsed = false;
 
     const roomId = sessionStorage.getItem('roomId');
     const playerId = sessionStorage.getItem('playerId');
@@ -139,6 +140,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const emojiButtonsContainer = document.getElementById('emojiButtons');
     const emojiPopinsContainer = document.getElementById('emojiPopins');
     const friendsContainer = document.getElementById('friendsContainer');
+    const playersSection = document.querySelector('.players-section');
+    const roomHeader = document.querySelector('.room-header');
     const emojiPanel = document.querySelector(
         '.room-emoji-chat.game-panel.game-emoji-panel'
     );
@@ -294,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
             toggle.title = isCollapsed
                 ? 'Mostrar reacciones rápidas'
                 : 'Minimizar reacciones rápidas';
-            toggle.textContent = isCollapsed ? '' : '−';
+            toggle.textContent = isCollapsed ? '\u{1F604}' : '-';
         });
 
         emojiPanel.dataset.toggleBound = 'true';
@@ -320,6 +323,76 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         emojiPanel.style.top = `${Math.round(rect.bottom + gap)}px`;
         emojiPanel.style.left = `${Math.round(rect.left)}px`;
+    }
+
+    function setupPlayersSectionToggle() {
+        if (!playersSection || playersSection.dataset.toggleBound === 'true') {
+            return;
+        }
+
+        const title = playersSection.querySelector('h3');
+        const list = playersSection.querySelector('#playersList');
+        if (!title || !list) {
+            return;
+        }
+
+        const header = document.createElement('div');
+        header.className = 'players-section-header';
+        title.parentNode.insertBefore(header, title);
+        header.appendChild(title);
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'emoji-panel-toggle players-panel-toggle';
+        toggle.setAttribute('aria-expanded', 'true');
+        toggle.setAttribute('aria-label', 'Minimizar jugadores');
+        toggle.title = 'Minimizar jugadores';
+        toggle.textContent = '-';
+        header.appendChild(toggle);
+
+        toggle.addEventListener('click', () => {
+            isPlayersSectionCollapsed = !isPlayersSectionCollapsed;
+            playersSection.classList.toggle('is-collapsed', isPlayersSectionCollapsed);
+            toggle.setAttribute('aria-expanded', String(!isPlayersSectionCollapsed));
+            toggle.setAttribute(
+                'aria-label',
+                isPlayersSectionCollapsed ? 'Mostrar jugadores' : 'Minimizar jugadores'
+            );
+            toggle.title = isPlayersSectionCollapsed
+                ? 'Mostrar jugadores'
+                : 'Minimizar jugadores';
+            toggle.textContent = isPlayersSectionCollapsed ? '\u{1F464}' : '-';
+            updatePlayersSectionPosition();
+        });
+
+        playersSection.dataset.toggleBound = 'true';
+    }
+
+    function updatePlayersSectionPosition() {
+        if (!playersSection) return;
+
+        if (!playersSection.classList.contains('is-collapsed')) {
+            playersSection.style.position = '';
+            playersSection.style.top = '';
+            playersSection.style.left = '';
+            playersSection.style.right = '';
+            playersSection.style.zIndex = '';
+            return;
+        }
+
+        const anchor =
+            friendsContainer && friendsContainer.getBoundingClientRect().width > 0
+                ? friendsContainer
+                : roomHeader;
+        if (!anchor) return;
+
+        const gap = 16;
+        const rect = anchor.getBoundingClientRect();
+        playersSection.style.position = 'fixed';
+        playersSection.style.top = `${Math.round(rect.bottom + gap)}px`;
+        playersSection.style.left = `${Math.round(rect.left)}px`;
+        playersSection.style.right = 'auto';
+        playersSection.style.zIndex = '24';
     }
 
     // Actualizar estado de conexión en UI
@@ -844,10 +917,13 @@ document.addEventListener('DOMContentLoaded', () => {
         updateConnectionStatus('Conectando...');
 
         setupEmojiPanelToggle();
+        setupPlayersSectionToggle();
+        updatePlayersSectionPosition();
 
         // también renderizamos la lista de amigos ahora que may have loaded
         renderFriendList();
         updateEmojiPanelPosition();
+        updatePlayersSectionPosition();
     }
 
     // Inicializar la aplicación
@@ -888,6 +964,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('resize', () => {
         updateEmojiPanelPosition();
+        updatePlayersSectionPosition();
     });
 
     // Iniciar

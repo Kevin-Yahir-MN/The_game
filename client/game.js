@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let connectionStatus = 'disconnected';
     const gameAudio = window.GameAudio || null;
     let lastTurnSoundTurnId = null;
+    let isPlayersPanelCollapsed = false;
     let dragStartCard = null;
     let dragStartX = 0;
     let dragStartY = 0;
@@ -789,7 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
             toggle.title = isCollapsed
                 ? 'Mostrar reacciones rápidas'
                 : 'Minimizar reacciones rápidas';
-            toggle.textContent = isCollapsed ? '' : '−';
+            toggle.textContent = isCollapsed ? '\u{1F604}' : '-';
         });
 
         panel.dataset.toggleBound = 'true';
@@ -2041,9 +2042,23 @@ document.addEventListener('DOMContentLoaded', () => {
     function updatePlayersPanel() {
         const panel =
             document.getElementById('playersPanel') || createPlayersPanel();
+        const toggleLabel = isPlayersPanelCollapsed ? '\u{1F464}' : '-';
+        const toggleTitle = isPlayersPanelCollapsed
+            ? 'Mostrar jugadores'
+            : 'Minimizar jugadores';
 
+        panel.classList.toggle('is-collapsed', isPlayersPanelCollapsed);
         panel.innerHTML = `
-            <h3>Jugadores (${gameState.players.length})</h3>
+            <div class="players-panel-header">
+                <h3>Jugadores (${gameState.players.length})</h3>
+                <button
+                    type="button"
+                    class="emoji-panel-toggle players-panel-toggle"
+                    aria-expanded="${String(!isPlayersPanelCollapsed)}"
+                    aria-label="${toggleTitle}"
+                    title="${toggleTitle}"
+                >${toggleLabel}</button>
+            </div>
             <ul>
                 ${gameState.players
                 .map((player) => {
@@ -2070,9 +2085,15 @@ document.addEventListener('DOMContentLoaded', () => {
             </ul>
         `;
 
-        // asegurarse de que el contenedor de mensajes de emoji exista
+        const toggle = panel.querySelector('.players-panel-toggle');
+        if (toggle) {
+            toggle.addEventListener('click', () => {
+                isPlayersPanelCollapsed = !isPlayersPanelCollapsed;
+                updatePlayersPanel();
+            });
+        }
+
         ensureEmojiMessagesContainer();
-        // reposicionar por si el panel cambió de tamaño
         positionEmojiMessages();
     }
 
