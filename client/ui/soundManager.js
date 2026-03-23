@@ -10,6 +10,9 @@
         specialmove: '/assets/sounds/specialmove.mp3',
         win: '/assets/sounds/win.mp3',
     };
+    const SOUND_PLAYBACK_RATES = {
+        put: 1.3,
+    };
     const AUDIO_ENABLED_STORAGE_KEY = 'game_audio_enabled';
 
     const audioCache = new Map();
@@ -138,11 +141,9 @@
         );
         button.title = isEnabled ? 'Silenciar sonido' : 'Activar sonido';
         button.innerHTML = `
-            <span class="game-audio-toggle__icon" aria-hidden="true">${
-                isEnabled ? '🔊' : '🔇'
+            <span class="game-audio-toggle__icon" aria-hidden="true">${isEnabled ? '🔊' : '🔇'
             }</span>
-            <span class="game-audio-toggle__label">${
-                isEnabled ? 'Sonido' : 'Mute'
+            <span class="game-audio-toggle__label">${isEnabled ? 'Sonido' : 'Mute'
             }</span>
         `;
     }
@@ -228,4 +229,5 @@
         ensureMuteButton();
     }
 })(window);
+
 
