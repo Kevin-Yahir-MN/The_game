@@ -1,12 +1,14 @@
 (function attachSoundManager(global) {
     const SOUND_FILES = {
-        chatmessage: '/assets/sounds/chatmessage.wav',
-        draw: '/assets/sounds/draw.wav',
-        invitation: '/assets/sounds/invitation.wav',
-        myturn: '/assets/sounds/myturn.wav',
-        playerenter: '/assets/sounds/playerenter.wav',
-        put: '/assets/sounds/put.wav',
-        specialmove: '/assets/sounds/specialmove.wav',
+        chatmessage: '/assets/sounds/chatmessage.mp3',
+        draw: '/assets/sounds/draw.mp3',
+        gameover: '/assets/sounds/gameover.mp3',
+        invitation: '/assets/sounds/invitation.mp3',
+        myturn: '/assets/sounds/myturn.mp3',
+        playerenter: '/assets/sounds/playerenter.mp3',
+        put: '/assets/sounds/put.mp3',
+        specialmove: '/assets/sounds/specialmove.mp3',
+        win: '/assets/sounds/win.mp3',
     };
     const AUDIO_ENABLED_STORAGE_KEY = 'game_audio_enabled';
 
@@ -226,3 +228,4 @@
         ensureMuteButton();
     }
 })(window);
+
