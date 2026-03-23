@@ -1290,6 +1290,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document
             .getElementById('returnToRoom')
             .addEventListener('click', async () => {
+                gameAudio?.play('returnbutton');
                 const button = document.getElementById('returnToRoom');
                 button.disabled = true;
                 button.textContent = 'Cargando...';
@@ -2442,5 +2443,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initGame();
 });
+
 
 

@@ -122,6 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let reconnectTimeout;
     let connectionStatus = 'disconnected';
     const gameAudio = window.GameAudio || null;
+    const playStartButtonSound = () => gameAudio?.play('startbutton');
+    const playReturnButtonSound = () => gameAudio?.play('returnbutton');
     let hasRenderedPlayersOnce = false;
     let lastEmojiErrorNotificationAt = 0;
     let lastNotificationAt = 0;
@@ -156,7 +158,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setupStartButton() {
         if (!startBtn || startButtonBound) return;
-        startBtn.addEventListener('click', handleStartGame);
+        startBtn.addEventListener('click', () => {
+            playStartButtonSound();
+            handleStartGame();
+        });
         startButtonBound = true;
     }
 
@@ -829,7 +834,10 @@ document.addEventListener('DOMContentLoaded', () => {
         setHostUI();
 
         if (backToMenuBtn) {
-            backToMenuBtn.addEventListener('click', backToMenu);
+            backToMenuBtn.addEventListener('click', () => {
+                playReturnButtonSound();
+                backToMenu();
+            });
         }
 
         if (emojiButtonsContainer) {
@@ -910,3 +918,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // Iniciar
     initialize();
 });
+

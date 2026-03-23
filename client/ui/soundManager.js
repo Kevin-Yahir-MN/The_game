@@ -4,14 +4,14 @@
         draw: '/assets/sounds/draw.mp3',
         gameover: '/assets/sounds/gameover.mp3',
         invitation: '/assets/sounds/invitation.mp3',
+        menubutton: '/assets/sounds/menubutton.mp3',
         myturn: '/assets/sounds/myturn.mp3',
         playerenter: '/assets/sounds/playerenter.mp3',
         put: '/assets/sounds/put.mp3',
+        returnbutton: '/assets/sounds/returnbutton.mp3',
         specialmove: '/assets/sounds/specialmove.mp3',
+        startbutton: '/assets/sounds/startbutton.mp3',
         win: '/assets/sounds/win.mp3',
-    };
-    const SOUND_PLAYBACK_RATES = {
-        put: 1.3,
     };
     const AUDIO_ENABLED_STORAGE_KEY = 'game_audio_enabled';
 
@@ -229,5 +229,8 @@
         ensureMuteButton();
     }
 })(window);
+
+
+
 
 

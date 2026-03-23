@@ -87,6 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let friends = [];
     let lobbyWs = null;
     const gameAudio = window.GameAudio || null;
+    const playMenuButtonSound = () => gameAudio?.play('menubutton');
+    const playReturnButtonSound = () => gameAudio?.play('returnbutton');
     const ROOM_AUTH_ERROR_COOLDOWN_MS = 4000;
     let lastRoomAuthErrorNotificationAt = 0;
 
@@ -1363,7 +1365,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    [
+        loginBtn,
+        registerBtn,
+        acceptGuestBtn,
+        myAccountBtn,
+        logoutBtn,
+        showLoginTab,
+        showRegisterTab,
+        createRoomBtn,
+        joinRoomBtn,
+        confirmJoinRoomBtn,
+        openAvatarModalBtn,
+        openNameModalBtn,
+        openPasswordModalBtn,
+        uploadAvatarBtn,
+        saveDisplayNameBtn,
+        changePasswordBtn,
+    ].forEach((button) => {
+        if (!button) return;
+        button.addEventListener('click', playMenuButtonSound);
+    });
+
+    if (backToMenuBtn) {
+        backToMenuBtn.addEventListener('click', playReturnButtonSound);
+    }
+
+    document.querySelectorAll('[data-back-account]').forEach((button) => {
+        button.addEventListener('click', playReturnButtonSound);
+    });
+
     closeAllAccountModals();
     hydrateSession();
 });
+
+
 
