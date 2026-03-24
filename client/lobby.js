@@ -1389,6 +1389,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    loginPasswordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            loginBtn.click();
+        }
+    });
+
     [
         myAccountBtn,
         showLoginTab,
