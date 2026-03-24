@@ -757,6 +757,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        playStartButtonSound();
         startBtn.disabled = true;
         startBtn.textContent = 'Iniciando...';
         startBtn.classList.add('loading');
@@ -797,7 +798,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (message.type === 'game_started') {
                     clearTimeout(timeout);
                     socket.removeEventListener('message', handler);
-                    playStartButtonSound();
                     window.location.href = 'game.html';
                 }
             });
