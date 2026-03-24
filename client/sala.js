@@ -158,10 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setupStartButton() {
         if (!startBtn || startButtonBound) return;
-        startBtn.addEventListener('click', () => {
-            playStartButtonSound();
-            handleStartGame();
-        });
+        startBtn.addEventListener('click', handleStartGame);
         startButtonBound = true;
     }
 
@@ -180,6 +177,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Mostrar notificación
     function showNotification(message, isError = false) {
+        if (isError) {
+            gameAudio?.play('error');
+        }
         const now = Date.now();
         if (now - lastNotificationAt < NOTIFICATION_COOLDOWN_MS) {
             return;
@@ -452,6 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const message = JSON.parse(event.data);
 
                 if (message.type === 'game_started') {
+                    playStartButtonSound();
                     window.location.href = 'game.html';
                 }
                 if (message.type === 'pong') {
@@ -686,6 +687,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             avatarId: btn.closest('li').dataset.avatarId || null,
                             avatarUrl: btn.closest('li').dataset.avatarUrl || null,
                         });
+                        gameAudio?.play('menubutton');
                         renderFriendList();
                         updatePlayersUI(currentPlayers); // rerender to remove button
                     } else {
@@ -789,6 +791,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (message.type === 'game_started') {
                     clearTimeout(timeout);
                     socket.removeEventListener('message', handler);
+                    playStartButtonSound();
                     window.location.href = 'game.html';
                 }
             });
@@ -918,4 +921,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Iniciar
     initialize();
 });
+
+
 

@@ -2,6 +2,7 @@
     const SOUND_FILES = {
         chatmessage: '/assets/sounds/chatmessage.mp3',
         draw: '/assets/sounds/draw.mp3',
+        error: '/assets/sounds/error.mp3',
         gameover: '/assets/sounds/gameover.mp3',
         invitation: '/assets/sounds/invitation.mp3',
         menubutton: '/assets/sounds/menubutton.mp3',
@@ -229,6 +230,8 @@
         ensureMuteButton();
     }
 })(window);
+
+
 
 
 

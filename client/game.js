@@ -1093,6 +1093,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showNotification(message, isError = false) {
+        if (isError) {
+            gameAudio?.play('error');
+        }
         const now = Date.now();
         if (now - lastNotificationAt < NOTIFICATION_COOLDOWN_MS) {
             return;
@@ -2443,6 +2446,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initGame();
 });
+
 
 
 
