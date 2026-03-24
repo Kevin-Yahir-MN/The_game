@@ -85,7 +85,9 @@
         const modalWins = document.getElementById('modalWins');
         const modalWinStreak = document.getElementById('modalWinStreak');
         const removeFriendBtn = document.getElementById('removeFriendBtn');
-        
+        const closeFriendModalBtn = document.querySelector(
+            '[data-close-friend-modal]'
+        );
         const gameAudio = window.GameAudio || null;
 
         if (!modal) {
@@ -180,6 +182,7 @@
         createFriendModalController,
     };
 })();
+
 
 
 
