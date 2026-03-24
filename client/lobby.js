@@ -89,6 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameAudio = window.GameAudio || null;
     const playMenuButtonSound = () => gameAudio?.play('menubutton');
     const playReturnButtonSound = () => gameAudio?.play('returnbutton');
+    const ERROR_NOTIFICATION_DURATION_MS = 3000;
     const ROOM_AUTH_ERROR_COOLDOWN_MS = 4000;
     let lastRoomAuthErrorNotificationAt = 0;
 
@@ -339,6 +340,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showError(message) {
+        if (document.querySelector('.notification.error')) {
+            return;
+        }
+
         gameAudio?.play('error');
         const errorElement = document.createElement('div');
         errorElement.className = 'notification error';
@@ -364,6 +369,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showSuccess(message) {
+        if (document.querySelector('.notification.success')) {
+            return;
+        }
+
         const successElement = document.createElement('div');
         successElement.className = 'notification success';
         successElement.textContent = message;
@@ -1409,6 +1418,9 @@ document.addEventListener('DOMContentLoaded', () => {
     closeAllAccountModals();
     hydrateSession();
 });
+
+
+
 
 
 

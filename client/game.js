@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const HISTORY_ICON_PULSE_DURATION = 500;
     const SPECIAL_MOVE_EFFECT_DURATION = 900;
     const EMOJI_ERROR_COOLDOWN_MS = 4000;
+    const ERROR_NOTIFICATION_DURATION_MS = 3000;
     const NOTIFICATION_COOLDOWN_MS = 4000;
     const MAX_VISIBLE_EMOJI_REACTIONS = 9;
 
@@ -1094,7 +1095,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showNotification(message, isError = false) {
         if (isError) {
+            if (document.querySelector('.notification.error')) {
+                return;
+            }
             gameAudio?.play('error');
+        } else if (document.querySelector('.notification.success')) {
+            return;
         }
         const now = Date.now();
         if (now - lastNotificationAt < NOTIFICATION_COOLDOWN_MS) {
@@ -1117,7 +1123,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             notification.style.animation = 'notificationExit 0.15s forwards';
             setTimeout(() => notification.remove(), 300);
-        }, 3000);
+        }, isError ? ERROR_NOTIFICATION_DURATION_MS : 3000);
     }
 
     function showEmojiSendErrorNotification() {
@@ -2446,6 +2452,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initGame();
 });
+
+
+
+
 
 
 
