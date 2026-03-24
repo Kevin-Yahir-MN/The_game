@@ -13,6 +13,7 @@ function toPersistedPlayer(player) {
         connected: player.ws?.readyState === WebSocket.OPEN,
         movesThisTurn: getTurnState(player).moves,
         totalCardsPlayed: Number(player.totalCardsPlayed) || 0,
+        specialMovesThisMatch: Number(player.specialMovesThisMatch) || 0,
         lastActivity: player.lastActivity,
     };
 }

@@ -126,6 +126,8 @@ async function restoreActiveGames() {
                                         : [],
                             },
                             totalCardsPlayed: Number(p.totalCardsPlayed) || 0,
+                            specialMovesThisMatch:
+                                Number(p.specialMovesThisMatch) || 0,
                             lastActivity: Date.now(),
                             // asegurar que solo el host original sea host
                             isHost: p.id === originalHostId,

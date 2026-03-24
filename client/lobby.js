@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const statGamesPlayed = document.getElementById('statGamesPlayed');
     const statWins = document.getElementById('statWins');
     const statWinStreak = document.getElementById('statWinStreak');
+    const statSpecialMoves = document.getElementById('statSpecialMoves');
     const avatarCurrent = document.getElementById('avatarCurrent');
     const avatarOptions = document.getElementById('avatarOptions');
     const avatarUploadInput = document.getElementById('avatarUploadInput');
@@ -826,6 +827,9 @@ document.addEventListener('DOMContentLoaded', () => {
             );
             statWins.textContent = String(account.stats?.wins || 0);
             statWinStreak.textContent = String(account.stats?.winStreak || 0);
+            statSpecialMoves.textContent = String(
+                account.stats?.specialMoves || 0
+            );
             setCurrentAvatar(
                 account.avatarId || DEFAULT_AVATAR_ID,
                 account.avatarUrl || null

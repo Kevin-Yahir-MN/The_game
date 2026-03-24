@@ -84,6 +84,7 @@
         const modalGamesPlayed = document.getElementById('modalGamesPlayed');
         const modalWins = document.getElementById('modalWins');
         const modalWinStreak = document.getElementById('modalWinStreak');
+        const modalSpecialMoves = document.getElementById('modalSpecialMoves');
         const removeFriendBtn = document.getElementById('removeFriendBtn');
         const closeFriendModalBtn = document.querySelector(
             '[data-close-friend-modal]'
@@ -130,6 +131,8 @@
                             stats.gamesPlayed ?? '-';
                         modalWins.textContent = stats.wins ?? '-';
                         modalWinStreak.textContent = stats.winStreak ?? '-';
+                        modalSpecialMoves.textContent =
+                            stats.specialMoves ?? '-';
                         modal.classList.remove('hidden');
                         modal.dataset.currentId = friendId;
                     })
@@ -138,6 +141,7 @@
                         modalGamesPlayed.textContent = '-';
                         modalWins.textContent = '-';
                         modalWinStreak.textContent = '-';
+                        modalSpecialMoves.textContent = '-';
                         modal.classList.remove('hidden');
                         modal.dataset.currentId = friendId;
                     });
@@ -146,6 +150,7 @@
                 modalGamesPlayed.textContent = '-';
                 modalWins.textContent = '-';
                 modalWinStreak.textContent = '-';
+                modalSpecialMoves.textContent = '-';
                 modal.classList.remove('hidden');
                 modal.dataset.currentId = friendId;
             }
@@ -182,6 +187,8 @@
         createFriendModalController,
     };
 })();
+
+
 
 
 

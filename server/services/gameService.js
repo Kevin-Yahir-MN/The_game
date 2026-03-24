@@ -46,7 +46,12 @@ function finalizeGame(room, { result, message, reason }) {
     if (room.gameState.gameFinished) return;
     room.gameState.gameFinished = true;
 
-    const userIds = room.players.map((player) => player.userId).filter(Boolean);
+    const playerResults = room.players
+        .filter((player) => player.userId)
+        .map((player) => ({
+            userId: player.userId,
+            specialMoves: Number(player.specialMovesThisMatch) || 0,
+        }));
 
     if (!require('../config').IS_PRODUCTION) {
         console.log(
@@ -55,11 +60,11 @@ function finalizeGame(room, { result, message, reason }) {
             ', players=' +
             room.players.length +
             ', validUserIds=' +
-            userIds.length
+            playerResults.length
         );
     }
 
-    recordUsersGameResult(userIds, result === 'win').catch((error) => {
+    recordUsersGameResult(playerResults, result === 'win').catch((error) => {
         console.error('[GAME] Error updating stats:', error);
     });
 
@@ -169,6 +174,10 @@ async function handlePlayCard(room, player, msg) {
         previousValue,
     });
     player.totalCardsPlayed = (Number(player.totalCardsPlayed) || 0) + 1;
+    if (isSpecialMove) {
+        player.specialMovesThisMatch =
+            (Number(player.specialMovesThisMatch) || 0) + 1;
+    }
     player.cards = player.cards.filter((c) => c !== msg.cardValue);
 
     if (room.gameState.deck.length > 0 && getPlayerTurnCount(player) === 1) {

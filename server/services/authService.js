@@ -211,7 +211,7 @@ async function getAccountById(userId) {
     }
 
     const result = await pool.query(
-        `SELECT id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak
+        `SELECT id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak, special_moves
          FROM users
          WHERE id = $1`,
         [userId]
@@ -257,7 +257,7 @@ async function updateDisplayName(userId, displayName) {
              SET display_name = $1,
                  updated_at = NOW()
              WHERE id = $2
-             RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak`,
+             RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak, special_moves`,
             [normalizedDisplayName, userId]
         );
 
@@ -288,7 +288,7 @@ async function updateAvatar(userId, avatarId) {
              avatar_url = NULL,
              updated_at = NOW()
          WHERE id = $2
-         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak`,
+         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak, special_moves`,
         [avatarId, userId]
     );
 
@@ -315,7 +315,7 @@ async function updateAvatarUrl(userId, avatarUrl) {
          SET avatar_url = $1,
              updated_at = NOW()
          WHERE id = $2
-         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak`,
+         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak, special_moves`,
         [avatarUrl, userId]
     );
 
@@ -336,7 +336,7 @@ async function clearAvatarUrl(userId) {
          SET avatar_url = NULL,
              updated_at = NOW()
          WHERE id = $1
-         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak`,
+         RETURNING id, username, display_name, avatar_id, avatar_url, games_played, wins, win_streak, special_moves`,
         [userId]
     );
 
@@ -394,26 +394,44 @@ async function changePassword(userId, currentPassword, newPassword) {
     }
 }
 
-async function recordUsersGameResult(userIds, didWin) {
+async function recordUsersGameResult(playerResults, didWin) {
     console.log(
-        '[AUTH] recordUsersGameResult called with userIds=' +
-        JSON.stringify(userIds) +
+        '[AUTH] recordUsersGameResult called with playerResults=' +
+        JSON.stringify(playerResults) +
         ', didWin=' +
         didWin
     );
 
-    if (!Array.isArray(userIds) || userIds.length === 0) {
-        console.warn('[AUTH] Invalid or empty userIds array');
+    if (!Array.isArray(playerResults) || playerResults.length === 0) {
+        console.warn('[AUTH] Invalid or empty playerResults array');
         return;
     }
 
-    const uniqueIds = [...new Set(userIds.filter(Boolean))];
-    if (uniqueIds.length === 0) {
-        console.warn('[AUTH] No valid IDs after deduplication');
+    const mergedResults = new Map();
+    for (const entry of playerResults) {
+        if (!entry || !entry.userId) continue;
+        const existing = mergedResults.get(entry.userId) || {
+            userId: entry.userId,
+            specialMoves: 0,
+        };
+        existing.specialMoves += Number(entry.specialMoves) || 0;
+        mergedResults.set(entry.userId, existing);
+    }
+
+    const sanitizedResults = Array.from(mergedResults.values());
+    if (sanitizedResults.length === 0) {
+        console.warn('[AUTH] No valid player results after sanitization');
         return;
     }
 
-    console.log('[AUTH] Updating stats for ' + uniqueIds.length + ' users');
+    const userIds = sanitizedResults.map((entry) => entry.userId);
+    const specialMovesPayload = JSON.stringify(
+        Object.fromEntries(
+            sanitizedResults.map((entry) => [entry.userId, entry.specialMoves])
+        )
+    );
+
+    console.log('[AUTH] Updating stats for ' + userIds.length + ' users');
 
     if (didWin) {
         const result = await pool.query(
@@ -421,15 +439,16 @@ async function recordUsersGameResult(userIds, didWin) {
              SET games_played = games_played + 1,
                  wins = wins + 1,
                  win_streak = win_streak + 1,
+                 special_moves = special_moves + COALESCE(($2::jsonb ->> id), '0')::integer,
                  updated_at = NOW()
              WHERE id = ANY($1::uuid[])
              RETURNING id, games_played, wins`,
-            [uniqueIds]
+            [userIds, specialMovesPayload]
         );
         console.log('[AUTH] Win updated for ' + result.rowCount + ' rows');
         // Invalidate cache
         if (redisConnected) {
-            for (const id of uniqueIds) {
+            for (const id of userIds) {
                 try {
                     await redisClient.del(`user:${id}`);
                 } catch (err) {
@@ -444,15 +463,16 @@ async function recordUsersGameResult(userIds, didWin) {
         `UPDATE users
          SET games_played = games_played + 1,
              win_streak = 0,
+             special_moves = special_moves + COALESCE(($2::jsonb ->> id), '0')::integer,
              updated_at = NOW()
          WHERE id = ANY($1::uuid[])
          RETURNING id, games_played`,
-        [uniqueIds]
+        [userIds, specialMovesPayload]
     );
     console.log('[AUTH] Loss updated for ' + result.rowCount + ' rows');
     // Invalidate cache
     if (redisConnected) {
-        for (const id of uniqueIds) {
+        for (const id of userIds) {
             try {
                 await redisClient.del(`user:${id}`);
             } catch (err) {
