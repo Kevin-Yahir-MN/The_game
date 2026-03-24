@@ -190,6 +190,38 @@
             audioInstance.play().catch(() => null);
             return true;
         },
+        playAndWait(soundName) {
+            return new Promise((resolve) => {
+                if (!isEnabled) {
+                    resolve(false);
+                    return;
+                }
+
+                const baseAudio = getAudio(soundName);
+                if (!baseAudio) {
+                    resolve(false);
+                    return;
+                }
+
+                const audioInstance = baseAudio.cloneNode(true);
+                audioInstance.volume = baseAudio.volume || 1;
+                audioInstance.currentTime = 0;
+
+                const finish = () => resolve(true);
+                audioInstance.addEventListener('ended', finish, {
+                    once: true,
+                });
+                audioInstance.addEventListener(
+                    'error',
+                    () => resolve(false),
+                    {
+                        once: true,
+                    }
+                );
+
+                audioInstance.play().catch(() => resolve(false));
+            });
+        },
         setEnabled(nextValue) {
             isEnabled = Boolean(nextValue);
             persistEnabledState();
@@ -230,6 +262,7 @@
         ensureMuteButton();
     }
 })(window);
+
 
 
 

@@ -124,6 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let connectionStatus = 'disconnected';
     const gameAudio = window.GameAudio || null;
     const playStartButtonSound = () => gameAudio?.play('startbutton');
+    const playStartButtonSoundAndWait = () =>
+        gameAudio?.playAndWait?.('startbutton') || Promise.resolve(false);
     const playReturnButtonSound = () => gameAudio?.play('returnbutton');
     let hasRenderedPlayersOnce = false;
     let lastEmojiErrorNotificationAt = 0;
@@ -757,7 +759,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        playStartButtonSound();
         startBtn.disabled = true;
         startBtn.textContent = 'Iniciando...';
         startBtn.classList.add('loading');
@@ -798,7 +799,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (message.type === 'game_started') {
                     clearTimeout(timeout);
                     socket.removeEventListener('message', handler);
-                    window.location.href = 'game.html';
+                    playStartButtonSoundAndWait().finally(() => {
+                        window.location.href = 'game.html';
+                    });
                 }
             });
         } catch (error) {
