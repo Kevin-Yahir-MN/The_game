@@ -845,7 +845,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (backToMenuBtn) {
             backToMenuBtn.addEventListener('click', () => {
                 playReturnButtonSound();
-                backToMenu();
+                setTimeout(backToMenu, 120);
             });
         }
 
@@ -927,6 +927,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Iniciar
     initialize();
 });
+
 
 
 
