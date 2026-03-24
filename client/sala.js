@@ -123,9 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let reconnectTimeout;
     let connectionStatus = 'disconnected';
     const gameAudio = window.GameAudio || null;
-    const playStartButtonSound = () => gameAudio?.play('startbutton');
-    const playStartButtonSoundAndWait = () =>
-        gameAudio?.playAndWait?.('startbutton') || Promise.resolve(false);
+    const playStartButtonSound = () => gameAudio?.play('menubutton');
     const playReturnButtonSound = () => gameAudio?.play('returnbutton');
     let hasRenderedPlayersOnce = false;
     let lastEmojiErrorNotificationAt = 0;
@@ -799,9 +797,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (message.type === 'game_started') {
                     clearTimeout(timeout);
                     socket.removeEventListener('message', handler);
-                    playStartButtonSoundAndWait().finally(() => {
-                        window.location.href = 'game.html';
-                    });
+                    window.location.href = 'game.html';
                 }
             });
         } catch (error) {

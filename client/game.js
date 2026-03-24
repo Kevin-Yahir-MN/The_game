@@ -2351,6 +2351,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (loadingScreen) {
             loadingScreen.classList.remove('hidden');
         }
+        gameAudio?.play('startbutton');
 
         Promise.all([
             loadAsset('/assets/cards-icon.png')
