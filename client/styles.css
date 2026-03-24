@@ -474,7 +474,19 @@ body.modal-open {
     padding: 1rem;
     border-radius: 8px;
     margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
     transition: all 0.3s;
+}
+
+#playersList .avatar-chip,
+#playersList .avatar-img {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    font-size: 28px;
 }
 
 #playersList li.host {
@@ -1250,20 +1262,20 @@ body.modal-open {
 }
 
 .avatar-current {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
+    width: 84px;
+    height: 84px;
+    border-radius: 20px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 28px;
+    font-size: 48px;
     background: rgba(255, 255, 255, 0.12);
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .avatar-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
     gap: 10px;
 }
 
@@ -1315,12 +1327,12 @@ body.modal-open {
 }
 
 .avatar-option {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.15);
     background: rgba(255, 255, 255, 0.08);
-    font-size: 22px;
+    font-size: 30px;
     cursor: pointer;
     transition: transform 0.15s ease, border-color 0.15s ease;
 }
@@ -1339,29 +1351,31 @@ body.modal-open {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 8px;
-    margin-right: 8px;
-    font-size: 16px;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    margin-right: 10px;
+    font-size: 22px;
     background: rgba(255, 255, 255, 0.12);
+    flex-shrink: 0;
 }
 
 .avatar-img {
-    width: 24px;
-    height: 24px;
-    border-radius: 8px;
-    margin-right: 8px;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    margin-right: 10px;
     object-fit: cover;
     display: inline-block;
+    flex-shrink: 0;
 }
 
 .players-panel .avatar-chip,
 .players-panel .avatar-img {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    font-size: 22px;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    font-size: 30px;
 }
 
 .players-panel .avatar-chip {
@@ -1371,9 +1385,9 @@ body.modal-open {
 }
 
 .avatar-current .avatar-img {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
+    width: 84px;
+    height: 84px;
+    border-radius: 20px;
     margin-right: 0;
 }
 
@@ -2009,10 +2023,10 @@ body.modal-open {
 
     .players-panel .avatar-chip,
     .players-panel .avatar-img {
-        width: 28px;
-        height: 28px;
-        border-radius: 8px;
-        font-size: 18px;
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        font-size: 24px;
     }
 
     #emojiMessages {
@@ -2357,6 +2371,19 @@ body.modal-open {
     margin: 0.6rem 0 1rem;
     color: var(--light);
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.active-user-card .avatar-chip,
+.active-user-card .avatar-img {
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+    font-size: 34px;
+    margin-right: 0;
 }
 
 .account-panel {
