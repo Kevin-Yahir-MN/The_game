@@ -112,7 +112,7 @@
                 removeFriendBtn.style.display = 'none';
             }
 
-            if (allowRemove && typeof fetchAccount === 'function') {
+            if (typeof fetchAccount === 'function') {
                 fetchAccount(friendId)
                     .then((account) => {
                         if (!account) {
@@ -187,6 +187,7 @@
         createFriendModalController,
     };
 })();
+
 
 
 

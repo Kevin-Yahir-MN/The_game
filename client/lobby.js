@@ -682,6 +682,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
+    setCurrentAvatar(DEFAULT_AVATAR_ID, null);
+    renderAvatarOptions(DEFAULT_AVATAR_ID);
+
     async function updateAvatar(avatarId) {
         if (!avatarId) return;
         try {
