@@ -425,51 +425,40 @@ async function recordUsersGameResult(playerResults, didWin) {
     }
 
     const userIds = sanitizedResults.map((entry) => entry.userId);
-    const specialMovesPayload = JSON.stringify(
-        Object.fromEntries(
-            sanitizedResults.map((entry) => [entry.userId, entry.specialMoves])
-        )
-    );
 
     console.log('[AUTH] Updating stats for ' + userIds.length + ' users');
 
-    if (didWin) {
-        const result = await pool.query(
-            `UPDATE users
-             SET games_played = games_played + 1,
-                 wins = wins + 1,
-                 win_streak = win_streak + 1,
-                 special_moves = special_moves + COALESCE(($2::jsonb ->> id), '0')::integer,
-                 updated_at = NOW()
-             WHERE id = ANY($1::uuid[])
-             RETURNING id, games_played, wins`,
-            [userIds, specialMovesPayload]
-        );
-        console.log('[AUTH] Win updated for ' + result.rowCount + ' rows');
-        // Invalidate cache
-        if (redisConnected) {
-            for (const id of userIds) {
-                try {
-                    await redisClient.del(`user:${id}`);
-                } catch (err) {
-                    console.warn('Redis del error:', err);
-                }
+    await withTransaction(async (client) => {
+        for (const entry of sanitizedResults) {
+            if (didWin) {
+                await client.query(
+                    `UPDATE users
+                     SET games_played = games_played + 1,
+                         wins = wins + 1,
+                         win_streak = win_streak + 1,
+                         special_moves = special_moves + $2,
+                         updated_at = NOW()
+                     WHERE id = $1`,
+                    [entry.userId, entry.specialMoves]
+                );
+                continue;
             }
-        }
-        return;
-    }
 
-    const result = await pool.query(
-        `UPDATE users
-         SET games_played = games_played + 1,
-             win_streak = 0,
-             special_moves = special_moves + COALESCE(($2::jsonb ->> id), '0')::integer,
-             updated_at = NOW()
-         WHERE id = ANY($1::uuid[])
-         RETURNING id, games_played`,
-        [userIds, specialMovesPayload]
+            await client.query(
+                `UPDATE users
+                 SET games_played = games_played + 1,
+                     win_streak = 0,
+                     special_moves = special_moves + $2,
+                     updated_at = NOW()
+                 WHERE id = $1`,
+                [entry.userId, entry.specialMoves]
+            );
+        }
+    });
+
+    console.log(
+        `[AUTH] ${didWin ? 'Win' : 'Loss'} updated for ${userIds.length} rows`
     );
-    console.log('[AUTH] Loss updated for ' + result.rowCount + ' rows');
     // Invalidate cache
     if (redisConnected) {
         for (const id of userIds) {
