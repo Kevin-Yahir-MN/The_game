@@ -1370,7 +1370,6 @@ document.addEventListener('DOMContentLoaded', () => {
         registerBtn,
         acceptGuestBtn,
         myAccountBtn,
-        logoutBtn,
         showLoginTab,
         showRegisterTab,
         createRoomBtn,
@@ -1387,9 +1386,19 @@ document.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click', playMenuButtonSound);
     });
 
-    if (backToMenuBtn) {
-        backToMenuBtn.addEventListener('click', playReturnButtonSound);
-    }
+    [
+        logoutBtn,
+        backToMenuBtn,
+        cancelJoinRoomBtn,
+        closeJoinRoomBtn,
+        closeAccountModalBtn,
+        closeAvatarModalBtn,
+        closeNameModalBtn,
+        closePasswordModalBtn,
+    ].forEach((button) => {
+        if (!button) return;
+        button.addEventListener('click', playReturnButtonSound);
+    });
 
     document.querySelectorAll('[data-back-account]').forEach((button) => {
         button.addEventListener('click', playReturnButtonSound);
@@ -1398,6 +1407,7 @@ document.addEventListener('DOMContentLoaded', () => {
     closeAllAccountModals();
     hydrateSession();
 });
+
 
 
 

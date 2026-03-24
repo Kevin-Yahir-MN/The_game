@@ -85,9 +85,8 @@
         const modalWins = document.getElementById('modalWins');
         const modalWinStreak = document.getElementById('modalWinStreak');
         const removeFriendBtn = document.getElementById('removeFriendBtn');
-        const closeFriendModalBtn = document.querySelector(
-            '[data-close-friend-modal]'
-        );
+        
+        const gameAudio = window.GameAudio || null;
 
         if (!modal) {
             return {
@@ -162,6 +161,9 @@
 
         if (closeFriendModalBtn) {
             closeFriendModalBtn.addEventListener('click', closeFriendModal);
+            closeFriendModalBtn.addEventListener('click', () => {
+                gameAudio?.play('returnbutton');
+            });
         }
 
         modal.addEventListener('click', (event) => {
@@ -178,3 +180,6 @@
         createFriendModalController,
     };
 })();
+
+
+
