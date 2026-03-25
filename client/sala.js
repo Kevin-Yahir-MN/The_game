@@ -346,6 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         emojiPanel.style.top = `${Math.round(rect.bottom + gap)}px`;
         emojiPanel.style.left = `${Math.round(rect.left)}px`;
+        emojiPanel.style.right = 'auto';
     }
 
     function updateConnectionStatus(status, isError = false) {

@@ -3359,6 +3359,33 @@ body.app-theme .loading-content {
         inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+body.app-theme--lobby .friends-container {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    width: min(88vw, 320px);
+    max-width: 320px;
+    z-index: 40;
+}
+
+body.app-theme--room .friends-container {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    width: min(88vw, 320px);
+    max-width: 320px;
+    z-index: 40;
+}
+
+body.app-theme--room .room-container .room-emoji-chat.game-panel.game-emoji-panel {
+    position: fixed;
+    top: 12rem;
+    left: 1rem;
+    right: auto;
+    width: min(88vw, 320px);
+    z-index: 35;
+}
+
 @media (max-width: 850px) {
     body.app-theme .friends-container,
     body.app-theme .room-container .room-emoji-chat.game-panel.game-emoji-panel {
@@ -3380,6 +3407,17 @@ body.app-theme .loading-content {
     body.app-theme .room-header h1,
     body.app-theme .lobby-header h1 {
         letter-spacing: 0.02em;
+    }
+
+    body.app-theme--lobby .friends-container,
+    body.app-theme--room .friends-container {
+        top: 0.75rem;
+        left: 0.75rem;
+    }
+
+    body.app-theme--room .room-container .room-emoji-chat.game-panel.game-emoji-panel {
+        left: 0.75rem;
+        right: auto;
     }
 }
 
