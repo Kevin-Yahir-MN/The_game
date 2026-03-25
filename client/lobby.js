@@ -17,8 +17,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const authStatus = document.getElementById('authStatus');
     const loginPanel = document.getElementById('loginPanel');
     const registerPanel = document.getElementById('registerPanel');
+    const guestPanel = document.getElementById('guestPanel');
     const showLoginTab = document.getElementById('showLoginTab');
     const showRegisterTab = document.getElementById('showRegisterTab');
+    const showGuestTab = document.getElementById('showGuestTab');
     const loginBtn = document.getElementById('loginBtn');
     const registerBtn = document.getElementById('registerBtn');
     const logoutBtn = document.getElementById('logoutBtn');
@@ -510,6 +512,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         authOptionsContainer.style.display = isLoggedIn ? 'none' : 'block';
         activeUserContainer.style.display = isLoggedIn ? 'block' : 'none';
+        if (mainActions) {
+            mainActions.style.display = isLoggedIn ? 'flex' : 'none';
+        }
 
         if (isLoggedIn) {
             activeUserLabel.textContent = '';
@@ -538,12 +543,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function switchAuthTab(type) {
         const isLogin = type === 'login';
+        const isRegister = type === 'register';
+        const isGuest = type === 'guest';
 
         showLoginTab.classList.toggle('active', isLogin);
-        showRegisterTab.classList.toggle('active', !isLogin);
+        showRegisterTab.classList.toggle('active', isRegister);
+        showGuestTab.classList.toggle('active', isGuest);
 
         loginPanel.classList.toggle('active', isLogin);
-        registerPanel.classList.toggle('active', !isLogin);
+        registerPanel.classList.toggle('active', isRegister);
+        guestPanel.classList.toggle('active', isGuest);
     }
 
     function openJoinRoomModal() {
@@ -1265,6 +1274,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     showLoginTab.addEventListener('click', () => switchAuthTab('login'));
     showRegisterTab.addEventListener('click', () => switchAuthTab('register'));
+    showGuestTab.addEventListener('click', () => switchAuthTab('guest'));
 
     createRoomBtn.addEventListener('click', async () => {
         const identity = getCurrentIdentity();

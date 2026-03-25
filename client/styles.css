@@ -2490,7 +2490,6 @@ body.modal-open {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.guest-card,
 .active-user-card {
     margin-top: var(--space-2);
     padding: var(--space-2);
@@ -2499,13 +2498,8 @@ body.modal-open {
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.active-user-card h3 {
-    margin: 0;
-    font-size: 1.2rem;
-}
-
 .active-user-card p {
-    margin: 0.6rem 0 1rem;
+    margin: 0 0 1rem;
     color: var(--light);
     font-weight: 600;
     display: flex;

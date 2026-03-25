@@ -212,6 +212,10 @@
                                 <span class="auth-tab__eyebrow">Nuevo perfil</span>
                                 Crear usuario
                             </button>
+                            <button id="showGuestTab" class="auth-tab" type="button">
+                                <span class="auth-tab__eyebrow">Acceso rapido</span>
+                                Invitado
+                            </button>
                         </div>
 
                         <div id="loginPanel" class="auth-panel active">
@@ -253,27 +257,24 @@
                                 Crear usuario
                             </button>
                         </div>
-                    </div>
 
-                    <div class="guest-card">
-                        <div class="auth-header">
-                            <h3>Jugar como invitado</h3>
-                            <p>
-                                Crea un usuario temporal.
-                            </p>
+                        <div id="guestPanel" class="auth-panel">
+                            <div class="auth-panel__intro">
+                                <span class="auth-panel__badge">Entrada inmediata</span>
+                                <p>Entra en segundos con un nombre temporal y empieza a jugar sin crear cuenta.</p>
+                            </div>
+                            <div class="form-group">
+                                <label for="guestName">Nombre</label>
+                                <input type="text" id="guestName" placeholder="Ej: Invitado123" maxlength="20" />
+                            </div>
+                            <button id="acceptGuestBtn" class="btn btn-secondary" type="button">
+                                Jugar como invitado
+                            </button>
                         </div>
-                        <div class="form-group">
-                            <label for="guestName">Nombre</label>
-                            <input type="text" id="guestName" placeholder="Ej: Invitado123" maxlength="20" />
-                        </div>
-                        <button id="acceptGuestBtn" class="btn btn-secondary" type="button">
-                            Aceptar
-                        </button>
                     </div>
                 </div>
 
                 <div id="activeUserContainer" class="active-user-card" style="display: none">
-                    <h3>Usuario activo</h3>
                     <p id="activeUserLabel">-</p>
                     <button id="myAccountBtn" class="btn btn-secondary" type="button">
                         Mi cuenta
@@ -283,7 +284,7 @@
                     </button>
                 </div>
 
-                <div id="mainActions" class="action-buttons">
+                <div id="mainActions" class="action-buttons" style="display: none">
                     <button id="createRoom" class="btn btn-primary">
                         <span class="btn-icon">+</span> Crear nueva sala
                     </button>
