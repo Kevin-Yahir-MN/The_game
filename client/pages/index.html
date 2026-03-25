@@ -195,20 +195,30 @@
                 <div id="authOptionsContainer" class="auth-grid">
                     <div class="auth-card">
                         <div class="auth-header">
-                            <h3>Cuenta</h3>
+                            <span class="auth-kicker">Acceso al mazo</span>
+                            <h3>Cuenta de jugador</h3>
+                            <p class="auth-lead">
+                                Entra a la mesa o crea tu perfil para guardar nombre, avatar y progreso.
+                            </p>
                             <p id="authStatus">No has iniciado sesión.</p>
                         </div>
 
                         <div class="auth-tabs">
                             <button id="showLoginTab" class="auth-tab active" type="button">
+                                <span class="auth-tab__eyebrow">Regresar</span>
                                 Iniciar sesión
                             </button>
                             <button id="showRegisterTab" class="auth-tab" type="button">
+                                <span class="auth-tab__eyebrow">Nuevo perfil</span>
                                 Crear usuario
                             </button>
                         </div>
 
                         <div id="loginPanel" class="auth-panel active">
+                            <div class="auth-panel__intro">
+                                <span class="auth-panel__badge">Jugador recurrente</span>
+                                <p>Recupera tu nombre, tu avatar y vuelve a entrar directo a la partida.</p>
+                            </div>
                             <div class="form-group">
                                 <label for="loginUsername">Usuario</label>
                                 <input type="text" id="loginUsername" placeholder="Ej: jugador123" />
@@ -223,6 +233,10 @@
                         </div>
 
                         <div id="registerPanel" class="auth-panel">
+                            <div class="auth-panel__intro">
+                                <span class="auth-panel__badge">Nuevo ingreso</span>
+                                <p>Crea tu identidad dentro de The Game y deja listo tu perfil para futuras partidas.</p>
+                            </div>
                             <div class="form-group">
                                 <label for="registerDisplayName">Nombre visible</label>
                                 <input type="text" id="registerDisplayName" placeholder="Ej: Juan" />
