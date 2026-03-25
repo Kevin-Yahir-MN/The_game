@@ -306,6 +306,7 @@
         },
         mountControls() {
             ensureMuteButton();
+            bindGlobalButtonSounds();
         },
     };
 
@@ -317,11 +318,19 @@
     });
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', ensureMuteButton, {
-            once: true,
-        });
+        document.addEventListener(
+            'DOMContentLoaded',
+            () => {
+                ensureMuteButton();
+                bindGlobalButtonSounds();
+            },
+            {
+                once: true,
+            }
+        );
     } else {
         ensureMuteButton();
+        bindGlobalButtonSounds();
     }
 })(window);
 
