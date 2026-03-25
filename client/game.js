@@ -775,6 +775,50 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Position the floating emoji messages list so it appears below the players panel
+    function setupInfoPanelToggle() {
+        const panel = document.querySelector('.info-panel');
+        if (!panel || panel.dataset.toggleBound === 'true') {
+            return;
+        }
+
+        const title = panel.querySelector('h3');
+        const content = panel.querySelector('.panel-content');
+        if (!title || !content) {
+            return;
+        }
+
+        const header = document.createElement('div');
+        header.className = 'info-panel-header';
+        title.parentNode.insertBefore(header, title);
+        header.appendChild(title);
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'emoji-panel-toggle info-panel-toggle';
+        toggle.setAttribute('aria-expanded', 'true');
+        toggle.setAttribute('aria-label', 'Minimizar informacion del juego');
+        toggle.title = 'Minimizar informacion del juego';
+        toggle.textContent = '−';
+        header.appendChild(toggle);
+
+        toggle.addEventListener('click', () => {
+            const isCollapsed = panel.classList.toggle('is-collapsed');
+            toggle.setAttribute('aria-expanded', String(!isCollapsed));
+            toggle.setAttribute(
+                'aria-label',
+                isCollapsed
+                    ? 'Mostrar informacion del juego'
+                    : 'Minimizar informacion del juego'
+            );
+            toggle.title = isCollapsed
+                ? 'Mostrar informacion del juego'
+                : 'Minimizar informacion del juego';
+            toggle.textContent = isCollapsed ? '\u2139' : '-';
+            updateEmojiPanelPosition();
+        });
+
+        panel.dataset.toggleBound = 'true';
+    }
     function setupEmojiPanelToggle() {
         const panel = document.querySelector('.game-emoji-panel');
         if (!panel || panel.dataset.toggleBound === 'true') {
@@ -2417,6 +2461,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     pulseInterval: 20000,
                 };
 
+                setupInfoPanelToggle();
                 setupEmojiPanelToggle();
                 updateEmojiPanelPosition();
 
@@ -2474,6 +2519,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initGame();
 });
+
 
 
 

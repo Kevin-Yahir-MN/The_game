@@ -2713,6 +2713,18 @@ body.modal-open {
     top: 400px;
 }
 
+
+.info-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.8rem;
+}
+
+.info-panel-header h3 {
+    margin: 0;
+}
 .emoji-panel-header {
     display: flex;
     align-items: center;
@@ -2809,6 +2821,56 @@ body.modal-open {
     display: none;
 }
 
+.info-panel {
+    overflow: hidden;
+    transition:
+        width 0.22s ease,
+        min-width 0.22s ease,
+        height 0.22s ease,
+        min-height 0.22s ease,
+        padding 0.22s ease,
+        border-radius 0.22s ease,
+        background 0.22s ease,
+        box-shadow 0.22s ease;
+}
+
+.info-panel.is-collapsed {
+    width: 32px !important;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+    border-radius: 999px;
+    background: rgba(52, 152, 219, 0.96);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
+}
+
+.info-panel.is-collapsed .info-panel-header h3,
+.info-panel.is-collapsed .panel-content {
+    display: none;
+}
+
+.info-panel.is-collapsed .info-panel-header {
+    margin: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.info-panel.is-collapsed .info-panel-toggle {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0;
+    font-size: 18px;
+    line-height: 1;
+    background: transparent;
+    box-shadow: none;
+    color: #fff;
+}
 .players-panel-header,
 .players-section-header {
     display: flex;
@@ -2907,3 +2969,4 @@ body.modal-open {
     align-items: center;
     justify-content: center;
 }
+

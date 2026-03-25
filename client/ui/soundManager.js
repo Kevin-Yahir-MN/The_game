@@ -14,6 +14,11 @@
         startbutton: '/assets/sounds/startbutton.mp3',
         win: '/assets/sounds/win.mp3',
     };
+    const SOUND_VOLUMES = {
+        gameover: 0.55,
+        specialmove: 0.55,
+        win: 0.55,
+    };
     const AUDIO_ENABLED_STORAGE_KEY = 'game_audio_enabled';
 
     const audioCache = new Map();
@@ -47,6 +52,7 @@
         if (!audioCache.has(soundName)) {
             const audio = new Audio(src);
             audio.preload = 'auto';
+            audio.volume = SOUND_VOLUMES[soundName] ?? 1;
             audioCache.set(soundName, audio);
         }
 
@@ -262,6 +268,9 @@
         ensureMuteButton();
     }
 })(window);
+
+
+
 
 
 
