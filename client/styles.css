@@ -3359,6 +3359,53 @@ body.app-theme .loading-content {
         inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+body.app-theme .loading-screen {
+    background:
+        radial-gradient(circle at top left, rgba(52, 152, 219, 0.22), transparent 30%),
+        radial-gradient(circle at top right, rgba(46, 204, 113, 0.16), transparent 26%),
+        linear-gradient(160deg, rgba(7, 19, 29, 0.98) 0%, rgba(13, 29, 43, 0.98) 52%, rgba(8, 17, 25, 0.99) 100%);
+    overflow: hidden;
+}
+
+body.app-theme .loading-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(circle at center, black 48%, transparent 100%);
+    opacity: 0.28;
+    pointer-events: none;
+}
+
+body.app-theme .loading-content {
+    position: relative;
+    z-index: 1;
+    min-width: min(88vw, 420px);
+    padding: 2.2rem 2rem;
+    border-radius: 28px;
+}
+
+body.app-theme .loading-content h2 {
+    color: #dff5ff;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+body.app-theme .loading-content p {
+    color: rgba(215, 229, 238, 0.78);
+    font-style: normal;
+}
+
+body.app-theme .loading-spinner {
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top: 4px solid #6dd0ff;
+    border-right: 4px solid #76efbd;
+    box-shadow: 0 0 28px rgba(81, 201, 255, 0.2);
+}
+
 body.app-theme--lobby .friends-container {
     position: fixed;
     top: 1rem;
