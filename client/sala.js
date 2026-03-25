@@ -124,7 +124,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let connectionStatus = 'disconnected';
     const gameAudio = window.GameAudio || null;
     const playStartButtonSound = () => gameAudio?.play('menubutton');
-    const playReturnButtonSound = () => gameAudio?.play('returnbutton');
     let hasRenderedPlayersOnce = false;
     let lastEmojiErrorNotificationAt = 0;
     let lastNotificationAt = 0;
@@ -694,7 +693,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             avatarId: btn.closest('li').dataset.avatarId || null,
                             avatarUrl: btn.closest('li').dataset.avatarUrl || null,
                         });
-                        gameAudio?.play('menubutton');
                         renderFriendList();
                         updatePlayersUI(currentPlayers); // rerender to remove button
                     } else {
@@ -844,7 +842,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (backToMenuBtn) {
             backToMenuBtn.addEventListener('click', () => {
-                playReturnButtonSound();
                 setTimeout(backToMenu, 120);
             });
         }
@@ -927,6 +924,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Iniciar
     initialize();
 });
+
+
+
+
 
 
 

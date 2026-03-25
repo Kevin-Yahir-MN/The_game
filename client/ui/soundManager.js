@@ -179,6 +179,62 @@
         updateMuteButton(button);
     }
 
+    function resolveButtonSound(target) {
+        const button = target?.closest?.(
+            'button, [role="button"], .avatar-option'
+        );
+        if (!button || button.id === 'gameAudioToggle' || button.disabled) {
+            return null;
+        }
+
+        const explicitSound = button.dataset?.sound;
+        if (explicitSound) {
+            return explicitSound;
+        }
+
+        if (
+            button.matches(
+                '.emoji-button, #endTurnBtn'
+            )
+        ) {
+            return null;
+        }
+
+        if (
+            button.matches(
+                '.modal-close-button, .btn-ghost, .room-secondary-button, [data-back-account], [data-close-account-modal], [data-close-avatar-modal], [data-close-name-modal], [data-close-password-modal], #logoutBtn, #backToMenu, #cancelJoinRoomBtn, #closeJoinRoomBtn, #backToMenuBtn, #removeAvatarBtn'
+            )
+        ) {
+            return 'returnbutton';
+        }
+
+        if (button.matches('#startGame')) {
+            return 'startbutton';
+        }
+
+        if (
+            button.matches(
+                '.btn, .auth-tab, .avatar-option, .add-friend-btn, .account-modal__button, .invite-modal__button'
+            )
+        ) {
+            return 'menubutton';
+        }
+
+        return null;
+    }
+
+    function bindGlobalButtonSounds() {
+        document.addEventListener(
+            'click',
+            (event) => {
+                const soundName = resolveButtonSound(event.target);
+                if (soundName) {
+                    global.GameAudio?.play(soundName);
+                }
+            },
+            true
+        );
+    }
     global.GameAudio = {
         play(soundName) {
             if (!isEnabled) {
@@ -268,6 +324,8 @@
         ensureMuteButton();
     }
 })(window);
+
+
 
 
 

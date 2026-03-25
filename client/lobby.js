@@ -89,9 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---- estado y lógica de amigos ----
     let friends = [];
     let lobbyWs = null;
-    const gameAudio = window.GameAudio || null;
-    const playMenuButtonSound = () => gameAudio?.play('menubutton');
-    const playReturnButtonSound = () => gameAudio?.play('returnbutton');
     const ERROR_NOTIFICATION_DURATION_MS = 3000;
     const ROOM_AUTH_ERROR_COOLDOWN_MS = 4000;
     let lastRoomAuthErrorNotificationAt = 0;
@@ -313,7 +310,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         sessionStorage.setItem('playerId', data.playerId);
                         sessionStorage.setItem('roomId', invite.roomId);
                         sessionStorage.setItem('isHost', 'false');
-                        playMenuButtonSound();
                 window.location.href = 'sala.html';
                     } else {
                         showError(data.message || 'No se pudo unir a la sala');
@@ -766,7 +762,6 @@ document.addEventListener('DOMContentLoaded', () => {
             );
             renderAvatarOptions(data.account.avatarId || DEFAULT_AVATAR_ID);
             refreshIdentityUI();
-            playMenuButtonSound();
             showSuccess('Avatar actualizado');
             return data.account;
         } catch (error) {
@@ -931,7 +926,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            playMenuButtonSound();
             saveAuth(data.token, data.user);
             showSuccess('Sesión iniciada correctamente');
             loginPasswordInput.value = '';
@@ -976,7 +970,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            playMenuButtonSound();
             saveAuth(data.token, data.user);
             showSuccess('Usuario creado correctamente');
             registerPasswordInput.value = '';
@@ -998,7 +991,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        playMenuButtonSound();
         saveGuestUser(guestName);
         showSuccess('Usuario temporal creado');
     });
@@ -1190,7 +1182,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 );
             }
 
-            playMenuButtonSound();
             refreshIdentityUI();
             await loadMyAccount();
             showSuccess('Nombre actualizado');
@@ -1235,7 +1226,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            playMenuButtonSound();
             currentPasswordInput.value = '';
             newPasswordInput.value = '';
             showSuccess('Contraseña actualizada correctamente');
@@ -1305,8 +1295,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionStorage.setItem('playerId', data.playerId);
                 sessionStorage.setItem('roomId', data.roomId);
                 sessionStorage.setItem('isHost', 'true');
-                playMenuButtonSound();
-                window.location.href = 'sala.html';
+                    window.location.href = 'sala.html';
             } else {
                 showError(data.message || 'Error al crear la sala');
             }
@@ -1326,7 +1315,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        playMenuButtonSound();
         openJoinRoomModal();
     });
 
@@ -1364,8 +1352,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionStorage.setItem('playerId', data.playerId);
                 sessionStorage.setItem('roomId', roomCode);
                 sessionStorage.setItem('isHost', 'false');
-                playMenuButtonSound();
-                window.location.href = 'sala.html';
+                    window.location.href = 'sala.html';
             } else {
                 showError(data.message || 'Error al unirse a la sala');
             }
@@ -1408,39 +1395,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    [
-        myAccountBtn,
-        showLoginTab,
-        showRegisterTab,
-        openAvatarModalBtn,
-        openNameModalBtn,
-        openPasswordModalBtn,
-    ].forEach((button) => {
-        if (!button) return;
-        button.addEventListener('click', playMenuButtonSound);
-    });
-
-    [
-        logoutBtn,
-        backToMenuBtn,
-        cancelJoinRoomBtn,
-        closeJoinRoomBtn,
-        closeAccountModalBtn,
-        closeAvatarModalBtn,
-        closeNameModalBtn,
-        closePasswordModalBtn,
-    ].forEach((button) => {
-        if (!button) return;
-        button.addEventListener('click', playReturnButtonSound);
-    });
-
-    document.querySelectorAll('[data-back-account]').forEach((button) => {
-        button.addEventListener('click', playReturnButtonSound);
-    });
 
     closeAllAccountModals();
     hydrateSession();
 });
+
+
 
 
 
