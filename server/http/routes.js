@@ -1,7 +1,5 @@
 // src/http/routes.js
 const { v4: uuidv4 } = require('uuid');
-const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
 const sharp = require('sharp');
 const { pool, withTransaction, generateUniqueRoomId } = require('../db');
@@ -28,31 +26,19 @@ const {
     changePassword,
     deleteSession,
 } = require('../services/authService');
+const {
+    uploadAvatarBuffer,
+    deleteAvatar,
+    ensureCloudinaryConfigured,
+} = require('../services/cloudinaryService');
 const { DEFAULT_AVATAR_ID } = require('../../shared/avatars');
 
 const MAX_PLAYERS_PER_ROOM = 6;
-const uploadsRoot = process.env.UPLOADS_DIR
-    ? path.resolve(__dirname, '../../', process.env.UPLOADS_DIR)
-    : path.join(__dirname, '../../uploads');
-const avatarsDir = path.join(uploadsRoot, 'avatars');
-fs.mkdirSync(avatarsDir, { recursive: true });
 const MAX_AVATAR_BYTES = Number(process.env.AVATAR_MAX_BYTES) || 1024 * 1024;
 const AVATAR_SIZE_PX = 256;
 
-const avatarStorage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, avatarsDir),
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname || '').toLowerCase() || '.png';
-        const safeExt = ['.png', '.jpg', '.jpeg', '.webp'].includes(ext)
-            ? ext
-            : '.png';
-        const userId = req.user?.id || 'user';
-        cb(null, `${userId}_${Date.now()}${safeExt}`);
-    },
-});
-
 const avatarUpload = multer({
-    storage: avatarStorage,
+    storage: multer.memoryStorage(),
     limits: { fileSize: MAX_AVATAR_BYTES },
     fileFilter: (req, file, cb) => {
         const ok = ['image/png', 'image/jpeg', 'image/webp'].includes(
@@ -417,6 +403,7 @@ function registerHttpRoutes(app) {
 
     app.post('/auth/avatar/upload', async (req, res) => {
         try {
+            ensureCloudinaryConfigured();
             const user = await getAuthenticatedUser(req);
             if (!user) {
                 return res
@@ -453,33 +440,17 @@ function registerHttpRoutes(app) {
                     });
                 }
 
-                const processedName = `${user.id}_${Date.now()}.webp`;
-                const processedPath = path.join(avatarsDir, processedName);
-                try {
-                    await sharp(req.file.path)
-                        .resize(AVATAR_SIZE_PX, AVATAR_SIZE_PX, { fit: 'cover' })
-                        .webp({ quality: 80 })
-                        .toFile(processedPath);
-                } finally {
-                    fs.unlink(req.file.path, () => {});
-                }
+                const processedBuffer = await sharp(req.file.buffer)
+                    .resize(AVATAR_SIZE_PX, AVATAR_SIZE_PX, { fit: 'cover' })
+                    .webp({ quality: 80 })
+                    .toBuffer();
 
-                const avatarUrl = `/uploads/avatars/${processedName}`;
-                const previous = await getAccountById(user.id);
+                const uploadResult = await uploadAvatarBuffer(
+                    user.id,
+                    processedBuffer
+                );
+                const avatarUrl = uploadResult.secure_url;
                 const account = await updateAvatarUrl(user.id, avatarUrl);
-
-                if (
-                    previous?.avatar_url &&
-                    previous.avatar_url.startsWith('/uploads/avatars/')
-                ) {
-                    const oldPath = path.join(
-                        uploadsRoot,
-                        previous.avatar_url.replace('/uploads/', '')
-                    );
-                    if (oldPath !== path.join(uploadsRoot, avatarUrl.replace('/uploads/', ''))) {
-                        fs.unlink(oldPath, () => {});
-                    }
-                }
 
                 return res.json({
                     success: true,
@@ -499,6 +470,12 @@ function registerHttpRoutes(app) {
                 });
             });
         } catch (error) {
+            if (error.code === 'CLOUDINARY_NOT_CONFIGURED') {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Falta configurar Cloudinary en el servidor',
+                });
+            }
             console.error('Error subiendo avatar:', error);
             return res.status(500).json({
                 success: false,
@@ -519,15 +496,13 @@ function registerHttpRoutes(app) {
             const previous = await getAccountById(user.id);
             const account = await clearAvatarUrl(user.id);
 
-            if (
-                previous?.avatar_url &&
-                previous.avatar_url.startsWith('/uploads/avatars/')
-            ) {
-                const oldPath = path.join(
-                    uploadsRoot,
-                    previous.avatar_url.replace('/uploads/', '')
-                );
-                fs.unlink(oldPath, () => {});
+            if (previous?.avatar_url) {
+                await deleteAvatar(user.id).catch((cloudinaryError) => {
+                    console.warn(
+                        'No se pudo eliminar avatar en Cloudinary:',
+                        cloudinaryError
+                    );
+                });
             }
 
             return res.json({
