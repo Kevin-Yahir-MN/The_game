@@ -3498,9 +3498,9 @@ body.app-theme--game .info-panel {
 }
 
 body.app-theme--game .game-emoji-panel {
-    top: 25px;
-    right: 25px;
-    left: auto;
+    top: 270px;
+    left: 25px;
+    right: auto;
 }
 
 body.app-theme--game .game-controls {
@@ -3715,10 +3715,16 @@ body.app-theme--game .game-over-notification img {
         top: 15px;
     }
 
-    body.app-theme--game .game-emoji-panel {
+    body.app-theme--game .players-panel {
         right: 15px;
-        top: 360px;
+        top: 15px;
         left: auto;
+    }
+
+    body.app-theme--game .game-emoji-panel {
+        left: 15px;
+        top: 250px;
+        right: auto;
     }
 }
 
