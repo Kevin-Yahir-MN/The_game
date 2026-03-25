@@ -133,14 +133,6 @@ async function bootstrapDatabase() {
     try {
         await initializeDatabase();
 
-        // Clean old sessions before deploying this version; this resolves the case of previous users blocked by inherited session records.
-        try {
-            await pool.query('DELETE FROM user_sessions');
-            logger.info('Old sessions purged');
-        } catch (err) {
-            logger.error('Error purging old sessions at startup:', err);
-        }
-
         if (!hasInitialized) {
             restoreActiveGames();
             setInterval(cleanupOldGames, 3600000);

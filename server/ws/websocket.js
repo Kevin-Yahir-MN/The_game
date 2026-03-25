@@ -312,9 +312,9 @@ function setupWebSocket(server) {
                 cardCount: p.cards.length,
                 cardsPlayedThisTurn: getPlayerTurnCount(p),
                 connected: p.ws?.readyState === WebSocket.OPEN,
-                    userId: p.userId || null,
-                    avatarId: p.avatarId || null,
-                    avatarUrl: p.avatarUrl || null,
+                userId: p.userId || null,
+                avatarId: p.avatarId || null,
+                avatarUrl: p.avatarUrl || null,
             }));
         }
 
@@ -328,9 +328,9 @@ function setupWebSocket(server) {
                 name: p.name,
                 isHost: p.isHost,
                 connected: p.ws?.readyState === WebSocket.OPEN,
-                    userId: p.userId || null,
-                    avatarId: p.avatarId || null,
-                    avatarUrl: p.avatarUrl || null,
+                userId: p.userId || null,
+                avatarId: p.avatarId || null,
+                avatarUrl: p.avatarUrl || null,
             })),
         });
 

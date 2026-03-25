@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
         positionEmojiMessages();
     });
     const TARGET_FPS = 60;
-    const MAX_RECONNECT_ATTEMPTS = 5;
+    const MAX_RECONNECT_ATTEMPTS = 12;
     const RECONNECT_BASE_DELAY = 2000;
     let CARD_WIDTH = 80;
     let CARD_HEIGHT = 120;
@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastRenderTime = 0;
     let reconnectAttempts = 0;
     let reconnectTimeout;
+    let pingInterval;
     let connectionStatus = 'disconnected';
     const gameAudio = window.GameAudio || null;
     let lastTurnSoundTurnId = null;
@@ -550,6 +551,24 @@ document.addEventListener('DOMContentLoaded', () => {
             showNotification('Conectado al servidor');
             restoreGameState();
 
+            clearInterval(pingInterval);
+            pingInterval = setInterval(() => {
+                if (socket?.readyState === WebSocket.OPEN) {
+                    try {
+                        socket.send(
+                            JSON.stringify({
+                                type: 'ping',
+                                playerId: currentPlayer.id,
+                                roomId,
+                                timestamp: Date.now(),
+                            })
+                        );
+                    } catch (error) {
+                        log('Error enviando ping', error);
+                    }
+                }
+            }, 15000);
+
             socket.send(
                 JSON.stringify({
                     type: 'get_full_state',
@@ -569,6 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         socket.onclose = (event) => {
+            clearInterval(pingInterval);
             if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                 reconnectAttempts++;
                 const delay = Math.min(
@@ -2282,6 +2302,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Clear timers and animation frames
         clearInterval(historyIconsAnimation.interval);
+        clearInterval(pingInterval);
         clearTimeout(reconnectTimeout);
         cancelAnimationFrame(animationFrameId);
 

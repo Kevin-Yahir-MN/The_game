@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateEmojiPanelPosition();
     }
 
-    const MAX_RECONNECT_ATTEMPTS = 10;
+    const MAX_RECONNECT_ATTEMPTS = 12;
     const RECONNECT_BASE_DELAY = 2000;
     const EMOJI_ERROR_COOLDOWN_MS = 4000;
     const ERROR_NOTIFICATION_DURATION_MS = 3000;
