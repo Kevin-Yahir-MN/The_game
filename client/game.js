@@ -814,7 +814,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? 'Mostrar informacion del juego'
                 : 'Minimizar informacion del juego';
             toggle.textContent = isCollapsed ? '\u2139' : '-';
-            updateEmojiPanelPosition();
         });
 
         panel.dataset.toggleBound = 'true';
@@ -865,20 +864,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateEmojiPanelPosition() {
         const panel = document.querySelector('.game-emoji-panel');
-        const infoPanel = document.querySelector('.info-panel');
-        if (!panel || !infoPanel) return;
+        if (!panel) return;
         if (window.getComputedStyle(panel).position !== 'fixed') {
             panel.style.top = '';
             panel.style.left = '';
             panel.style.right = '';
+            delete panel.dataset.fixedTop;
+            delete panel.dataset.fixedLeft;
+            delete panel.dataset.fixedRight;
             return;
         }
-        const gap = 84;
-        const rect = infoPanel.getBoundingClientRect();
-        panel.style.top = `${Math.round(rect.bottom + gap)}px`;
-        panel.style.left = `${Math.round(rect.left)}px`;
-        panel.style.right = 'auto';
+
+        const computed = window.getComputedStyle(panel);
+        if (!panel.dataset.fixedTop) {
+            panel.dataset.fixedTop = computed.top;
+        }
+        if (!panel.dataset.fixedLeft) {
+            panel.dataset.fixedLeft = computed.left;
+        }
+        if (!panel.dataset.fixedRight) {
+            panel.dataset.fixedRight = computed.right;
+        }
+
+        panel.style.top = panel.dataset.fixedTop;
+        panel.style.left = panel.dataset.fixedLeft;
+        panel.style.right = panel.dataset.fixedRight;
     }
+
     function positionEmojiMessages() {
         const msgs = document.getElementById('emojiMessages');
         const panel = document.getElementById('playersPanel');
