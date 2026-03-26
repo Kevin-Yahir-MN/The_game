@@ -580,6 +580,47 @@ body.modal-open {
     margin-bottom: 1rem;
 }
 
+.room-code-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: 0.4rem;
+    flex-wrap: wrap;
+    vertical-align: middle;
+}
+
+.room-code-copy-btn {
+    border: 1px solid rgba(122, 205, 255, 0.24);
+    border-radius: 999px;
+    padding: 0.45rem 0.95rem;
+    background:
+        linear-gradient(135deg, rgba(47, 140, 214, 0.95), rgba(94, 224, 180, 0.92));
+    color: #f7fdff;
+    font-size: 0.92rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    box-shadow:
+        0 10px 18px rgba(0, 0, 0, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    transition:
+        transform 0.18s ease,
+        box-shadow 0.18s ease,
+        filter 0.18s ease;
+}
+
+.room-code-copy-btn:hover {
+    transform: translateY(-1px);
+    box-shadow:
+        0 14px 22px rgba(0, 0, 0, 0.26),
+        inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    filter: brightness(1.03);
+}
+
+.room-code-copy-btn:active {
+    transform: translateY(0);
+}
+
 .players-section {
     background: rgba(0, 0, 0, 0.3);
     border-radius: 12px;
@@ -978,6 +1019,10 @@ body.modal-open {
     min-height: 50px;
     background-color: #e74c3c;
     position: relative;
+}
+
+#endTurnBtn.is-ready {
+    background-color: #2ecc71;
 }
 
 #endTurnBtn:hover:not(:disabled) {
@@ -2335,13 +2380,14 @@ body.modal-open {
 /* Colores para victoria */
 .game-over-notification h2[style*='#2ecc71'] {
     text-shadow: 0 2px 4px rgba(46, 204, 113, 0.4);
+    background: transparent !important;
 }
 
-.game-over-notification [style*='#2ecc71'] {
+.game-over-notification button[style*='#2ecc71'] {
     transition: all 0.3s;
 }
 
-.game-over-notification [style*='#2ecc71']:hover {
+.game-over-notification button[style*='#2ecc71']:hover {
     background-color: #27ae60 !important;
     box-shadow: 0 5px 15px rgba(46, 204, 113, 0.4) !important;
 }
@@ -2349,13 +2395,14 @@ body.modal-open {
 /* Colores para derrota */
 .game-over-notification h2[style*='#e74c3c'] {
     text-shadow: 0 2px 4px rgba(231, 76, 60, 0.4);
+    background: transparent !important;
 }
 
-.game-over-notification [style*='#e74c3c'] {
+.game-over-notification button[style*='#e74c3c'] {
     transition: all 0.3s;
 }
 
-.game-over-notification [style*='#e74c3c']:hover {
+.game-over-notification button[style*='#e74c3c']:hover {
     background-color: #c0392b !important;
     box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4) !important;
 }
@@ -3523,6 +3570,10 @@ body.app-theme--game #endTurnBtn {
         inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
+body.app-theme--game #endTurnBtn.is-ready {
+    background: linear-gradient(135deg, #1f7b5f 0%, #2bbf84 52%, #7ef0b8 100%);
+}
+
 body.app-theme--game #endTurnBtn:hover:not(:disabled) {
     box-shadow:
         0 20px 34px rgba(0, 0, 0, 0.34),
@@ -3698,11 +3749,16 @@ body.app-theme--game .game-over-notification button {
         inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
-body.app-theme--game .game-over-notification [style*='#2ecc71'] {
+body.app-theme--game .game-over-notification h2[style*='#2ecc71'],
+body.app-theme--game .game-over-notification h2[style*='#e74c3c'] {
+    background: transparent !important;
+}
+
+body.app-theme--game .game-over-notification button[style*='#2ecc71'] {
     background: linear-gradient(135deg, #1f7b5f 0%, #2bbf84 52%, #7ef0b8 100%) !important;
 }
 
-body.app-theme--game .game-over-notification [style*='#e74c3c'] {
+body.app-theme--game .game-over-notification button[style*='#e74c3c'] {
     background: linear-gradient(135deg, #8f2431 0%, #d84c5b 58%, #ff8b74 100%) !important;
 }
 

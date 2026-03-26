@@ -19,7 +19,21 @@
 
     <div class="room-container room-stack">
         <div class="room-header">
-            <h1>Código de Sala: <span id="roomIdDisplay"></span></h1>
+            <h1>
+                Código de Sala:
+                <span class="room-code-inline">
+                    <span id="roomIdDisplay"></span>
+                    <button
+                        id="copyRoomCodeBtn"
+                        class="room-code-copy-btn"
+                        type="button"
+                        aria-label="Copiar código de sala"
+                        title="Copiar código de sala"
+                    >
+                        Copiar
+                    </button>
+                </span>
+            </h1>
             <div class="room-code"></div>
         </div>
         <!-- lista de amigos dentro de la sala -->

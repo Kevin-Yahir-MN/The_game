@@ -137,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomIdDisplay = document.getElementById('roomIdDisplay');
     const playersList = document.getElementById('playersList');
     const startBtn = document.getElementById('startGame');
+    const copyRoomCodeBtn = document.getElementById('copyRoomCodeBtn');
     const gameSettings = document.getElementById('gameSettings');
     const initialCardsSelect = document.getElementById('initialCards');
     const backToMenuBtn = document.getElementById('backToMenu');
@@ -843,6 +844,27 @@ document.addEventListener('DOMContentLoaded', () => {
         if (backToMenuBtn) {
             backToMenuBtn.addEventListener('click', () => {
                 setTimeout(backToMenu, 120);
+            });
+        }
+
+        if (copyRoomCodeBtn) {
+            copyRoomCodeBtn.addEventListener('click', async () => {
+                try {
+                    if (navigator.clipboard?.writeText) {
+                        await navigator.clipboard.writeText(roomId);
+                    } else {
+                        const tempInput = document.createElement('input');
+                        tempInput.value = roomId;
+                        document.body.appendChild(tempInput);
+                        tempInput.select();
+                        document.execCommand('copy');
+                        tempInput.remove();
+                    }
+                    showNotification(`Código ${roomId} copiado`);
+                } catch (error) {
+                    console.error('No se pudo copiar el código de sala:', error);
+                    showNotification('No se pudo copiar el código', true);
+                }
             });
         }
 

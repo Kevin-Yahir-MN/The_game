@@ -1546,8 +1546,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 remainingCards > 0
                     ? `Necesitas jugar ${remainingCards} carta(s) más${deckEmpty ? ' (Mazo vacío)' : ''}`
                     : 'Puedes terminar tu turno';
-            endTurnButton.style.backgroundColor =
-                cardsPlayed >= minCardsRequired ? '#2ecc71' : '#e74c3c';
+            endTurnButton.classList.toggle(
+                'is-ready',
+                cardsPlayed >= minCardsRequired
+            );
         }
     }
 
