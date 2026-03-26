@@ -3240,6 +3240,19 @@ body.app-theme .history-modal h3 {
     letter-spacing: 0.03em;
 }
 
+/* Lobby: evita el efecto "tarjeta dentro de tarjeta" (lobby-card + auth-card) */
+body.app-theme--lobby .lobby-card {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    padding: 0;
+}
+
+body.app-theme--lobby .lobby-card::before {
+    content: none;
+}
+
 body.app-theme .players-section h3,
 body.app-theme .room-emoji-chat h3,
 body.app-theme .game-settings h3 {
