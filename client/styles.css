@@ -1746,7 +1746,7 @@ body.modal-open {
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     transform: translateY(-20px);
     transition: transform 0.3s ease;
-    border-top: 5px solid;
+    border-top: none;
 }
 
 .game-over-notification h2 {
@@ -3547,6 +3547,7 @@ body.app-theme--game .game-over-notification {
         0 24px 50px rgba(0, 0, 0, 0.34),
         inset 0 1px 0 rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(16px);
+    border-top: none;
 }
 
 body.app-theme--game .game-panel::before,
