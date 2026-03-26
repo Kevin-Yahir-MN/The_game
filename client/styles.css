@@ -3258,6 +3258,16 @@ body.app-theme--lobby .lobby-card::before {
     content: none;
 }
 
+/* Lobby: subir título + tarjeta (evitar centrado vertical) */
+body.app-theme--lobby .lobby-container {
+    justify-content: flex-start;
+    padding-top: clamp(2rem, 3vh, 3.25rem);
+}
+
+body.app-theme--lobby .lobby-header {
+    margin-bottom: var(--space-2);
+}
+
 body.app-theme .players-section h3,
 body.app-theme .room-emoji-chat h3,
 body.app-theme .game-settings h3 {
