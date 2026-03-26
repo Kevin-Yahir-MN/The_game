@@ -3245,8 +3245,8 @@ body.app-theme .history-modal h3 {
     letter-spacing: 0.03em;
 }
 
-/* Lobby: evita el efecto "tarjeta dentro de tarjeta" (lobby-card + auth-card) */
-body.app-theme--lobby .lobby-card {
+/* Lobby: evita el efecto "tarjeta dentro de tarjeta" (solo cuando NO hay sesión) */
+body.app-theme--lobby:not(.is-authenticated) .lobby-card {
     background: transparent;
     border: 0;
     box-shadow: none;
@@ -3254,7 +3254,7 @@ body.app-theme--lobby .lobby-card {
     padding: 0;
 }
 
-body.app-theme--lobby .lobby-card::before {
+body.app-theme--lobby:not(.is-authenticated) .lobby-card::before {
     content: none;
 }
 

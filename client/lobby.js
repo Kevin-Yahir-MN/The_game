@@ -497,6 +497,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const identity = getCurrentIdentity();
         const isLoggedIn = !!identity;
 
+        document.body.classList.toggle('is-authenticated', isLoggedIn);
+
         authStatus.textContent = isLoggedIn
             ? `Sesión iniciada como ${identity.displayName}${identity.isGuest ? ' (invitado)' : ` (@${identity.username})`}`
             : 'No has iniciado sesión.';
