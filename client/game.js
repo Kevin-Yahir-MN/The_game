@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // reposition floating emoji messages when the window resizes
     window.addEventListener('resize', () => {
         applyResponsiveCanvasSizing();
+        applyHudPanelLayout();
         updateEmojiPanelPosition();
         positionEmojiMessages();
     });
@@ -814,6 +815,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? 'Mostrar informacion del juego'
                 : 'Minimizar informacion del juego';
             toggle.textContent = isCollapsed ? '\u2139' : '-';
+            requestAnimationFrame(() => {
+                applyHudPanelLayout();
+                positionEmojiMessages();
+            });
         });
 
         panel.dataset.toggleBound = 'true';
@@ -857,6 +862,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? 'Mostrar reacciones rápidas'
                 : 'Minimizar reacciones rápidas';
             toggle.textContent = isCollapsed ? '\u{1F604}' : '-';
+            requestAnimationFrame(() => {
+                applyHudPanelLayout();
+                positionEmojiMessages();
+            });
         });
 
         panel.dataset.toggleBound = 'true';
@@ -889,6 +898,52 @@ document.addEventListener('DOMContentLoaded', () => {
         panel.style.top = panel.dataset.fixedTop;
         panel.style.left = panel.dataset.fixedLeft;
         panel.style.right = panel.dataset.fixedRight;
+    }
+
+    function applyHudPanelLayout() {
+        const infoPanel = document.querySelector('.info-panel');
+        const emojiPanel = document.querySelector('.game-emoji-panel');
+        const playersPanel = document.getElementById('playersPanel');
+        const margin = window.innerWidth <= 768 ? 15 : 20;
+        const gap = 12;
+        const availableWidth = Math.max(window.innerWidth - margin * 3, 260);
+        const panelWidth = Math.min(
+            380,
+            Math.max(170, Math.floor(availableWidth / 2))
+        );
+
+        if (infoPanel) {
+            infoPanel.style.position = 'fixed';
+            infoPanel.style.top = `${margin}px`;
+            infoPanel.style.left = `${margin}px`;
+            infoPanel.style.right = 'auto';
+            infoPanel.style.width = `${panelWidth}px`;
+            infoPanel.style.maxWidth = `${panelWidth}px`;
+        }
+
+        if (playersPanel) {
+            playersPanel.style.position = 'fixed';
+            playersPanel.style.top = `${margin}px`;
+            playersPanel.style.right = `${margin}px`;
+            playersPanel.style.left = 'auto';
+            playersPanel.style.width = `${panelWidth}px`;
+            playersPanel.style.maxWidth = `${panelWidth}px`;
+        }
+
+        if (emojiPanel) {
+            emojiPanel.style.position = 'fixed';
+            emojiPanel.style.left = `${margin}px`;
+            emojiPanel.style.right = 'auto';
+            emojiPanel.style.width = `${panelWidth}px`;
+            emojiPanel.style.maxWidth = `${panelWidth}px`;
+
+            if (infoPanel) {
+                const rect = infoPanel.getBoundingClientRect();
+                emojiPanel.style.top = `${Math.round(rect.bottom + gap)}px`;
+            } else {
+                emojiPanel.style.top = `${margin + 220}px`;
+            }
+        }
     }
 
     function positionEmojiMessages() {
@@ -2185,6 +2240,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        applyHudPanelLayout();
         ensureEmojiMessagesContainer();
         positionEmojiMessages();
     }
@@ -2475,6 +2531,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 setupInfoPanelToggle();
                 setupEmojiPanelToggle();
+                applyHudPanelLayout();
                 updateEmojiPanelPosition();
 
                 // configurar botones de emoji si existen
