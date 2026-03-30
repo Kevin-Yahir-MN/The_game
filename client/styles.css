@@ -2959,10 +2959,10 @@ body.app-theme--lobby .lobby-card {
 }
 
 .game-emoji-panel.is-collapsed {
-    width: 26px !important;
-    min-width: 26px;
-    height: 26px;
-    min-height: 26px;
+    width: 32px !important;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
     padding: 0;
     border-radius: 999px;
     background: rgba(255, 224, 82, 0.95);
@@ -2976,20 +2976,20 @@ body.app-theme--lobby .lobby-card {
 
 .game-emoji-panel.is-collapsed .emoji-panel-header {
     margin: 0;
-    width: 26px;
-    height: 26px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .game-emoji-panel.is-collapsed .emoji-panel-toggle {
-    width: 26px;
-    height: 26px;
-    min-width: 26px;
-    min-height: 26px;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
     padding: 0;
-    font-size: 16px;
+    font-size: 18px;
     line-height: 1;
     background: transparent;
     box-shadow: none;

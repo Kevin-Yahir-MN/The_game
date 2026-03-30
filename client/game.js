@@ -897,11 +897,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const playersPanel = document.getElementById('playersPanel');
         const margin = window.innerWidth <= 768 ? 15 : 20;
         const gap = 12;
+        const collapsedPanelSize = 32;
         const availableWidth = Math.max(window.innerWidth - margin * 3, 260);
         const panelWidth = Math.min(
             380,
             Math.max(170, Math.floor(availableWidth / 2))
         );
+        const getStablePanelHeight = (panel) => {
+            if (!panel) return 0;
+            if (panel.classList.contains('is-collapsed')) {
+                return collapsedPanelSize;
+            }
+            return Math.max(panel.offsetHeight || 0, collapsedPanelSize);
+        };
 
         if (infoPanel) {
             infoPanel.style.position = 'fixed';
@@ -929,18 +937,10 @@ document.addEventListener('DOMContentLoaded', () => {
             emojiPanel.style.maxWidth = `${panelWidth}px`;
 
             if (infoPanel) {
-                const rect = infoPanel.getBoundingClientRect();
-                // If the emoji panel is collapsed (small circular icon), align it vertically
-                // centered to the info panel for visual symmetry. Otherwise place it below.
-                const epHeight = Math.max(emojiPanel.offsetHeight || 26, 26);
-                if (emojiPanel.classList.contains('is-collapsed')) {
-                    const top = Math.round(rect.top + (rect.height - epHeight) / 2);
-                    emojiPanel.style.top = `${top}px`;
-                } else {
-                    emojiPanel.style.top = `${Math.round(rect.bottom + gap)}px`;
-                }
+                const infoBottom = margin + getStablePanelHeight(infoPanel);
+                emojiPanel.style.top = `${Math.round(infoBottom + gap)}px`;
             } else {
-                emojiPanel.style.top = `${margin + 220}px`;
+                emojiPanel.style.top = `${margin}px`;
             }
         }
     }
