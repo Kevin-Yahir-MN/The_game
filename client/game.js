@@ -930,7 +930,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (infoPanel) {
                 const rect = infoPanel.getBoundingClientRect();
-                emojiPanel.style.top = `${Math.round(rect.bottom + gap)}px`;
+                // If the emoji panel is collapsed (small circular icon), align it vertically
+                // centered to the info panel for visual symmetry. Otherwise place it below.
+                const epHeight = Math.max(emojiPanel.offsetHeight || 26, 26);
+                if (emojiPanel.classList.contains('is-collapsed')) {
+                    const top = Math.round(rect.top + (rect.height - epHeight) / 2);
+                    emojiPanel.style.top = `${top}px`;
+                } else {
+                    emojiPanel.style.top = `${Math.round(rect.bottom + gap)}px`;
+                }
             } else {
                 emojiPanel.style.top = `${margin + 220}px`;
             }
