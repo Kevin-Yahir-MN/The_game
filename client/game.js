@@ -884,20 +884,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Always use the panel's current computed values to avoid stale cached positions
         const computed = window.getComputedStyle(panel);
-        if (!panel.dataset.fixedTop) {
-            panel.dataset.fixedTop = computed.top;
-        }
-        if (!panel.dataset.fixedLeft) {
-            panel.dataset.fixedLeft = computed.left;
-        }
-        if (!panel.dataset.fixedRight) {
-            panel.dataset.fixedRight = computed.right;
-        }
-
-        panel.style.top = panel.dataset.fixedTop;
-        panel.style.left = panel.dataset.fixedLeft;
-        panel.style.right = panel.dataset.fixedRight;
+        panel.style.top = computed.top;
+        panel.style.left = computed.left;
+        panel.style.right = computed.right;
     }
 
     function applyHudPanelLayout() {
