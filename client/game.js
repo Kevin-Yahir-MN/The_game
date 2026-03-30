@@ -821,6 +821,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+        panel.addEventListener('transitionend', (event) => {
+            if (event.propertyName !== 'height' && event.propertyName !== 'padding') {
+                return;
+            }
+            applyHudPanelLayout();
+            positionEmojiMessages();
+        });
+
         panel.dataset.toggleBound = 'true';
     }
     function setupEmojiPanelToggle() {
@@ -868,6 +876,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+        panel.addEventListener('transitionend', (event) => {
+            if (event.propertyName !== 'height' && event.propertyName !== 'padding') {
+                return;
+            }
+            applyHudPanelLayout();
+            positionEmojiMessages();
+        });
+
         panel.dataset.toggleBound = 'true';
     }
 
@@ -908,7 +924,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (panel.classList.contains('is-collapsed')) {
                 return collapsedPanelSize;
             }
-            return Math.max(panel.offsetHeight || 0, collapsedPanelSize);
+            return Math.max(
+                panel.scrollHeight || 0,
+                panel.offsetHeight || 0,
+                collapsedPanelSize
+            );
         };
 
         if (infoPanel) {
