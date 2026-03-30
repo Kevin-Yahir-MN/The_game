@@ -201,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const notification = document.createElement('div');
         notification.className = `notification ${isError ? 'error' : ''}`;
         notification.textContent = message;
-        
+
         document.body.appendChild(notification);
 
         setTimeout(() => {
@@ -321,14 +321,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? 'Mostrar reacciones rápidas'
                 : 'Minimizar reacciones rápidas';
             toggle.textContent = isCollapsed ? '\u{1F604}' : '-';
+            // Recalcular posición tras la animación de expansión/colapso
+            // esperar un poco para dejar que las transiciones de CSS terminen
+            setTimeout(() => updateEmojiPanelPosition(), 260);
         });
 
         emojiPanel.dataset.toggleBound = 'true';
     }
 
     function updateEmojiPanelPosition() {
-        if (!friendsContainer || !emojiPanel) return;
+        if (!emojiPanel) return;
 
+        // Solo ajustar si el panel está en posición fixed
         if (window.getComputedStyle(emojiPanel).position !== 'fixed') {
             emojiPanel.style.top = '';
             emojiPanel.style.left = '';
@@ -337,15 +341,47 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const gap = 84;
-        const rect = friendsContainer.getBoundingClientRect();
-        if (rect.width === 0 || rect.height === 0) {
+
+        // Preferir posicionar respecto al contenedor de amigos cuando exista (sala)
+        let refRect = null;
+        if (friendsContainer) {
+            const r = friendsContainer.getBoundingClientRect();
+            if (r.width > 0 && r.height > 0) refRect = r;
+        }
+
+        // En pantallas de juego no existe friendsContainer; usar #gameContainer como referencia
+        if (!refRect) {
+            const gameContainerEl = document.getElementById('gameContainer');
+            if (gameContainerEl) {
+                const gr = gameContainerEl.getBoundingClientRect();
+                if (gr.width > 0 && gr.height > 0) refRect = gr;
+            }
+        }
+
+        // Si no hay referencia, colocar en posición por defecto cercana a la esquina
+        if (!refRect) {
             emojiPanel.style.top = '1rem';
             emojiPanel.style.left = '1rem';
             emojiPanel.style.right = 'auto';
             return;
         }
-        emojiPanel.style.top = `${Math.round(rect.bottom + gap)}px`;
-        emojiPanel.style.left = `${Math.round(rect.left)}px`;
+
+        // Si estamos en la sala, queremos el panel justo debajo del contenedor de amigos.
+        // Si estamos en la partida (game), queremos alinear el panel al borde izquierdo del gameContainer.
+        const isGameContext = !!document.body.classList.contains('app-theme--game');
+        if (isGameContext) {
+            // Alinear al borde izquierdo interno del game container
+            const top = Math.round(refRect.top + 16);
+            const left = Math.round(refRect.left + 16);
+            emojiPanel.style.top = `${top}px`;
+            emojiPanel.style.left = `${left}px`;
+            emojiPanel.style.right = 'auto';
+            return;
+        }
+
+        // Comportamiento por defecto para sala
+        emojiPanel.style.top = `${Math.round(refRect.bottom + gap)}px`;
+        emojiPanel.style.left = `${Math.round(refRect.left)}px`;
         emojiPanel.style.right = 'auto';
     }
 
@@ -894,6 +930,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateConnectionStatus('Conectando...');
 
         setupEmojiPanelToggle();
+
+        // Recalcular posición al redimensionar la ventana para mantener simetría
+        window.addEventListener('resize', () => updateEmojiPanelPosition());
 
 
         // también renderizamos la lista de amigos ahora que may have loaded
