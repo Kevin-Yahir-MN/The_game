@@ -904,22 +904,6 @@ document.addEventListener('DOMContentLoaded', () => {
             380,
             Math.max(170, Math.floor(availableWidth / 2))
         );
-        const getInfoAnchorBottom = (panel) => {
-            if (!panel) return margin;
-
-            const rect = panel.getBoundingClientRect();
-            const measuredBottom = rect.bottom;
-
-            if (!panel.classList.contains('is-collapsed')) {
-                panel.dataset.expandedBottom = String(measuredBottom);
-                return measuredBottom;
-            }
-
-            const storedBottom = Number(panel.dataset.expandedBottom);
-            return Number.isFinite(storedBottom) && storedBottom > margin
-                ? storedBottom
-                : measuredBottom;
-        };
 
         if (infoPanel) {
             infoPanel.style.position = 'fixed';
@@ -947,8 +931,8 @@ document.addEventListener('DOMContentLoaded', () => {
             emojiPanel.style.maxWidth = `${panelWidth}px`;
 
             if (infoPanel) {
-                const anchorBottom = getInfoAnchorBottom(infoPanel);
-                emojiPanel.style.top = `${Math.round(anchorBottom + gap)}px`;
+                const rect = infoPanel.getBoundingClientRect();
+                emojiPanel.style.top = `${Math.round(rect.bottom + gap)}px`;
             } else {
                 emojiPanel.style.top = `${margin}px`;
             }
