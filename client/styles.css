@@ -1192,7 +1192,7 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
 
 .history-modal {
     position: fixed;
-    top: 50%;
+    top: 42%;
     left: 50%;
     transform: translate(-50%, -50%);
     background: linear-gradient(135deg, var(--dark), var(--darker));
@@ -3846,6 +3846,13 @@ body.app-theme--game .game-over-notification {
         inset 0 1px 0 rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(16px);
     border-top: none;
+}
+
+body.app-theme--game .history-modal {
+    position: fixed;
+    top: 42%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }
 
 body.app-theme--game .info-panel,
