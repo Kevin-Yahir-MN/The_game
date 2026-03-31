@@ -3302,7 +3302,7 @@ body.app-theme--lobby.is-authenticated .lobby-header {
 }
 
 body.app-theme--lobby.is-authenticated .lobby-header h1 {
-    font-size: clamp(3.25rem, 4.8vw, 5.4rem);
+    font-size: clamp(2.6rem, 4vw, 4.35rem);
     font-weight: 800;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -3328,7 +3328,7 @@ body.app-theme--lobby.is-authenticated .active-user-card {
 body.app-theme--lobby.is-authenticated .active-user-card p {
     margin: 0;
     min-height: 88px;
-    padding: 0.15rem 0;
+    padding: 0.15rem 0 0.7rem;
     display: flex;
     align-items: center;
     gap: 1rem;
