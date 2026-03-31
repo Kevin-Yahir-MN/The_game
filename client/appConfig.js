@@ -7,5 +7,6 @@
         WS_URL: wsOrigin,
         PROD_API_URL: 'https://the-game-2xks.onrender.com',
         PROD_WS_URL: 'wss://the-game-2xks.onrender.com',
+        REACTION_ICON_BASE_URL: `${origin}/assets/reactions`,
     };
 })();
