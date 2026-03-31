@@ -822,9 +822,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         panel.addEventListener('transitionend', (event) => {
-            if (event.propertyName !== 'height' && event.propertyName !== 'padding') {
-                return;
-            }
             applyHudPanelLayout();
             positionEmojiMessages();
         });
@@ -877,9 +874,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         panel.addEventListener('transitionend', (event) => {
-            if (event.propertyName !== 'height' && event.propertyName !== 'padding') {
-                return;
-            }
             applyHudPanelLayout();
             positionEmojiMessages();
         });
@@ -937,6 +931,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 emojiPanel.style.top = `${margin}px`;
             }
         }
+    }
+
+    function setupHudLayoutObservers() {
+        if (typeof ResizeObserver !== 'function') {
+            return;
+        }
+
+        const panels = [
+            document.querySelector('.info-panel'),
+            document.querySelector('.game-emoji-panel'),
+            document.getElementById('playersPanel'),
+        ].filter(Boolean);
+
+        panels.forEach((panel) => {
+            if (panel.dataset.layoutObserved === 'true') {
+                return;
+            }
+
+            const observer = new ResizeObserver(() => {
+                requestAnimationFrame(() => {
+                    applyHudPanelLayout();
+                    positionEmojiMessages();
+                });
+            });
+
+            observer.observe(panel);
+            panel.dataset.layoutObserved = 'true';
+        });
     }
 
     function positionEmojiMessages() {
@@ -2236,6 +2258,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         applyHudPanelLayout();
+        setupHudLayoutObservers();
         ensureEmojiMessagesContainer();
         positionEmojiMessages();
     }
@@ -2527,6 +2550,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setupInfoPanelToggle();
                 setupEmojiPanelToggle();
                 applyHudPanelLayout();
+                setupHudLayoutObservers();
                 updateEmojiPanelPosition();
 
                 // configurar botones de emoji si existen
