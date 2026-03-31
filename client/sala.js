@@ -7,6 +7,23 @@ document.addEventListener('DOMContentLoaded', () => {
         'wss://the-game-2xks.onrender.com';
     const PLAYER_UPDATE_INTERVAL = 5000;
     const AVATARS = window.APP_AVATARS?.AVATARS || [];
+    const REACTION_ICON_BASE =
+        window.APP_CONFIG?.REACTION_ICON_BASE_URL ||
+        `${window.APP_CONFIG?.API_URL || window.location.origin}/assets/reactions`;
+    const REACTION_ASSETS = {
+        happy: { label: 'Feliz', src: `${REACTION_ICON_BASE}/happy.svg` },
+        love: { label: 'Amor', src: `${REACTION_ICON_BASE}/love.svg` },
+        wow: { label: 'Sorpresa', src: `${REACTION_ICON_BASE}/wow.svg` },
+        sleep: { label: 'Sueno', src: `${REACTION_ICON_BASE}/sleep.svg` },
+        cry: { label: 'Llanto', src: `${REACTION_ICON_BASE}/cry.svg` },
+        proud: { label: 'Orgullo', src: `${REACTION_ICON_BASE}/proud.svg` },
+        angel: { label: 'Angel', src: `${REACTION_ICON_BASE}/angel.svg` },
+        crazy: { label: 'Loco', src: `${REACTION_ICON_BASE}/crazy.svg` },
+        angry: { label: 'Enojo', src: `${REACTION_ICON_BASE}/angry.svg` },
+        demon: { label: 'Demonio', src: `${REACTION_ICON_BASE}/demon.svg` },
+        middle: { label: 'Gesto', src: `${REACTION_ICON_BASE}/middle.svg` },
+        poop: { label: 'Popo', src: `${REACTION_ICON_BASE}/poop.svg` },
+    };
     const DEFAULT_AVATAR_ID =
         window.APP_AVATARS?.DEFAULT_AVATAR_ID || (AVATARS[0]?.id ?? '');
 
@@ -218,6 +235,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
         lastEmojiErrorNotificationAt = now;
         showNotification('No hay conexión para enviar reacción', true);
+    }
+
+    function createReactionIconElement(emojiCode, className) {
+        const asset = REACTION_ASSETS[emojiCode];
+        if (!asset) {
+            return null;
+        }
+
+        const img = document.createElement('img');
+        img.className = className;
+        img.src = asset.src;
+        img.alt = asset.label;
+        img.width = 28;
+        img.height = 28;
+        img.decoding = 'async';
+        img.loading = 'eager';
+        return img;
+    }
+
+    function hydrateReactionButtons() {
+        if (!emojiButtonsContainer) return;
+
+        emojiButtonsContainer
+            .querySelectorAll('.emoji-button[data-emoji]')
+            .forEach((button) => {
+                const asset = REACTION_ASSETS[button.dataset.emoji];
+                if (!asset) return;
+
+                button.textContent = '';
+                button.setAttribute('aria-label', asset.label);
+                button.title = asset.label;
+                const icon = createReactionIconElement(
+                    button.dataset.emoji,
+                    'emoji-button-icon'
+                );
+                if (icon) {
+                    button.appendChild(icon);
+                }
+            });
     }
 
     // Mostrar un modal simple con mensaje y texto de redirección
@@ -594,24 +650,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderEmojiReaction(message) {
         if (!emojiPopinsContainer) return;
-
-        const emojiMap = {
-            happy: '😄',
-            angry: '😡',
-            poop: '💩',
-            love: '😍',
-            wow: '😮',
-            middle: '🖕',
-            cry: '😭',
-            proud: '😎',
-            angel: '😇',
-            demon: '😈',
-            sleep: '😴',
-            crazy: '🤪',
-        };
-
-        const emojiChar = emojiMap[message.emoji];
-        if (!emojiChar) return;
+        const asset = REACTION_ASSETS[message.emoji];
+        if (!asset) return;
 
         const emojiSenderId = String(
             message.fromPlayerId ?? message.playerId ?? ''
@@ -627,9 +667,11 @@ document.addEventListener('DOMContentLoaded', () => {
         nameSpan.className = 'emoji-message-name';
         nameSpan.textContent = message.fromPlayerName || 'Jugador';
 
-        const emojiSpan = document.createElement('span');
-        emojiSpan.className = 'emoji-message-emoji';
-        emojiSpan.textContent = emojiChar;
+        const emojiSpan = createReactionIconElement(
+            message.emoji,
+            'emoji-message-emoji'
+        );
+        if (!emojiSpan) return;
 
         item.appendChild(nameSpan);
         item.appendChild(emojiSpan);
@@ -903,6 +945,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
+
+        hydrateReactionButtons();
 
         if (emojiButtonsContainer) {
             emojiButtonsContainer.addEventListener('click', (event) => {
