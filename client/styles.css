@@ -3401,27 +3401,29 @@ body.app-theme--lobby.is-authenticated .btn-icon {
 body.app-theme--lobby.is-authenticated .friends-container {
     top: 1.9rem;
     left: 2.35rem;
-    width: min(27.5vw, 400px);
-    padding: 1.2rem;
-    border-radius: 22px;
+    width: min(33vw, 500px);
+    max-width: 500px;
+    padding: 1.4rem;
+    border-radius: 26px;
 }
 
 body.app-theme--lobby.is-authenticated .friends-container h3 {
-    font-size: 0.92rem;
-    letter-spacing: 0.08em;
+    font-size: 1rem;
+    letter-spacing: 0.1em;
     color: rgba(242, 251, 255, 0.92);
 }
 
 body.app-theme--lobby.is-authenticated .friends-container li {
-    padding: 0.75rem 0.85rem;
-    border-radius: 16px;
+    padding: 0.95rem 1rem;
+    border-radius: 18px;
+    font-size: 1rem;
 }
 
 body.app-theme--lobby.is-authenticated .friends-container .invite-friend-btn,
 body.app-theme--lobby.is-authenticated .friends-container button {
-    min-width: 92px;
+    min-width: 84px;
     width: auto;
-    padding: 0.35rem 0.55rem;
+    padding: 0.32rem 0.5rem;
     font-size: 0.75rem;
     justify-content: center;
 }
@@ -3436,7 +3438,8 @@ body.app-theme--lobby.is-authenticated .friends-container button {
     }
 
     body.app-theme--lobby.is-authenticated .friends-container {
-        width: min(32vw, 360px);
+        width: min(36vw, 420px);
+        max-width: 420px;
         left: 1.25rem;
     }
 }
