@@ -913,23 +913,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const playersPanel = document.getElementById('playersPanel');
         const margin = window.innerWidth <= 768 ? 15 : 20;
         const gap = 12;
-        const collapsedPanelSize = 32;
         const availableWidth = Math.max(window.innerWidth - margin * 3, 260);
         const panelWidth = Math.min(
             380,
             Math.max(170, Math.floor(availableWidth / 2))
         );
-        const getStablePanelHeight = (panel) => {
-            if (!panel) return 0;
-            if (panel.classList.contains('is-collapsed')) {
-                return collapsedPanelSize;
-            }
-            return Math.max(
-                panel.scrollHeight || 0,
-                panel.offsetHeight || 0,
-                collapsedPanelSize
-            );
-        };
 
         if (infoPanel) {
             infoPanel.style.position = 'fixed';
@@ -957,8 +945,8 @@ document.addEventListener('DOMContentLoaded', () => {
             emojiPanel.style.maxWidth = `${panelWidth}px`;
 
             if (infoPanel) {
-                const infoBottom = margin + getStablePanelHeight(infoPanel);
-                emojiPanel.style.top = `${Math.round(infoBottom + gap)}px`;
+                const rect = infoPanel.getBoundingClientRect();
+                emojiPanel.style.top = `${Math.round(rect.bottom + gap)}px`;
             } else {
                 emojiPanel.style.top = `${margin}px`;
             }
