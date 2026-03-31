@@ -890,21 +890,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateEmojiPanelPosition() {
         const panel = document.querySelector('.game-emoji-panel');
         if (!panel) return;
-        if (window.getComputedStyle(panel).position !== 'fixed') {
-            panel.style.top = '';
-            panel.style.left = '';
-            panel.style.right = '';
-            delete panel.dataset.fixedTop;
-            delete panel.dataset.fixedLeft;
-            delete panel.dataset.fixedRight;
-            return;
-        }
-
-        // Always use the panel's current computed values to avoid stale cached positions
-        const computed = window.getComputedStyle(panel);
-        panel.style.top = computed.top;
-        panel.style.left = computed.left;
-        panel.style.right = computed.right;
+        applyHudPanelLayout();
     }
 
     function applyHudPanelLayout() {
