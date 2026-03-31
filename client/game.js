@@ -930,6 +930,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 emojiPanel.style.top = `${margin}px`;
             }
+
+            emojiPanel.classList.add('is-layout-ready');
         }
     }
 
@@ -950,10 +952,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const observer = new ResizeObserver(() => {
-                requestAnimationFrame(() => {
-                    applyHudPanelLayout();
-                    positionEmojiMessages();
-                });
+                applyHudPanelLayout();
+                positionEmojiMessages();
             });
 
             observer.observe(panel);

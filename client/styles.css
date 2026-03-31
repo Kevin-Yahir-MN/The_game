@@ -1097,6 +1097,11 @@ body.app-theme--lobby .lobby-card {
     margin-bottom: 0;
 }
 
+body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
+    visibility: hidden;
+    pointer-events: none;
+}
+
 .info-panel p {
     margin: 14px 0;
     display: block;
