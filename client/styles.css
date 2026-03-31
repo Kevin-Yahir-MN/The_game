@@ -3298,7 +3298,10 @@ body.app-theme--lobby.is-authenticated .lobby-container {
 }
 
 body.app-theme--lobby.is-authenticated .lobby-header {
+    width: min(100%, 760px);
     margin-bottom: 1.35rem;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 body.app-theme--lobby.is-authenticated .lobby-header h1 {
@@ -3312,6 +3315,7 @@ body.app-theme--lobby.is-authenticated .login-form.lobby-stack {
     width: min(100%, 760px);
     align-items: stretch;
     gap: 2rem;
+    margin: 0 auto;
 }
 
 body.app-theme--lobby.is-authenticated .active-user-card {
@@ -3414,6 +3418,10 @@ body.app-theme--lobby.is-authenticated .friends-container li {
 }
 
 @media (max-width: 1100px) {
+    body.app-theme--lobby.is-authenticated .lobby-header {
+        width: min(100%, 680px);
+    }
+
     body.app-theme--lobby.is-authenticated .login-form.lobby-stack {
         width: min(100%, 680px);
     }
@@ -3425,6 +3433,10 @@ body.app-theme--lobby.is-authenticated .friends-container li {
 }
 
 @media (max-width: 768px) {
+    body.app-theme--lobby.is-authenticated .lobby-header {
+        width: 100%;
+    }
+
     body.app-theme--lobby.is-authenticated .login-form.lobby-stack {
         width: 100%;
         gap: 1.35rem;
