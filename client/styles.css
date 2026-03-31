@@ -2953,14 +2953,15 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
 .game-emoji-panel {
     position: fixed;
     overflow: hidden;
+    will-change: width, height, padding, border-radius;
     transition:
-        width 0.22s ease,
-        min-width 0.22s ease,
-        height 0.22s ease,
-        padding 0.22s ease,
-        border-radius 0.22s ease,
-        background 0.22s ease,
-        box-shadow 0.22s ease;
+        width 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        min-width 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        height 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        padding 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        border-radius 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        background 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 0.16s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .game-emoji-panel.is-collapsed {
@@ -3011,15 +3012,16 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
 
 .info-panel {
     overflow: hidden;
+    will-change: width, height, padding, border-radius;
     transition:
-        width 0.22s ease,
-        min-width 0.22s ease,
-        height 0.22s ease,
-        min-height 0.22s ease,
-        padding 0.22s ease,
-        border-radius 0.22s ease,
-        background 0.22s ease,
-        box-shadow 0.22s ease;
+        width 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        min-width 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        height 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        min-height 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        padding 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        border-radius 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        background 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 0.16s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .info-panel.is-collapsed {
@@ -3078,16 +3080,17 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
 .players-panel,
 .players-section {
     overflow: hidden;
+    will-change: width, height, padding, border-radius;
     transition:
-        width 0.22s ease,
-        min-width 0.22s ease,
-        height 0.22s ease,
-        min-height 0.22s ease,
-        max-height 0.22s ease,
-        padding 0.22s ease,
-        border-radius 0.22s ease,
-        background 0.22s ease,
-        box-shadow 0.22s ease;
+        width 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        min-width 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        height 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        min-height 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        max-height 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        padding 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        border-radius 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        background 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 0.16s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .players-panel.is-collapsed {
