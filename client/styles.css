@@ -3289,6 +3289,168 @@ body.app-theme--lobby.is-authenticated .lobby-card::before {
     content: none;
 }
 
+body.app-theme--lobby.is-authenticated .lobby-container {
+    max-width: min(100vw, 1600px);
+    padding:
+        clamp(1rem, 2vh, 1.5rem)
+        clamp(1.25rem, 3vw, 2.5rem)
+        3rem;
+}
+
+body.app-theme--lobby.is-authenticated .lobby-header {
+    margin-bottom: 1.35rem;
+}
+
+body.app-theme--lobby.is-authenticated .lobby-header h1 {
+    font-size: clamp(3.25rem, 4.8vw, 5.4rem);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+body.app-theme--lobby.is-authenticated .login-form.lobby-stack {
+    width: min(100%, 760px);
+    align-items: stretch;
+    gap: 2rem;
+}
+
+body.app-theme--lobby.is-authenticated .active-user-card {
+    width: 100%;
+    padding: 1.35rem;
+    border-radius: 26px;
+    display: grid;
+    gap: 0.9rem;
+    box-shadow:
+        0 28px 54px rgba(0, 0, 0, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+body.app-theme--lobby.is-authenticated .active-user-card p {
+    margin: 0;
+    min-height: 88px;
+    padding: 0.15rem 0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: clamp(1.5rem, 2vw, 2.1rem);
+    font-weight: 700;
+    color: #f4fbff;
+}
+
+body.app-theme--lobby.is-authenticated .active-user-card .avatar-chip,
+body.app-theme--lobby.is-authenticated .active-user-card .avatar-img {
+    width: 86px;
+    height: 86px;
+    min-width: 86px;
+    border-radius: 24px;
+    font-size: 52px;
+    box-shadow:
+        0 18px 28px rgba(0, 0, 0, 0.24),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+body.app-theme--lobby.is-authenticated .active-user-card .btn,
+body.app-theme--lobby.is-authenticated .action-buttons .btn {
+    width: 100%;
+    min-height: 76px;
+    justify-content: center;
+    border-radius: 22px;
+    font-size: clamp(1.15rem, 1.4vw, 1.45rem);
+}
+
+body.app-theme--lobby.is-authenticated #myAccountBtn {
+    background: linear-gradient(135deg, #214d7a 0%, #2e7db0 42%, #39a7b1 72%, #47c39b 100%);
+    box-shadow:
+        0 16px 34px rgba(48, 147, 195, 0.24),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+body.app-theme--lobby.is-authenticated #logoutBtn {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+    color: #f4fbff;
+}
+
+body.app-theme--lobby.is-authenticated .action-buttons {
+    width: 100%;
+    gap: 1.2rem;
+    margin-top: 0.25rem;
+}
+
+body.app-theme--lobby.is-authenticated #createRoom {
+    background: linear-gradient(135deg, #3486e5 0%, #56c9ff 46%, #7af3cf 100%);
+    box-shadow:
+        0 0 0 1px rgba(173, 245, 255, 0.34),
+        0 0 28px rgba(92, 216, 255, 0.26),
+        0 18px 38px rgba(0, 0, 0, 0.24);
+}
+
+body.app-theme--lobby.is-authenticated #joinRoom {
+    background: linear-gradient(135deg, #17354f 0%, #255471 42%, #28766b 100%);
+    color: #f4fbff;
+}
+
+body.app-theme--lobby.is-authenticated .btn-icon {
+    font-size: 1.7rem;
+    line-height: 1;
+}
+
+body.app-theme--lobby.is-authenticated .friends-container {
+    top: 1.9rem;
+    left: 2.35rem;
+    width: min(22vw, 320px);
+    padding: 1rem;
+    border-radius: 22px;
+}
+
+body.app-theme--lobby.is-authenticated .friends-container h3 {
+    font-size: 0.92rem;
+    letter-spacing: 0.08em;
+    color: rgba(242, 251, 255, 0.92);
+}
+
+body.app-theme--lobby.is-authenticated .friends-container li {
+    padding: 0.75rem 0.85rem;
+    border-radius: 16px;
+}
+
+@media (max-width: 1100px) {
+    body.app-theme--lobby.is-authenticated .login-form.lobby-stack {
+        width: min(100%, 680px);
+    }
+
+    body.app-theme--lobby.is-authenticated .friends-container {
+        width: min(26vw, 300px);
+        left: 1.25rem;
+    }
+}
+
+@media (max-width: 768px) {
+    body.app-theme--lobby.is-authenticated .login-form.lobby-stack {
+        width: 100%;
+        gap: 1.35rem;
+    }
+
+    body.app-theme--lobby.is-authenticated .active-user-card p {
+        min-height: auto;
+        font-size: 1.25rem;
+    }
+
+    body.app-theme--lobby.is-authenticated .active-user-card .avatar-chip,
+    body.app-theme--lobby.is-authenticated .active-user-card .avatar-img {
+        width: 68px;
+        height: 68px;
+        min-width: 68px;
+        border-radius: 18px;
+        font-size: 42px;
+    }
+
+    body.app-theme--lobby.is-authenticated .active-user-card .btn,
+    body.app-theme--lobby.is-authenticated .action-buttons .btn {
+        min-height: 64px;
+        font-size: 1.05rem;
+    }
+}
+
 body.app-theme .players-section h3,
 body.app-theme .room-emoji-chat h3,
 body.app-theme .game-settings h3 {
