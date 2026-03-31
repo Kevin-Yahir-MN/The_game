@@ -3401,8 +3401,8 @@ body.app-theme--lobby.is-authenticated .btn-icon {
 body.app-theme--lobby.is-authenticated .friends-container {
     top: 1.9rem;
     left: 2.35rem;
-    width: min(33vw, 500px);
-    max-width: 500px;
+    width: min(27vw, 410px);
+    max-width: 410px;
     padding: 1.4rem;
     border-radius: 26px;
 }
@@ -3438,8 +3438,8 @@ body.app-theme--lobby.is-authenticated .friends-container button {
     }
 
     body.app-theme--lobby.is-authenticated .friends-container {
-        width: min(36vw, 420px);
-        max-width: 420px;
+        width: min(31vw, 360px);
+        max-width: 360px;
         left: 1.25rem;
     }
 }
