@@ -15,8 +15,8 @@
         win: '/assets/sounds/win.mp3',
     };
     const SOUND_VOLUMES = {
-        gameover: 0.55,
-        specialmove: 0.55,
+        gameover: 0.35,
+        specialmove: 0.35,
         win: 0.55,
     };
     const AUDIO_ENABLED_STORAGE_KEY = 'game_audio_enabled';
@@ -333,6 +333,7 @@
         bindGlobalButtonSounds();
     }
 })(window);
+
 
 
 
