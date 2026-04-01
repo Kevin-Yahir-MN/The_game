@@ -1,13 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <radialGradient id="bg" cx="30%" cy="30%" r="75%">
-      <stop offset="0%" stop-color="#fff6c4"/>
-      <stop offset="100%" stop-color="#ffc857"/>
-    </radialGradient>
-  </defs>
-  <ellipse cx="32" cy="10" rx="16" ry="5" fill="none" stroke="#8edbff" stroke-width="4"/>
-  <circle cx="32" cy="34" r="25" fill="url(#bg)"/>
-  <circle cx="22" cy="27" r="3.5" fill="#243447"/>
-  <circle cx="42" cy="27" r="3.5" fill="#243447"/>
-  <path d="M22 39c3 4 7 6 10 6s7-2 10-6" fill="none" stroke="#243447" stroke-linecap="round" stroke-width="4"/>
+<svg id="emoji" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+  <g id="color">
+    <path fill="#fcea2b" d="M36,60A24,24,0,0,0,54.157,20.3047q-.1309-.1515-.2646-.3008A24,24,0,1,0,36,60Z"/>
+  </g>
+  <g id="hair"/>
+  <g id="skin"/>
+  <g id="skin-shadow"/>
+  <g id="line">
+    <path fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M45.8147,45.2268a15.4294,15.4294,0,0,1-19.6294,0"/>
+    <path fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M47.7657,16.233a23.0273,23.0273,0,0,0-23.3693-.096"/>
+    <path fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.6381,22.1467a23,23,0,1,0,36.625-.1294"/>
+    <ellipse cx="36" cy="14.8" rx="25" ry="5.25" fill="none" stroke="#000" stroke-miterlimit="10" stroke-width="2"/>
+    <path fill="none" stroke="#000" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M31.6941,33.4036a4.7262,4.7262,0,0,0-8.6382,0"/>
+    <path fill="none" stroke="#000" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M48.9441,33.4036a4.7262,4.7262,0,0,0-8.6382,0"/>
+  </g>
+  <g id="color-foreground">
+    <ellipse cx="36" cy="14.8" rx="25" ry="5.25" fill="none" stroke="#61b2e4" stroke-miterlimit="10" stroke-width="2.1"/>
+  </g>
 </svg>
