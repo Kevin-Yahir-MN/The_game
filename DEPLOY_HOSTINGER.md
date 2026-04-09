@@ -2,7 +2,7 @@
 
 Esta guia sirve para migrar el proyecto a un VPS con Debian usando Docker, con todo el proyecto dentro de la carpeta `/data/The_game`.
 
-La IP publica definida para este despliegue es `http://45.82.72.43:3000/`.
+La IP publica definida para este despliegue es `http://45.82.72.43/`.
 
 ## Resumen De La Arquitectura
 
@@ -11,7 +11,7 @@ El proyecto quedara asi:
 - `app`: contenedor Node.js con Express y WebSocket
 - `postgres`: base de datos principal para usuarios, partidas, amigos y sesiones
 - `redis`: cache opcional usada por el backend
-- `nginx`: reverse proxy publico por HTTP en el puerto `3000`
+- `nginx`: reverse proxy publico por HTTP en el puerto `80`
 - `storage/uploads`: avatares e imagenes guardadas localmente en el VPS
 - `storage/postgres`: datos persistentes de PostgreSQL
 - `storage/redis`: persistencia de Redis
@@ -19,10 +19,10 @@ El proyecto quedara asi:
 
 ## Importante
 
-Esta guia usa la IP publica `45.82.72.43` directamente sobre el puerto `3000`.
+Esta guia usa la IP publica `45.82.72.43` directamente por HTTP.
 
-- la aplicacion correra por `http://45.82.72.43:3000`
-- el WebSocket correra por `ws://45.82.72.43:3000`
+- la aplicacion correra por `http://45.82.72.43`
+- el WebSocket correra por `ws://45.82.72.43`
 - no se configurara dominio
 - no se configurara HTTPS
 - no se usara Let’s Encrypt
@@ -55,9 +55,9 @@ Necesitas:
 - acceso SSH al VPS
 - la IP publica `45.82.72.43`
 - el proyecto disponible en Git o copiado manualmente
-- puertos `22` y `3000` abiertos en el firewall del VPS
+- puertos `22` y `80` abiertos en el firewall del VPS
 
-No hace falta abrir `80` ni `443` porque esta guia no usa HTTPS ni un proxy publico en esos puertos.
+No hace falta abrir `443` porque esta guia no usa HTTPS.
 
 ## Paso 1. Entrar Al VPS
 
@@ -137,7 +137,7 @@ REDIS_URL=redis://redis:6379
 DB_SSL=false
 PORT=3000
 NODE_ENV=production
-ALLOWED_ORIGINS=http://45.82.72.43:3000
+ALLOWED_ORIGINS=http://45.82.72.43
 DB_INIT_MAX_RETRIES=8
 DB_INIT_RETRY_DELAY_MS=4000
 DB_CONNECTION_TIMEOUT_MS=10000
@@ -151,7 +151,7 @@ POSTGRES_PASSWORD=TG_9vK_4mQ2_A7
 
 - `POSTGRES_PASSWORD` y la contraseña dentro de `DATABASE_URL` deben coincidir
 - `DB_SSL=false` es correcto porque PostgreSQL vive dentro de Docker en el mismo VPS
-- `ALLOWED_ORIGINS` debe quedar exactamente como `http://45.82.72.43:3000`
+- `ALLOWED_ORIGINS` debe quedar exactamente como `http://45.82.72.43`
 
 ## Paso 8. Crear Carpetas Persistentes
 
@@ -183,7 +183,7 @@ Verifica:
 docker compose ps
 docker compose logs -f app
 docker compose logs -f nginx
-curl http://127.0.0.1:3000/healthz
+curl http://127.0.0.1/healthz
 ```
 
 Si todo va bien:
@@ -191,13 +191,13 @@ Si todo va bien:
 - `app` debe quedar `healthy`
 - `postgres` debe quedar activo
 - `redis` debe quedar activo
-- `nginx` debe servir por HTTP en el puerto `3000`
+- `nginx` debe servir por HTTP
 
 ## Paso 11. Probar La App Desde La IP
 
 Prueba en el navegador:
 
-- `http://45.82.72.43:3000/`
+- `http://45.82.72.43/`
 
 Si no abre:
 
@@ -222,7 +222,7 @@ Prueba en el sitio real:
 ### Que deberias verificar
 
 - que `auth/me` responda correctamente
-- que el WebSocket conecte sobre `ws://45.82.72.43:3000`
+- que el WebSocket conecte sobre `ws://45.82.72.43`
 - que la cookie de sesion funcione correctamente en HTTP
 - que el avatar quede guardado en `storage/uploads/avatars`
 - que `avatar_url` quede guardado en PostgreSQL
@@ -368,7 +368,7 @@ tar -xzf backups/uploads/NOMBRE.tar.gz -C /data/The_game/storage/uploads
 
 No des por terminado el cambio hasta verificar:
 
-- la IP `45.82.72.43` ya responde por HTTP en `:3000`
+- la IP `45.82.72.43` ya responde por HTTP
 - login funciona
 - registro funciona
 - WebSocket funciona
@@ -382,8 +382,8 @@ No des por terminado el cambio hasta verificar:
 
 Al terminar correctamente, tu proyecto funcionara asi:
 
-- `http://45.82.72.43:3000/` sirve la aplicacion
-- `ws://45.82.72.43:3000` maneja tiempo real
+- `http://45.82.72.43/` sirve la aplicacion
+- `ws://45.82.72.43` maneja tiempo real
 - PostgreSQL local guarda usuarios y datos
 - Redis local acelera lecturas cacheadas
 - los avatares viven en el disco del VPS

@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>http://45.82.72.43:3000/</loc>
+    <loc>http://45.82.72.43/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
   <url>
-    <loc>http://45.82.72.43:3000/sala.html</loc>
+    <loc>http://45.82.72.43/sala.html</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>http://45.82.72.43:3000/game.html</loc>
+    <loc>http://45.82.72.43/game.html</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
