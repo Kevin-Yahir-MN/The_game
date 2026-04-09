@@ -10,3 +10,7 @@ combined.log
 error.log
 OLD
 uploads
+storage
+backups
+*.dump
+*.tar.gz
