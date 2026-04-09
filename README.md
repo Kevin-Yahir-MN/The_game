@@ -86,7 +86,7 @@ Recommended flow for a Hostinger VPS:
 
    ```bash
    docker compose ps
-   curl http://127.0.0.1/healthz
+   curl http://127.0.0.1:3000/healthz
    ```
 
 Notes:

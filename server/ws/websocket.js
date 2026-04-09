@@ -99,6 +99,41 @@ const ALLOWED_EMOJI_REACTIONS = [
 const EMOJI_WINDOW_MS = 10_000;
 const EMOJI_MAX_PER_WINDOW = 3;
 
+function parseCookieHeader(headerValue) {
+    return String(headerValue || '')
+        .split(';')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .reduce((cookies, entry) => {
+            const separatorIndex = entry.indexOf('=');
+            if (separatorIndex === -1) {
+                return cookies;
+            }
+
+            const key = entry.slice(0, separatorIndex).trim();
+            const value = entry.slice(separatorIndex + 1).trim();
+            cookies[key] = decodeURIComponent(value);
+            return cookies;
+        }, {});
+}
+
+function getSessionTokenFromUpgradeRequest(req) {
+    const cookies = parseCookieHeader(req.headers?.cookie);
+    if (cookies.authToken) {
+        return cookies.authToken;
+    }
+
+    const authorization = req.headers?.authorization;
+    if (
+        typeof authorization === 'string' &&
+        authorization.startsWith('Bearer ')
+    ) {
+        return authorization.slice('Bearer '.length).trim();
+    }
+
+    return null;
+}
+
 function checkEmojiRateLimit(playerId) {
     const now = Date.now();
     let history = emojiRateLimit.get(playerId) || [];
@@ -166,22 +201,15 @@ function setupWebSocket(server) {
 
         // lobby connection: sólo para recibir invitaciones y respuesta
         if (isLobby) {
-            const userId = params.get('userId');
             let identity = null;
-            if (userId) {
-                // Get user from DB by ID (assuming authenticated via cookies in HTTP, but for WS we trust the ID)
-                try {
-                    const result = await pool.query(
-                        'SELECT id, display_name FROM users WHERE id = $1',
-                        [userId]
-                    );
-                    if (result.rowCount > 0) {
-                        identity = result.rows[0];
-                    }
-                } catch (err) {
-                    console.error('Error fetching user for WS:', err);
-                }
+
+            try {
+                const sessionToken = getSessionTokenFromUpgradeRequest(req);
+                identity = await getUserFromToken(sessionToken);
+            } catch (err) {
+                console.error('Error authenticating lobby WS:', err);
             }
+
             let lobbyId;
             if (identity) {
                 lobbyId = identity.id;

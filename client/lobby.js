@@ -178,10 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!identity) return;
         const wsUrl = new URL(API_URL.replace(/^http/, 'ws'));
         wsUrl.searchParams.set('lobby', 'true');
-        if (!identity.isGuest && identity.id) {
-            // send userId so server can look up display name and map lobby client
-            wsUrl.searchParams.set('userId', identity.id);
-        } else {
+        if (identity.isGuest) {
             let lobbyId = sessionStorage.getItem('lobbyId');
             if (!lobbyId) {
                 lobbyId = crypto.randomUUID
@@ -851,53 +848,53 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function hydrateSession() {
-        const token = getAuthToken();
-        if (!token) {
-            // No podemos leer la cookie httpOnly, pero si hay usuario en localStorage
-            // reconstruimos la UI desde ahí y abrimos el WS de lobby.
-            refreshIdentityUI();
-            if (getAuthUser()) {
-                await loadFriends();
-                setupLobbyWebSocket();
-            }
-            return;
-        }
+        const persistedAuthUser = getAuthUser();
+        const persistedGuestUser = getGuestUser();
 
-        try {
-            const response = await fetchWithAuth(`${API_URL}/auth/me`, {
-                method: 'GET',
-            });
-            if (!response.ok) {
-                localStorage.removeItem(AUTH_TOKEN_KEY);
-                localStorage.removeItem(AUTH_USER_KEY);
-            } else {
-                const data = await response.json();
-                if (data.success && data.user) {
-                    const normalizedUser = {
-                        id: data.user.id,
-                        username: data.user.username,
-                        displayName: data.user.displayName,
-                        avatarId: data.user.avatarId || DEFAULT_AVATAR_ID,
-                        avatarUrl: data.user.avatarUrl || null,
-                    };
-                    localStorage.setItem(
-                        AUTH_USER_KEY,
-                        JSON.stringify(normalizedUser)
-                    );
-                } else {
+        if (persistedAuthUser) {
+            try {
+                const response = await fetchWithAuth(`${API_URL}/auth/me`, {
+                    method: 'GET',
+                });
+
+                if (!response.ok) {
                     localStorage.removeItem(AUTH_TOKEN_KEY);
                     localStorage.removeItem(AUTH_USER_KEY);
+                } else {
+                    const data = await response.json();
+                    if (data.success && data.user) {
+                        const normalizedUser = {
+                            id: data.user.id,
+                            username: data.user.username,
+                            displayName: data.user.displayName,
+                            avatarId: data.user.avatarId || DEFAULT_AVATAR_ID,
+                            avatarUrl: data.user.avatarUrl || null,
+                        };
+                        localStorage.setItem(
+                            AUTH_USER_KEY,
+                            JSON.stringify(normalizedUser)
+                        );
+                    } else {
+                        localStorage.removeItem(AUTH_TOKEN_KEY);
+                        localStorage.removeItem(AUTH_USER_KEY);
+                    }
                 }
+            } catch (error) {
+                console.error('Error verificando sesión:', error);
+                localStorage.removeItem(AUTH_TOKEN_KEY);
+                localStorage.removeItem(AUTH_USER_KEY);
             }
-        } catch (error) {
-            console.error('Error verificando sesión:', error);
         }
 
         refreshIdentityUI();
-        // siempre intentamos cargar la lista de amigos (API devolverá vacío/401 si no está autenticado)
-        await loadFriends();
-        // abrir socket sólo si seguimos autenticados
-        if (token && getAuthUser()) {
+
+        if (getAuthUser()) {
+            await loadFriends();
+            setupLobbyWebSocket();
+            return;
+        }
+
+        if (persistedGuestUser) {
             setupLobbyWebSocket();
         }
     }
@@ -1401,7 +1398,6 @@ document.addEventListener('DOMContentLoaded', () => {
     closeAllAccountModals();
     hydrateSession();
 });
-
 
 
 

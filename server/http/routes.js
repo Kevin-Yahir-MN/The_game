@@ -57,7 +57,7 @@ async function getAuthenticatedUser(req) {
     return getUserFromToken(token);
 }
 
-function registerHttpRoutes(app) {
+function registerHttpRoutes(app, authLimiter) {
     app.get('/health', (req, res) => {
         res.set('Cache-Control', 'no-store');
         res.json({
@@ -81,7 +81,7 @@ function registerHttpRoutes(app) {
         };
     };
 
-    app.post('/auth/register', async (req, res) => {
+    app.post('/auth/register', authLimiter, async (req, res) => {
         const { username, password, displayName, avatarId } = req.body || {};
 
         if (
@@ -156,7 +156,7 @@ function registerHttpRoutes(app) {
         }
     });
 
-    app.post('/auth/login', async (req, res) => {
+    app.post('/auth/login', authLimiter, async (req, res) => {
         const { username, password } = req.body || {};
 
         if (!hasContent(username) || !hasContent(password)) {
