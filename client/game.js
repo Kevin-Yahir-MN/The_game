@@ -2,8 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const WS_URL =
-        window.APP_CONFIG?.PROD_WS_URL ||
-        'wss://the-game-2xks.onrender.com';
+        window.APP_CONFIG?.WS_URL ||
+        `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
     const endTurnButton = document.getElementById('endTurnBtn');
     const GAME_RULES = window.GAME_RULES;
     const emojiButtonsContainer = document.getElementById('emojiButtons');

@@ -12,7 +12,6 @@
         "migrate": "node scripts/migrate.js"
     },
     "dependencies": {
-        "cloudinary": "^2.9.0",
         "compression": "^1.8.0",
         "cookie-parser": "^1.4.6",
         "dotenv": "^16.5.0",

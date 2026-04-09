@@ -29,8 +29,7 @@ const {
 const {
     uploadAvatarBuffer,
     deleteAvatar,
-    ensureCloudinaryConfigured,
-} = require('../services/cloudinaryService');
+} = require('../services/avatarStorageService');
 const { DEFAULT_AVATAR_ID } = require('../../shared/avatars');
 
 const MAX_PLAYERS_PER_ROOM = 6;
@@ -403,7 +402,6 @@ function registerHttpRoutes(app) {
 
     app.post('/auth/avatar/upload', async (req, res) => {
         try {
-            ensureCloudinaryConfigured();
             const user = await getAuthenticatedUser(req);
             if (!user) {
                 return res
@@ -470,12 +468,6 @@ function registerHttpRoutes(app) {
                 });
             });
         } catch (error) {
-            if (error.code === 'CLOUDINARY_NOT_CONFIGURED') {
-                return res.status(500).json({
-                    success: false,
-                    message: 'Falta configurar Cloudinary en el servidor',
-                });
-            }
             console.error('Error subiendo avatar:', error);
             return res.status(500).json({
                 success: false,
@@ -497,10 +489,10 @@ function registerHttpRoutes(app) {
             const account = await clearAvatarUrl(user.id);
 
             if (previous?.avatar_url) {
-                await deleteAvatar(user.id).catch((cloudinaryError) => {
+                await deleteAvatar(user.id).catch((storageError) => {
                     console.warn(
-                        'No se pudo eliminar avatar en Cloudinary:',
-                        cloudinaryError
+                        'No se pudo eliminar avatar local:',
+                        storageError
                     );
                 });
             }

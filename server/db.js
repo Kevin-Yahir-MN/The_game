@@ -8,13 +8,42 @@ const DB_INIT_MAX_RETRIES = Number(process.env.DB_INIT_MAX_RETRIES || 8);
 const DB_INIT_RETRY_DELAY_MS = Number(
     process.env.DB_INIT_RETRY_DELAY_MS || 4000
 );
+const DB_SSL_MODE = String(process.env.DB_SSL || '').trim().toLowerCase();
+
+function resolveSslConfig() {
+    if (!DB_SSL_MODE) {
+        return IS_PRODUCTION
+            ? { require: true, rejectUnauthorized: true }
+            : false;
+    }
+
+    if (['false', '0', 'off', 'no', 'disable'].includes(DB_SSL_MODE)) {
+        return false;
+    }
+
+    if (
+        ['true', '1', 'on', 'yes', 'require', 'enabled'].includes(DB_SSL_MODE)
+    ) {
+        return {
+            require: true,
+            rejectUnauthorized: IS_PRODUCTION,
+        };
+    }
+
+    if (
+        ['strict', 'verify-full', 'verify-ca'].includes(DB_SSL_MODE)
+    ) {
+        return { require: true, rejectUnauthorized: true };
+    }
+
+    return IS_PRODUCTION
+        ? { require: true, rejectUnauthorized: true }
+        : false;
+}
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: {
-        require: true,
-        rejectUnauthorized: IS_PRODUCTION,
-    },
+    ssl: resolveSslConfig(),
     max: 5,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: Number(

@@ -81,6 +81,16 @@ app.get('/google5bea87fead3cc824.html', (req, res) => {
     res.sendFile(path.join(assetsDir, 'google5bea87fead3cc824.html'));
 });
 
+app.get('/healthz', async (req, res) => {
+    try {
+        await pool.query('SELECT 1');
+        res.status(200).json({ ok: true });
+    } catch (error) {
+        logger.error('Healthcheck failed', error);
+        res.status(503).json({ ok: false });
+    }
+});
+
 // Rate limiting for HTTP routes
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes

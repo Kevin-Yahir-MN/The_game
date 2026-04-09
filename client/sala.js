@@ -1,10 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const API_URL =
-        window.APP_CONFIG?.PROD_API_URL ||
-        'https://the-game-2xks.onrender.com';
+    const API_URL = window.APP_CONFIG?.API_URL || window.location.origin;
     const WS_URL =
-        window.APP_CONFIG?.PROD_WS_URL ||
-        'wss://the-game-2xks.onrender.com';
+        window.APP_CONFIG?.WS_URL ||
+        `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
     const PLAYER_UPDATE_INTERVAL = 5000;
     const AVATARS = window.APP_AVATARS?.AVATARS || [];
     const REACTION_ICON_BASE =
