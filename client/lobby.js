@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetchWithAuth(`${API_URL}/friends`, {
                 method: 'GET',
             });
-            const data = await response.json();
+            const data = await parseJsonSafe(response);
             if (response.ok && data.success) {
                 friends = data.friends || [];
             }
@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetchWithAuth(
                     `${API_URL}/users/${friendId}`
                 );
-                const data = await response.json();
+                const data = await parseJsonSafe(response);
                 return data && data.success ? data.account : null;
             },
             onFetchError: () => {
@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     `${API_URL}/friends/${friendId}`,
                     { method: 'DELETE' }
                 );
-                const json = await resp.json();
+                const json = await parseJsonSafe(resp);
                 if (!json.success) {
                     showError('Error eliminando amigo');
                     throw new Error('remove_failed');
@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function displayInvite(invite) {
-        gameAudio?.play('invitation');
+        window.gameAudio?.play('invitation');
         const existingInvite = document.querySelector('.invite-modal');
         if (existingInvite) {
             existingInvite.remove();
@@ -301,13 +301,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             roomId: invite.roomId,
                         }),
                     });
-                    const data = await response.json();
+                    const data = await parseJsonSafe(response);
                     if (response.ok && data.success) {
                         sessionStorage.setItem('playerName', identity.displayName);
                         sessionStorage.setItem('playerId', data.playerId);
                         sessionStorage.setItem('roomId', invite.roomId);
                         sessionStorage.setItem('isHost', 'false');
-                window.location.href = 'sala.html';
+                        window.location.href = 'sala.html';
                     } else {
                         showError(data.message || 'No se pudo unir a la sala');
                     }
@@ -340,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        gameAudio?.play('error');
+        window.gameAudio?.play('error');
         const errorElement = document.createElement('div');
         errorElement.className = 'notification error';
         errorElement.textContent = message;
@@ -442,8 +442,8 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem(AUTH_USER_KEY);
         localStorage.removeItem(GUEST_USER_KEY);
         closeJoinRoomModal();
-            closeAllAccountModals();
-            refreshIdentityUI();
+        closeAllAccountModals();
+        refreshIdentityUI();
     }
 
     function getCurrentIdentity() {
@@ -643,6 +643,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    async function parseJsonSafe(response) {
+        try {
+            return await response.json();
+        } catch (err) {
+            try {
+                const txt = await response.text();
+                return { success: false, __rawText: txt, message: txt };
+            } catch (_) {
+                return { success: false, message: 'Respuesta inválida del servidor' };
+            }
+        }
+    }
+
     function getAvatarEmoji(avatarId) {
         const found = AVATARS.find((avatar) => avatar.id === avatarId);
         return found ? found.emoji : '';
@@ -696,7 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'PATCH',
                 body: JSON.stringify({ avatarId }),
             });
-            const data = await response.json();
+            const data = await parseJsonSafe(response);
             if (!response.ok || !data.success || !data.account) {
                 showError(data.message || 'No se pudo actualizar el avatar');
                 return;
@@ -737,7 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: formData,
                 credentials: 'include',
             });
-            const data = await response.json();
+            const data = await parseJsonSafe(response);
             if (!response.ok || !data.success || !data.account) {
                 showError(data.message || 'No se pudo subir el avatar');
                 return null;
@@ -781,7 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 credentials: 'include',
             });
-            const data = await response.json();
+            const data = await parseJsonSafe(response);
             if (!response.ok || !data.success || !data.account) {
                 showError(data.message || 'No se pudo quitar el avatar');
                 return;
@@ -819,7 +832,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetchWithAuth(`${API_URL}/auth/account`, {
                 method: 'GET',
             });
-            const data = await response.json();
+            const data = await parseJsonSafe(response);
 
             if (!response.ok || !data.success || !data.account) {
                 showError(data.message || 'No se pudo cargar Mi cuenta');
@@ -853,15 +866,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (persistedAuthUser) {
             try {
-                const response = await fetchWithAuth(`${API_URL}/auth/me`, {
-                    method: 'GET',
-                });
 
                 if (!response.ok) {
                     localStorage.removeItem(AUTH_TOKEN_KEY);
                     localStorage.removeItem(AUTH_USER_KEY);
                 } else {
-                    const data = await response.json();
+                    const data = await parseJsonSafe(response);
                     if (data.success && data.user) {
                         const normalizedUser = {
                             id: data.user.id,
@@ -918,8 +928,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({ username, password }),
             });
-
-            const data = await response.json();
+            const data = await parseJsonSafe(response);
             if (!response.ok || !data.success) {
                 showError(data.message || 'No se pudo iniciar sesión');
                 return;
@@ -962,8 +971,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({ username, password, displayName }),
             });
-
-            const data = await response.json();
+            const data = await parseJsonSafe(response);
             if (!response.ok || !data.success) {
                 showError(data.message || 'No se pudo crear el usuario');
                 return;
@@ -1163,7 +1171,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'PATCH',
                 body: JSON.stringify({ displayName }),
             });
-            const data = await response.json();
+            const data = await parseJsonSafe(response);
 
             if (!response.ok || !data.success) {
                 showError(data.message || 'No se pudo actualizar el nombre');
@@ -1218,7 +1226,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'PATCH',
                 body: JSON.stringify({ currentPassword, newPassword }),
             });
-            const data = await response.json();
+            const data = await parseJsonSafe(response);
 
             if (!response.ok || !data.success) {
                 showError(data.message || 'No se pudo cambiar la contraseña');
@@ -1287,14 +1295,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(`Error HTTP: ${response.status}`);
             }
 
-            const data = await response.json();
+            const data = await parseJsonSafe(response);
 
             if (data.success) {
                 sessionStorage.setItem('playerName', playerName);
                 sessionStorage.setItem('playerId', data.playerId);
                 sessionStorage.setItem('roomId', data.roomId);
                 sessionStorage.setItem('isHost', 'true');
-                    window.location.href = 'sala.html';
+                window.location.href = 'sala.html';
             } else {
                 showError(data.message || 'Error al crear la sala');
             }
@@ -1344,14 +1352,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(`Error HTTP: ${response.status}`);
             }
 
-            const data = await response.json();
+            const data = await parseJsonSafe(response);
 
             if (data.success) {
                 sessionStorage.setItem('playerName', playerName);
                 sessionStorage.setItem('playerId', data.playerId);
                 sessionStorage.setItem('roomId', roomCode);
                 sessionStorage.setItem('isHost', 'false');
-                    window.location.href = 'sala.html';
+                window.location.href = 'sala.html';
             } else {
                 showError(data.message || 'Error al unirse a la sala');
             }
