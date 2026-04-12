@@ -15,10 +15,10 @@ services:
       - the_game_default
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.thegame.rule=Host(`45.82.72.43`)"
+      - "traefik.http.routers.thegame.rule=Host(`cardenasexzacarias.tech`)"
       - "traefik.http.routers.thegame.entrypoints=websecure"
       - "traefik.http.routers.thegame.tls=true"
-      - "traefik.http.services.thegame.loadbalancer.server.port=80"
+      - "traefik.http.services.thegame.loadbalancer.server.port=80:80"
 
   app:
     build:
