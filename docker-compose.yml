@@ -10,7 +10,7 @@ services:
     expose:
       - "80"
     volumes:
-      - ./nginx-hostinger-ssl.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx-hostinger.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - the_game_default
     labels:
