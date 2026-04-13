@@ -1324,7 +1324,7 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
     max-width: 420px;
     width: min(92vw, 420px);
     padding: 1.6rem 1.5rem 1.4rem;
-    font-family: 'Poppins', 'Segoe UI', sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .account-modal__badge {

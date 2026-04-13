@@ -38,7 +38,11 @@ app.use(
                 defaultSrc: ["'self'"],
                 scriptSrc: ["'self'", "'unsafe-inline'"],
                 styleSrc: ["'self'", "'unsafe-inline'"],
-                imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+                fontSrc: ["'self'", 'data:'],
+                imgSrc: ["'self'", 'data:', 'blob:'],
+                objectSrc: ["'none'"],
+                baseUri: ["'self'"],
+                frameAncestors: ["'none'"],
             },
         },
     })
@@ -79,6 +83,10 @@ app.get('/sitemap.xml', (req, res) => {
 
 app.get('/google5bea87fead3cc824.html', (req, res) => {
     res.sendFile(path.join(assetsDir, 'google5bea87fead3cc824.html'));
+});
+
+app.get('/favicon.ico', (req, res) => {
+    res.sendFile(path.join(assetsDir, 'cards-icon.png'));
 });
 
 app.get('/healthz', async (req, res) => {
