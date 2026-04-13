@@ -1462,7 +1462,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const title = isVictory ? '¡VICTORIA!' : '¡GAME OVER!';
         const titleColor = isVictory ? '#2ecc71' : '#e74c3c';
 
-        gameAudio?.play(isVictory ? 'win' : 'gameover');
+        gameAudio?.play(isVictory ? (message.reason === 'all_cards_played' ? 'win' : 'victory') : 'gameover');
 
         gameOverDiv.innerHTML = `
         <h2 style="color: ${titleColor}">${title}</h2>
