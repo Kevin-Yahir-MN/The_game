@@ -1650,6 +1650,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updatePlayerCards(cards) {
+        // Don't update card positions while the player is actively dragging a card
+        if (isDragging && dragStartCard) return;
+
         const isYourTurn = isMyTurn();
         const deckEmpty = gameState.remainingDeck === 0;
         const startX =
