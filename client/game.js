@@ -167,8 +167,8 @@ document.addEventListener('DOMContentLoaded', () => {
         needsRedraw = true;
     }
 
-    function log(message, data) {
-        console.log(`[${new Date().toISOString()}] ${message}`, data);
+    function log() {
+        // Debug logs disabled in production game view.
     }
 
     function getAvatarEmoji(avatarId) {

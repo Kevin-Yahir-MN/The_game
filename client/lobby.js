@@ -866,8 +866,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (persistedAuthUser) {
             try {
+                const response = await fetchWithAuth(`${API_URL}/auth/me`, {
+                    method: 'GET',
+                });
 
-                if (!response.ok) {
+                if (response.status === 401) {
                     localStorage.removeItem(AUTH_TOKEN_KEY);
                     localStorage.removeItem(AUTH_USER_KEY);
                 } else {
@@ -884,15 +887,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             AUTH_USER_KEY,
                             JSON.stringify(normalizedUser)
                         );
-                    } else {
+                    } else if (!response.ok) {
                         localStorage.removeItem(AUTH_TOKEN_KEY);
                         localStorage.removeItem(AUTH_USER_KEY);
                     }
                 }
             } catch (error) {
                 console.error('Error verificando sesión:', error);
-                localStorage.removeItem(AUTH_TOKEN_KEY);
-                localStorage.removeItem(AUTH_USER_KEY);
+                // Mantener usuario local si hubo fallo temporal de red/backend.
             }
         }
 
