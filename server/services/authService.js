@@ -174,11 +174,15 @@ async function createSession(userId) {
     const token = generateSessionToken();
     const expiresAtQuery = `NOW() + INTERVAL '${TOKEN_TTL_DAYS} days'`;
 
-    await pool.query(
-        `INSERT INTO user_sessions (token, user_id, created_at, expires_at)
-         VALUES ($1, $2, NOW(), ${expiresAtQuery})`,
-        [token, userId]
-    );
+    await withTransaction(async (client) => {
+        // keep a single active session per user by replacing any stale/previous session
+        await client.query('DELETE FROM user_sessions WHERE user_id = $1', [userId]);
+        await client.query(
+            `INSERT INTO user_sessions (token, user_id, created_at, expires_at)
+             VALUES ($1, $2, NOW(), ${expiresAtQuery})`,
+            [token, userId]
+        );
+    });
 
     return token;
 }
