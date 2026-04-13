@@ -548,6 +548,14 @@ document.addEventListener('DOMContentLoaded', () => {
         loginPanel.classList.toggle('active', isLogin);
         registerPanel.classList.toggle('active', isRegister);
         guestPanel.classList.toggle('active', isGuest);
+
+        // Clear inputs when switching tabs
+        loginUsernameInput.value = '';
+        loginPasswordInput.value = '';
+        registerDisplayNameInput.value = '';
+        registerUsernameInput.value = '';
+        registerPasswordInput.value = '';
+        guestNameInput.value = '';
     }
 
     function openJoinRoomModal() {
