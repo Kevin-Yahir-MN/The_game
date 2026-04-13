@@ -14,11 +14,24 @@
         startbutton: '/assets/sounds/startbutton.mp3',
         win: '/assets/sounds/win.mp3',
     };
+
     const SOUND_VOLUMES = {
-        gameover: 0.35,
-        specialmove: 0.35,
-        win: 0.55,
+        chatmessage: 0.4,
+        draw: 0.4,
+        error: 0.4,
+        gameover: 0.4,
+        invitation: 0.4,
+        menubutton: 0.4,
+        myturn: 0.4,
+        playerenter: 0.4,
+        put: 0.4,
+        returnbutton: 0.4,
+        specialmove: 0.4,
+        startbutton: 0.4,
+        win: 0.4,
+        victory: 0.4,
     };
+
     const AUDIO_ENABLED_STORAGE_KEY = 'game_audio_enabled';
 
     const audioCache = new Map();
