@@ -83,7 +83,7 @@ function checkGameStatus(room) {
     if (allPlayersEmpty && deckEmpty) {
         finalizeGame(room, {
             result: 'win',
-            message: '¡Todos ganan! Todas las cartas jugadas.',
+            message: '¡Victoria magistral! Todas las cartas jugadas.',
             reason: 'all_cards_played',
         });
         return;
@@ -100,7 +100,7 @@ function checkGameStatus(room) {
             message:
                 '¡Victoria! Sin movimientos posibles y solo ' +
                 totalCardsInHand +
-                ' cartas restantes.',
+                ' carta(s) restante(s).',
             reason: 'low_remaining_cards',
         });
         return;
@@ -299,8 +299,9 @@ async function endTurn(room, player) {
 
     if (!deckEmpty) {
         const targetCardCount = room.gameState.initialCards;
+        const cardsPlayedThisTurn = getPlayerTurnCount(player);
         const cardsToDraw = Math.min(
-            targetCardCount - player.cards.length,
+            cardsPlayedThisTurn,
             room.gameState.deck.length
         );
 
