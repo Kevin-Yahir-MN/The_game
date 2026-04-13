@@ -16,6 +16,9 @@ const {
 } = require('./server/db.js');
 const { registerHttpRoutes } = require('./server/http/routes.js');
 const { restoreActiveGames } = require('./server/services/persistence.js');
+const {
+    scheduleDailyRoomReset,
+} = require('./server/services/dailyRoomReset.js');
 const { setupWebSocket } = require('./server/ws/websocket.js');
 const {
     cleanupExpiredSessions,
@@ -168,6 +171,7 @@ async function bootstrapDatabase() {
             restoreActiveGames();
             setInterval(cleanupOldGames, 3600000);
             setInterval(cleanupExpiredSessions, 3600000);
+            scheduleDailyRoomReset();
             hasInitialized = true;
         }
 

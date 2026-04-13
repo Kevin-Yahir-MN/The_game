@@ -135,6 +135,18 @@ async function cleanupOldGames() {
     }
 }
 
+async function deleteAllRooms() {
+    try {
+        await withTransaction(async (client) => {
+            await client.query('DELETE FROM player_connections');
+            await client.query('DELETE FROM game_states');
+        });
+    } catch (error) {
+        console.error('Error eliminando todas las salas:', error);
+        throw error;
+    }
+}
+
 async function generateUniqueRoomId(maxAttempts = 10) {
     for (let i = 0; i < maxAttempts; i++) {
         const roomId = Math.floor(1000 + Math.random() * 9000).toString();
@@ -152,6 +164,7 @@ module.exports = {
     withTransaction,
     initializeDatabase,
     cleanupOldGames,
+    deleteAllRooms,
     generateUniqueRoomId,
     isTransientConnectionError,
 };
