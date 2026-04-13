@@ -838,6 +838,14 @@ function setupWebSocket(server) {
                 );
                 if (playerIndex !== -1) {
                     room.players.splice(playerIndex, 1);
+                    try {
+                        await flushSaveGameState(roomId);
+                    } catch (error) {
+                        console.error(
+                            'Error al persistir sala tras salida de jugador:',
+                            error
+                        );
+                    }
                 }
 
                 // Notificar a todos que este jugador se desconectó (solo en pre‑juego)

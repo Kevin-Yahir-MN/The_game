@@ -106,6 +106,11 @@ app.get('/healthz', async (req, res) => {
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // limit each IP to 100 requests per windowMs
+    skip: (req) => {
+        if (req.method !== 'GET') return false;
+        // room polling endpoints are called frequently by clients in active rooms
+        return req.path.startsWith('/room-info/') || req.path.startsWith('/room-history/');
+    },
     message: 'Too many requests from this IP, please try again later.',
 });
 app.use(limiter);

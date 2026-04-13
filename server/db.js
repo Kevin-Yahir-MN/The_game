@@ -113,7 +113,8 @@ async function cleanupOldGames() {
             const staleRoomsQuery = `
                 SELECT room_id
                 FROM game_states
-                WHERE last_activity < NOW() - INTERVAL '4 hours'
+                WHERE last_activity < NOW() - INTERVAL '2 hours'
+                  AND COALESCE(jsonb_array_length(game_data->'players'), 0) = 0
             `;
             const { rows } = await client.query(staleRoomsQuery);
             if (rows.length === 0) return;
