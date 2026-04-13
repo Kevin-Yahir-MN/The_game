@@ -1970,10 +1970,12 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
         text-shadow: 0 0 0 rgba(46, 204, 113, 0);
         opacity: 1;
     }
+
     50% {
         text-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
         opacity: 0.92;
     }
+
     100% {
         text-shadow: 0 0 0 rgba(46, 204, 113, 0);
         opacity: 1;
@@ -2929,6 +2931,7 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
 .info-panel-header h3 {
     margin: 0;
 }
+
 .emoji-panel-header {
     display: flex;
     align-items: center;
@@ -3077,6 +3080,7 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
     box-shadow: none;
     color: #fff;
 }
+
 .players-panel-header,
 .players-section-header {
     display: flex;
@@ -3308,9 +3312,7 @@ body.app-theme--lobby.is-authenticated .lobby-card::before {
 body.app-theme--lobby.is-authenticated .lobby-container {
     max-width: min(100vw, 1600px);
     padding:
-        clamp(1rem, 2vh, 1.5rem)
-        clamp(1.25rem, 3vw, 2.5rem)
-        3rem;
+        clamp(1rem, 2vh, 1.5rem) clamp(1.25rem, 3vw, 2.5rem) 3rem;
 }
 
 body.app-theme--lobby.is-authenticated .lobby-header {
@@ -3750,6 +3752,7 @@ body.app-theme--room .room-container .room-emoji-chat.game-panel.game-emoji-pane
 }
 
 @media (max-width: 850px) {
+
     body.app-theme .friends-container,
     body.app-theme .room-container .room-emoji-chat.game-panel.game-emoji-panel {
         width: min(92vw, 360px);
@@ -3757,6 +3760,7 @@ body.app-theme--room .room-container .room-emoji-chat.game-panel.game-emoji-pane
 }
 
 @media (max-width: 768px) {
+
     body.app-theme .lobby-card,
     body.app-theme .players-section,
     body.app-theme .room-emoji-chat,
@@ -4049,3 +4053,31 @@ body.app-theme--game .game-over-notification img {
     }
 }
 
+.password-input-wrapper input {
+    flex: 1;
+    padding-right: 2.8rem !important;
+    width: 100%;
+}
+
+.password-toggle-btn {
+    position: absolute;
+    right: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0.25rem;
+    min-height: unset !important;
+    color: #555;
+    opacity: 0.7;
+    transition: opacity 0.15s ease;
+    z-index: 2;
+}
+
+.password-toggle-btn:hover {
+    opacity: 1;
+    transform: translateY(-50%) scale(1.1);
+}

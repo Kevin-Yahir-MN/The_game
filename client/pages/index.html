@@ -85,19 +85,23 @@
                 </div>
 
                 <div class="account-modal__section account-hub">
-                    <button id="openAvatarModal" class="btn account-modal__button account-modal__button--primary" type="button">
+                    <button id="openAvatarModal" class="btn account-modal__button account-modal__button--primary"
+                        type="button">
                         Avatar
                     </button>
-                    <button id="openNameModal" class="btn account-modal__button account-modal__button--primary" type="button">
+                    <button id="openNameModal" class="btn account-modal__button account-modal__button--primary"
+                        type="button">
                         Nombre visible
                     </button>
-                    <button id="openPasswordModal" class="btn account-modal__button account-modal__button--success" type="button">
+                    <button id="openPasswordModal" class="btn account-modal__button account-modal__button--success"
+                        type="button">
                         Contraseña
                     </button>
                 </div>
 
                 <div class="account-modal__footer">
-                    <button id="backToMenuBtn" class="btn account-modal__button account-modal__button--danger" type="button">
+                    <button id="backToMenuBtn" class="btn account-modal__button account-modal__button--danger"
+                        type="button">
                         Volver al menú
                     </button>
                 </div>
@@ -117,21 +121,25 @@
                     <label>Selecciona tu avatar</label>
                     <div class="avatar-picker">
                         <div id="avatarCurrent" class="avatar-current" aria-hidden="true"></div>
-                        <div id="avatarOptions" class="avatar-grid" role="listbox" aria-label="Selecciona un avatar"></div>
+                        <div id="avatarOptions" class="avatar-grid" role="listbox" aria-label="Selecciona un avatar">
+                        </div>
                     </div>
                     <div class="avatar-upload">
                         <span class="avatar-upload__icon" aria-hidden="true">🖼️</span>
                         <input id="avatarUploadInput" type="file" accept="image/png,image/jpeg,image/webp" />
-                        <button id="uploadAvatarBtn" class="btn account-modal__button account-modal__button--primary" type="button">
+                        <button id="uploadAvatarBtn" class="btn account-modal__button account-modal__button--primary"
+                            type="button">
                             Subir imagen
                         </button>
-                        <button id="removeAvatarBtn" class="btn account-modal__button account-modal__button--danger" type="button">
+                        <button id="removeAvatarBtn" class="btn account-modal__button account-modal__button--danger"
+                            type="button">
                             Quitar imagen
                         </button>
                     </div>
                 </div>
                 <div class="account-modal__footer">
-                    <button class="btn account-modal__button account-modal__button--ghost" type="button" data-back-account>
+                    <button class="btn account-modal__button account-modal__button--ghost" type="button"
+                        data-back-account>
                         Volver
                     </button>
                 </div>
@@ -150,12 +158,14 @@
                 <div class="account-modal__section">
                     <label for="accountDisplayName">Cambiar nombre visible</label>
                     <input type="text" id="accountDisplayName" placeholder="Nuevo nombre visible" />
-                    <button id="saveDisplayNameBtn" class="btn account-modal__button account-modal__button--primary" type="button">
+                    <button id="saveDisplayNameBtn" class="btn account-modal__button account-modal__button--primary"
+                        type="button">
                         Guardar nombre
                     </button>
                 </div>
                 <div class="account-modal__footer">
-                    <button class="btn account-modal__button account-modal__button--ghost" type="button" data-back-account>
+                    <button class="btn account-modal__button account-modal__button--ghost" type="button"
+                        data-back-account>
                         Volver
                     </button>
                 </div>
@@ -164,7 +174,8 @@
 
         <!-- Modal contraseña -->
         <div id="passwordModal" class="modal hidden" aria-hidden="true">
-            <div class="modal-content account-modal" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
+            <div class="modal-content account-modal" role="dialog" aria-modal="true"
+                aria-labelledby="passwordModalTitle">
                 <button type="button" class="modal-close-button" data-close-password-modal aria-label="Cerrar modal">
                     ×
                 </button>
@@ -173,17 +184,26 @@
 
                 <div class="account-modal__section">
                     <label for="currentPassword">Contraseña actual</label>
-                    <input type="password" id="currentPassword" placeholder="Contraseña actual" />
+                    <div class="password-input-wrapper">
+                        <input type="password" id="currentPassword" placeholder="Contraseña actual" />
+                        <button type="button" class="password-toggle-btn" data-target="currentPassword"
+                            aria-label="Mostrar contraseña" title="Mostrar contraseña">👁️</button>
+                    </div>
                 </div>
                 <div class="account-modal__section">
                     <label for="newPassword">Nueva contraseña</label>
-                    <input type="password" id="newPassword" placeholder="Nueva contraseña" />
-                    <button id="changePasswordBtn" class="btn account-modal__button account-modal__button--success" type="button">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="newPassword" placeholder="Nueva contraseña" />
+                        <button type="button" class="password-toggle-btn" data-target="newPassword"
+                            aria-label="Mostrar contraseña" title="Mostrar contraseña">👁️</button>
+                    </div> <button id="changePasswordBtn"
+                        class="btn account-modal__button account-modal__button--success" type="button">
                         Cambiar contraseña
                     </button>
                 </div>
                 <div class="account-modal__footer">
-                    <button class="btn account-modal__button account-modal__button--ghost" type="button" data-back-account>
+                    <button class="btn account-modal__button account-modal__button--ghost" type="button"
+                        data-back-account>
                         Volver
                     </button>
                 </div>
@@ -229,7 +249,11 @@
                             </div>
                             <div class="form-group">
                                 <label for="loginPassword">Contraseña</label>
-                                <input type="password" id="loginPassword" placeholder="Tu contraseña" />
+                                <div class="password-input-wrapper">
+                                    <input type="password" id="loginPassword" placeholder="Tu contraseña" />
+                                    <button type="button" class="password-toggle-btn" data-target="loginPassword"
+                                        aria-label="Mostrar contraseña" title="Mostrar contraseña">👁️</button>
+                                </div>
                             </div>
                             <button id="loginBtn" class="btn btn-secondary" type="button">
                                 Iniciar sesión
@@ -239,7 +263,8 @@
                         <div id="registerPanel" class="auth-panel">
                             <div class="auth-panel__intro">
                                 <span class="auth-panel__badge">Nuevo ingreso</span>
-                                <p>Crea tu identidad dentro de The Game y deja listo tu perfil para futuras partidas.</p>
+                                <p>Crea tu identidad dentro de The Game y deja listo tu perfil para futuras partidas.
+                                </p>
                             </div>
                             <div class="form-group">
                                 <label for="registerDisplayName">Nombre visible</label>
@@ -251,7 +276,11 @@
                             </div>
                             <div class="form-group">
                                 <label for="registerPassword">Contraseña</label>
-                                <input type="password" id="registerPassword" placeholder="Tu contraseña" />
+                                <div class="password-input-wrapper">
+                                    <input type="password" id="registerPassword" placeholder="Tu contraseña" />
+                                    <button type="button" class="password-toggle-btn" data-target="registerPassword"
+                                        aria-label="Mostrar contraseña" title="Mostrar contraseña">👁️</button>
+                                </div>
                             </div>
                             <button id="registerBtn" class="btn btn-primary" type="button">
                                 Crear usuario
@@ -312,15 +341,8 @@
             </p>
             <div class="form-group join-room-form-group">
                 <label for="joinRoomCodeInput">Código de sala</label>
-                <input
-                    type="text"
-                    id="joinRoomCodeInput"
-                    placeholder="Ej: 1234"
-                    maxlength="4"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
-                    autofocus
-                />
+                <input type="text" id="joinRoomCodeInput" placeholder="Ej: 1234" maxlength="4" inputmode="numeric"
+                    pattern="[0-9]*" autofocus />
             </div>
             <div class="join-room-guidance">
                 <span>Solo admite numeros</span>
@@ -330,8 +352,7 @@
                     type="button">
                     Unirse
                 </button>
-                <button id="cancelJoinRoomBtn" class="invite-modal__button invite-modal__button--ghost"
-                    type="button">
+                <button id="cancelJoinRoomBtn" class="invite-modal__button invite-modal__button--ghost" type="button">
                     Cancelar
                 </button>
             </div>
