@@ -463,18 +463,6 @@ document.addEventListener('DOMContentLoaded', () => {
         passwordModal,
     ].filter(Boolean);
 
-    document.querySelectorAll('.password-toggle-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const input = document.getElementById(btn.dataset.target);
-            if (!input) return;
-            const isHidden = input.type === 'password';
-            input.type = isHidden ? 'text' : 'password';
-            btn.textContent = isHidden ? '🙈' : '👁️';
-            btn.setAttribute('aria-label', isHidden ? 'Ocultar contraseña' : 'Mostrar contraseña');
-            btn.title = isHidden ? 'Ocultar contraseña' : 'Mostrar contraseña';
-        });
-    });
-
     function setModalVisibility(modal, show) {
         if (!modal) return;
         modal.classList.toggle('hidden', !show);
