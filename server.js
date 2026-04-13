@@ -108,9 +108,22 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Specific rate limit for auth routes
+const authWindowMs = Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
+const authMaxAttempts = Number(process.env.AUTH_RATE_LIMIT_MAX) || 20;
 const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // limit each IP to 5 auth attempts per windowMs
+    windowMs: authWindowMs,
+    max: authMaxAttempts,
+    // count only failed responses (4xx/5xx), so successful logins do not consume the quota
+    skipSuccessfulRequests: true,
+    // avoid penalizing all users behind a shared IP by scoping by IP + username when available
+    keyGenerator: (req) => {
+        const rawUsername =
+            typeof req.body?.username === 'string' ? req.body.username : '';
+        const username = rawUsername.trim().toLowerCase() || 'anonymous';
+        return `${req.ip}:${username}`;
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
     message: 'Too many authentication attempts, please try again later.',
 });
 
