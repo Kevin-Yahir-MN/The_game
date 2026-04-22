@@ -2335,7 +2335,7 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
     }
 
     #gameCanvas {
-        margin-top: 90px;
+        margin-top: 20px;
     }
 
     .game-panel {
@@ -2442,7 +2442,7 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
     }
 
     #gameCanvas {
-        margin-top: 80px;
+        margin-top: 10px;
     }
 
     .redirect-modal {
