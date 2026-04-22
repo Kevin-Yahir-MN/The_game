@@ -292,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         targetWidth = Math.max(280, targetWidth);
         targetHeight = Math.max(
-            portraitMobile ? 245 : 280,
+            portraitMobile ? 300 : 280,
             targetHeight
         );
 
@@ -321,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ),
                 y: Math.round(canvas.height * 0.13),
             };
-            PLAYER_CARDS_Y = Math.round(canvas.height * 0.70);
+            PLAYER_CARDS_Y = Math.round(canvas.height - CARD_HEIGHT - 12);
             BUTTONS_Y = Math.round(canvas.height * 0.84);
             HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 8;
         } else {

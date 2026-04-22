@@ -4367,7 +4367,7 @@ body.app-theme--game .players-panel {
     }
 
     body.app-theme--game .game-board {
-        min-height: clamp(380px, 54vh, 620px);
+        min-height: clamp(430px, 60vh, 680px);
         padding: 2px;
     }
 
