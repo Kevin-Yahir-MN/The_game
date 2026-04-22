@@ -999,7 +999,7 @@ body.app-theme--lobby .lobby-card {
 #gameCanvas {
     background-color: #1a6b1a;
     display: block;
-    margin: 140px auto 0;
+    margin: 20px auto 0;
     border: 1px solid rgba(52, 73, 94, 0.45);
     border-radius: 12px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
@@ -2224,7 +2224,7 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
     }
 
     #gameCanvas {
-        margin-top: 120px;
+        margin-top: 20px;
     }
 
     .game-controls {
@@ -2335,7 +2335,7 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
     }
 
     #gameCanvas {
-        margin-top: 20px;
+        margin-top: 10px;
     }
 
     .game-panel {
@@ -2442,7 +2442,7 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
     }
 
     #gameCanvas {
-        margin-top: 10px;
+        margin-top: 8px;
     }
 
     .redirect-modal {
