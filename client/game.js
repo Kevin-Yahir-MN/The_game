@@ -292,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         targetWidth = Math.max(280, targetWidth);
         targetHeight = Math.max(
-            portraitMobile ? 300 : 280,
+            portraitMobile ? 340 : 280,
             targetHeight
         );
 
