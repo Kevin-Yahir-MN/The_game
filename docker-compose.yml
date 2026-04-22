@@ -18,7 +18,7 @@ services:
       - "traefik.http.routers.thegame.rule=Host(`kymnavarro.site`)"
       - "traefik.http.routers.thegame.entrypoints=websecure"
       - "traefik.http.routers.thegame.tls=true"
-      - "traefik.http.services.thegame.loadbalancer.server.port=80:80"
+      - "traefik.http.services.thegame.loadbalancer.server.port=80"
 
   app:
     build:

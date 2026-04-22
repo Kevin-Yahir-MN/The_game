@@ -7,6 +7,7 @@ const {
     getPlayableCards,
     isValidMove,
     canAnyPlayerPlay,
+    initializeDeck,
 } = require('../utils/gameRules');
 const {
     createTurnState,
@@ -380,6 +381,32 @@ async function startGame(room, initialCards = 6) {
     const roomId = reverseRoomMap.get(room);
     if (!roomId) throw new Error('Room ID no encontrado');
 
+    const nextPlayers = Array.isArray(room.players)
+        ? room.players.filter(Boolean)
+        : [];
+    if (nextPlayers.length === 0) {
+        throw new Error('La sala no tiene jugadores para iniciar');
+    }
+
+    const activeHost =
+        nextPlayers.find((player) => player.isHost) || nextPlayers[0];
+
+    room.players = nextPlayers.map((player) => ({
+        ...player,
+        isHost: player.id === activeHost.id,
+    }));
+    room.originalHostId = activeHost.id;
+    room.gameState.deck = initializeDeck();
+    room.gameState.board = {
+        ascending: [1, 1],
+        descending: [100, 100],
+    };
+    room.gameState.currentTurn = activeHost.id;
+    room.gameState.gameStarted = true;
+    room.gameState.gameFinished = false;
+    room.gameState.initialCards = initialCards;
+    boardHistory.set(roomId, createDefaultHistory());
+
     try {
         await withTransaction(async (client) => {
             await client.query(
@@ -429,10 +456,6 @@ async function startGame(room, initialCards = 6) {
             );
         });
 
-        room.gameState.gameStarted = true;
-        room.gameState.gameFinished = false;
-        room.gameState.initialCards = initialCards;
-
         room.players.forEach((player) => {
             player.cards = [];
             resetPlayerTurnState(player);
@@ -452,7 +475,7 @@ async function startGame(room, initialCards = 6) {
             type: 'game_started',
             state: {
                 board: room.gameState.board,
-                currentTurn: room.players[0].id,
+                currentTurn: room.gameState.currentTurn,
                 remainingDeck: room.gameState.deck.length,
                 initialCards: initialCards,
                 players: room.players.map((p) => ({

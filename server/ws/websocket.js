@@ -612,6 +612,7 @@ function setupWebSocket(server) {
                                     p.ws?.readyState === WebSocket.OPEN
                             );
                             if (newHost) {
+                                player.isHost = false;
                                 newHost.isHost = true;
                                 room.originalHostId = newHost.id;
                                 broadcastToRoom(room, {
