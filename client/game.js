@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let PLAYER_CARDS_Y = canvas.height * 0.6;
     let BUTTONS_Y = canvas.height * 0.85;
     let HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
+    let HAND_CARD_SCALE = 1;
 
     const assetCache = new Map();
     let historyIcon = new Image();
@@ -168,36 +169,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getHandLayout(cardCount) {
         const count = Math.max(0, Number(cardCount) || 0);
+        const handCardWidth = Math.round(CARD_WIDTH * HAND_CARD_SCALE);
         if (count === 0) {
             return {
                 spacing: CARD_SPACING,
-                startX: (canvas.width - CARD_WIDTH) / 2,
-                totalWidth: CARD_WIDTH,
+                startX: (canvas.width - handCardWidth) / 2,
+                totalWidth: handCardWidth,
+                cardWidth: handCardWidth,
             };
         }
 
         const maxWidth = canvas.width - (isMobilePortraitLayout() ? 20 : 40);
-        const naturalWidth = count * CARD_WIDTH + (count - 1) * CARD_SPACING;
+        const naturalWidth =
+            count * handCardWidth + (count - 1) * CARD_SPACING;
         const maxOverlap = isMobilePortraitLayout()
-            ? Math.round(CARD_WIDTH * 0.32)
+            ? Math.round(handCardWidth * 0.32)
             : 0;
         const minSpacing = -maxOverlap;
         const fittedSpacing =
             count > 1
-                ? Math.floor((maxWidth - count * CARD_WIDTH) / (count - 1))
+                ? Math.floor((maxWidth - count * handCardWidth) / (count - 1))
                 : CARD_SPACING;
         const spacing = Math.max(
             minSpacing,
             Math.min(CARD_SPACING, fittedSpacing)
         );
         const totalWidth =
-            count * CARD_WIDTH + Math.max(0, count - 1) * spacing;
+            count * handCardWidth + Math.max(0, count - 1) * spacing;
 
         return {
             spacing,
             startX: Math.round((canvas.width - totalWidth) / 2),
             totalWidth,
             naturalWidth,
+            cardWidth: handCardWidth,
         };
     }
 
@@ -308,6 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
             CARD_HEIGHT = Math.round(CARD_WIDTH * 1.48);
             COLUMN_SPACING = boardSpacing;
             CARD_SPACING = Math.max(4, Math.round(CARD_WIDTH * 0.08));
+            HAND_CARD_SCALE = 0.82;
 
             BOARD_POSITION = {
                 x: Math.round(
@@ -315,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ),
                 y: Math.round(canvas.height * 0.16),
             };
-            PLAYER_CARDS_Y = Math.round(canvas.height * 0.63);
+            PLAYER_CARDS_Y = Math.round(canvas.height * 0.69);
             BUTTONS_Y = Math.round(canvas.height * 0.84);
             HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 8;
         } else {
@@ -323,6 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
             CARD_HEIGHT = Math.round(120 * scale);
             COLUMN_SPACING = Math.round(60 * scale);
             CARD_SPACING = Math.max(10, Math.round(15 * scale));
+            HAND_CARD_SCALE = 1;
 
             BOARD_POSITION = {
                 x:
@@ -1805,7 +1812,10 @@ document.addEventListener('DOMContentLoaded', () => {
             );
 
             if (existingCard) {
-                existingCard.x = startX + index * (CARD_WIDTH + spacing);
+                existingCard.width = handLayout.cardWidth;
+                existingCard.height = CARD_HEIGHT;
+                existingCard.x =
+                    startX + index * (handLayout.cardWidth + spacing);
                 existingCard.y = startY;
                 existingCard.isPlayable =
                     isYourTurn &&
@@ -1830,9 +1840,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     );
                 return existingCard;
             } else {
-                return cardPool.get(
+                const handCard = cardPool.get(
                     cardValue,
-                    startX + index * (CARD_WIDTH + spacing),
+                    startX + index * (handLayout.cardWidth + spacing),
                     startY,
                     isYourTurn &&
                     (deckEmpty
@@ -1856,6 +1866,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             move.playerId === currentPlayer.id
                     )
                 );
+                handCard.width = handLayout.cardWidth;
+                handCard.height = CARD_HEIGHT;
+                return handCard;
             }
         });
 
@@ -2102,7 +2115,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const handLayout = getHandLayout(gameState.yourCards.length);
         const startX =
-            handLayout.startX + cardIndex * (CARD_WIDTH + handLayout.spacing);
+            handLayout.startX +
+            cardIndex * (handLayout.cardWidth + handLayout.spacing);
 
         if (!dragStartCard) return;
 
@@ -2374,7 +2388,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         gameState.yourCards.forEach((card, index) => {
             if (card && card !== dragStartCard) {
-                card.x = handLayout.startX + index * (CARD_WIDTH + handLayout.spacing);
+                card.width = handLayout.cardWidth;
+                card.height = CARD_HEIGHT;
+                card.x =
+                    handLayout.startX +
+                    index * (handLayout.cardWidth + handLayout.spacing);
                 card.y = PLAYER_CARDS_Y;
                 card.draw();
             }
