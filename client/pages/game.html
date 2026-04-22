@@ -18,54 +18,91 @@
         </div>
     </div>
 
-    <!-- Contenedor principal del juego -->
-    <div id="gameContainer">
-        <canvas id="gameCanvas" width="800" height="700"></canvas>
-        <div class="game-controls">
-            <button id="endTurnBtn">Terminar Turno</button>
+    <div class="game-shell" id="gameShell">
+        <div id="orientationTip" class="orientation-tip" aria-live="polite">
+            Para una mejor experiencia, gira tu dispositivo a horizontal.
         </div>
-        <!-- Emoji bar debajo de la mano del jugador (fuera del canvas) -->
 
-    </div>
-
-    <!-- Panel de Información -->
-    <div class="game-panel info-panel">
-        <h3>Información del Juego</h3>
-        <div class="panel-content">
-            <p>
-                <strong>Turno actual:</strong>
-                <span id="currentTurn">Esperando...</span>
-            </p>
-            <p>
-                <strong>Cartas restantes:</strong>
-                <span id="remainingDeck">98</span>
-            </p>
-            <!-- El estado de conexión se insertará aquí automáticamente -->
-            <div class="progress-container">
-                <span id="progressText">0/2 carta(s) jugada(s)</span>
-                <div class="progress-bar" id="progressBar"></div>
+        <section class="game-info-region">
+            <div class="game-panel info-panel">
+                <h3>Información del Juego</h3>
+                <div class="panel-content">
+                    <p>
+                        <strong>Turno actual:</strong>
+                        <span id="currentTurn">Esperando...</span>
+                    </p>
+                    <p>
+                        <strong>Cartas restantes:</strong>
+                        <span id="remainingDeck">98</span>
+                    </p>
+                    <div class="progress-container">
+                        <span id="progressText">0/2 carta(s) jugada(s)</span>
+                        <div class="progress-bar" id="progressBar"></div>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
+        </section>
 
-    <div class="room-emoji-chat game-panel game-emoji-panel">
-        <h3>Reacciones rápidas</h3>
+        <main class="game-main">
+            <section class="game-board" id="gameBoard">
+                <div id="gameContainer">
+                    <canvas id="gameCanvas" width="800" height="700"></canvas>
+                </div>
+            </section>
 
-        <div class="emoji-buttons" id="emojiButtons">
-            <button type="button" class="emoji-button" data-emoji="happy">😄</button>
-            <button type="button" class="emoji-button" data-emoji="love">😍</button>
-            <button type="button" class="emoji-button" data-emoji="wow">😮</button>
-            <button type="button" class="emoji-button" data-emoji="sleep">😴</button>
-            <button type="button" class="emoji-button" data-emoji="cry">😭</button>
-            <button type="button" class="emoji-button" data-emoji="proud">😎</button>
-            <button type="button" class="emoji-button" data-emoji="angel">😇</button>
-            <button type="button" class="emoji-button" data-emoji="crazy">🤪</button>
-            <button type="button" class="emoji-button" data-emoji="angry">😡</button>
-            <button type="button" class="emoji-button" data-emoji="demon">😈</button>
-            <button type="button" class="emoji-button" data-emoji="middle">🖕</button>
-            <button type="button" class="emoji-button" data-emoji="poop">💩</button>
-        </div>
+            <section class="game-bottombar">
+                <div class="game-controls">
+                    <button id="endTurnBtn">Terminar Turno</button>
+                </div>
+                <div class="mobile-panel-actions">
+                    <button
+                        id="togglePlayersDrawer"
+                        class="mobile-panel-btn"
+                        type="button"
+                        aria-controls="playersPanel"
+                        aria-expanded="false"
+                    >
+                        Jugadores
+                    </button>
+                    <button
+                        id="toggleEmojiDrawer"
+                        class="mobile-panel-btn"
+                        type="button"
+                        aria-controls="emojiPanel"
+                        aria-expanded="false"
+                    >
+                        Reacciones
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <aside class="game-sidepanel">
+            <div id="playersPanel" class="players-panel"></div>
+            <div
+                id="emojiPanel"
+                class="room-emoji-chat game-panel game-emoji-panel"
+            >
+                <h3>Reacciones rápidas</h3>
+
+                <div class="emoji-buttons" id="emojiButtons">
+                    <button type="button" class="emoji-button" data-emoji="happy">😄</button>
+                    <button type="button" class="emoji-button" data-emoji="love">😍</button>
+                    <button type="button" class="emoji-button" data-emoji="wow">😮</button>
+                    <button type="button" class="emoji-button" data-emoji="sleep">😴</button>
+                    <button type="button" class="emoji-button" data-emoji="cry">😭</button>
+                    <button type="button" class="emoji-button" data-emoji="proud">😎</button>
+                    <button type="button" class="emoji-button" data-emoji="angel">😇</button>
+                    <button type="button" class="emoji-button" data-emoji="crazy">🤪</button>
+                    <button type="button" class="emoji-button" data-emoji="angry">😡</button>
+                    <button type="button" class="emoji-button" data-emoji="demon">😈</button>
+                    <button type="button" class="emoji-button" data-emoji="middle">🖕</button>
+                    <button type="button" class="emoji-button" data-emoji="poop">💩</button>
+                </div>
+            </div>
+        </aside>
     </div>
+    <div id="gameDrawerBackdrop" class="game-drawer-backdrop"></div>
 
     <!-- Modal para el historial -->
     <div id="historyModal" class="history-modal" style="display: none">

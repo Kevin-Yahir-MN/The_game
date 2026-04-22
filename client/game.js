@@ -5,6 +5,14 @@ document.addEventListener('DOMContentLoaded', () => {
         window.APP_CONFIG?.WS_URL ||
         `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
     const endTurnButton = document.getElementById('endTurnBtn');
+    const gameShell = document.getElementById('gameShell');
+    const gameBoard = document.getElementById('gameBoard');
+    const playersDrawerButton = document.getElementById(
+        'togglePlayersDrawer'
+    );
+    const emojiDrawerButton = document.getElementById('toggleEmojiDrawer');
+    const drawerBackdrop = document.getElementById('gameDrawerBackdrop');
+    const orientationTip = document.getElementById('orientationTip');
     const GAME_RULES = window.GAME_RULES;
     const emojiButtonsContainer = document.getElementById('emojiButtons');
     const AVATARS = window.APP_AVATARS?.AVATARS || [];
@@ -29,10 +37,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const STATE_UPDATE_THROTTLE = 0;
     // reposition floating emoji messages when the window resizes
     window.addEventListener('resize', () => {
+        updateResponsiveUiState();
         applyResponsiveCanvasSizing();
         applyHudPanelLayout();
         updateEmojiPanelPosition();
         positionEmojiMessages();
+    });
+    window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+            updateResponsiveUiState();
+            applyResponsiveCanvasSizing();
+            applyHudPanelLayout();
+            positionEmojiMessages();
+        }, 80);
     });
     const TARGET_FPS = 60;
     const MAX_RECONNECT_ATTEMPTS = 12;
@@ -135,14 +152,107 @@ document.addEventListener('DOMContentLoaded', () => {
         return input ? input.replace(/[^a-zA-Z0-9-_]/g, '') : '';
     }
 
+    function isMobilePortraitLayout() {
+        return (
+            window.matchMedia('(max-width: 768px)').matches &&
+            window.matchMedia('(orientation: portrait)').matches
+        );
+    }
+
+    function isMobileLandscapeLayout() {
+        return (
+            window.matchMedia('(max-width: 1024px)').matches &&
+            window.matchMedia('(orientation: landscape)').matches
+        );
+    }
+
+    function closeResponsiveDrawers() {
+        document.body.classList.remove(
+            'drawer-players-open',
+            'drawer-emoji-open'
+        );
+        updateResponsiveUiState();
+    }
+
+    function openResponsiveDrawer(drawerName) {
+        if (drawerName === 'players') {
+            document.body.classList.add('drawer-players-open');
+            document.body.classList.remove('drawer-emoji-open');
+        } else if (drawerName === 'emoji') {
+            document.body.classList.add('drawer-emoji-open');
+            document.body.classList.remove('drawer-players-open');
+        }
+        updateResponsiveUiState();
+        positionEmojiMessages();
+    }
+
+    function updateResponsiveUiState() {
+        const isPortrait = isMobilePortraitLayout();
+        const isLandscape = isMobileLandscapeLayout();
+        const isMobile = isPortrait || isLandscape;
+        const isPlayersDrawerOpen =
+            document.body.classList.contains('drawer-players-open');
+        const isEmojiDrawerOpen =
+            document.body.classList.contains('drawer-emoji-open');
+
+        document.body.classList.toggle('is-mobile-portrait', isPortrait);
+        document.body.classList.toggle('is-mobile-landscape', isLandscape);
+
+        if (!isPortrait) {
+            document.body.classList.remove('drawer-players-open');
+        }
+        if (!isMobile) {
+            document.body.classList.remove('drawer-emoji-open');
+        }
+
+        if (orientationTip) {
+            orientationTip.hidden = !isPortrait;
+        }
+
+        if (playersDrawerButton) {
+            playersDrawerButton.hidden = !isPortrait;
+            playersDrawerButton.setAttribute(
+                'aria-expanded',
+                isPortrait && isPlayersDrawerOpen ? 'true' : 'false'
+            );
+        }
+
+        if (emojiDrawerButton) {
+            emojiDrawerButton.hidden = !isMobile;
+            emojiDrawerButton.setAttribute(
+                'aria-expanded',
+                isEmojiDrawerOpen ? 'true' : 'false'
+            );
+        }
+    }
+
     function applyResponsiveCanvasSizing() {
+        const boardRect = gameBoard?.getBoundingClientRect();
         const viewportWidth = window.innerWidth || 800;
         const viewportHeight = window.innerHeight || 700;
-        const maxWidth = Math.min(900, viewportWidth - 32);
-        const targetWidth = Math.max(320, maxWidth);
-        const targetHeight = Math.min(
-            Math.max(520, Math.floor(targetWidth * 0.85)),
-            Math.floor(viewportHeight * 0.9)
+        const availableWidth = Math.max(
+            280,
+            Math.floor((boardRect?.width || viewportWidth) - 20)
+        );
+        const availableHeight = Math.max(
+            isMobilePortraitLayout() ? 260 : 300,
+            Math.floor((boardRect?.height || viewportHeight * 0.72) - 20)
+        );
+        const aspectRatio = 800 / 700;
+        let targetWidth = Math.floor(
+            Math.min(availableWidth, availableHeight * aspectRatio)
+        );
+        let targetHeight = Math.floor(targetWidth / aspectRatio);
+
+        if (targetHeight > availableHeight) {
+            targetHeight = availableHeight;
+            targetWidth = Math.floor(targetHeight * aspectRatio);
+        }
+
+        targetWidth = Math.max(280, targetWidth);
+        targetHeight = Math.max(
+            isMobilePortraitLayout() ? 245 : 280,
+            targetHeight
         );
 
         canvas.width = targetWidth;
@@ -905,49 +1015,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyHudPanelLayout() {
-        const infoPanel = document.querySelector('.info-panel');
+        updateResponsiveUiState();
         const emojiPanel = document.querySelector('.game-emoji-panel');
-        const playersPanel = document.getElementById('playersPanel');
-        const margin = window.innerWidth <= 768 ? 15 : 20;
-        const gap = 12;
-        const availableWidth = Math.max(window.innerWidth - margin * 3, 260);
-        const panelWidth = Math.min(
-            380,
-            Math.max(170, Math.floor(availableWidth / 2))
-        );
-
-        if (infoPanel) {
-            infoPanel.style.position = 'fixed';
-            infoPanel.style.top = `${margin}px`;
-            infoPanel.style.left = `${margin}px`;
-            infoPanel.style.right = 'auto';
-            infoPanel.style.width = `${panelWidth}px`;
-            infoPanel.style.maxWidth = `${panelWidth}px`;
-        }
-
-        if (playersPanel) {
-            playersPanel.style.position = 'fixed';
-            playersPanel.style.top = `${margin}px`;
-            playersPanel.style.right = `${margin}px`;
-            playersPanel.style.left = 'auto';
-            playersPanel.style.width = `${panelWidth}px`;
-            playersPanel.style.maxWidth = `${panelWidth}px`;
-        }
-
         if (emojiPanel) {
-            emojiPanel.style.position = 'fixed';
-            emojiPanel.style.left = `${margin}px`;
-            emojiPanel.style.right = 'auto';
-            emojiPanel.style.width = `${panelWidth}px`;
-            emojiPanel.style.maxWidth = `${panelWidth}px`;
-
-            if (infoPanel) {
-                const rect = infoPanel.getBoundingClientRect();
-                emojiPanel.style.top = `${Math.round(rect.bottom + gap)}px`;
-            } else {
-                emojiPanel.style.top = `${margin}px`;
-            }
-
             emojiPanel.classList.add('is-layout-ready');
         }
     }
@@ -982,9 +1052,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const msgs = document.getElementById('emojiMessages');
         const panel = document.getElementById('playersPanel');
         if (!msgs || !panel) return;
+        if (isMobilePortraitLayout()) {
+            msgs.style.position = 'fixed';
+            msgs.style.right = '12px';
+            msgs.style.bottom = '88px';
+            msgs.style.top = 'auto';
+            msgs.style.zIndex = 32;
+            return;
+        }
         const rect = panel.getBoundingClientRect();
         msgs.style.position = 'fixed';
-        msgs.style.right = '20px';
+        msgs.style.right = window.innerWidth <= 768 ? '12px' : '20px';
         msgs.style.top = rect.bottom + 5 + 'px';
         // keep it above other UI
         msgs.style.zIndex = 21;
@@ -2242,10 +2320,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createPlayersPanel() {
+        const existingPanel = document.getElementById('playersPanel');
+        if (existingPanel) return existingPanel;
         const panel = document.createElement('div');
         panel.id = 'playersPanel';
         panel.className = 'players-panel';
-        document.body.appendChild(panel);
+        const panelHost =
+            document.querySelector('.game-sidepanel') || document.body;
+        panelHost.appendChild(panel);
         return panel;
     }
 
@@ -2518,6 +2600,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document
             .getElementById('modalBackdrop')
             ?.removeEventListener('click', closeHistoryModal);
+        playersDrawerButton?.removeEventListener('click', handlePlayersDrawerClick);
+        emojiDrawerButton?.removeEventListener('click', handleEmojiDrawerClick);
+        drawerBackdrop?.removeEventListener('click', closeResponsiveDrawers);
 
         // Remove emoji button listeners
         if (emojiButtonsContainer) {
@@ -2535,6 +2620,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clear memory caches
         assetCache.clear();
         cardPool.pool = [];
+    }
+
+    function handlePlayersDrawerClick() {
+        if (document.body.classList.contains('drawer-players-open')) {
+            closeResponsiveDrawers();
+            return;
+        }
+        openResponsiveDrawer('players');
+    }
+
+    function handleEmojiDrawerClick() {
+        if (document.body.classList.contains('drawer-emoji-open')) {
+            closeResponsiveDrawers();
+            return;
+        }
+        openResponsiveDrawer('emoji');
     }
 
     function initGame() {
@@ -2561,6 +2662,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }),
         ])
             .then(() => {
+                updateResponsiveUiState();
                 applyResponsiveCanvasSizing();
 
                 canvas.addEventListener('click', handleCanvasClick);
@@ -2580,11 +2682,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     .getElementById('modalBackdrop')
                     .addEventListener('click', closeHistoryModal);
                 window.addEventListener('beforeunload', cleanup);
-
-                const controlsDiv = document.querySelector('.game-controls');
-                if (controlsDiv) {
-                    controlsDiv.style.bottom = `${canvas.height - BUTTONS_Y}px`;
-                }
+                playersDrawerButton?.addEventListener(
+                    'click',
+                    handlePlayersDrawerClick
+                );
+                emojiDrawerButton?.addEventListener(
+                    'click',
+                    handleEmojiDrawerClick
+                );
+                drawerBackdrop?.addEventListener(
+                    'click',
+                    closeResponsiveDrawers
+                );
 
                 historyIconsAnimation = {
                     interval: null,
