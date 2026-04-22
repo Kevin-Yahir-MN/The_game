@@ -127,6 +127,46 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function setPasswordToggleState(button, input) {
+        const isVisible = input.type === 'text';
+        button.classList.toggle('is-visible', isVisible);
+        button.setAttribute('aria-pressed', isVisible ? 'true' : 'false');
+        button.setAttribute(
+            'aria-label',
+            isVisible ? 'Ocultar contraseña' : 'Mostrar contraseña'
+        );
+    }
+
+    function initPasswordToggles() {
+        document
+            .querySelectorAll('.password-toggle[aria-controls]')
+            .forEach((button) => {
+                const inputId = button.getAttribute('aria-controls');
+                const input = document.getElementById(inputId);
+                if (!input || button.dataset.bound === 'true') return;
+
+                setPasswordToggleState(button, input);
+
+                button.addEventListener('click', () => {
+                    const nextType =
+                        input.type === 'password' ? 'text' : 'password';
+                    input.type = nextType;
+                    setPasswordToggleState(button, input);
+                    try {
+                        input.focus({ preventScroll: true });
+                    } catch (error) {
+                        input.focus();
+                    }
+                    const valueLength = input.value.length;
+                    if (typeof input.setSelectionRange === 'function') {
+                        input.setSelectionRange(valueLength, valueLength);
+                    }
+                });
+
+                button.dataset.bound = 'true';
+            });
+    }
+
     // friend modal functions
     const friendModalController = window.FriendsUI
         ? window.FriendsUI.createFriendModalController({
@@ -1414,10 +1454,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     closeAllAccountModals();
+    initPasswordToggles();
     hydrateSession();
 });
-
-
 
 
 

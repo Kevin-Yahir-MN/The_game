@@ -184,11 +184,25 @@
 
                 <div class="account-modal__section">
                     <label for="currentPassword">Contraseña actual</label>
-                    <input type="password" id="currentPassword" placeholder="Contraseña actual" />
+                    <div class="password-field">
+                        <input type="password" id="currentPassword" placeholder="Contraseña actual"
+                            autocomplete="current-password" data-password-toggle="currentPassword" />
+                        <button type="button" class="password-toggle" aria-label="Mostrar contraseña"
+                            aria-pressed="false" aria-controls="currentPassword">
+                            <span class="password-toggle__icon" aria-hidden="true"></span>
+                        </button>
+                    </div>
                 </div>
                 <div class="account-modal__section">
                     <label for="newPassword">Nueva contraseña</label>
-                    <input type="password" id="newPassword" placeholder="Nueva contraseña" />
+                    <div class="password-field">
+                        <input type="password" id="newPassword" placeholder="Nueva contraseña"
+                            autocomplete="new-password" data-password-toggle="newPassword" />
+                        <button type="button" class="password-toggle" aria-label="Mostrar contraseña"
+                            aria-pressed="false" aria-controls="newPassword">
+                            <span class="password-toggle__icon" aria-hidden="true"></span>
+                        </button>
+                    </div>
                     <button id="changePasswordBtn" class="btn account-modal__button account-modal__button--success"
                         type="button">
                         Cambiar contraseña
@@ -242,7 +256,14 @@
                             </div>
                             <div class="form-group">
                                 <label for="loginPassword">Contraseña</label>
-                                <input type="password" id="loginPassword" placeholder="Tu contraseña" />
+                                <div class="password-field">
+                                    <input type="password" id="loginPassword" placeholder="Tu contraseña"
+                                        autocomplete="current-password" data-password-toggle="loginPassword" />
+                                    <button type="button" class="password-toggle" aria-label="Mostrar contraseña"
+                                        aria-pressed="false" aria-controls="loginPassword">
+                                        <span class="password-toggle__icon" aria-hidden="true"></span>
+                                    </button>
+                                </div>
                             </div>
                             <button id="loginBtn" class="btn btn-secondary" type="button">
                                 Iniciar sesión
@@ -265,7 +286,14 @@
                             </div>
                             <div class="form-group">
                                 <label for="registerPassword">Contraseña</label>
-                                <input type="password" id="registerPassword" placeholder="Tu contraseña" />
+                                <div class="password-field">
+                                    <input type="password" id="registerPassword" placeholder="Tu contraseña"
+                                        autocomplete="new-password" data-password-toggle="registerPassword" />
+                                    <button type="button" class="password-toggle" aria-label="Mostrar contraseña"
+                                        aria-pressed="false" aria-controls="registerPassword">
+                                        <span class="password-toggle__icon" aria-hidden="true"></span>
+                                    </button>
+                                </div>
                             </div>
                             <button id="registerBtn" class="btn btn-primary" type="button">
                                 Crear usuario

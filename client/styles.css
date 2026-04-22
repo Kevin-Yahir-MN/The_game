@@ -1409,6 +1409,56 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
     border-color: rgba(52, 152, 219, 0.7);
 }
 
+.password-field {
+    position: relative;
+}
+
+.password-field input {
+    padding-right: 3.6rem;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.7rem;
+    transform: translateY(-50%);
+    width: 2.5rem;
+    height: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #466170;
+    cursor: pointer;
+    padding: 0;
+    z-index: 1;
+}
+
+.password-toggle:hover {
+    background: rgba(70, 97, 112, 0.12);
+}
+
+.password-toggle:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(95, 196, 255, 0.35);
+}
+
+.password-toggle__icon {
+    width: 1.4rem;
+    height: 1.4rem;
+    display: block;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23466170' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
+}
+
+.password-toggle.is-visible .password-toggle__icon {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23466170' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3l18 18'/%3E%3Cpath d='M10.6 10.7A3 3 0 0 0 9 12a3 3 0 0 0 5.2 2.1'/%3E%3Cpath d='M6.7 6.7C4.1 8.2 2.5 10.9 2 12c.8 1.5 4.2 6 10 6 1.7 0 3.2-.4 4.5-1'/%3E%3Cpath d='M14.8 5.3A11 11 0 0 1 22 12c-.4.8-1.6 2.8-3.8 4.4'/%3E%3C/svg%3E");
+}
+
 .account-modal__separator {
     display: flex;
     align-items: center;
@@ -3549,6 +3599,14 @@ body.app-theme .avatar-upload input[type='file']:focus {
     box-shadow:
         0 0 0 3px rgba(95, 196, 255, 0.28),
         0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
+body.app-theme .password-toggle {
+    color: #32586d;
+}
+
+body.app-theme .password-toggle:hover {
+    background: rgba(50, 88, 109, 0.12);
 }
 
 body.app-theme .btn,
