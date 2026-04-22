@@ -270,12 +270,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const boardRect = gameBoard?.getBoundingClientRect();
         const viewportWidth = window.innerWidth || 800;
         const viewportHeight = window.innerHeight || 700;
+        const portraitMobile = isMobilePortraitLayout();
         const availableWidth = Math.max(
             280,
-            Math.floor((boardRect?.width || viewportWidth) - 20)
+            Math.floor((boardRect?.width || viewportWidth) - (portraitMobile ? 6 : 20))
         );
         const availableHeight = Math.max(
-            isMobilePortraitLayout() ? 260 : 300,
+            portraitMobile ? 260 : 300,
             Math.floor((boardRect?.height || viewportHeight * 0.72) - 20)
         );
         const aspectRatio = 800 / 700;
@@ -291,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         targetWidth = Math.max(280, targetWidth);
         targetHeight = Math.max(
-            isMobilePortraitLayout() ? 245 : 280,
+            portraitMobile ? 245 : 280,
             targetHeight
         );
 
@@ -299,15 +300,14 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.height = targetHeight;
 
         const scale = Math.min(targetWidth / 800, targetHeight / 700);
-        const portraitMobile = isMobilePortraitLayout();
 
         if (portraitMobile) {
             const boardSpacing = Math.max(
-                10,
-                Math.round(Math.min(canvas.width * 0.032, 14))
+                8,
+                Math.round(Math.min(canvas.width * 0.024, 10))
             );
             const boardCardWidth = Math.floor(
-                (canvas.width - boardSpacing * 3 - 26) / 4
+                (canvas.width - boardSpacing * 3 - 10) / 4
             );
             CARD_WIDTH = Math.max(58, boardCardWidth);
             CARD_HEIGHT = Math.round(CARD_WIDTH * 1.48);
@@ -2271,7 +2271,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function drawBoard() {
         const portraitMobile = isMobilePortraitLayout();
-        const boardPaddingX = portraitMobile ? 16 : 25;
+        const boardPaddingX = portraitMobile ? 8 : 25;
         const boardPaddingY = portraitMobile ? 38 : 50;
         const boardExtraHeight = portraitMobile ? 82 : 110;
         const arrowOffset = portraitMobile ? 16 : 25;
