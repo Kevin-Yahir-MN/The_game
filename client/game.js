@@ -166,6 +166,41 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
+    function getHandLayout(cardCount) {
+        const count = Math.max(0, Number(cardCount) || 0);
+        if (count === 0) {
+            return {
+                spacing: CARD_SPACING,
+                startX: (canvas.width - CARD_WIDTH) / 2,
+                totalWidth: CARD_WIDTH,
+            };
+        }
+
+        const maxWidth = canvas.width - (isMobilePortraitLayout() ? 20 : 40);
+        const naturalWidth = count * CARD_WIDTH + (count - 1) * CARD_SPACING;
+        const maxOverlap = isMobilePortraitLayout()
+            ? Math.round(CARD_WIDTH * 0.32)
+            : 0;
+        const minSpacing = -maxOverlap;
+        const fittedSpacing =
+            count > 1
+                ? Math.floor((maxWidth - count * CARD_WIDTH) / (count - 1))
+                : CARD_SPACING;
+        const spacing = Math.max(
+            minSpacing,
+            Math.min(CARD_SPACING, fittedSpacing)
+        );
+        const totalWidth =
+            count * CARD_WIDTH + Math.max(0, count - 1) * spacing;
+
+        return {
+            spacing,
+            startX: Math.round((canvas.width - totalWidth) / 2),
+            totalWidth,
+            naturalWidth,
+        };
+    }
+
     function closeResponsiveDrawers() {
         document.body.classList.remove(
             'drawer-players-open',
@@ -259,20 +294,46 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.height = targetHeight;
 
         const scale = Math.min(targetWidth / 800, targetHeight / 700);
-        CARD_WIDTH = Math.round(80 * scale);
-        CARD_HEIGHT = Math.round(120 * scale);
-        COLUMN_SPACING = Math.round(60 * scale);
-        CARD_SPACING = Math.max(10, Math.round(15 * scale));
+        const portraitMobile = isMobilePortraitLayout();
 
-        BOARD_POSITION = {
-            x:
-                canvas.width / 2 -
-                (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
-            y: Math.round(canvas.height * 0.3),
-        };
-        PLAYER_CARDS_Y = Math.round(canvas.height * 0.6);
-        BUTTONS_Y = Math.round(canvas.height * 0.85);
-        HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
+        if (portraitMobile) {
+            const boardSpacing = Math.max(
+                10,
+                Math.round(Math.min(canvas.width * 0.032, 14))
+            );
+            const boardCardWidth = Math.floor(
+                (canvas.width - boardSpacing * 3 - 26) / 4
+            );
+            CARD_WIDTH = Math.max(58, boardCardWidth);
+            CARD_HEIGHT = Math.round(CARD_WIDTH * 1.48);
+            COLUMN_SPACING = boardSpacing;
+            CARD_SPACING = Math.max(4, Math.round(CARD_WIDTH * 0.08));
+
+            BOARD_POSITION = {
+                x: Math.round(
+                    (canvas.width - (CARD_WIDTH * 4 + COLUMN_SPACING * 3)) / 2
+                ),
+                y: Math.round(canvas.height * 0.16),
+            };
+            PLAYER_CARDS_Y = Math.round(canvas.height * 0.63);
+            BUTTONS_Y = Math.round(canvas.height * 0.84);
+            HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 8;
+        } else {
+            CARD_WIDTH = Math.round(80 * scale);
+            CARD_HEIGHT = Math.round(120 * scale);
+            COLUMN_SPACING = Math.round(60 * scale);
+            CARD_SPACING = Math.max(10, Math.round(15 * scale));
+
+            BOARD_POSITION = {
+                x:
+                    canvas.width / 2 -
+                    (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
+                y: Math.round(canvas.height * 0.3),
+            };
+            PLAYER_CARDS_Y = Math.round(canvas.height * 0.6);
+            BUTTONS_Y = Math.round(canvas.height * 0.85);
+            HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
+        }
 
         needsRedraw = true;
     }
@@ -1733,8 +1794,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const isYourTurn = isMyTurn();
         const deckEmpty = gameState.remainingDeck === 0;
-        const startX =
-            (canvas.width - cards.length * (CARD_WIDTH + CARD_SPACING)) / 2;
+        const handLayout = getHandLayout(cards.length);
+        const startX = handLayout.startX;
+        const spacing = handLayout.spacing;
         const startY = PLAYER_CARDS_Y;
 
         const newCards = cards.map((cardValue, index) => {
@@ -1743,7 +1805,7 @@ document.addEventListener('DOMContentLoaded', () => {
             );
 
             if (existingCard) {
-                existingCard.x = startX + index * (CARD_WIDTH + CARD_SPACING);
+                existingCard.x = startX + index * (CARD_WIDTH + spacing);
                 existingCard.y = startY;
                 existingCard.isPlayable =
                     isYourTurn &&
@@ -1770,7 +1832,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 return cardPool.get(
                     cardValue,
-                    startX + index * (CARD_WIDTH + CARD_SPACING),
+                    startX + index * (CARD_WIDTH + spacing),
                     startY,
                     isYourTurn &&
                     (deckEmpty
@@ -2038,11 +2100,9 @@ document.addEventListener('DOMContentLoaded', () => {
             cardIndex = gameState.yourCards.length - 1;
         }
 
+        const handLayout = getHandLayout(gameState.yourCards.length);
         const startX =
-            (canvas.width -
-                gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING)) /
-            2 +
-            cardIndex * (CARD_WIDTH + CARD_SPACING);
+            handLayout.startX + cardIndex * (CARD_WIDTH + handLayout.spacing);
 
         if (!dragStartCard) return;
 
@@ -2196,20 +2256,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawBoard() {
+        const portraitMobile = isMobilePortraitLayout();
+        const boardPaddingX = portraitMobile ? 16 : 25;
+        const boardPaddingY = portraitMobile ? 38 : 50;
+        const boardExtraHeight = portraitMobile ? 82 : 110;
+        const arrowOffset = portraitMobile ? 16 : 25;
+        const arrowFontSize = portraitMobile ? 28 : 36;
         ctx.clearRect(
-            BOARD_POSITION.x - 30,
-            BOARD_POSITION.y - 55,
-            CARD_WIDTH * 4 + COLUMN_SPACING * 3 + 60,
-            CARD_HEIGHT + 120
+            BOARD_POSITION.x - (boardPaddingX + 5),
+            BOARD_POSITION.y - (boardPaddingY + 5),
+            CARD_WIDTH * 4 + COLUMN_SPACING * 3 + boardPaddingX * 2 + 10,
+            CARD_HEIGHT + boardExtraHeight + 10
         );
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
         ctx.beginPath();
         ctx.roundRect(
-            BOARD_POSITION.x - 25,
-            BOARD_POSITION.y - 50,
-            CARD_WIDTH * 4 + COLUMN_SPACING * 3 + 50,
-            CARD_HEIGHT + 110,
+            BOARD_POSITION.x - boardPaddingX,
+            BOARD_POSITION.y - boardPaddingY,
+            CARD_WIDTH * 4 + COLUMN_SPACING * 3 + boardPaddingX * 2,
+            CARD_HEIGHT + boardExtraHeight,
             15
         );
         ctx.fill();
@@ -2224,10 +2290,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     : 'rgb(248, 51, 51)';
                 ctx.beginPath();
                 ctx.roundRect(
-                    x - 5,
-                    BOARD_POSITION.y - 10,
-                    CARD_WIDTH + 10,
-                    CARD_HEIGHT + 20,
+                    x - 4,
+                    BOARD_POSITION.y - (portraitMobile ? 6 : 10),
+                    CARD_WIDTH + 8,
+                    CARD_HEIGHT + (portraitMobile ? 12 : 20),
                     15
                 );
                 ctx.fill();
@@ -2235,7 +2301,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         ctx.fillStyle = 'white';
-        ctx.font = 'bold 36px Arial';
+        ctx.font = `bold ${arrowFontSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
@@ -2247,7 +2313,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 BOARD_POSITION.x +
                 (CARD_WIDTH + COLUMN_SPACING) * i +
                 CARD_WIDTH / 2;
-            ctx.fillText(i < 2 ? '↑' : '↓', x, BOARD_POSITION.y - 25);
+            ctx.fillText(i < 2 ? '↑' : '↓', x, BOARD_POSITION.y - arrowOffset);
         });
 
         ctx.shadowColor = 'transparent';
@@ -2284,15 +2350,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawPlayerCards() {
-        const backgroundHeight = CARD_HEIGHT + 30;
-        const backgroundWidth =
-            gameState.yourCards.length * (CARD_WIDTH + CARD_SPACING) + 40;
+        const handLayout = getHandLayout(gameState.yourCards.length);
+        const portraitMobile = isMobilePortraitLayout();
+        const backgroundHeight = CARD_HEIGHT + (portraitMobile ? 20 : 30);
+        const backgroundWidth = handLayout.totalWidth + (portraitMobile ? 22 : 40);
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
         ctx.beginPath();
         ctx.roundRect(
             (canvas.width - backgroundWidth) / 2,
-            PLAYER_CARDS_Y - 15,
+            PLAYER_CARDS_Y - (portraitMobile ? 10 : 15),
             backgroundWidth,
             backgroundHeight,
             15
@@ -2300,19 +2367,14 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fill();
         markDirty(
             (canvas.width - backgroundWidth) / 2,
-            PLAYER_CARDS_Y - 15,
+            PLAYER_CARDS_Y - (portraitMobile ? 10 : 15),
             backgroundWidth,
             backgroundHeight
         );
 
         gameState.yourCards.forEach((card, index) => {
             if (card && card !== dragStartCard) {
-                card.x =
-                    (canvas.width -
-                        gameState.yourCards.length *
-                        (CARD_WIDTH + CARD_SPACING)) /
-                    2 +
-                    index * (CARD_WIDTH + CARD_SPACING);
+                card.x = handLayout.startX + index * (CARD_WIDTH + handLayout.spacing);
                 card.y = PLAYER_CARDS_Y;
                 card.draw();
             }

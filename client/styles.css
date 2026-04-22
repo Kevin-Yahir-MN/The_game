@@ -4366,12 +4366,33 @@ body.app-theme--game .players-panel {
     }
 
     body.app-theme--game .game-board {
-        min-height: clamp(280px, 42vh, 480px);
-        padding: 8px;
+        min-height: clamp(320px, 48vh, 540px);
+        padding: 6px;
     }
 
     body.app-theme--game .game-info-region .info-panel {
-        padding: 14px 16px;
+        padding: 12px 14px;
+    }
+
+    body.app-theme--game .info-panel h3 {
+        margin-bottom: 12px;
+        font-size: 1.2rem;
+        padding-bottom: 6px;
+    }
+
+    body.app-theme--game .info-panel strong,
+    body.app-theme--game .panel-content,
+    body.app-theme--game #progressText {
+        font-size: 0.95rem;
+    }
+
+    body.app-theme--game .progress-container {
+        margin: 6px 0 0;
+        padding: 8px 10px;
+    }
+
+    body.app-theme--game .game-main {
+        gap: 10px;
     }
 
     body.app-theme--game .game-info-region .info-panel .panel-content {
