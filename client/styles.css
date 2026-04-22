@@ -4355,6 +4355,7 @@ body.app-theme--game .players-panel {
         grid-template-areas:
             'info'
             'main';
+        gap: 6px;
     }
 
     body.app-theme--game .orientation-tip {
@@ -4366,7 +4367,7 @@ body.app-theme--game .players-panel {
     }
 
     body.app-theme--game .game-board {
-        min-height: clamp(340px, 50vh, 560px);
+        min-height: clamp(380px, 54vh, 620px);
         padding: 2px;
     }
 
@@ -4401,7 +4402,7 @@ body.app-theme--game .players-panel {
     }
 
     body.app-theme--game .game-main {
-        gap: 4px;
+        gap: 2px;
     }
 
     body.app-theme--game .game-info-region .info-panel .panel-content {
@@ -4436,7 +4437,7 @@ body.app-theme--game .players-panel {
     body.app-theme--game .mobile-panel-actions {
         display: flex;
         width: 100%;
-        margin-top: 2px;
+        margin-top: 6px;
     }
 
     body.app-theme--game .mobile-panel-btn {
@@ -4444,11 +4445,11 @@ body.app-theme--game .players-panel {
     }
 
     body.app-theme--game .game-bottombar {
-        gap: 16px;
+        gap: 18px;
     }
 
     body.app-theme--game .game-controls {
-        margin-top: 8px;
+        margin-top: 12px;
     }
 
     body.app-theme--game .players-panel,

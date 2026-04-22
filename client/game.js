@@ -313,15 +313,15 @@ document.addEventListener('DOMContentLoaded', () => {
             CARD_HEIGHT = Math.round(CARD_WIDTH * 1.48);
             COLUMN_SPACING = boardSpacing;
             CARD_SPACING = Math.max(4, Math.round(CARD_WIDTH * 0.08));
-            HAND_CARD_SCALE = 0.82;
+            HAND_CARD_SCALE = 1;
 
             BOARD_POSITION = {
                 x: Math.round(
                     (canvas.width - (CARD_WIDTH * 4 + COLUMN_SPACING * 3)) / 2
                 ),
-                y: Math.round(canvas.height * 0.16),
+                y: Math.round(canvas.height * 0.13),
             };
-            PLAYER_CARDS_Y = Math.round(canvas.height * 0.69);
+            PLAYER_CARDS_Y = Math.round(canvas.height * 0.70);
             BUTTONS_Y = Math.round(canvas.height * 0.84);
             HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 8;
         } else {

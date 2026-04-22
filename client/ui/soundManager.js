@@ -173,6 +173,14 @@
             return;
         }
 
+        if (document.body.classList.contains('app-theme--game')) {
+            const existingButton = document.getElementById('gameAudioToggle');
+            if (existingButton) {
+                existingButton.remove();
+            }
+            return;
+        }
+
         ensureMuteButtonStyles();
 
         let button = document.getElementById('gameAudioToggle');
