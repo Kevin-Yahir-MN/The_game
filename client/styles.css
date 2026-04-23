@@ -1076,7 +1076,7 @@ body.app-theme--lobby .lobby-card {
 
 .game-panel {
     position: fixed;
-    width: 220px;
+    width: 380px;
     background: rgba(42, 52, 65, 0.96);
     border-radius: 14px;
     padding: 20px;
@@ -1937,7 +1937,7 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
     background: rgba(42, 52, 65, 0.95);
     padding: 22px;
     border-radius: 14px;
-    width: 220px;
+    width: 375px;
     max-height: 60vh;
     overflow-y: auto;
     z-index: 20;
@@ -4113,7 +4113,7 @@ body.app-theme--game .game-over-notification img {
 
 body.app-theme--game {
     min-height: 100vh;
-    padding: clamp(6px, 1vw, 12px);
+    padding: clamp(12px, 2vw, 24px);
     overflow-x: hidden;
 }
 
@@ -4121,9 +4121,9 @@ body.app-theme--game .game-shell {
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(180px, 220px);
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(240px, 300px);
     grid-template-areas: 'info main side';
-    gap: 10px;
+    gap: 16px;
     align-items: start;
     max-width: min(100%, 1600px);
     margin: 0 auto;
