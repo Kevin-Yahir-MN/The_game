@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateResponsiveUiState();
         applyResponsiveCanvasSizing();
         applyHudPanelLayout();
-        updateEmojiPanelPosition();
+        debouncedUpdateEmojiPanelPosition();
         positionEmojiMessages();
     });
     window.addEventListener('orientationchange', () => {
@@ -48,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateResponsiveUiState();
             applyResponsiveCanvasSizing();
             applyHudPanelLayout();
+            debouncedUpdateEmojiPanelPosition();
             positionEmojiMessages();
         }, 80);
     });
@@ -1078,11 +1079,47 @@ document.addEventListener('DOMContentLoaded', () => {
         panel.dataset.toggleBound = 'true';
     }
 
+    // debounce helper
+    function debounce(fn, wait) {
+        let t;
+        return function (...args) {
+            clearTimeout(t);
+            t = setTimeout(() => fn.apply(this, args), wait);
+        };
+    }
+
+    // Position the emoji panel immediately under the info panel on large screens.
     function updateEmojiPanelPosition() {
         const panel = document.querySelector('.game-emoji-panel');
-        if (!panel) return;
-        applyHudPanelLayout();
+        const info = document.querySelector('.info-panel');
+        if (!panel || !info) return;
+
+        const isDesktop = window.matchMedia('(min-width: 1200px)').matches;
+        // If not desktop, clear inline positioning to allow CSS/media queries to take over
+        if (!isDesktop) {
+            panel.style.position = '';
+            panel.style.left = '';
+            panel.style.top = '';
+            panel.style.width = '';
+            panel.classList.remove('is-layout-ready');
+            return;
+        }
+
+        // Measure info panel and place emoji panel directly below it with a small gap
+        const infoRect = info.getBoundingClientRect();
+        const gap = 12; // px gap between panels
+
+        panel.style.position = 'fixed';
+        // align left edge with info panel left edge
+        panel.style.left = `${Math.max(6, Math.round(infoRect.left))}px`;
+        panel.style.top = `${Math.round(infoRect.bottom + gap)}px`;
+        // match width to info panel width (keeps visual alignment)
+        panel.style.width = `${Math.round(infoRect.width)}px`;
+        panel.classList.add('is-layout-ready');
     }
+
+    // Debounced version to use on resize/observe
+    const debouncedUpdateEmojiPanelPosition = debounce(updateEmojiPanelPosition, 80);
 
     function applyHudPanelLayout() {
         updateResponsiveUiState();
@@ -1110,6 +1147,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const observer = new ResizeObserver(() => {
                 applyHudPanelLayout();
+                debouncedUpdateEmojiPanelPosition();
                 positionEmojiMessages();
             });
 
@@ -2789,7 +2827,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setupEmojiPanelToggle();
                 applyHudPanelLayout();
                 setupHudLayoutObservers();
-                updateEmojiPanelPosition();
+                debouncedUpdateEmojiPanelPosition();
 
                 // configurar botones de emoji si existen
                 if (emojiButtonsContainer) {
