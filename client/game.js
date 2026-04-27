@@ -335,10 +335,13 @@ document.addEventListener('DOMContentLoaded', () => {
             CARD_SPACING = Math.max(10, Math.round(15 * scale));
             HAND_CARD_SCALE = 1;
 
+            // compute board padding to keep tables separated from canvas edges
+            const boardWidth = CARD_WIDTH * 4 + COLUMN_SPACING * 3;
+            const minSidePadding = Math.max(24, Math.round(canvas.width * 0.06));
+            const centeredX = Math.round((canvas.width - boardWidth) / 2);
             BOARD_POSITION = {
-                x:
-                    canvas.width / 2 -
-                    (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
+                // ensure a minimum side padding so board doesn't touch edges in full-screen
+                x: Math.max(minSidePadding, centeredX),
                 y: Math.round(canvas.height * 0.3),
             };
             // Move player cards closer to bottom to halve the bottom spacing
@@ -2332,9 +2335,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function drawBoard() {
         const portraitMobile = isMobilePortraitLayout();
-        const boardPaddingX = portraitMobile ? 8 : 25;
-        const boardPaddingY = portraitMobile ? 38 : 50;
-        const boardExtraHeight = portraitMobile ? 82 : 110;
+        // increase padding dynamically so tables don't touch container edges
+        const boardPaddingX = portraitMobile
+            ? 8
+            : Math.max(25, Math.round(canvas.width * 0.06));
+        const boardPaddingY = portraitMobile
+            ? 38
+            : Math.max(50, Math.round(canvas.height * 0.06));
+        const boardExtraHeight = portraitMobile ? 82 : Math.max(110, Math.round(canvas.height * 0.12));
         const arrowOffset = portraitMobile ? 16 : 25;
         const arrowFontSize = portraitMobile ? 28 : 36;
         ctx.clearRect(
