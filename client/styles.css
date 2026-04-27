@@ -919,6 +919,10 @@ body.app-theme--lobby .lobby-card {
     animation: loadingAnimation 1.5s infinite;
 }
 
+:root {
+    --game-gutter: clamp(10px, 3.5vw, 36px);
+}
+
 /* layout for sala buttons */
 .button-row {
     display: flex;
@@ -1134,7 +1138,7 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
     margin: 15px 0;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    padding: 10px;
+    padding: var(--game-gutter);
 }
 
 .progress-bar {
@@ -4178,11 +4182,16 @@ body.app-theme--game .game-sidepanel {
     align-content: start;
 }
 
+/* Responsive gutter around the game canvas — keeps equal spacing on all sides */
+body.app-theme--game .game-board {
+    padding: var(--game-gutter);
+}
+
 body.app-theme--game .game-board {
     position: relative;
     min-width: 0;
     min-height: clamp(360px, 62vh, 780px);
-    padding: 10px;
+    padding: var(--game-gutter);
     border-radius: 28px;
     background:
         radial-gradient(circle at top center, rgba(94, 224, 180, 0.1), transparent 42%),
@@ -4191,6 +4200,11 @@ body.app-theme--game .game-board {
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.04),
         0 18px 40px rgba(0, 0, 0, 0.24);
+}
+
+body.app-theme--game #gameContainer {
+    box-sizing: border-box;
+    padding: 0;
 }
 
 body.app-theme--game #gameContainer {
@@ -4396,7 +4410,7 @@ body.app-theme--game .players-panel {
 
     body.app-theme--game .game-board {
         min-height: clamp(430px, 60vh, 680px);
-        padding: 2px;
+        padding: var(--game-gutter);
     }
 
     body.app-theme--game #gameContainer {
