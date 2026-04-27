@@ -321,7 +321,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 ),
                 y: Math.round(canvas.height * 0.13),
             };
-            PLAYER_CARDS_Y = Math.round(canvas.height - CARD_HEIGHT - 12);
+            // Reduce bottom gap by ~50% (previous gap was 12px)
+            PLAYER_CARDS_Y = Math.round(canvas.height - CARD_HEIGHT - 6);
             BUTTONS_Y = Math.round(canvas.height * 0.84);
             HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 8;
         } else {
@@ -337,7 +338,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     (CARD_WIDTH * 4 + COLUMN_SPACING * 3) / 2,
                 y: Math.round(canvas.height * 0.3),
             };
-            PLAYER_CARDS_Y = Math.round(canvas.height * 0.6);
+            // Move player cards closer to bottom to halve the bottom spacing
+            PLAYER_CARDS_Y = Math.round(canvas.height * 0.7);
             BUTTONS_Y = Math.round(canvas.height * 0.85);
             HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 15;
         }

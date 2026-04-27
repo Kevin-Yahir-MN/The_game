@@ -17,6 +17,8 @@
     --radius-2: 12px;
     --radius-3: 16px;
     --content-max: 1100px;
+    /* Reduced gutter: 1/3 smaller than previous (approx). */
+    --game-gutter: clamp(7px, 2.3vw, 24px);
 }
 
 body {
