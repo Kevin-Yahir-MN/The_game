@@ -1468,9 +1468,16 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
 
 /* Blink / WebKit (Chrome, Edge Chromium, Safari) */
 .password-field input[type="password"]::-webkit-textfield-decoration-container,
+.password-field input[type="password"]::-webkit-textfield-decoration-button,
+.password-field input[type="password"]::-webkit-password-reveal-button,
+.password-field input[type="password"]::-webkit-clear-button,
 .password-field input[type="password"]::-webkit-credentials-auto-fill-button,
 .password-field input[type="password"]::-webkit-contacts-auto-fill-button {
     display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
 }
 
 /* Normalize appearance so browsers don't inject native controls */
