@@ -4147,6 +4147,39 @@ body.app-theme--game {
     overflow-x: hidden;
 }
 
+/* Desktop: bring panels closer to viewport edges */
+@media (min-width: 1200px) {
+    body.app-theme--game {
+        /* reduce page padding so side panels can be nearer the screen edges */
+        padding: 6px;
+    }
+
+    body.app-theme--game .info-panel {
+        position: absolute;
+        left: 6px;
+        top: 20px;
+        width: min(300px, 22%);
+        max-width: 340px;
+    }
+
+    body.app-theme--game .players-panel {
+        position: absolute;
+        right: 6px;
+        top: 20px;
+        width: min(300px, 22%);
+        max-width: 340px;
+    }
+
+    /* Ensure the emoji panel (now inside left column) stays under info-panel but near left edge */
+    body.app-theme--game .game-emoji-panel {
+        position: absolute;
+        left: 6px;
+        top: calc(20px + 1px + 100%);
+        width: min(300px, 22%);
+        max-width: 340px;
+    }
+}
+
 body.app-theme--game .game-shell {
     position: relative;
     z-index: 1;
@@ -4299,15 +4332,17 @@ body.app-theme--game.drawer-emoji-open .game-drawer-backdrop {
     pointer-events: auto;
 }
 
-body.app-theme--game .info-panel,
-body.app-theme--game .players-panel,
-body.app-theme--game .game-emoji-panel {
-    position: static;
-    top: auto;
-    left: auto;
-    right: auto;
-    width: 100%;
-    max-width: none;
+@media (max-width: 1024px) {
+    body.app-theme--game .info-panel,
+    body.app-theme--game .players-panel,
+    body.app-theme--game .game-emoji-panel {
+        position: static;
+        top: auto;
+        left: auto;
+        right: auto;
+        width: 100%;
+        max-width: none;
+    }
 }
 
 body.app-theme--game .info-panel .panel-content {
