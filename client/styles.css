@@ -1459,6 +1459,27 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23466170' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3l18 18'/%3E%3Cpath d='M10.6 10.7A3 3 0 0 0 9 12a3 3 0 0 0 5.2 2.1'/%3E%3Cpath d='M6.7 6.7C4.1 8.2 2.5 10.9 2 12c.8 1.5 4.2 6 10 6 1.7 0 3.2-.4 4.5-1'/%3E%3Cpath d='M14.8 5.3A11 11 0 0 1 22 12c-.4.8-1.6 2.8-3.8 4.4'/%3E%3C/svg%3E");
 }
 
+/* Hide native browser password-reveal controls so only the custom eye button shows */
+/* Edge / IE */
+.password-field input[type="password"]::-ms-reveal,
+.password-field input[type="password"]::-ms-clear {
+    display: none !important;
+}
+
+/* Blink / WebKit (Chrome, Edge Chromium, Safari) */
+.password-field input[type="password"]::-webkit-textfield-decoration-container,
+.password-field input[type="password"]::-webkit-credentials-auto-fill-button,
+.password-field input[type="password"]::-webkit-contacts-auto-fill-button {
+    display: none !important;
+}
+
+/* Normalize appearance so browsers don't inject native controls */
+.password-field input[type="password"] {
+    -webkit-appearance: none;
+    appearance: none;
+    -moz-appearance: textfield;
+}
+
 .account-modal__separator {
     display: flex;
     align-items: center;

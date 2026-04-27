@@ -147,9 +147,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 setPasswordToggleState(button, input);
 
-                button.addEventListener('click', () => {
-                    const nextType =
-                        input.type === 'password' ? 'text' : 'password';
+                // Toggle handler used for click, pointerdown or touchstart.
+                const toggleHandler = (event) => {
+                    // Prevent duplicate activation on mobile where touch -> click can both fire.
+                    if (
+                        event.type === 'click' &&
+                        button.dataset.suppressClick &&
+                        Date.now() < Number(button.dataset.suppressClick)
+                    ) {
+                        return;
+                    }
+
+                    const nextType = input.type === 'password' ? 'text' : 'password';
                     input.type = nextType;
                     setPasswordToggleState(button, input);
                     try {
@@ -161,7 +170,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (typeof input.setSelectionRange === 'function') {
                         input.setSelectionRange(valueLength, valueLength);
                     }
-                });
+
+                    // If this was a pointer/touch event, suppress the following click that some
+                    // mobile browsers emit after touch to avoid double-toggle.
+                    if (event.type === 'pointerdown' || event.type === 'touchstart') {
+                        button.dataset.suppressClick = String(Date.now() + 700);
+                    }
+                };
+
+                // Always keep click handler for keyboard accessibility and desktop mouse.
+                button.addEventListener('click', toggleHandler);
+
+                // Use PointerEvent when available (covers mouse/touch/stylus) for immediate response on mobile.
+                if (window.PointerEvent) {
+                    button.addEventListener('pointerdown', toggleHandler, { passive: true });
+                } else {
+                    // Fallback for older touch-only browsers.
+                    button.addEventListener('touchstart', toggleHandler, { passive: true });
+                }
 
                 button.dataset.bound = 'true';
             });
