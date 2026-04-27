@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         applyResponsiveCanvasSizing();
         applyHudPanelLayout();
         debouncedUpdateEmojiPanelPosition();
+        debouncedUpdateHalfScreenClass();
         positionEmojiMessages();
     });
     window.addEventListener('orientationchange', () => {
@@ -49,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
             applyResponsiveCanvasSizing();
             applyHudPanelLayout();
             debouncedUpdateEmojiPanelPosition();
+            debouncedUpdateHalfScreenClass();
             positionEmojiMessages();
         }, 80);
     });
@@ -1120,6 +1122,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Debounced version to use on resize/observe
     const debouncedUpdateEmojiPanelPosition = debounce(updateEmojiPanelPosition, 80);
+
+    // Detect if the browser window is approximately half the screen (split-screen)
+    function updateHalfScreenClass() {
+        try {
+            const screenW = window.screen?.availWidth || window.screen?.width || window.outerWidth || 0;
+            const winW = window.innerWidth || document.documentElement.clientWidth || 0;
+            // allow small tolerance
+            const tolerance = Math.round(Math.max(40, screenW * 0.05));
+            const isHalf = winW <= Math.round(screenW / 2) + tolerance;
+            document.body.classList.toggle('is-half-screen', !!isHalf);
+        } catch (e) {
+            // ignore
+        }
+    }
+
+    const debouncedUpdateHalfScreenClass = debounce(updateHalfScreenClass, 120);
 
     function applyHudPanelLayout() {
         updateResponsiveUiState();
@@ -2828,6 +2846,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 applyHudPanelLayout();
                 setupHudLayoutObservers();
                 debouncedUpdateEmojiPanelPosition();
+                debouncedUpdateHalfScreenClass();
 
                 // configurar botones de emoji si existen
                 if (emojiButtonsContainer) {

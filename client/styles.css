@@ -4191,6 +4191,36 @@ body.app-theme--game {
     }
 }
 
+/* Adjust layout when the browser tab/window is approximately half the screen (split view) */
+body.is-half-screen {
+    --side-panel-width: 220px;
+    --game-gutter: clamp(6px, 2vw, 18px);
+}
+
+body.is-half-screen .game-shell {
+    grid-template-columns: minmax(160px, 220px) minmax(0, 1fr) minmax(160px, 220px);
+}
+
+body.is-half-screen .players-panel,
+body.is-half-screen .info-panel,
+body.is-half-screen .game-emoji-panel {
+    width: var(--side-panel-width);
+}
+
+body.is-half-screen #gameContainer {
+    /* make sure canvas can be slightly larger inside reduced viewport */
+    width: calc(100% - (var(--game-gutter) * 2));
+}
+
+@media (max-width: 480px) {
+    /* don't apply half-screen styling for very small devices */
+    body.is-half-screen .players-panel,
+    body.is-half-screen .info-panel,
+    body.is-half-screen .game-emoji-panel {
+        width: 100%;
+    }
+}
+
 body.app-theme--game .game-shell {
     position: relative;
     z-index: 1;
