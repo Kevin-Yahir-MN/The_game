@@ -20,7 +20,10 @@
     /* Reduced gutter: 1/3 smaller than previous (approx). */
     --game-gutter: clamp(7px, 2.3vw, 24px);
     /* Width reserved for side panels on large screens */
-    --side-panel-width: 300px;
+    --side-panel-width: 260px;
+    /* Gap between stacked HUD panels; small and large variants for different contexts */
+    --panel-gap: 12px;
+    --panel-gap-large: 84px;
 }
 
 body {
@@ -4193,12 +4196,12 @@ body.app-theme--game {
 
 /* Adjust layout when the browser tab/window is approximately half the screen (split view) */
 body.is-half-screen {
-    --side-panel-width: 220px;
+    --side-panel-width: 200px;
     --game-gutter: clamp(6px, 2vw, 18px);
 }
 
 body.is-half-screen .game-shell {
-    grid-template-columns: minmax(160px, 220px) minmax(0, 1fr) minmax(160px, 220px);
+    grid-template-columns: minmax(140px, var(--side-panel-width)) minmax(0, 1fr) minmax(140px, var(--side-panel-width));
 }
 
 body.is-half-screen .players-panel,
@@ -4208,8 +4211,9 @@ body.is-half-screen .game-emoji-panel {
 }
 
 body.is-half-screen #gameContainer {
-    /* make sure canvas can be slightly larger inside reduced viewport */
-    width: calc(100% - (var(--game-gutter) * 2));
+    /* allow the container to grow but cap its max-width to account for side panels */
+    max-width: calc(100% - (2 * var(--side-panel-width)) - (2 * var(--game-gutter)));
+    width: 100%;
 }
 
 @media (max-width: 480px) {
@@ -4225,7 +4229,7 @@ body.app-theme--game .game-shell {
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(240px, 300px);
+    grid-template-columns: minmax(160px, var(--side-panel-width)) minmax(0, 1fr) minmax(160px, var(--side-panel-width));
     grid-template-areas: 'info main side';
     gap: 16px;
     align-items: start;

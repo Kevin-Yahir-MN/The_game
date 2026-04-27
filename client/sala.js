@@ -394,7 +394,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const gap = 84;
+        // read large gap from CSS variable `--panel-gap-large`, fallback to 84px
+        const rootStyles = getComputedStyle(document.documentElement);
+        const parsedLargeGap = parseFloat(rootStyles.getPropertyValue('--panel-gap-large'));
+        const gap = Number.isFinite(parsedLargeGap) ? Math.round(parsedLargeGap) : 84;
 
         // Preferir posicionar respecto al contenedor de amigos cuando exista (sala)
         let refRect = null;

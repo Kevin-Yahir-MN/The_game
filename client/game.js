@@ -1109,7 +1109,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Measure info panel and place emoji panel directly below it with a small gap
         const infoRect = info.getBoundingClientRect();
-        const gap = 12; // px gap between panels
+        // read gap from CSS variable `--panel-gap`, fallback to 12px
+        const rootStyles = getComputedStyle(document.documentElement);
+        const parsedGap = parseFloat(rootStyles.getPropertyValue('--panel-gap'));
+        const gap = Number.isFinite(parsedGap) ? Math.round(parsedGap) : 12;
 
         panel.style.position = 'fixed';
         // align left edge with info panel left edge
