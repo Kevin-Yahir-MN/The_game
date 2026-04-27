@@ -41,48 +41,8 @@
                     </div>
                 </div>
             </div>
-        </section>
-
-        <main class="game-main">
-            <section class="game-board" id="gameBoard">
-                <div id="gameContainer">
-                    <canvas id="gameCanvas" width="800" height="700"></canvas>
-                </div>
-            </section>
-
-            <section class="game-bottombar">
-                <div class="game-controls">
-                    <button id="endTurnBtn">Terminar Turno</button>
-                </div>
-                <div class="mobile-panel-actions">
-                    <button
-                        id="togglePlayersDrawer"
-                        class="mobile-panel-btn"
-                        type="button"
-                        aria-controls="playersPanel"
-                        aria-expanded="false"
-                    >
-                        Jugadores
-                    </button>
-                    <button
-                        id="toggleEmojiDrawer"
-                        class="mobile-panel-btn"
-                        type="button"
-                        aria-controls="emojiPanel"
-                        aria-expanded="false"
-                    >
-                        Reacciones
-                    </button>
-                </div>
-            </section>
-        </main>
-
-        <aside class="game-sidepanel">
-            <div id="playersPanel" class="players-panel"></div>
-            <div
-                id="emojiPanel"
-                class="room-emoji-chat game-panel game-emoji-panel"
-            >
+            <!-- Moved emoji panel here so it appears under the info panel on the left side -->
+            <div id="emojiPanel" class="room-emoji-chat game-panel game-emoji-panel">
                 <h3>Reacciones rápidas</h3>
 
                 <div class="emoji-buttons" id="emojiButtons">
@@ -100,6 +60,34 @@
                     <button type="button" class="emoji-button" data-emoji="poop">💩</button>
                 </div>
             </div>
+        </section>
+
+        <main class="game-main">
+            <section class="game-board" id="gameBoard">
+                <div id="gameContainer">
+                    <canvas id="gameCanvas" width="800" height="700"></canvas>
+                </div>
+            </section>
+
+            <section class="game-bottombar">
+                <div class="game-controls">
+                    <button id="endTurnBtn">Terminar Turno</button>
+                </div>
+                <div class="mobile-panel-actions">
+                    <button id="togglePlayersDrawer" class="mobile-panel-btn" type="button" aria-controls="playersPanel"
+                        aria-expanded="false">
+                        Jugadores
+                    </button>
+                    <button id="toggleEmojiDrawer" class="mobile-panel-btn" type="button" aria-controls="emojiPanel"
+                        aria-expanded="false">
+                        Reacciones
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <aside class="game-sidepanel">
+            <div id="playersPanel" class="players-panel"></div>
         </aside>
     </div>
     <div id="gameDrawerBackdrop" class="game-drawer-backdrop"></div>

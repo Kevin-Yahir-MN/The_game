@@ -3955,11 +3955,7 @@ body.app-theme--game .history-modal {
     transform: translate(-50%, -50%);
 }
 
-body.app-theme--game .info-panel,
-body.app-theme--game .game-emoji-panel,
-body.app-theme--game .players-panel {
-    position: fixed;
-}
+
 
 body.app-theme--game .game-panel::before,
 body.app-theme--game .players-panel::before,
