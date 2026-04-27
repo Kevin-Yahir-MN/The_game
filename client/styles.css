@@ -4183,10 +4183,11 @@ body.app-theme--game {
         z-index: 39;
     }
 
-    /* Shift the main grid to leave room for fixed side panels */
+    /* Panels are fixed; keep grid columns for layout instead of shell padding so
+       the central canvas area remains large. No extra shell padding here. */
     body.app-theme--game .game-shell {
-        padding-left: calc(var(--side-panel-width) + 24px);
-        padding-right: calc(var(--side-panel-width) + 24px);
+        padding-left: 0;
+        padding-right: 0;
     }
 }
 
