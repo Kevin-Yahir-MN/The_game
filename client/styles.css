@@ -1967,8 +1967,10 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
 
 .players-panel {
     position: fixed;
-    top: var(--panel-top);
-    right: var(--panel-gap);
+    top: var(--panel-top) !important;
+    right: var(--panel-gap) !important;
+    left: auto !important;
+    bottom: auto !important;
     background: rgba(42, 52, 65, 0.95);
     padding: 22px;
     border-radius: 14px;
@@ -1976,7 +1978,7 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
     max-width: min(42vw, 420px);
     max-height: 60vh;
     overflow-y: auto;
-    z-index: 40;
+    z-index: 9999;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.36);
     display: block !important;
     font-size: 16px;
