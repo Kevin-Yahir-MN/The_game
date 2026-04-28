@@ -4869,3 +4869,124 @@ body.app-theme--game .players-panel {
         width: 100% !important;
     }
 }
+
+/* Extra-final overrides: ensure panels are true fixed overlays and follow viewport scroll
+   These rules are very specific and at file end to override any earlier grid/layout rules. */
+@media (min-width: 1024px) {
+    /* Force shell to be non-grid so overlays do not reserve space */
+    body.app-theme--game .game-shell {
+        display: block !important;
+        grid-template-columns: none !important;
+        grid-template-areas: none !important;
+        gap: 0 !important;
+    }
+
+    /* Make individual panels fixed overlays that follow scroll */
+    body.app-theme--game .info-panel,
+    .info-panel {
+        position: fixed !important;
+        top: var(--panel-top) !important;
+        left: var(--panel-gap) !important;
+        right: auto !important;
+        width: var(--side-panel-width) !important;
+        max-width: 360px !important;
+        max-height: calc(100vh - (var(--panel-top) * 2)) !important;
+        overflow-y: auto !important;
+        z-index: 10010 !important;
+        transform: none !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
+    body.app-theme--game .players-panel,
+    .players-panel {
+        position: fixed !important;
+        top: var(--panel-top) !important;
+        right: var(--panel-gap) !important;
+        left: auto !important;
+        width: var(--side-panel-width) !important;
+        max-width: 380px !important;
+        max-height: calc(100vh - (var(--panel-top) * 2)) !important;
+        overflow-y: auto !important;
+        z-index: 10010 !important;
+        transform: none !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
+    body.app-theme--game .game-emoji-panel,
+    .game-emoji-panel {
+        position: fixed !important;
+        top: calc(var(--panel-top) + 160px) !important;
+        left: var(--panel-gap) !important;
+        right: auto !important;
+        width: min(320px, var(--side-panel-width)) !important;
+        max-height: calc(60vh) !important;
+        overflow-y: auto !important;
+        z-index: 10009 !important;
+        transform: none !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
+    /* Ensure parent containers don't use height that affects flow */
+    body.app-theme--game .game-info-region,
+    body.app-theme--game .game-sidepanel,
+    .game-info-region,
+    .game-sidepanel {
+        height: 0 !important;
+        min-height: 0 !important;
+        display: block !important;
+        overflow: visible !important;
+        pointer-events: none !important; /* panels themselves handle pointer-events */
+    }
+
+    /* Allow the actual panel elements to receive pointer events */
+    body.app-theme--game .game-info-region .info-panel,
+    body.app-theme--game .game-sidepanel .players-panel {
+        pointer-events: auto !important;
+    }
+}
+
+/* Make info and players inherit ONLY the emoji-panel characteristics.
+   This ensures they behave exactly like the emoji drawer and nothing else. */
+@media (min-width: 0) {
+    .game-emoji-panel,
+    .info-panel,
+    .players-panel {
+        position: fixed !important;
+        left: 12px !important;
+        right: 12px !important;
+        bottom: 12px !important;
+        top: auto !important;
+        width: auto !important;
+        max-width: none !important;
+        max-height: min(68vh, 420px) !important;
+        overflow-y: auto !important;
+        transform: translateY(calc(100% + 18px)) !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transition: transform 0.18s ease, opacity 0.18s ease !important;
+        z-index: 31 !important;
+        background: rgba(0,0,0,0.0) !important;
+        box-shadow: none !important;
+    }
+
+    /* Open handlers (mirror emoji drawer behavior) */
+    body.app-theme--game.drawer-players-open .players-panel,
+    body.app-theme--game.drawer-info-open .info-panel,
+    body.app-theme--game.drawer-emoji-open .game-emoji-panel {
+        transform: translateY(0) !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
+    /* Ensure internal panels keep their visual styling but do not affect layout */
+    .game-info-region .info-panel,
+    .game-sidepanel .players-panel {
+        position: relative !important;
+        width: auto !important;
+        margin: 0 !important;
+        pointer-events: auto !important;
+    }
+}
