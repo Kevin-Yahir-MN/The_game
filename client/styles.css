@@ -4856,8 +4856,9 @@ body.app-theme--game .players-panel {
         margin: 0 auto !important;
         width: auto !important;
         max-width: var(--content-max) !important;
-        padding-left: calc(var(--side-panel-width) + (var(--panel-gap) * 2)) !important;
-        padding-right: calc(var(--side-panel-width) + (var(--panel-gap) * 2)) !important;
+        /* Do not add lateral padding; overlays must not affect flow */
+        padding-left: 0 !important;
+        padding-right: 0 !important;
         box-sizing: border-box !important;
     }
 
