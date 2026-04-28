@@ -136,6 +136,27 @@
     #endTurnBtn { min-height: 38px !important; padding: 7px 18px !important; }
 }
 
+    /* Pull the bottom bar up over the canvas and remove its background so no blue gap shows */
+    @media (min-width: 1100px) {
+        body.app-theme--game .game-bottombar {
+            margin-top: -26px !important;
+            padding-top: 0 !important;
+            background: transparent !important;
+            pointer-events: none;
+        }
+
+        /* Keep the controls clickable while allowing the bar to be transparent */
+        body.app-theme--game .game-bottombar .game-controls {
+            pointer-events: auto !important;
+        }
+
+        /* remove any extra bottom slack from containers */
+        body.app-theme--game #gameBoard,
+        body.app-theme--game #gameContainer {
+            padding-bottom: 0 !important;
+        }
+    }
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     min-height: 100vh;
