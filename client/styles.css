@@ -26,6 +26,86 @@
     --panel-top: 20px;
 }
 
+/* Final canonical overlay rules for desktop: ensure panels appear in their
+   respective positions and never affect the canvas layout. Placed at file
+   end so it overrides earlier rules. */
+@media (min-width: 769px) {
+    .game-shell { display: block !important; }
+
+    /* Info panel: fixed top-left */
+    .info-panel {
+        position: fixed !important;
+        top: var(--panel-top) !important;
+        left: var(--panel-gap) !important;
+        right: auto !important;
+        width: var(--side-panel-width) !important;
+        max-width: 360px !important;
+        max-height: calc(100vh - (var(--panel-top) * 2)) !important;
+        overflow-y: auto !important;
+        z-index: 1100 !important;
+        pointer-events: auto !important;
+        transform: none !important;
+        opacity: 1 !important;
+        background: rgba(12,18,26,0.88) !important;
+    }
+
+    /* Players panel: fixed top-right */
+    .players-panel {
+        position: fixed !important;
+        top: var(--panel-top) !important;
+        right: var(--panel-gap) !important;
+        left: auto !important;
+        width: var(--side-panel-width) !important;
+        max-width: 380px !important;
+        max-height: calc(100vh - (var(--panel-top) * 2)) !important;
+        overflow-y: auto !important;
+        z-index: 1100 !important;
+        pointer-events: auto !important;
+        transform: none !important;
+        opacity: 1 !important;
+        background: rgba(12,18,26,0.88) !important;
+    }
+
+    /* Emoji panel: default positioned under info by JS, but fallback rules here */
+    .game-emoji-panel {
+        position: fixed !important;
+        left: var(--panel-gap) !important;
+        top: calc(var(--panel-top) + 160px) !important;
+        width: min(var(--side-panel-width), 320px) !important;
+        max-height: calc(60vh) !important;
+        overflow-y: auto !important;
+        z-index: 1090 !important;
+        pointer-events: auto !important;
+        transform: none !important;
+        opacity: 1 !important;
+        background: rgba(12,18,26,0.88) !important;
+    }
+
+    /* Collapsed variants must be purely visual and not affect layout */
+    .info-panel.is-collapsed,
+    .players-panel.is-collapsed,
+    .game-emoji-panel.is-collapsed {
+        width: 56px !important;
+        height: 56px !important;
+        padding: 6px !important;
+        overflow: visible !important;
+    }
+
+    /* Neutralize parent containers so they don't reserve space */
+    .game-info-region,
+    .game-sidepanel {
+        width: 0 !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        display: block !important;
+        overflow: visible !important;
+        pointer-events: none !important;
+    }
+
+    /* Ensure panels inside the body receive events */
+    .info-panel, .players-panel, .game-emoji-panel { pointer-events: auto !important; }
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     min-height: 100vh;

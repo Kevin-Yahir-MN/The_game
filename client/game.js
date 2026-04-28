@@ -2851,19 +2851,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
 
                 hydrateReactionButtons();
-                // Move HUD panels to document.body so they behave as overlays
-                // and their parent containers don't affect page flow/layout.
-                (function moveHudPanelsToBody() {
+                // Remove the surrounding `game-info-region` container by
+                // moving its child panels to `document.body` and deleting
+                // the empty wrapper. This avoids changing other panel
+                // placement (more surgical than moving all HUD panels).
+                (function removeGameInfoRegion() {
                     try {
-                        const selectors = ['.info-panel', '.players-panel', '.game-emoji-panel'];
-                        selectors.forEach((sel) => {
-                            const el = document.querySelector(sel);
-                            if (el && el.parentNode !== document.body) {
-                                document.body.appendChild(el);
+                        const infoRegion = document.querySelector('.game-info-region');
+                        if (!infoRegion) return;
+                        // Move relevant children (info-panel, room-emoji-chat) to body
+                        Array.from(infoRegion.children).forEach((child) => {
+                            if (!child || !child.classList) return;
+                            const cls = child.classList;
+                            if (
+                                cls.contains('info-panel') ||
+                                cls.contains('room-emoji-chat') ||
+                                cls.contains('game-panel')
+                            ) {
+                                document.body.appendChild(child);
                             }
                         });
+                        // If empty, remove the region container
+                        if (infoRegion.children.length === 0) {
+                            infoRegion.remove();
+                        }
                     } catch (e) {
-                        // fail silently; this is a best-effort fix
+                        // silent
                     }
                 })();
 
