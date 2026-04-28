@@ -4677,9 +4677,10 @@ body.app-theme--game .players-panel {
         align-items: flex-start;
         justify-content: center;
         padding: 0 20px;
+        /* align the main area's top with fixed panels (info/players) */
+        padding-top: var(--panel-top);
         /* allow main to use full viewport while leaving room for top panels */
         min-height: calc(100vh - var(--panel-top));
-        padding-top: clamp(8px, 3.5vh, 32px);
     }
 
     /* Scale the game container with viewport while keeping aspect ratio */
