@@ -20,10 +20,7 @@
     /* Reduced gutter: 1/3 smaller than previous (approx). */
     --game-gutter: clamp(7px, 2.3vw, 24px);
     /* Width reserved for side panels on large screens */
-    --side-panel-width: 260px;
-    /* Gap between stacked HUD panels; small and large variants for different contexts */
-    --panel-gap: 12px;
-    --panel-gap-large: 84px;
+    --side-panel-width: 300px;
 }
 
 body {
@@ -4136,14 +4133,14 @@ body.app-theme--game .game-over-notification img {
     }
 
     body.app-theme--game .game-emoji-panel {
-        left: 15px;
-        top: 250px;
-        right: auto;
-    }
-}
-
-body.app-theme--game {
-    min-height: 100vh;
+            position: fixed;
+            z-index: 20;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-3);
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            padding: var(--space-3);
     padding: clamp(12px, 2vw, 24px);
     overflow-x: hidden;
 }
@@ -4196,12 +4193,12 @@ body.app-theme--game {
 
 /* Adjust layout when the browser tab/window is approximately half the screen (split view) */
 body.is-half-screen {
-    --side-panel-width: 200px;
+    --side-panel-width: 220px;
     --game-gutter: clamp(6px, 2vw, 18px);
 }
 
 body.is-half-screen .game-shell {
-    grid-template-columns: minmax(140px, var(--side-panel-width)) minmax(0, 1fr) minmax(140px, var(--side-panel-width));
+    grid-template-columns: minmax(160px, 220px) minmax(0, 1fr) minmax(160px, 220px);
 }
 
 body.is-half-screen .players-panel,
@@ -4211,9 +4208,8 @@ body.is-half-screen .game-emoji-panel {
 }
 
 body.is-half-screen #gameContainer {
-    /* allow the container to grow but cap its max-width to account for side panels */
-    max-width: calc(100% - (2 * var(--side-panel-width)) - (2 * var(--game-gutter)));
-    width: 100%;
+    /* make sure canvas can be slightly larger inside reduced viewport */
+    width: calc(100% - (var(--game-gutter) * 2));
 }
 
 @media (max-width: 480px) {
@@ -4229,7 +4225,7 @@ body.app-theme--game .game-shell {
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: minmax(160px, var(--side-panel-width)) minmax(0, 1fr) minmax(160px, var(--side-panel-width));
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(240px, 300px);
     grid-template-areas: 'info main side';
     gap: 16px;
     align-items: start;
@@ -4605,4 +4601,98 @@ body.app-theme--game .players-panel {
         bottom: 88px;
         max-width: min(84vw, 320px);
     }
+
+/* Desktop: symmetric three-column layout for game view */
+@media (min-width: 1100px) {
+    .game-shell {
+        display: grid;
+        grid-template-columns: minmax(220px, var(--side-panel-width)) 1fr minmax(260px, var(--side-panel-width));
+        gap: var(--game-gutter);
+        align-items: start;
+        padding: clamp(1rem, 2.5vw, 3rem);
+        max-width: var(--content-max);
+        margin: 0 auto;
+    }
+
+    .game-info-region {
+        grid-column: 1;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        align-items: flex-start;
+    }
+
+    .game-main {
+        grid-column: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-3);
+    }
+
+    .game-sidepanel {
+        grid-column: 3;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: var(--space-3);
+    }
+
+    /* Make left panels flow normally inside left column */
+    .game-info-region .game-panel,
+    .game-info-region .room-emoji-chat {
+        position: relative;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    /* Stop players panel being fixed/absolute on wide screens */
+    .players-panel {
+        position: relative !important;
+        top: auto !important;
+        right: auto !important;
+        width: 100%;
+        max-width: 360px;
+        margin-left: auto;
+    }
+
+    /* Scale the game container with viewport while keeping aspect ratio */
+    #gameContainer {
+        width: clamp(560px, 56vw, 980px);
+        height: auto;
+        margin: 0 auto;
+        padding: 0;
+    }
+
+    #gameCanvas {
+        width: 100%;
+        height: auto;
+        max-width: 980px;
+        aspect-ratio: 800/700;
+        border-radius: 14px;
+    }
+
+    /* Place controls below the board and centered */
+    .game-controls {
+        position: relative;
+        bottom: auto;
+        transform: none;
+        margin-top: 1rem;
+        left: auto;
+        display: flex;
+        justify-content: center;
+    }
+
+    /* So both side panels look balanced */
+    .game-panel {
+        box-shadow: 0 18px 40px rgba(0,0,0,0.32);
+    }
+}
+
+@media (min-width: 1600px) {
+    #gameContainer {
+        width: clamp(720px, 48vw, 1200px);
+    }
+}
 }
