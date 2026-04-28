@@ -4762,3 +4762,48 @@ body.app-theme--game .players-panel {
         bottom: auto !important;
     }
 }
+
+/* Canonical overlays for other panels (match emoji-panel behavior, keep side) */
+@media (min-width: 769px) {
+    /* Left info panel */
+    .info-panel,
+    body.app-theme--game .info-panel {
+        position: fixed !important;
+        left: var(--panel-gap) !important;
+        top: var(--panel-top) !important;
+        width: var(--side-panel-width) !important;
+        max-height: calc(100vh - calc(var(--panel-top) * 2)) !important;
+        overflow-y: auto !important;
+        padding: 14px !important;
+        background: rgba(12, 18, 26, 0.88) !important;
+        border-radius: 12px !important;
+        border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45) !important;
+        z-index: 9998 !important;
+    }
+
+    /* Instruction panel (usually bottom-right) keep side but fixed */
+    .instructions-panel,
+    body.app-theme--game .instructions-panel {
+        position: fixed !important;
+        right: var(--panel-gap) !important;
+        bottom: var(--panel-top) !important;
+        width: min(320px, var(--side-panel-width)) !important;
+        max-height: calc(50vh) !important;
+        overflow-y: auto !important;
+        padding: 12px !important;
+        background: rgba(12, 18, 26, 0.88) !important;
+        border-radius: 10px !important;
+        z-index: 9997 !important;
+    }
+
+    /* Ensure any mobile-drawer transforms don't move these overlays on desktop */
+    .info-panel,
+    .players-panel,
+    .instructions-panel,
+    .game-emoji-panel {
+        transform: none !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+}
