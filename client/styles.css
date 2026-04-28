@@ -4638,6 +4638,7 @@ body.app-theme--game .players-panel {
     /* Keep shell as simple centered container; side panels will be fixed overlays */
     .game-shell {
         position: relative;
+        display: block; /* override earlier grid layout so fixed overlays don't affect main flow */
         padding: clamp(1rem, 2.5vw, 3rem);
         max-width: var(--content-max);
         margin: 0 auto;
