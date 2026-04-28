@@ -20,7 +20,9 @@
     /* Reduced gutter: 1/3 smaller than previous (approx). */
     --game-gutter: clamp(7px, 2.3vw, 24px);
     /* Width reserved for side panels on large screens */
-    --side-panel-width: 300px;
+    --side-panel-width: 260px;
+    /* Gap from viewport edge for fixed panels to avoid canvas overlap */
+    --panel-gap: 28px;
 }
 
 body {
@@ -4156,7 +4158,7 @@ body.app-theme--game .game-over-notification img {
 
     body.app-theme--game .info-panel {
         position: fixed;
-        left: 6px;
+        left: var(--panel-gap);
         top: 16px;
         width: var(--side-panel-width);
         max-width: 34vw;
@@ -4165,7 +4167,7 @@ body.app-theme--game .game-over-notification img {
 
     body.app-theme--game .players-panel {
         position: fixed;
-        right: 6px;
+        right: var(--panel-gap);
         top: 16px;
         width: var(--side-panel-width);
         max-width: 34vw;
@@ -4175,7 +4177,7 @@ body.app-theme--game .game-over-notification img {
     /* Emoji panel lives with info but should be below it; keep fixed near left edge */
     body.app-theme--game .game-emoji-panel {
         position: fixed;
-        left: 6px;
+        left: var(--panel-gap);
         /* place below the info panel with a small gap (info panel height varies) */
         top: calc(16px + 1px + 320px);
         width: var(--side-panel-width);
@@ -4604,42 +4606,29 @@ body.app-theme--game .players-panel {
 
 /* Desktop: symmetric three-column layout for game view */
 @media (min-width: 1100px) {
+    /* Keep shell as simple centered container; side panels will be fixed overlays */
     .game-shell {
-        display: grid;
-        grid-template-columns: minmax(220px, var(--side-panel-width)) 1fr minmax(260px, var(--side-panel-width));
-        gap: var(--game-gutter);
-        align-items: start;
+        position: relative;
         padding: clamp(1rem, 2.5vw, 3rem);
         max-width: var(--content-max);
         margin: 0 auto;
     }
 
+    /* Left info column becomes a fixed overlay (minimizable) */
     .game-info-region {
-        grid-column: 1;
+        position: fixed;
+        left: var(--panel-gap);
+        top: clamp(24px, 4vh, 48px);
+        width: min(var(--side-panel-width), 320px);
+        max-width: 340px;
         display: flex;
         flex-direction: column;
         gap: var(--space-3);
-        align-items: flex-start;
+        z-index: 40;
+        pointer-events: auto;
     }
 
-    .game-main {
-        grid-column: 2;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: var(--space-3);
-    }
-
-    .game-sidepanel {
-        grid-column: 3;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: var(--space-3);
-    }
-
-    /* Make left panels flow normally inside left column */
+    /* Keep the panels inside the left region stacked and full-width */
     .game-info-region .game-panel,
     .game-info-region .room-emoji-chat {
         position: relative;
@@ -4647,14 +4636,23 @@ body.app-theme--game .players-panel {
         max-width: 100%;
     }
 
-    /* Stop players panel being fixed/absolute on wide screens */
+    /* Right players panel fixed (minimizable) */
     .players-panel {
-        position: relative !important;
-        top: auto !important;
-        right: auto !important;
-        width: 100%;
-        max-width: 360px;
-        margin-left: auto;
+        position: fixed !important;
+        right: var(--panel-gap) !important;
+        top: clamp(20px, 4vh, 48px);
+        width: min(var(--side-panel-width), 380px);
+        max-width: 420px;
+        z-index: 40;
+    }
+
+    /* Main area: center the game canvas independently of side panels */
+    .game-main {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 20px;
+        min-height: 70vh;
     }
 
     /* Scale the game container with viewport while keeping aspect ratio */
@@ -4663,6 +4661,7 @@ body.app-theme--game .players-panel {
         height: auto;
         margin: 0 auto;
         padding: 0;
+        z-index: 10;
     }
 
     #gameCanvas {
@@ -4671,20 +4670,20 @@ body.app-theme--game .players-panel {
         max-width: 980px;
         aspect-ratio: 800/700;
         border-radius: 14px;
+        display: block;
     }
 
-    /* Place controls below the board and centered */
+    /* Controls centered below the board */
     .game-controls {
         position: relative;
         bottom: auto;
         transform: none;
         margin-top: 1rem;
-        left: auto;
         display: flex;
         justify-content: center;
+        z-index: 12;
     }
 
-    /* So both side panels look balanced */
     .game-panel {
         box-shadow: 0 18px 40px rgba(0,0,0,0.32);
     }
@@ -4694,5 +4693,4 @@ body.app-theme--game .players-panel {
     #gameContainer {
         width: clamp(720px, 48vw, 1200px);
     }
-}
 }
