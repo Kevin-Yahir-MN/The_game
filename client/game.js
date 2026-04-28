@@ -2851,6 +2851,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
 
                 hydrateReactionButtons();
+                // Move HUD panels to document.body so they behave as overlays
+                // and their parent containers don't affect page flow/layout.
+                (function moveHudPanelsToBody() {
+                    try {
+                        const selectors = ['.info-panel', '.players-panel', '.game-emoji-panel'];
+                        selectors.forEach((sel) => {
+                            const el = document.querySelector(sel);
+                            if (el && el.parentNode !== document.body) {
+                                document.body.appendChild(el);
+                            }
+                        });
+                    } catch (e) {
+                        // fail silently; this is a best-effort fix
+                    }
+                })();
+
                 setupInfoPanelToggle();
                 setupEmojiPanelToggle();
                 applyHudPanelLayout();

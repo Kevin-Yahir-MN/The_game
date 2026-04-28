@@ -4948,45 +4948,4 @@ body.app-theme--game .players-panel {
     }
 }
 
-/* Make info and players inherit ONLY the emoji-panel characteristics.
-   This ensures they behave exactly like the emoji drawer and nothing else. */
-@media (min-width: 0) {
-    .game-emoji-panel,
-    .info-panel,
-    .players-panel {
-        position: fixed !important;
-        left: 12px !important;
-        right: 12px !important;
-        bottom: 12px !important;
-        top: auto !important;
-        width: auto !important;
-        max-width: none !important;
-        max-height: min(68vh, 420px) !important;
-        overflow-y: auto !important;
-        transform: translateY(calc(100% + 18px)) !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-        transition: transform 0.18s ease, opacity 0.18s ease !important;
-        z-index: 31 !important;
-        background: rgba(0,0,0,0.0) !important;
-        box-shadow: none !important;
-    }
-
-    /* Open handlers (mirror emoji drawer behavior) */
-    body.app-theme--game.drawer-players-open .players-panel,
-    body.app-theme--game.drawer-info-open .info-panel,
-    body.app-theme--game.drawer-emoji-open .game-emoji-panel {
-        transform: translateY(0) !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
-    }
-
-    /* Ensure internal panels keep their visual styling but do not affect layout */
-    .game-info-region .info-panel,
-    .game-sidepanel .players-panel {
-        position: relative !important;
-        width: auto !important;
-        margin: 0 !important;
-        pointer-events: auto !important;
-    }
-}
+/* removed: info/players forced to mimic emoji panel */
