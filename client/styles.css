@@ -115,8 +115,8 @@
     }
 
     .game-controls {
-        bottom: 4px !important;
-        margin-top: 4px !important;
+        bottom: 8px !important;
+        margin-top: 6px !important;
         padding: 8px 14px !important;
         gap: 12px !important;
         box-shadow: 0 6px 18px rgba(0,0,0,0.18) !important;
@@ -131,15 +131,15 @@
 /* Stronger override to ensure minimal gap and tighter layout */
 @media (min-width: 1100px) {
     #gameContainer { margin: 8px auto !important; }
-    #gameCanvas { margin: 8px auto 4px !important; }
-    .game-controls { bottom: 4px !important; }
+    #gameCanvas { margin: 8px auto 8px !important; }
+    .game-controls { bottom: 8px !important; }
     #endTurnBtn { min-height: 38px !important; padding: 7px 18px !important; }
 }
 
     /* Pull the bottom bar up over the canvas and remove its background so no blue gap shows */
     @media (min-width: 1100px) {
         body.app-theme--game .game-bottombar {
-            margin-top: -26px !important;
+            margin-top: -18px !important;
             padding-top: 0 !important;
             background: transparent !important;
             pointer-events: none;
