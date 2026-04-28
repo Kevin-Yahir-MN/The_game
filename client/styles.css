@@ -115,17 +115,25 @@
     }
 
     .game-controls {
-        bottom: 8px !important;
-        margin-top: 6px !important;
-        padding: 10px 18px !important;
-        gap: 16px !important;
-        box-shadow: 0 6px 18px rgba(0,0,0,0.24) !important;
+        bottom: 4px !important;
+        margin-top: 4px !important;
+        padding: 8px 14px !important;
+        gap: 12px !important;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.18) !important;
     }
 
     #endTurnBtn {
-        padding: 10px 24px !important;
-        min-height: 44px !important;
+        padding: 8px 20px !important;
+        min-height: 40px !important;
     }
+}
+
+/* Stronger override to ensure minimal gap and tighter layout */
+@media (min-width: 1100px) {
+    #gameContainer { margin: 8px auto !important; }
+    #gameCanvas { margin: 8px auto 4px !important; }
+    .game-controls { bottom: 4px !important; }
+    #endTurnBtn { min-height: 38px !important; padding: 7px 18px !important; }
 }
 
 body {
