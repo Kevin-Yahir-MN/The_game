@@ -2474,8 +2474,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const panel = document.createElement('div');
         panel.id = 'playersPanel';
         panel.className = 'players-panel';
-        const panelHost =
-            document.querySelector('.game-sidepanel') || document.body;
+        const panelHost = document.body;
         panelHost.appendChild(panel);
         return panel;
     }
