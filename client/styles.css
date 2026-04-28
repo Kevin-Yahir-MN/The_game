@@ -23,6 +23,7 @@
     --side-panel-width: 260px;
     /* Gap from viewport edge for fixed panels to avoid canvas overlap */
     --panel-gap: 28px;
+    --panel-top: 20px;
 }
 
 body {
@@ -1966,16 +1967,17 @@ body.app-theme--game .game-emoji-panel:not(.is-layout-ready) {
 
 .players-panel {
     position: fixed;
-    top: 20px;
-    right: 20px;
+    top: var(--panel-top);
+    right: var(--panel-gap);
     background: rgba(42, 52, 65, 0.95);
     padding: 22px;
     border-radius: 14px;
-    width: 375px;
+    width: var(--side-panel-width);
+    max-width: min(42vw, 420px);
     max-height: 60vh;
     overflow-y: auto;
-    z-index: 20;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 40;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.36);
     display: block !important;
     font-size: 16px;
     line-height: 1.3;
