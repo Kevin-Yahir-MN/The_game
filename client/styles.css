@@ -4671,13 +4671,15 @@ body.app-theme--game .players-panel {
         max-width: 420px;
     }
 
-    /* Main area: center the game canvas independently of side panels */
+    /* Main area: keep canvas elevated to avoid vertical scroll */
     .game-main {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: center;
         padding: 0 20px;
-        min-height: 70vh;
+        /* allow main to use full viewport while leaving room for top panels */
+        min-height: calc(100vh - var(--panel-top));
+        padding-top: clamp(8px, 3.5vh, 32px);
     }
 
     /* Scale the game container with viewport while keeping aspect ratio */
@@ -4687,12 +4689,16 @@ body.app-theme--game .players-panel {
         margin: 0 auto;
         padding: 0;
         z-index: 10;
+        /* Ensure container doesn't force page scroll; scale canvas inside */
+        max-height: calc(100vh - (var(--panel-top) + 48px));
+        overflow: hidden;
     }
 
     #gameCanvas {
         width: 100%;
-        height: auto;
+        height: auto !important;
         max-width: 980px;
+        max-height: 100%;
         aspect-ratio: 800/700;
         border-radius: 14px;
         display: block;
