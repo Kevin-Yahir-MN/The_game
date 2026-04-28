@@ -4808,3 +4808,63 @@ body.app-theme--game .players-panel {
         pointer-events: auto !important;
     }
 }
+
+/* FINAL OVERRIDES: make info & side panels true overlays on desktop so
+   collapsing them never changes document flow. */
+@media (min-width: 1100px) {
+    /* Remove grid layout reservation so overlays don't reserve columns */
+    body.app-theme--game .game-shell {
+        display: block !important;
+        grid-template-columns: none !important;
+        grid-template-areas: none !important;
+        gap: 0 !important;
+    }
+
+    /* Force info region to be a fixed left overlay */
+    body.app-theme--game .game-info-region,
+    .game-info-region {
+        position: fixed !important;
+        top: var(--panel-top) !important;
+        left: var(--panel-gap) !important;
+        right: auto !important;
+        width: var(--side-panel-width) !important;
+        max-width: 360px !important;
+        max-height: calc(100vh - (var(--panel-top) * 2)) !important;
+        overflow-y: auto !important;
+        z-index: 9998 !important;
+        pointer-events: auto !important;
+    }
+
+    /* Force sidepanel (players) to be a fixed right overlay */
+    body.app-theme--game .game-sidepanel,
+    .game-sidepanel {
+        position: fixed !important;
+        top: var(--panel-top) !important;
+        right: var(--panel-gap) !important;
+        left: auto !important;
+        width: var(--side-panel-width) !important;
+        max-width: 380px !important;
+        max-height: calc(100vh - (var(--panel-top) * 2)) !important;
+        overflow-y: auto !important;
+        z-index: 9998 !important;
+        pointer-events: auto !important;
+    }
+
+    /* Ensure the game main area does not get pushed or reserve columns */
+    body.app-theme--game .game-main,
+    .game-main {
+        margin: 0 auto !important;
+        width: auto !important;
+        max-width: var(--content-max) !important;
+        padding-left: calc(var(--side-panel-width) + (var(--panel-gap) * 2)) !important;
+        padding-right: calc(var(--side-panel-width) + (var(--panel-gap) * 2)) !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Make child panels inside info/side stack visually but not affect layout */
+    body.app-theme--game .game-info-region .game-panel,
+    body.app-theme--game .game-sidepanel .game-panel {
+        position: relative !important;
+        width: 100% !important;
+    }
+}
