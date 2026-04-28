@@ -106,6 +106,28 @@
     .info-panel, .players-panel, .game-emoji-panel { pointer-events: auto !important; }
 }
 
+/* Tweak: reduce gap between canvas and End Turn button on desktop
+   Leave a small aesthetic margin. */
+@media (min-width: 1100px) {
+    #gameContainer {
+        /* slightly reduce bottom slack so controls sit closer to canvas */
+        max-height: calc(100vh - (var(--panel-top) + 28px)) !important;
+    }
+
+    .game-controls {
+        bottom: 8px !important;
+        margin-top: 6px !important;
+        padding: 10px 18px !important;
+        gap: 16px !important;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.24) !important;
+    }
+
+    #endTurnBtn {
+        padding: 10px 24px !important;
+        min-height: 44px !important;
+    }
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     min-height: 100vh;
