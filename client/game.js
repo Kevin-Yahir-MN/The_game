@@ -1130,20 +1130,27 @@ document.addEventListener('DOMContentLoaded', () => {
             bodyStyles.getPropertyValue('--desktop-panel-gap') ||
             rootStyles.getPropertyValue('--desktop-panel-gap')
         );
+        const parsedPanelWidth = parseFloat(
+            bodyStyles.getPropertyValue('--desktop-panel-width') ||
+            rootStyles.getPropertyValue('--desktop-panel-width')
+        );
         const gap = Number.isFinite(parsedStackGap)
             ? Math.round(parsedStackGap)
             : Number.isFinite(parsedPanelGap)
                 ? Math.round(parsedPanelGap)
                 : 18;
         const top = Math.round(infoRect.bottom + gap);
+        const panelWidth = Number.isFinite(parsedPanelWidth)
+            ? Math.round(parsedPanelWidth)
+            : Math.round(Math.max(infoRect.width, panel.getBoundingClientRect().width));
 
         panel.style.setProperty('position', 'fixed', 'important');
         // align left edge with info panel left edge
         panel.style.setProperty('left', `${Math.max(6, Math.round(infoRect.left))}px`, 'important');
         panel.style.setProperty('right', 'auto', 'important');
         panel.style.setProperty('top', `${top}px`, 'important');
-        // match width to info panel width (keeps visual alignment)
-        panel.style.setProperty('width', `${Math.round(infoRect.width)}px`, 'important');
+        // Keep the normal panel width even when the info panel is collapsed.
+        panel.style.setProperty('width', `${panelWidth}px`, 'important');
         panel.style.setProperty('max-height', `calc(100vh - ${top + gap}px)`, 'important');
         panel.classList.add('is-layout-ready');
     }
