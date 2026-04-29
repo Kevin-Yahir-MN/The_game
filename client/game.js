@@ -268,6 +268,13 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
 
+        if (isMobile) {
+            document.querySelector('.info-panel')?.classList.remove('is-collapsed');
+            document.querySelector('.game-emoji-panel')?.classList.remove('is-collapsed');
+            isPlayersPanelCollapsed = false;
+            document.getElementById('playersPanel')?.classList.remove('is-collapsed');
+        }
+
         syncMobileInfoPanelPlacement(isPortrait);
     }
 
