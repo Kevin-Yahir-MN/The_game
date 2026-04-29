@@ -5268,7 +5268,7 @@ body.app-theme--game .players-panel {
 
     @media (min-width: 769px) and (max-width: 1024px) {
         body.app-theme--game.is-half-screen {
-            --desktop-panel-width: clamp(190px, 21vw, 220px);
+            --desktop-panel-width: clamp(240px, 28vw, 285px);
             --desktop-panel-gap: clamp(8px, 1.2vw, 14px);
             --desktop-panel-stack-gap: clamp(12px, 1.6vh, 18px);
             --desktop-controls-space: clamp(80px, 9vh, 104px);
