@@ -5306,7 +5306,7 @@ body.app-theme--game .players-panel {
     }
 
     @media (min-width: 769px) and (max-width: 1024px) {
-        body.app-theme--game.is-half-screen {
+        body.app-theme--game {
             --desktop-panel-width: clamp(240px, 28vw, 285px);
             --desktop-panel-gap: clamp(8px, 1.2vw, 14px);
             --desktop-panel-stack-gap: clamp(12px, 1.6vh, 18px);
@@ -5320,7 +5320,7 @@ body.app-theme--game .players-panel {
             overflow: hidden;
         }
 
-        body.app-theme--game.is-half-screen .game-shell {
+        body.app-theme--game .game-shell {
             display: block !important;
             width: 100%;
             max-width: none;
@@ -5329,7 +5329,7 @@ body.app-theme--game .players-panel {
             padding: var(--desktop-panel-gap) 0 0;
         }
 
-        body.app-theme--game.is-half-screen .game-main {
+        body.app-theme--game .game-main {
             width: var(--desktop-board-width) !important;
             max-width: calc(100vw - 16px) !important;
             min-height: calc(100vh - var(--desktop-panel-gap));
@@ -5342,7 +5342,7 @@ body.app-theme--game .players-panel {
             gap: clamp(8px, 1.4vh, 14px);
         }
 
-        body.app-theme--game.is-half-screen .game-board {
+        body.app-theme--game .game-board {
             width: var(--desktop-board-width);
             max-width: 100%;
             aspect-ratio: 800 / 700;
@@ -5354,7 +5354,7 @@ body.app-theme--game .players-panel {
             border-radius: 18px;
         }
 
-        body.app-theme--game.is-half-screen #gameContainer {
+        body.app-theme--game #gameContainer {
             width: 100% !important;
             height: 100% !important;
             max-width: none !important;
@@ -5365,7 +5365,7 @@ body.app-theme--game .players-panel {
             overflow: hidden !important;
         }
 
-        body.app-theme--game.is-half-screen #gameCanvas {
+        body.app-theme--game #gameCanvas {
             width: 100% !important;
             height: auto !important;
             max-width: 100% !important;
@@ -5374,7 +5374,7 @@ body.app-theme--game .players-panel {
             aspect-ratio: 800 / 700;
         }
 
-        body.app-theme--game.is-half-screen .game-bottombar {
+        body.app-theme--game .game-bottombar {
             width: 100%;
             margin: 0 !important;
             padding: 0 0 var(--desktop-panel-gap) !important;
@@ -5384,7 +5384,7 @@ body.app-theme--game .players-panel {
             pointer-events: none;
         }
 
-        body.app-theme--game.is-half-screen .game-controls {
+        body.app-theme--game .game-controls {
             position: static !important;
             left: auto !important;
             bottom: auto !important;
@@ -5394,23 +5394,23 @@ body.app-theme--game .players-panel {
             pointer-events: auto;
         }
 
-        body.app-theme--game.is-half-screen #endTurnBtn {
+        body.app-theme--game #endTurnBtn {
             min-height: 42px !important;
             padding: 8px 24px !important;
         }
 
-        body.app-theme--game.is-half-screen .info-panel,
-        body.app-theme--game.is-half-screen .players-panel,
-        body.app-theme--game.is-half-screen .game-emoji-panel {
+        body.app-theme--game .info-panel,
+        body.app-theme--game .players-panel,
+        body.app-theme--game .game-emoji-panel {
             width: var(--desktop-panel-width) !important;
             max-width: var(--desktop-panel-width) !important;
             box-sizing: border-box;
             padding: 12px !important;
         }
 
-        body.app-theme--game.is-half-screen .info-panel.is-collapsed,
-        body.app-theme--game.is-half-screen .players-panel.is-collapsed,
-        body.app-theme--game.is-half-screen .game-emoji-panel.is-collapsed {
+        body.app-theme--game .info-panel.is-collapsed,
+        body.app-theme--game .players-panel.is-collapsed,
+        body.app-theme--game .game-emoji-panel.is-collapsed {
             width: 36px !important;
             min-width: 36px !important;
             max-width: 36px !important;
@@ -5422,14 +5422,14 @@ body.app-theme--game .players-panel {
             border-radius: 999px !important;
         }
 
-        body.app-theme--game.is-half-screen .info-panel {
+        body.app-theme--game .info-panel {
             position: fixed !important;
             top: var(--desktop-panel-gap) !important;
             left: var(--desktop-panel-gap) !important;
             max-height: min(42vh, 360px) !important;
         }
 
-        body.app-theme--game.is-half-screen .players-panel {
+        body.app-theme--game .players-panel {
             position: fixed !important;
             top: var(--desktop-panel-gap) !important;
             right: var(--desktop-panel-gap) !important;
@@ -5439,30 +5439,30 @@ body.app-theme--game .players-panel {
             max-height: calc(100vh - (var(--desktop-panel-gap) * 2)) !important;
         }
 
-        body.app-theme--game.is-half-screen .game-emoji-panel {
+        body.app-theme--game .game-emoji-panel {
             position: fixed !important;
             left: var(--desktop-panel-gap) !important;
             right: auto !important;
         }
 
-        body.app-theme--game.is-half-screen .info-panel.is-collapsed {
+        body.app-theme--game .info-panel.is-collapsed {
             top: var(--desktop-panel-gap) !important;
             left: var(--desktop-panel-gap) !important;
         }
 
-        body.app-theme--game.is-half-screen .game-emoji-panel.is-collapsed {
+        body.app-theme--game .game-emoji-panel.is-collapsed {
             left: var(--desktop-panel-gap) !important;
         }
 
-        body.app-theme--game.is-half-screen .players-panel.is-collapsed {
+        body.app-theme--game .players-panel.is-collapsed {
             top: var(--desktop-panel-gap) !important;
             right: var(--desktop-panel-gap) !important;
             left: auto !important;
         }
 
-        body.app-theme--game.is-half-screen .info-panel.is-collapsed .info-panel-toggle,
-        body.app-theme--game.is-half-screen .players-panel.is-collapsed .players-panel-toggle,
-        body.app-theme--game.is-half-screen .game-emoji-panel.is-collapsed .emoji-panel-toggle {
+        body.app-theme--game .info-panel.is-collapsed .info-panel-toggle,
+        body.app-theme--game .players-panel.is-collapsed .players-panel-toggle,
+        body.app-theme--game .game-emoji-panel.is-collapsed .emoji-panel-toggle {
             width: 36px !important;
             min-width: 36px !important;
             height: 36px !important;
@@ -5470,8 +5470,8 @@ body.app-theme--game .players-panel {
             font-size: 18px !important;
         }
 
-        body.app-theme--game.is-half-screen .game-info-region,
-        body.app-theme--game.is-half-screen .game-sidepanel {
+        body.app-theme--game .game-info-region,
+        body.app-theme--game .game-sidepanel {
             width: 0 !important;
             height: 0 !important;
             min-height: 0 !important;

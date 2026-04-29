@@ -1101,10 +1101,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const isDesktop =
             window.matchMedia('(min-width: 1200px)').matches ||
-            (
-                document.body.classList.contains('is-half-screen') &&
-                window.matchMedia('(min-width: 769px)').matches
-            );
+            window.matchMedia('(min-width: 769px) and (max-width: 1024px)').matches;
         // If not desktop, clear inline positioning to allow CSS/media queries to take over
         if (!isDesktop) {
             panel.style.removeProperty('position');
