@@ -5244,6 +5244,45 @@ body.app-theme--game .players-panel {
             max-height: calc(100vh - 420px) !important;
         }
 
+        body.app-theme--game .info-panel.is-collapsed,
+        body.app-theme--game .players-panel.is-collapsed,
+        body.app-theme--game .game-emoji-panel.is-collapsed {
+            width: 36px !important;
+            min-width: 36px !important;
+            max-width: 36px !important;
+            height: 36px !important;
+            min-height: 36px !important;
+            max-height: 36px !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            border-radius: 999px !important;
+        }
+
+        body.app-theme--game .info-panel.is-collapsed {
+            top: var(--desktop-panel-gap) !important;
+            left: var(--desktop-panel-gap) !important;
+        }
+
+        body.app-theme--game .game-emoji-panel.is-collapsed {
+            left: var(--desktop-panel-gap) !important;
+        }
+
+        body.app-theme--game .players-panel.is-collapsed {
+            top: var(--desktop-panel-gap) !important;
+            right: var(--desktop-panel-gap) !important;
+            left: auto !important;
+        }
+
+        body.app-theme--game .info-panel.is-collapsed .info-panel-toggle,
+        body.app-theme--game .players-panel.is-collapsed .players-panel-toggle,
+        body.app-theme--game .game-emoji-panel.is-collapsed .emoji-panel-toggle {
+            width: 36px !important;
+            min-width: 36px !important;
+            height: 36px !important;
+            min-height: 36px !important;
+            font-size: 18px !important;
+        }
+
         body.app-theme--game .game-info-region,
         body.app-theme--game .game-sidepanel {
             width: 0 !important;
