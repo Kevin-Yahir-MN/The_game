@@ -5119,9 +5119,9 @@ body.app-theme--game .players-panel {
     /* Desktop game layout: centered, symmetric, and viewport-responsive. */
     @media (min-width: 1025px) {
         body.app-theme--game {
-            --desktop-panel-width: clamp(220px, 14vw, 280px);
+            --desktop-panel-width: clamp(280px, 16vw, 340px);
             --desktop-panel-gap: clamp(10px, 1.35vw, 28px);
-            --desktop-main-clearance: clamp(18px, 3vw, 56px);
+            --desktop-main-clearance: clamp(28px, 3.5vw, 72px);
             --desktop-controls-space: clamp(86px, 10vh, 118px);
             --desktop-board-width: min(
                 calc(100vw - var(--desktop-panel-width) - var(--desktop-panel-width) - var(--desktop-panel-gap) - var(--desktop-panel-gap) - var(--desktop-main-clearance) - var(--desktop-main-clearance)),
@@ -5223,6 +5223,7 @@ body.app-theme--game .players-panel {
             position: fixed !important;
             top: var(--desktop-panel-gap) !important;
             left: var(--desktop-panel-gap) !important;
+            max-height: min(42vh, 380px) !important;
         }
 
         body.app-theme--game .players-panel {
@@ -5230,12 +5231,15 @@ body.app-theme--game .players-panel {
             top: var(--desktop-panel-gap) !important;
             right: var(--desktop-panel-gap) !important;
             left: auto !important;
+            min-height: min(28vh, 260px);
+            max-height: calc(100vh - (var(--desktop-panel-gap) * 2)) !important;
         }
 
         body.app-theme--game .game-emoji-panel {
             position: fixed !important;
             left: var(--desktop-panel-gap) !important;
             right: auto !important;
+            max-height: calc(100vh - 430px) !important;
         }
 
         body.app-theme--game .game-info-region,
@@ -5250,8 +5254,8 @@ body.app-theme--game .players-panel {
 
     @media (min-width: 1025px) and (max-width: 1320px) {
         body.app-theme--game {
-            --desktop-panel-width: clamp(190px, 17vw, 230px);
-            --desktop-main-clearance: clamp(10px, 1.5vw, 24px);
+            --desktop-panel-width: clamp(240px, 19vw, 280px);
+            --desktop-main-clearance: clamp(20px, 2.5vw, 40px);
         }
 
         body.app-theme--game .game-panel,
