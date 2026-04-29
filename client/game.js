@@ -1099,7 +1099,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const info = document.querySelector('.info-panel');
         if (!panel || !info) return;
 
-        const isDesktop = window.matchMedia('(min-width: 1200px)').matches;
+        const isDesktop =
+            window.matchMedia('(min-width: 1200px)').matches ||
+            (
+                document.body.classList.contains('is-half-screen') &&
+                window.matchMedia('(min-width: 769px)').matches
+            );
         // If not desktop, clear inline positioning to allow CSS/media queries to take over
         if (!isDesktop) {
             panel.style.removeProperty('position');
