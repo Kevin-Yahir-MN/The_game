@@ -267,6 +267,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 isEmojiDrawerOpen ? 'true' : 'false'
             );
         }
+
+        syncMobileInfoPanelPlacement(isPortrait);
+    }
+
+    function syncMobileInfoPanelPlacement(isPortrait) {
+        const infoPanel = document.querySelector('.info-panel');
+        const shell = document.getElementById('gameShell');
+        const main = document.querySelector('.game-main');
+        if (!infoPanel || !shell || !main) return;
+
+        if (isPortrait && infoPanel.parentElement !== shell) {
+            shell.insertBefore(infoPanel, main);
+        } else if (!isPortrait && infoPanel.parentElement !== document.body) {
+            document.body.appendChild(infoPanel);
+        }
     }
 
     function applyResponsiveCanvasSizing() {

@@ -5508,6 +5508,53 @@ body.app-theme--game .players-panel {
             padding: 0 !important;
         }
 
+        body.app-theme--game .info-panel {
+            position: static !important;
+            width: calc(100vw - (var(--mobile-game-gap) * 2)) !important;
+            max-width: 520px !important;
+            max-height: none !important;
+            margin: 0 auto var(--mobile-game-gap) !important;
+            padding: 10px 12px !important;
+            box-sizing: border-box;
+            overflow: visible !important;
+            transform: none !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        body.app-theme--game .info-panel .panel-content {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px 10px;
+        }
+
+        body.app-theme--game .info-panel .progress-container {
+            grid-column: 1 / -1;
+            margin: 2px 0 0;
+        }
+
+        body.app-theme--game .info-panel h3 {
+            font-size: 1rem;
+            margin-bottom: 6px;
+            padding-bottom: 5px;
+        }
+
+        body.app-theme--game .info-panel p {
+            margin: 0;
+            line-height: 1.15;
+        }
+
+        body.app-theme--game .info-panel strong,
+        body.app-theme--game .info-panel span,
+        body.app-theme--game #progressText {
+            font-size: 0.82rem;
+        }
+
+        body.app-theme--game .info-panel strong {
+            display: block;
+            min-width: 0;
+        }
+
         body.app-theme--game .game-board {
             width: 100%;
             max-width: none;
