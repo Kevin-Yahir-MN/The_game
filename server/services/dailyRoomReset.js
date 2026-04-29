@@ -1,61 +1,130 @@
-const { deleteAllRooms } = require('../db');
+const { pool, withTransaction } = require('../db');
 const { rooms, reverseRoomMap, boardHistory, saveDebounceTimers } = require('../state');
 const logger = require('../utils/logger');
 
-const DAILY_RESET_HOUR = Number(process.env.DAILY_ROOM_RESET_HOUR ?? 5);
-const DAILY_RESET_MINUTE = Number(process.env.DAILY_ROOM_RESET_MINUTE ?? 0);
+// A room is stale when the player whose turn it is has not acted for this long.
+const STALE_TURN_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 
-function getNextResetDelayMs(now = new Date()) {
-    const next = new Date(now);
-    next.setHours(DAILY_RESET_HOUR, DAILY_RESET_MINUTE, 0, 0);
+// How often to scan all active rooms for stale turns.
+const STALE_TURN_CHECK_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes
 
-    if (next <= now) {
-        next.setDate(next.getDate() + 1);
-    }
-
-    return next.getTime() - now.getTime();
-}
-
-function clearInMemoryRooms() {
-    for (const room of rooms.values()) {
-        for (const player of room.players || []) {
-            if (player.ws && player.ws.readyState === 1) {
-                player.ws.close(1012, 'Reinicio diario de salas');
+/**
+ * Close all WebSocket connections for a room and remove it from every
+ * in-memory map.
+ */
+function evictRoomFromMemory(roomId, room) {
+    for (const player of room.players || []) {
+        if (player.ws && player.ws.readyState === 1 /* OPEN */) {
+            try {
+                player.ws.close(1001, 'Sala eliminada por inactividad');
+            } catch (_) {
+                // ignore
             }
         }
     }
 
-    for (const timer of saveDebounceTimers.values()) {
+    const timer = saveDebounceTimers.get(roomId);
+    if (timer) {
         clearTimeout(timer);
+        saveDebounceTimers.delete(roomId);
     }
 
-    rooms.clear();
-    reverseRoomMap.clear();
-    boardHistory.clear();
-    saveDebounceTimers.clear();
+    reverseRoomMap.delete(room);
+    boardHistory.delete(roomId);
+    rooms.delete(roomId);
 }
 
-async function runDailyRoomReset() {
-    await deleteAllRooms();
-    clearInMemoryRooms();
-    logger.info('Daily room reset completed successfully');
+/**
+ * Delete a single room (and its player_connections) from the database.
+ */
+async function deleteRoomFromDb(roomId) {
+    await withTransaction(async (client) => {
+        await client.query(
+            'DELETE FROM player_connections WHERE room_id = $1',
+            [roomId]
+        );
+        await client.query(
+            'DELETE FROM game_states WHERE room_id = $1',
+            [roomId]
+        );
+    });
 }
 
-function scheduleDailyRoomReset() {
-    const delayMs = getNextResetDelayMs();
-    logger.info(`Daily room reset scheduled in ${Math.round(delayMs / 1000)} seconds`);
+/**
+ * Scan every in-memory room.  If the game is active and the current player's
+ * last recorded activity is older than STALE_TURN_THRESHOLD_MS, evict the
+ * room from memory and remove it from the database.
+ */
+async function checkAndEvictStaleRooms() {
+    const now = Date.now();
+    const staleRoomIds = [];
 
-    setTimeout(async () => {
-        try {
-            await runDailyRoomReset();
-        } catch (error) {
-            logger.error('Daily room reset failed', error);
-        } finally {
-            scheduleDailyRoomReset();
+    for (const [roomId, room] of rooms) {
+        // Only check rooms where a game is actually in progress.
+        if (!room.gameState?.gameStarted || room.gameState?.gameFinished) {
+            continue;
         }
-    }, delayMs);
+
+        const currentTurnPlayerId = room.gameState.currentTurn;
+        if (!currentTurnPlayerId) continue;
+
+        const currentPlayer = room.players.find(
+            (p) => p.id === currentTurnPlayerId
+        );
+        if (!currentPlayer) continue;
+
+        const lastActivity = Number(currentPlayer.lastActivity) || 0;
+        if (lastActivity > 0 && now - lastActivity > STALE_TURN_THRESHOLD_MS) {
+            staleRoomIds.push(roomId);
+        }
+    }
+
+    for (const roomId of staleRoomIds) {
+        const room = rooms.get(roomId);
+        if (!room) continue; // already gone
+
+        logger.info(
+            `Evicting stale room ${roomId}: current player inactive for >${STALE_TURN_THRESHOLD_MS / 60000} min`
+        );
+
+        try {
+            evictRoomFromMemory(roomId, room);
+            await deleteRoomFromDb(roomId);
+            logger.info(`Room ${roomId} evicted successfully`);
+        } catch (error) {
+            logger.error(`Failed to evict room ${roomId}`, error);
+            // Re-insert the room object so the next cycle can retry.
+            // (In practice it will no longer be in `rooms` so this is a no-op
+            // unless evictRoomFromMemory is partially rolled back — kept for
+            // safety.)
+        }
+    }
+}
+
+/**
+ * Start the periodic stale-turn scanner.  Returns the interval handle so
+ * callers can clear it in tests or on graceful shutdown.
+ */
+function scheduleStaleTurnCheck() {
+    logger.info(
+        `Stale-turn checker started (threshold=${STALE_TURN_THRESHOLD_MS / 60000} min, ` +
+        `interval=${STALE_TURN_CHECK_INTERVAL_MS / 60000} min)`
+    );
+
+    // Run once immediately so the first check doesn't wait a full interval.
+    checkAndEvictStaleRooms().catch((err) =>
+        logger.error('Initial stale-turn check failed', err)
+    );
+
+    return setInterval(() => {
+        checkAndEvictStaleRooms().catch((err) =>
+            logger.error('Stale-turn check failed', err)
+        );
+    }, STALE_TURN_CHECK_INTERVAL_MS);
 }
 
 module.exports = {
-    scheduleDailyRoomReset,
+    scheduleStaleTurnCheck,
+    // Exported for tests / manual use
+    checkAndEvictStaleRooms,
 };

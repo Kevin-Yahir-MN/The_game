@@ -17,7 +17,7 @@ const {
 const { registerHttpRoutes } = require('./server/http/routes.js');
 const { restoreActiveGames } = require('./server/services/persistence.js');
 const {
-    scheduleDailyRoomReset,
+    scheduleStaleTurnCheck,
 } = require('./server/services/dailyRoomReset.js');
 const { setupWebSocket } = require('./server/ws/websocket.js');
 const {
@@ -176,7 +176,7 @@ async function bootstrapDatabase() {
             restoreActiveGames();
             setInterval(cleanupOldGames, 3600000);
             setInterval(cleanupExpiredSessions, 3600000);
-            scheduleDailyRoomReset();
+            scheduleStaleTurnCheck();
             hasInitialized = true;
         }
 
