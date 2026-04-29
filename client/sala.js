@@ -362,6 +362,14 @@ document.addEventListener('DOMContentLoaded', () => {
         toggle.textContent = '−';
         header.appendChild(toggle);
 
+        if (window.matchMedia('(max-width: 768px)').matches) {
+            emojiPanel.classList.add('is-collapsed');
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.setAttribute('aria-label', 'Mostrar reacciones rápidas');
+            toggle.title = 'Mostrar reacciones rápidas';
+            toggle.textContent = '\u{1F604}';
+        }
+
         toggle.addEventListener('click', () => {
             const isCollapsed = emojiPanel.classList.toggle('is-collapsed');
             toggle.setAttribute('aria-expanded', String(!isCollapsed));
@@ -375,8 +383,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? 'Mostrar reacciones rápidas'
                 : 'Minimizar reacciones rápidas';
             toggle.textContent = isCollapsed ? '\u{1F604}' : '-';
-            // Recalcular posición tras la animación de expansión/colapso
-            // esperar un poco para dejar que las transiciones de CSS terminen
             setTimeout(() => updateEmojiPanelPosition(), 260);
         });
 
