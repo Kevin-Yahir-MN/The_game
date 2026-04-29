@@ -5152,7 +5152,7 @@ body.app-theme--game .players-panel {
             grid-template-rows: auto auto;
             align-content: start;
             justify-items: center;
-            gap: clamp(10px, 1.8vh, 18px);
+            gap: clamp(4px, 0.8vh, 8px);
         }
 
         body.app-theme--game .game-board {
@@ -5339,7 +5339,7 @@ body.app-theme--game .players-panel {
             grid-template-rows: auto auto;
             align-content: start;
             justify-items: center;
-            gap: clamp(8px, 1.4vh, 14px);
+            gap: clamp(4px, 0.8vh, 8px);
         }
 
         body.app-theme--game .game-board {
