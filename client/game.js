@@ -186,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const naturalWidth =
             count * handCardWidth + (count - 1) * CARD_SPACING;
         const maxOverlap = isMobilePortraitLayout()
-            ? Math.round(handCardWidth * 0.32)
+            ? Math.round(handCardWidth * 0.42)
             : 0;
         const minSpacing = -maxOverlap;
         const fittedSpacing =
@@ -293,7 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const boardCardWidth = Math.floor(
                 (canvas.width - boardSpacing * 3 - 10) / 4
             );
-            CARD_WIDTH = Math.max(58, boardCardWidth);
+            CARD_WIDTH = Math.max(50, Math.min(64, boardCardWidth));
             CARD_HEIGHT = Math.round(CARD_WIDTH * 1.48);
             COLUMN_SPACING = boardSpacing;
             CARD_SPACING = Math.max(4, Math.round(CARD_WIDTH * 0.08));
