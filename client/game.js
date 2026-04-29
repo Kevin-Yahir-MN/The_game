@@ -1106,23 +1106,31 @@ document.addEventListener('DOMContentLoaded', () => {
             panel.style.left = '';
             panel.style.top = '';
             panel.style.width = '';
+            panel.style.maxHeight = '';
             panel.classList.remove('is-layout-ready');
             return;
         }
 
         // Measure info panel and place emoji panel directly below it with a small gap
         const infoRect = info.getBoundingClientRect();
-        // read gap from CSS variable `--panel-gap`, fallback to 12px
+        // read desktop stack gap first so this matches the CSS desktop layout
         const rootStyles = getComputedStyle(document.documentElement);
-        const parsedGap = parseFloat(rootStyles.getPropertyValue('--panel-gap'));
-        const gap = Number.isFinite(parsedGap) ? Math.round(parsedGap) : 12;
+        const parsedStackGap = parseFloat(rootStyles.getPropertyValue('--desktop-panel-stack-gap'));
+        const parsedPanelGap = parseFloat(rootStyles.getPropertyValue('--desktop-panel-gap'));
+        const gap = Number.isFinite(parsedStackGap)
+            ? Math.round(parsedStackGap)
+            : Number.isFinite(parsedPanelGap)
+                ? Math.round(parsedPanelGap)
+                : 18;
+        const top = Math.round(infoRect.bottom + gap);
 
         panel.style.position = 'fixed';
         // align left edge with info panel left edge
         panel.style.left = `${Math.max(6, Math.round(infoRect.left))}px`;
-        panel.style.top = `${Math.round(infoRect.bottom + gap)}px`;
+        panel.style.top = `${top}px`;
         // match width to info panel width (keeps visual alignment)
         panel.style.width = `${Math.round(infoRect.width)}px`;
+        panel.style.maxHeight = `calc(100vh - ${top + gap}px)`;
         panel.classList.add('is-layout-ready');
     }
 
