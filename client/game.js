@@ -272,14 +272,51 @@ document.addEventListener('DOMContentLoaded', () => {
     function applyResponsiveCanvasSizing() {
         const boardRect = gameBoard?.getBoundingClientRect();
         const viewportWidth = window.innerWidth || 800;
-        const viewportHeight = window.innerHeight || 700;
+        const viewportHeight =
+            window.visualViewport?.height || window.innerHeight || 700;
         const portraitMobile = isMobilePortraitLayout();
+        if (portraitMobile) {
+            const aspectRatio = 800 / 700;
+            const targetWidth = Math.max(
+                280,
+                Math.floor(Math.min(viewportWidth - 16, 520))
+            );
+            const targetHeight = Math.floor(targetWidth / aspectRatio);
+
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+
+            const boardSpacing = Math.max(
+                8,
+                Math.round(Math.min(canvas.width * 0.024, 10))
+            );
+            const boardCardWidth = Math.floor(
+                (canvas.width - boardSpacing * 3 - 10) / 4
+            );
+            CARD_WIDTH = Math.max(58, boardCardWidth);
+            CARD_HEIGHT = Math.round(CARD_WIDTH * 1.48);
+            COLUMN_SPACING = boardSpacing;
+            CARD_SPACING = Math.max(4, Math.round(CARD_WIDTH * 0.08));
+            HAND_CARD_SCALE = 1;
+
+            BOARD_POSITION = {
+                x: Math.round(
+                    (canvas.width - (CARD_WIDTH * 4 + COLUMN_SPACING * 3)) / 2
+                ),
+                y: Math.round(canvas.height * 0.13),
+            };
+            PLAYER_CARDS_Y = Math.round(canvas.height - CARD_HEIGHT - 6);
+            BUTTONS_Y = Math.round(canvas.height * 0.84);
+            HISTORY_ICON_Y = BOARD_POSITION.y + CARD_HEIGHT + 8;
+            needsRedraw = true;
+            return;
+        }
         const availableWidth = Math.max(
             280,
-            Math.floor((boardRect?.width || viewportWidth) - (portraitMobile ? 6 : 20))
+            Math.floor((boardRect?.width || viewportWidth) - 20)
         );
         const availableHeight = Math.max(
-            portraitMobile ? 260 : 300,
+            300,
             Math.floor((boardRect?.height || viewportHeight * 0.72) - 20)
         );
         const aspectRatio = 800 / 700;

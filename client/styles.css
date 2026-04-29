@@ -5479,3 +5479,95 @@ body.app-theme--game .players-panel {
             pointer-events: none !important;
         }
     }
+
+    @media (max-width: 768px) and (orientation: portrait) {
+        body.app-theme--game {
+            --mobile-game-gap: clamp(8px, 2.4vw, 12px);
+            min-height: 100svh;
+            overflow-x: hidden;
+        }
+
+        body.app-theme--game .game-shell {
+            display: block !important;
+            width: 100%;
+            max-width: none;
+            min-height: 100svh;
+            margin: 0;
+            padding: var(--mobile-game-gap) 0 calc(var(--mobile-game-gap) * 2);
+        }
+
+        body.app-theme--game .game-main {
+            display: grid !important;
+            grid-template-rows: auto auto;
+            align-content: start;
+            justify-items: center;
+            gap: var(--mobile-game-gap);
+            width: 100%;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        body.app-theme--game .game-board {
+            width: 100%;
+            max-width: none;
+            min-height: 0 !important;
+            height: auto !important;
+            padding: var(--mobile-game-gap);
+            display: grid;
+            place-items: center;
+            box-sizing: border-box;
+            border-radius: 18px;
+        }
+
+        body.app-theme--game #gameContainer {
+            width: calc(100vw - (var(--mobile-game-gap) * 2)) !important;
+            height: auto !important;
+            max-width: 520px !important;
+            max-height: none !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+            display: block !important;
+            overflow: visible !important;
+        }
+
+        body.app-theme--game #gameCanvas {
+            display: block !important;
+            width: 100% !important;
+            height: auto !important;
+            max-width: 100% !important;
+            max-height: none !important;
+            margin: 0 !important;
+            aspect-ratio: 800 / 700;
+        }
+
+        body.app-theme--game .game-bottombar {
+            width: 100%;
+            margin: 0 !important;
+            padding: 0 var(--mobile-game-gap) !important;
+            display: grid;
+            gap: var(--mobile-game-gap);
+            box-sizing: border-box;
+        }
+
+        body.app-theme--game .game-controls {
+            position: static !important;
+            width: 100%;
+            margin: 0 !important;
+            padding: 8px !important;
+            transform: none !important;
+            box-sizing: border-box;
+        }
+
+        body.app-theme--game #endTurnBtn {
+            width: 100%;
+            min-height: 54px !important;
+            padding: 10px 18px !important;
+        }
+
+        body.app-theme--game .mobile-panel-actions {
+            display: flex;
+            width: 100%;
+            margin: 0;
+        }
+    }
