@@ -30,7 +30,9 @@
    respective positions and never affect the canvas layout. Placed at file
    end so it overrides earlier rules. */
 @media (min-width: 769px) {
-    .game-shell { display: block !important; }
+    .game-shell {
+        display: block !important;
+    }
 
     /* Info panel: fixed top-left */
     .info-panel {
@@ -46,7 +48,7 @@
         pointer-events: auto !important;
         transform: none !important;
         opacity: 1 !important;
-        background: rgba(12,18,26,0.88) !important;
+        background: rgba(12, 18, 26, 0.88) !important;
     }
 
     /* Players panel: fixed top-right */
@@ -63,7 +65,7 @@
         pointer-events: auto !important;
         transform: none !important;
         opacity: 1 !important;
-        background: rgba(12,18,26,0.88) !important;
+        background: rgba(12, 18, 26, 0.88) !important;
     }
 
     /* Emoji panel: default positioned under info by JS, but fallback rules here */
@@ -78,7 +80,7 @@
         pointer-events: auto !important;
         transform: none !important;
         opacity: 1 !important;
-        background: rgba(12,18,26,0.88) !important;
+        background: rgba(12, 18, 26, 0.88) !important;
     }
 
     /* Collapsed variants must be purely visual and not affect layout */
@@ -103,7 +105,11 @@
     }
 
     /* Ensure panels inside the body receive events */
-    .info-panel, .players-panel, .game-emoji-panel { pointer-events: auto !important; }
+    .info-panel,
+    .players-panel,
+    .game-emoji-panel {
+        pointer-events: auto !important;
+    }
 }
 
 /* Tweak: reduce gap between canvas and End Turn button on desktop
@@ -119,7 +125,7 @@
         margin-top: 6px !important;
         padding: 8px 14px !important;
         gap: 12px !important;
-        box-shadow: 0 6px 18px rgba(0,0,0,0.18) !important;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18) !important;
     }
 
     #endTurnBtn {
@@ -136,32 +142,44 @@
 
 /* Stronger override to ensure minimal gap and tighter layout */
 @media (min-width: 1100px) {
-    #gameContainer { margin: 8px auto !important; }
-    #gameCanvas { margin: 8px auto 8px !important; }
-    .game-controls { bottom: 8px !important; }
-    #endTurnBtn { min-height: 38px !important; padding: 7px 18px !important; }
+    #gameContainer {
+        margin: 8px auto !important;
+    }
+
+    #gameCanvas {
+        margin: 8px auto 8px !important;
+    }
+
+    .game-controls {
+        bottom: 8px !important;
+    }
+
+    #endTurnBtn {
+        min-height: 38px !important;
+        padding: 7px 18px !important;
+    }
 }
 
-    /* Pull the bottom bar up over the canvas and remove its background so no blue gap shows */
-    @media (min-width: 1100px) {
-        body.app-theme--game .game-bottombar {
-            margin-top: -18px !important;
-            padding-top: 0 !important;
-            background: transparent !important;
-            pointer-events: none;
-        }
-
-        /* Keep the controls clickable while allowing the bar to be transparent */
-        body.app-theme--game .game-bottombar .game-controls {
-            pointer-events: auto !important;
-        }
-
-        /* remove any extra bottom slack from containers */
-        body.app-theme--game #gameBoard,
-        body.app-theme--game #gameContainer {
-            padding-bottom: 0 !important;
-        }
+/* Pull the bottom bar up over the canvas and remove its background so no blue gap shows */
+@media (min-width: 1100px) {
+    body.app-theme--game .game-bottombar {
+        margin-top: -18px !important;
+        padding-top: 0 !important;
+        background: transparent !important;
+        pointer-events: none;
     }
+
+    /* Keep the controls clickable while allowing the bar to be transparent */
+    body.app-theme--game .game-bottombar .game-controls {
+        pointer-events: auto !important;
+    }
+
+    /* remove any extra bottom slack from containers */
+    body.app-theme--game #gameBoard,
+    body.app-theme--game #gameContainer {
+        padding-bottom: 0 !important;
+    }
+}
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -4301,16 +4319,17 @@ body.app-theme--game .game-over-notification img {
     }
 
     body.app-theme--game .game-emoji-panel {
-            position: fixed;
-            z-index: 20;
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: var(--space-3);
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 12px;
-            padding: var(--space-3);
-    padding: clamp(12px, 2vw, 24px);
-    overflow-x: hidden;
+        position: fixed;
+        z-index: 20;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-3);
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 12px;
+        padding: var(--space-3);
+        padding: clamp(12px, 2vw, 24px);
+        overflow-x: hidden;
+    }
 }
 
 /* Desktop: bring panels closer to viewport edges */
@@ -4381,6 +4400,7 @@ body.is-half-screen #gameContainer {
 }
 
 @media (max-width: 480px) {
+
     /* don't apply half-screen styling for very small devices */
     body.is-half-screen .players-panel,
     body.is-half-screen .info-panel,
@@ -4769,320 +4789,473 @@ body.app-theme--game .players-panel {
         bottom: 88px;
         max-width: min(84vw, 320px);
     }
+}
 
 /* Desktop: symmetric three-column layout for game view */
 @media (min-width: 1100px) {
-    /* Keep shell as simple centered container; side panels will be fixed overlays */
-    .game-shell {
-        position: relative;
-        display: block; /* override earlier grid layout so fixed overlays don't affect main flow */
-        padding: clamp(1rem, 2.5vw, 3rem);
-        max-width: var(--content-max);
-        margin: 0 auto;
+
+        /* Keep shell as simple centered container; side panels will be fixed overlays */
+        .game-shell {
+            position: relative;
+            display: block;
+            /* override earlier grid layout so fixed overlays don't affect main flow */
+            padding: clamp(1rem, 2.5vw, 3rem);
+            max-width: var(--content-max);
+            margin: 0 auto;
+        }
+
+        /* Left info column becomes a fixed overlay (minimizable) */
+        .game-info-region {
+            position: fixed;
+            left: var(--panel-gap);
+            top: clamp(24px, 4vh, 48px);
+            width: min(var(--side-panel-width), 320px);
+            max-width: 340px;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+            z-index: 40;
+            pointer-events: auto;
+        }
+
+        /* Keep the panels inside the left region stacked and full-width */
+        .game-info-region .game-panel,
+        .game-info-region .room-emoji-chat {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+        }
+
+        /* Right players panel: visual sizing only; positioning consolidated above */
+        .players-panel {
+            width: min(var(--side-panel-width), 380px);
+            max-width: 420px;
+        }
+
+        /* Main area: keep canvas elevated to avoid vertical scroll */
+        .game-main {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 0 20px;
+            /* align the main area's top with fixed panels (info/players) */
+            padding-top: var(--panel-top);
+            /* allow main to use full viewport while leaving room for top panels */
+            min-height: calc(100vh - var(--panel-top));
+        }
+
+        /* Scale the game container with viewport while keeping aspect ratio */
+        #gameContainer {
+            width: clamp(560px, 56vw, 980px);
+            height: auto;
+            margin: 0 auto;
+            padding: 0;
+            z-index: 10;
+            /* Ensure container doesn't force page scroll; scale canvas inside */
+            max-height: calc(100vh - (var(--panel-top) + 48px));
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: auto !important;
+            max-width: 980px;
+            max-height: 100%;
+            aspect-ratio: 800/700;
+            border-radius: 14px;
+            display: block;
+        }
+
+        /* Controls centered below the board */
+        .game-controls {
+            position: relative;
+            bottom: auto;
+            transform: none;
+            margin-top: 1rem;
+            display: flex;
+            justify-content: center;
+            z-index: 12;
+        }
+
+        .game-panel {
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
+        }
     }
 
-    /* Left info column becomes a fixed overlay (minimizable) */
-    .game-info-region {
-        position: fixed;
-        left: var(--panel-gap);
-        top: clamp(24px, 4vh, 48px);
-        width: min(var(--side-panel-width), 320px);
-        max-width: 340px;
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-3);
-        z-index: 40;
-        pointer-events: auto;
+    @media (min-width: 1600px) {
+        #gameContainer {
+            width: clamp(720px, 48vw, 1200px);
+        }
     }
 
-    /* Keep the panels inside the left region stacked and full-width */
-    .game-info-region .game-panel,
-    .game-info-region .room-emoji-chat {
-        position: relative;
-        width: 100%;
-        max-width: 100%;
+    /* Force desktop placement: ensure players panel is top-right for >=769px */
+    @media (min-width: 769px) {
+        body.app-theme--game .players-panel {
+            position: fixed !important;
+            top: var(--panel-top) !important;
+            right: var(--panel-gap) !important;
+            left: auto !important;
+            bottom: auto !important;
+            transform: none !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        /* also ensure emoji panel (if used) stays below info panel but not overlapping */
+        body.app-theme--game .game-emoji-panel {
+            left: var(--panel-gap) !important;
+            right: auto !important;
+            top: calc(var(--panel-top) + 160px) !important;
+            transform: none !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
     }
 
-    /* Right players panel: visual sizing only; positioning consolidated above */
-    .players-panel {
-        width: min(var(--side-panel-width), 380px);
-        max-width: 420px;
+    /* Desktop override: ensure mobile drawer transforms don't affect desktop overlays */
+    @media (min-width: 769px) {
+
+        .players-panel,
+        .game-emoji-panel {
+            transform: none !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            left: auto !important;
+            right: var(--panel-gap) !important;
+            bottom: auto !important;
+        }
     }
 
-    /* Main area: keep canvas elevated to avoid vertical scroll */
-    .game-main {
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
-        padding: 0 20px;
-        /* align the main area's top with fixed panels (info/players) */
-        padding-top: var(--panel-top);
-        /* allow main to use full viewport while leaving room for top panels */
-        min-height: calc(100vh - var(--panel-top));
+    /* Canonical overlays for other panels (match emoji-panel behavior, keep side) */
+    @media (min-width: 769px) {
+
+        /* Left info panel */
+        .info-panel,
+        body.app-theme--game .info-panel {
+            position: fixed !important;
+            left: var(--panel-gap) !important;
+            top: var(--panel-top) !important;
+            width: var(--side-panel-width) !important;
+            max-height: calc(100vh - calc(var(--panel-top) * 2)) !important;
+            overflow-y: auto !important;
+            padding: 14px !important;
+            background: rgba(12, 18, 26, 0.88) !important;
+            border-radius: 12px !important;
+            border: 1px solid rgba(255, 255, 255, 0.06) !important;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45) !important;
+            z-index: 9998 !important;
+        }
+
+        /* Instruction panel (usually bottom-right) keep side but fixed */
+        .instructions-panel,
+        body.app-theme--game .instructions-panel {
+            position: fixed !important;
+            right: var(--panel-gap) !important;
+            bottom: var(--panel-top) !important;
+            width: min(320px, var(--side-panel-width)) !important;
+            max-height: calc(50vh) !important;
+            overflow-y: auto !important;
+            padding: 12px !important;
+            background: rgba(12, 18, 26, 0.88) !important;
+            border-radius: 10px !important;
+            z-index: 9997 !important;
+        }
+
+        /* Ensure any mobile-drawer transforms don't move these overlays on desktop */
+        .info-panel,
+        .players-panel,
+        .instructions-panel,
+        .game-emoji-panel {
+            transform: none !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
     }
 
-    /* Scale the game container with viewport while keeping aspect ratio */
-    #gameContainer {
-        width: clamp(560px, 56vw, 980px);
-        height: auto;
-        margin: 0 auto;
-        padding: 0;
-        z-index: 10;
-        /* Ensure container doesn't force page scroll; scale canvas inside */
-        max-height: calc(100vh - (var(--panel-top) + 48px));
-        overflow: hidden;
-    }
-
-    #gameCanvas {
-        width: 100%;
-        height: auto !important;
-        max-width: 980px;
-        max-height: 100%;
-        aspect-ratio: 800/700;
-        border-radius: 14px;
-        display: block;
-    }
-
-    /* Controls centered below the board */
-    .game-controls {
-        position: relative;
-        bottom: auto;
-        transform: none;
-        margin-top: 1rem;
-        display: flex;
-        justify-content: center;
-        z-index: 12;
-    }
-
-    .game-panel {
-        box-shadow: 0 18px 40px rgba(0,0,0,0.32);
-    }
-}
-
-@media (min-width: 1600px) {
-    #gameContainer {
-        width: clamp(720px, 48vw, 1200px);
-    }
-}
-
-/* Force desktop placement: ensure players panel is top-right for >=769px */
-@media (min-width: 769px) {
-    body.app-theme--game .players-panel {
-        position: fixed !important;
-        top: var(--panel-top) !important;
-        right: var(--panel-gap) !important;
-        left: auto !important;
-        bottom: auto !important;
-        transform: none !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
-    }
-    /* also ensure emoji panel (if used) stays below info panel but not overlapping */
-    body.app-theme--game .game-emoji-panel {
-        left: var(--panel-gap) !important;
-        right: auto !important;
-        top: calc(var(--panel-top) + 160px) !important;
-        transform: none !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
-    }
-}
-
-/* Desktop override: ensure mobile drawer transforms don't affect desktop overlays */
-@media (min-width: 769px) {
-    .players-panel,
-    .game-emoji-panel {
-        transform: none !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
-        left: auto !important;
-        right: var(--panel-gap) !important;
-        bottom: auto !important;
-    }
-}
-
-/* Canonical overlays for other panels (match emoji-panel behavior, keep side) */
-@media (min-width: 769px) {
-    /* Left info panel */
-    .info-panel,
-    body.app-theme--game .info-panel {
-        position: fixed !important;
-        left: var(--panel-gap) !important;
-        top: var(--panel-top) !important;
-        width: var(--side-panel-width) !important;
-        max-height: calc(100vh - calc(var(--panel-top) * 2)) !important;
-        overflow-y: auto !important;
-        padding: 14px !important;
-        background: rgba(12, 18, 26, 0.88) !important;
-        border-radius: 12px !important;
-        border: 1px solid rgba(255, 255, 255, 0.06) !important;
-        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45) !important;
-        z-index: 9998 !important;
-    }
-
-    /* Instruction panel (usually bottom-right) keep side but fixed */
-    .instructions-panel,
-    body.app-theme--game .instructions-panel {
-        position: fixed !important;
-        right: var(--panel-gap) !important;
-        bottom: var(--panel-top) !important;
-        width: min(320px, var(--side-panel-width)) !important;
-        max-height: calc(50vh) !important;
-        overflow-y: auto !important;
-        padding: 12px !important;
-        background: rgba(12, 18, 26, 0.88) !important;
-        border-radius: 10px !important;
-        z-index: 9997 !important;
-    }
-
-    /* Ensure any mobile-drawer transforms don't move these overlays on desktop */
-    .info-panel,
-    .players-panel,
-    .instructions-panel,
-    .game-emoji-panel {
-        transform: none !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
-    }
-}
-
-/* FINAL OVERRIDES: make info & side panels true overlays on desktop so
+    /* FINAL OVERRIDES: make info & side panels true overlays on desktop so
    collapsing them never changes document flow. */
-@media (min-width: 1100px) {
-    /* Remove grid layout reservation so overlays don't reserve columns */
-    body.app-theme--game .game-shell {
-        display: block !important;
-        grid-template-columns: none !important;
-        grid-template-areas: none !important;
-        gap: 0 !important;
+    @media (min-width: 1100px) {
+
+        /* Remove grid layout reservation so overlays don't reserve columns */
+        body.app-theme--game .game-shell {
+            display: block !important;
+            grid-template-columns: none !important;
+            grid-template-areas: none !important;
+            gap: 0 !important;
+        }
+
+        /* Force info region to be a fixed left overlay */
+        body.app-theme--game .game-info-region,
+        .game-info-region {
+            position: fixed !important;
+            top: var(--panel-top) !important;
+            left: var(--panel-gap) !important;
+            right: auto !important;
+            width: var(--side-panel-width) !important;
+            max-width: 360px !important;
+            max-height: calc(100vh - (var(--panel-top) * 2)) !important;
+            overflow-y: auto !important;
+            z-index: 9998 !important;
+            pointer-events: auto !important;
+        }
+
+        /* Force sidepanel (players) to be a fixed right overlay */
+        body.app-theme--game .game-sidepanel,
+        .game-sidepanel {
+            position: fixed !important;
+            top: var(--panel-top) !important;
+            right: var(--panel-gap) !important;
+            left: auto !important;
+            width: var(--side-panel-width) !important;
+            max-width: 380px !important;
+            max-height: calc(100vh - (var(--panel-top) * 2)) !important;
+            overflow-y: auto !important;
+            z-index: 9998 !important;
+            pointer-events: auto !important;
+        }
+
+        /* Ensure the game main area does not get pushed or reserve columns */
+        body.app-theme--game .game-main,
+        .game-main {
+            margin: 0 auto !important;
+            width: auto !important;
+            max-width: var(--content-max) !important;
+            /* Do not add lateral padding; overlays must not affect flow */
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            box-sizing: border-box !important;
+        }
+
+        /* Make child panels inside info/side stack visually but not affect layout */
+        body.app-theme--game .game-info-region .game-panel,
+        body.app-theme--game .game-sidepanel .game-panel {
+            position: relative !important;
+            width: 100% !important;
+        }
     }
 
-    /* Force info region to be a fixed left overlay */
-    body.app-theme--game .game-info-region,
-    .game-info-region {
-        position: fixed !important;
-        top: var(--panel-top) !important;
-        left: var(--panel-gap) !important;
-        right: auto !important;
-        width: var(--side-panel-width) !important;
-        max-width: 360px !important;
-        max-height: calc(100vh - (var(--panel-top) * 2)) !important;
-        overflow-y: auto !important;
-        z-index: 9998 !important;
-        pointer-events: auto !important;
-    }
-
-    /* Force sidepanel (players) to be a fixed right overlay */
-    body.app-theme--game .game-sidepanel,
-    .game-sidepanel {
-        position: fixed !important;
-        top: var(--panel-top) !important;
-        right: var(--panel-gap) !important;
-        left: auto !important;
-        width: var(--side-panel-width) !important;
-        max-width: 380px !important;
-        max-height: calc(100vh - (var(--panel-top) * 2)) !important;
-        overflow-y: auto !important;
-        z-index: 9998 !important;
-        pointer-events: auto !important;
-    }
-
-    /* Ensure the game main area does not get pushed or reserve columns */
-    body.app-theme--game .game-main,
-    .game-main {
-        margin: 0 auto !important;
-        width: auto !important;
-        max-width: var(--content-max) !important;
-        /* Do not add lateral padding; overlays must not affect flow */
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-        box-sizing: border-box !important;
-    }
-
-    /* Make child panels inside info/side stack visually but not affect layout */
-    body.app-theme--game .game-info-region .game-panel,
-    body.app-theme--game .game-sidepanel .game-panel {
-        position: relative !important;
-        width: 100% !important;
-    }
-}
-
-/* Extra-final overrides: ensure panels are true fixed overlays and follow viewport scroll
+    /* Extra-final overrides: ensure panels are true fixed overlays and follow viewport scroll
    These rules are very specific and at file end to override any earlier grid/layout rules. */
-@media (min-width: 1024px) {
-    /* Force shell to be non-grid so overlays do not reserve space */
-    body.app-theme--game .game-shell {
-        display: block !important;
-        grid-template-columns: none !important;
-        grid-template-areas: none !important;
-        gap: 0 !important;
+    @media (min-width: 1024px) {
+
+        /* Force shell to be non-grid so overlays do not reserve space */
+        body.app-theme--game .game-shell {
+            display: block !important;
+            grid-template-columns: none !important;
+            grid-template-areas: none !important;
+            gap: 0 !important;
+        }
+
+        /* Make individual panels fixed overlays that follow scroll */
+        body.app-theme--game .info-panel,
+        .info-panel {
+            position: fixed !important;
+            top: var(--panel-top) !important;
+            left: var(--panel-gap) !important;
+            right: auto !important;
+            width: var(--side-panel-width) !important;
+            max-width: 360px !important;
+            max-height: calc(100vh - (var(--panel-top) * 2)) !important;
+            overflow-y: auto !important;
+            z-index: 10010 !important;
+            transform: none !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        body.app-theme--game .players-panel,
+        .players-panel {
+            position: fixed !important;
+            top: var(--panel-top) !important;
+            right: var(--panel-gap) !important;
+            left: auto !important;
+            width: var(--side-panel-width) !important;
+            max-width: 380px !important;
+            max-height: calc(100vh - (var(--panel-top) * 2)) !important;
+            overflow-y: auto !important;
+            z-index: 10010 !important;
+            transform: none !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        body.app-theme--game .game-emoji-panel,
+        .game-emoji-panel {
+            position: fixed !important;
+            top: calc(var(--panel-top) + 160px) !important;
+            left: var(--panel-gap) !important;
+            right: auto !important;
+            width: min(320px, var(--side-panel-width)) !important;
+            max-height: calc(60vh) !important;
+            overflow-y: auto !important;
+            z-index: 10009 !important;
+            transform: none !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        /* Ensure parent containers don't use height that affects flow */
+        body.app-theme--game .game-info-region,
+        body.app-theme--game .game-sidepanel,
+        .game-info-region,
+        .game-sidepanel {
+            height: 0 !important;
+            min-height: 0 !important;
+            display: block !important;
+            overflow: visible !important;
+            pointer-events: none !important;
+            /* panels themselves handle pointer-events */
+        }
+
+        /* Allow the actual panel elements to receive pointer events */
+        body.app-theme--game .game-info-region .info-panel,
+        body.app-theme--game .game-sidepanel .players-panel {
+            pointer-events: auto !important;
+        }
     }
 
-    /* Make individual panels fixed overlays that follow scroll */
-    body.app-theme--game .info-panel,
-    .info-panel {
-        position: fixed !important;
-        top: var(--panel-top) !important;
-        left: var(--panel-gap) !important;
-        right: auto !important;
-        width: var(--side-panel-width) !important;
-        max-width: 360px !important;
-        max-height: calc(100vh - (var(--panel-top) * 2)) !important;
-        overflow-y: auto !important;
-        z-index: 10010 !important;
-        transform: none !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
+    /* removed: info/players forced to mimic emoji panel */
+
+    /* Desktop game layout: centered, symmetric, and viewport-responsive. */
+    @media (min-width: 1025px) {
+        body.app-theme--game {
+            --desktop-panel-width: clamp(220px, 14vw, 280px);
+            --desktop-panel-gap: clamp(10px, 1.35vw, 28px);
+            --desktop-main-clearance: clamp(18px, 3vw, 56px);
+            --desktop-controls-space: clamp(86px, 10vh, 118px);
+            --desktop-board-width: min(
+                calc(100vw - var(--desktop-panel-width) - var(--desktop-panel-width) - var(--desktop-panel-gap) - var(--desktop-panel-gap) - var(--desktop-main-clearance) - var(--desktop-main-clearance)),
+                calc(114.2857vh - var(--desktop-controls-space)),
+                1040px
+            );
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        body.app-theme--game .game-shell {
+            display: block !important;
+            width: 100%;
+            max-width: none;
+            min-height: 100vh;
+            margin: 0;
+            padding: clamp(8px, 1.2vh, 18px) 0 0;
+        }
+
+        body.app-theme--game .game-main {
+            width: var(--desktop-board-width) !important;
+            max-width: calc(100vw - 32px) !important;
+            min-height: calc(100vh - clamp(8px, 1.2vh, 18px));
+            margin: 0 auto !important;
+            padding: 0 !important;
+            display: grid !important;
+            grid-template-rows: auto auto;
+            align-content: start;
+            justify-items: center;
+            gap: clamp(10px, 1.8vh, 18px);
+        }
+
+        body.app-theme--game .game-board {
+            width: var(--desktop-board-width);
+            max-width: 100%;
+            aspect-ratio: 800 / 700;
+            min-height: 0 !important;
+            padding: clamp(8px, 1.1vw, 16px);
+            display: grid;
+            place-items: center;
+            box-sizing: border-box;
+            border-radius: clamp(16px, 1.6vw, 28px);
+        }
+
+        body.app-theme--game #gameContainer {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: none !important;
+            max-height: none !important;
+            margin: 0 !important;
+            display: grid !important;
+            place-items: center;
+            overflow: hidden !important;
+        }
+
+        body.app-theme--game #gameCanvas {
+            width: 100% !important;
+            height: auto !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            margin: 0 !important;
+            aspect-ratio: 800 / 700;
+        }
+
+        body.app-theme--game .game-bottombar {
+            width: 100%;
+            margin: 0 !important;
+            padding: 0 0 clamp(8px, 1.3vh, 16px) !important;
+            display: flex;
+            justify-content: center;
+            background: transparent !important;
+            pointer-events: none;
+        }
+
+        body.app-theme--game .game-controls {
+            position: static !important;
+            left: auto !important;
+            bottom: auto !important;
+            transform: none !important;
+            margin: 0 !important;
+            padding: 10px 16px !important;
+            pointer-events: auto;
+        }
+
+        body.app-theme--game #endTurnBtn {
+            min-height: 44px !important;
+            padding: 9px 26px !important;
+        }
+
+        body.app-theme--game .info-panel,
+        body.app-theme--game .players-panel,
+        body.app-theme--game .game-emoji-panel {
+            width: var(--desktop-panel-width) !important;
+            max-width: var(--desktop-panel-width) !important;
+            box-sizing: border-box;
+        }
+
+        body.app-theme--game .info-panel {
+            position: fixed !important;
+            top: var(--desktop-panel-gap) !important;
+            left: var(--desktop-panel-gap) !important;
+        }
+
+        body.app-theme--game .players-panel {
+            position: fixed !important;
+            top: var(--desktop-panel-gap) !important;
+            right: var(--desktop-panel-gap) !important;
+            left: auto !important;
+        }
+
+        body.app-theme--game .game-emoji-panel {
+            position: fixed !important;
+            left: var(--desktop-panel-gap) !important;
+            right: auto !important;
+        }
+
+        body.app-theme--game .game-info-region,
+        body.app-theme--game .game-sidepanel {
+            width: 0 !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+            pointer-events: none !important;
+        }
     }
 
-    body.app-theme--game .players-panel,
-    .players-panel {
-        position: fixed !important;
-        top: var(--panel-top) !important;
-        right: var(--panel-gap) !important;
-        left: auto !important;
-        width: var(--side-panel-width) !important;
-        max-width: 380px !important;
-        max-height: calc(100vh - (var(--panel-top) * 2)) !important;
-        overflow-y: auto !important;
-        z-index: 10010 !important;
-        transform: none !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
-    }
+    @media (min-width: 1025px) and (max-width: 1320px) {
+        body.app-theme--game {
+            --desktop-panel-width: clamp(190px, 17vw, 230px);
+            --desktop-main-clearance: clamp(10px, 1.5vw, 24px);
+        }
 
-    body.app-theme--game .game-emoji-panel,
-    .game-emoji-panel {
-        position: fixed !important;
-        top: calc(var(--panel-top) + 160px) !important;
-        left: var(--panel-gap) !important;
-        right: auto !important;
-        width: min(320px, var(--side-panel-width)) !important;
-        max-height: calc(60vh) !important;
-        overflow-y: auto !important;
-        z-index: 10009 !important;
-        transform: none !important;
-        opacity: 1 !important;
-        pointer-events: auto !important;
+        body.app-theme--game .game-panel,
+        body.app-theme--game .players-panel {
+            padding: 12px !important;
+        }
     }
-
-    /* Ensure parent containers don't use height that affects flow */
-    body.app-theme--game .game-info-region,
-    body.app-theme--game .game-sidepanel,
-    .game-info-region,
-    .game-sidepanel {
-        height: 0 !important;
-        min-height: 0 !important;
-        display: block !important;
-        overflow: visible !important;
-        pointer-events: none !important; /* panels themselves handle pointer-events */
-    }
-
-    /* Allow the actual panel elements to receive pointer events */
-    body.app-theme--game .game-info-region .info-panel,
-    body.app-theme--game .game-sidepanel .players-panel {
-        pointer-events: auto !important;
-    }
-}
-
-/* removed: info/players forced to mimic emoji panel */
