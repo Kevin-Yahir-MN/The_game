@@ -1102,11 +1102,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const isDesktop = window.matchMedia('(min-width: 1200px)').matches;
         // If not desktop, clear inline positioning to allow CSS/media queries to take over
         if (!isDesktop) {
-            panel.style.position = '';
-            panel.style.left = '';
-            panel.style.top = '';
-            panel.style.width = '';
-            panel.style.maxHeight = '';
+            panel.style.removeProperty('position');
+            panel.style.removeProperty('left');
+            panel.style.removeProperty('right');
+            panel.style.removeProperty('top');
+            panel.style.removeProperty('width');
+            panel.style.removeProperty('max-height');
             panel.classList.remove('is-layout-ready');
             return;
         }
@@ -1114,9 +1115,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // Measure info panel and place emoji panel directly below it with a small gap
         const infoRect = info.getBoundingClientRect();
         // read desktop stack gap first so this matches the CSS desktop layout
+        const bodyStyles = getComputedStyle(document.body);
         const rootStyles = getComputedStyle(document.documentElement);
-        const parsedStackGap = parseFloat(rootStyles.getPropertyValue('--desktop-panel-stack-gap'));
-        const parsedPanelGap = parseFloat(rootStyles.getPropertyValue('--desktop-panel-gap'));
+        const parsedStackGap = parseFloat(
+            bodyStyles.getPropertyValue('--desktop-panel-stack-gap') ||
+            rootStyles.getPropertyValue('--desktop-panel-stack-gap')
+        );
+        const parsedPanelGap = parseFloat(
+            bodyStyles.getPropertyValue('--desktop-panel-gap') ||
+            rootStyles.getPropertyValue('--desktop-panel-gap')
+        );
         const gap = Number.isFinite(parsedStackGap)
             ? Math.round(parsedStackGap)
             : Number.isFinite(parsedPanelGap)
@@ -1124,13 +1132,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 : 18;
         const top = Math.round(infoRect.bottom + gap);
 
-        panel.style.position = 'fixed';
+        panel.style.setProperty('position', 'fixed', 'important');
         // align left edge with info panel left edge
-        panel.style.left = `${Math.max(6, Math.round(infoRect.left))}px`;
-        panel.style.top = `${top}px`;
+        panel.style.setProperty('left', `${Math.max(6, Math.round(infoRect.left))}px`, 'important');
+        panel.style.setProperty('right', 'auto', 'important');
+        panel.style.setProperty('top', `${top}px`, 'important');
         // match width to info panel width (keeps visual alignment)
-        panel.style.width = `${Math.round(infoRect.width)}px`;
-        panel.style.maxHeight = `calc(100vh - ${top + gap}px)`;
+        panel.style.setProperty('width', `${Math.round(infoRect.width)}px`, 'important');
+        panel.style.setProperty('max-height', `calc(100vh - ${top + gap}px)`, 'important');
         panel.classList.add('is-layout-ready');
     }
 
